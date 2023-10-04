@@ -48,11 +48,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           files: results.xml
           job_summary: true
-        permissions:
-          contents: read
-          issues: read
-          checks: write
-          pull-requests: write
 #      - name: Upload to CodeCov
 #        uses: codecov/codecov-action@v1
 #        with:
