@@ -1,0 +1,39 @@
+name: OCaaS Compliance checks
+ 
+on:
+  push:
+    branches:
+      - main
+ 
+jobs:
+  ocaas-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: OCaaS Scans
+        id: ocaas
+        uses: docker://osmipublic.azurecr.io/ocaas-ci:latest
+        continue-on-error: true # Built artifacts also should also be uploaded if the scan finds violations.
+        with:
+          args: auth generate-token run start download
+        env:
+          OCAAS_USERNAME: tu-etas-vcs-rust
+          OCAAS_PASSWORD: ${{ secrets.OCAAS }}
+          PROJECT_NAME: "uprotocol-sdk-rust"
+          PIPELINE_ID: 541
+          VCS_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          VCS_REVISION: ${{ github.ref_name }}
+          APPLICATION_CATEGORY: "BT11"
+          BLOCKING: true
+          REPORT_FILES: DISCLOSURE_DOCUMENT_PDF,VULNERABILITY_REPORT_PDF,SCAN_REPORT_WEB_APP_HTML,GITHUB_ACTION_SUMMARY
+          OUTPUT_DIR: reports/
+      - name: Create GitHub Summary
+        run: cat reports/github-action-summary.md >> $GITHUB_STEP_SUMMARY
+      - name: Upload reports
+        id: upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: reports
+          path: reports/
+      - name: Check for violations
+        if: steps.ocaas.outcome != 'success' || steps.upload.outcome != 'success'
+        run: exit 1
