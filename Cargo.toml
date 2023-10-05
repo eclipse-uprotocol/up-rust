@@ -1,8 +1,37 @@
+################################################################################
+# Copyright (c) 2023 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+################################################################################
+
 [package]
-name = "uprotocol-sdk-rust-fork"
+name = "uprotocol_sdk"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+base64 = "0.21"
+byteorder = "1.4"
+bytes = "1.4"
+chrono = "0.4.3"
+cloudevents-sdk = { version = "0.7.0" }
+futures = "0.3"
+mac_address = "1.1"
+prost = "0.12"
+prost-types = "0.12"
+rand = "0.8"
+regex = "1"
+url = "2"
+uuid = { version = "1.4", features = ["v6", "v8"] }
+
+[build-dependencies]
+prost-build = { version = "0.12" }
+protoc-bin-vendored = { version = "3" }
+ureq = "2.7"
