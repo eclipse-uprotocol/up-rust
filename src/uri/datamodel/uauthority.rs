@@ -296,7 +296,7 @@ impl std::fmt::Debug for UAuthority {
             self.domain.as_ref().unwrap_or(&String::from("")),
             self.inet_address
                 .map(|addr| addr.to_string())
-                .unwrap_or(String::new()),
+                .unwrap_or_default(),
             self.marked_remote
         )
     }

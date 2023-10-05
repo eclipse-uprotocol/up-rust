@@ -23,7 +23,7 @@ use crate::cloudevent::datamodel::ucloudeventtype::UCloudEventType;
 pub struct UCloudEventBuilder;
 
 impl UCloudEventBuilder {
-    pub const PROTOBUF_CONTENT_TYPE: &str = "application/x-protobuf";
+    pub const PROTOBUF_CONTENT_TYPE: &'static str = "application/x-protobuf";
 
     /// In this module, we provide functions to generate concrete objects of the same type,
     /// adhering to the CloudEvents specification.
