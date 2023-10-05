@@ -1,2 +1,2 @@
 analyzer:
-  skip_excluded: false
+  skip_excluded: true
