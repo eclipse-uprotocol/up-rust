@@ -10,6 +10,7 @@ jobs:
   test:
     name: Test
     env:
+      PROJECT_NAME_UNDERSCORE: uprotocol_sdk
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: --cfg uuid_unstable -Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort
       RUSTDOCFLAGS: -Cpanic=abort
@@ -33,8 +34,18 @@ jobs:
         run: |
           cargo install cargo2junit grcov;
           cargo test $CARGO_OPTIONS -- -Z unstable-options --format json | cargo2junit > results.xml;
-          zip -0 ccov.zip `find src \( -name "*.gc*" \) -print`;
-          grcov ccov.zip -s . -t lcov --llvm --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info;
+          zip -0 ccov.zip `find . \( -name "$PROJECT_NAME_UNDERSCORE*.gc*" \) -print`;
+          grcov ccov.zip -s . -t lcov --llvm --ignore-not-existing --ignore "/*" --ignore "tests/*" --ignore "target/*" -o lcov.info;
+          mkdir -p reports;
+          mv results.xml reports/;
+          mv lcov.info reports/;
+      - name: Commit and push reports
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add ./reports/*
+          git commit -m "Add test and coverage reports" || echo "No changes to commit"
+          git push
       - name: Upload test results
         uses: EnricoMi/publish-unit-test-result-action@v1
         with:

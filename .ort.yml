@@ -1,2 +1,7 @@
 analyzer:
   skip_excluded: true
+excludes:
+  scopes:
+  - pattern: "build-dependencies"
+    reason: "BUILD_DEPENDENCY_OF"
+    comment: "Packages only required during build"
