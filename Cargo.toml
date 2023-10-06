@@ -17,12 +17,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-base64 = "0.21"
 byteorder = "1.4"
 bytes = "1.4"
 chrono = "0.4.3"
 cloudevents-sdk = { version = "0.7.0" }
-futures = "0.3"
 mac_address = "1.1"
 prost = "0.12"
 prost-types = "0.12"
@@ -35,3 +33,7 @@ uuid = { version = "1.4", features = ["v6", "v8"] }
 prost-build = { version = "0.12" }
 protoc-bin-vendored = { version = "3" }
 ureq = "2.7"
+
+[dev-dependencies]
+base64 = "0.21"
+futures = "0.3"

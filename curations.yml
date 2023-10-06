@@ -1,0 +1,45 @@
+- id: "Crate::windows"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/windows
+    concluded_license: "MIT OR Apache-2.0"
+- id: "Crate::windows_aarch64_msvc"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/windows
+    concluded_license: "MIT OR Apache-2.0"
+- id: "Crate::windows_i686_msvc"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/windows
+    concluded_license: "MIT OR Apache-2.0"
+- id: "Crate::windows_x86_64_msvc"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/windows
+    concluded_license: "MIT OR Apache-2.0"
+- id: "Crate::rand_core"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/rand_core
+    concluded_license: "MIT OR Apache-2.0"
+- id: "Crate::nix"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/nix
+    concluded_license: "MIT"
+- id: "Crate::ureq"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/ureq
+    concluded_license: "MIT OR Apache-2.0"
+- id: "Crate::web-sys"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/web-sys
+    concluded_license: "MIT OR Apache-2.0"
+- id: "Crate::ryu"
+  curations:
+    comment: >-
+      License information as per https://crates.io/crates/ryu
+    concluded_license: "Apache-2.0 OR BSL-1.0"

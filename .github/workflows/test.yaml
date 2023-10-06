@@ -60,6 +60,14 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           files: lcov.info
           job_summary: true
+      - name: Publish Test Report
+        uses: codecov/codecov-action@v3
+        with:
+          files: lcov.info
+          flags: unittests # optional
+          name: codecov-umbrella # optional
+          fail_ci_if_error: true # optional (default = false)
+          verbose: true # optional (default = false)
 #      - name: Upload to CodeCov
 #        uses: codecov/codecov-action@v1
 #        with:

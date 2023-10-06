@@ -5,3 +5,6 @@ excludes:
   - pattern: "build-dependencies"
     reason: "BUILD_DEPENDENCY_OF"
     comment: "Packages only required during build"
+  - pattern: "dev-dependencies"
+    reason: "DEV_DEPENDENCY_OF"
+    comment: "Packages required for testing"
