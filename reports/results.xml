@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <testsuites>
-  <testsuite id="0" name="cargo test #0" package="testsuite/cargo test #0" tests="347" errors="0" failures="0" hostname="localhost" timestamp="2023-10-06T19:46:09.083722447Z" time="0">
+  <testsuite id="0" name="cargo test #0" package="testsuite/cargo test #0" tests="347" errors="0" failures="0" hostname="localhost" timestamp="2023-10-09T09:03:13.693772783Z" time="0">
     <testcase name="test_create_valid" time="0" classname="cloudevent::datamodel::ucloudeventattributes::tests" />
     <testcase name="test_hash_code_equals" time="0" classname="cloudevent::datamodel::ucloudeventattributes::tests" />
     <testcase name="test_is_empty_function" time="0" classname="cloudevent::datamodel::ucloudeventattributes::tests" />
@@ -46,9 +46,9 @@
     <testcase name="test_extract_platform_error_from_cloud_event_when_error_exists" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_extract_platform_error_from_cloud_event_when_error_exists_in_wrong_format" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_extract_priority_from_cloud_event_when_priority_does_not_exist" time="0" classname="cloudevent::ucloudevent::tests" />
-    <testcase name="test_cloudevent_is_expired_when_ttl_1_mili" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_extract_priority_from_cloud_event_when_priority_exists" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_extract_request_id_from_cloud_event_when_request_id_does_not_exist" time="0" classname="cloudevent::ucloudevent::tests" />
+    <testcase name="test_cloudevent_is_expired_when_ttl_1_mili" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_extract_request_id_from_cloud_event_when_request_id_exists" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_extract_request_id_from_cloud_event_when_request_id_value_is_none" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_extract_sink_from_cloud_event_when_sink_does_not_exist" time="0" classname="cloudevent::ucloudevent::tests" />
@@ -124,8 +124,8 @@
     <testcase name="test_is_success_on_success" time="0" classname="rpc::rpcresult::tests" />
     <testcase name="test_map_on_failure" time="0" classname="rpc::rpcresult::tests" />
     <testcase name="test_map_on_success" time="0" classname="rpc::rpcresult::tests" />
-    <testcase name="test_success_value_on_failure" time="0" classname="rpc::rpcresult::tests" />
     <testcase name="test_map_success_when_function_returns_error" time="0" classname="rpc::rpcresult::tests" />
+    <testcase name="test_success_value_on_failure" time="0" classname="rpc::rpcresult::tests" />
     <testcase name="test_success_value_on_success" time="0" classname="rpc::rpcresult::tests" />
     <testcase name="test_to_string_failure" time="0" classname="rpc::rpcresult::tests" />
     <testcase name="test_to_string_success" time="0" classname="rpc::rpcresult::tests" />
@@ -204,8 +204,8 @@
     <testcase name="test_remote_uauthority" time="0" classname="uri::datamodel::uauthority::tests" />
     <testcase name="test_remote_uauthority_case_sensitive" time="0" classname="uri::datamodel::uauthority::tests" />
     <testcase name="test_to_string" time="0" classname="uri::datamodel::uauthority::tests" />
-    <testcase name="test_to_string_case_sensitivity" time="0" classname="uri::datamodel::uauthority::tests" />
     <testcase name="test_create_empty_using_empty" time="0" classname="uri::datamodel::uentity::tests" />
+    <testcase name="test_to_string_case_sensitivity" time="0" classname="uri::datamodel::uauthority::tests" />
     <testcase name="test_create_use" time="0" classname="uri::datamodel::uentity::tests" />
     <testcase name="test_create_use_with_id" time="0" classname="uri::datamodel::uentity::tests" />
     <testcase name="test_create_use_with_invalid_id" time="0" classname="uri::datamodel::uentity::tests" />
@@ -349,32 +349,32 @@
     <testcase name="test_uuid_for_constant_random" time="0" classname="uuid::uuidbuilder::tests" />
     <testcase name="test_uuid_size" time="0" classname="uuid::uuidbuilder::tests" />
   </testsuite>
-  <testsuite id="1" name="cargo test #1" package="testsuite/cargo test #1" tests="1" errors="0" failures="0" hostname="localhost" timestamp="2023-10-06T19:46:09.083722447Z" time="0">
+  <testsuite id="1" name="cargo test #1" package="testsuite/cargo test #1" tests="1" errors="0" failures="0" hostname="localhost" timestamp="2023-10-09T09:03:13.693772783Z" time="0">
     <testcase name="empty" time="0" classname="" />
   </testsuite>
-  <testsuite id="2" name="cargo test #2" package="testsuite/cargo test #2" tests="26" errors="0" failures="0" hostname="localhost" timestamp="2023-10-06T19:46:09.083722447Z" time="0">
+  <testsuite id="2" name="cargo test #2" package="testsuite/cargo test #2" tests="26" errors="0" failures="0" hostname="localhost" timestamp="2023-10-09T09:03:13.693772783Z" time="0">
     <testcase name="build_base_cloud_event (line 334)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
     <testcase name="notify (line 279)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
-    <testcase name="request (line 57)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
     <testcase name="publish (line 233)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
-    <testcase name="response_failed (line 173)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
+    <testcase name="request (line 57)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
     <testcase name="response (line 113)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
+    <testcase name="response_failed (line 173)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
     <testcase name="EMPTY (line 56)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
     <testcase name="LOCAL (line 76)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
-    <testcase name="is_remote (line 219)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
     <testcase name="is_local (line 238)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
-    <testcase name="remote_device_domain (line 179)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
+    <testcase name="is_remote (line 219)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
     <testcase name="new (line 99)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
-    <testcase name="long_format (line 102)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
+    <testcase name="remote_device_domain (line 179)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
     <testcase name="is_empty (line 148)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
+    <testcase name="long_format (line 102)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
     <testcase name="new (line 59)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
     <testcase name="EMPTY (line 43)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="for_rpc_request (line 207)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="is_empty (line 298)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="is_rpc_method (line 249)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="long_format (line 120)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
-    <testcase name="name_with_instance (line 321)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="long_format_with_instance (line 150)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
+    <testcase name="name_with_instance (line 321)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="src/uri/datamodel/uuri.rs - uri::datamodel::uuri::UUri (line 33)" time="0">
       <skipped />
     </testcase>
