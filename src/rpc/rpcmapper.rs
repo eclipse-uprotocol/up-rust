@@ -58,7 +58,7 @@ impl fmt::Display for RpcMapperError {
 /// an RPC response (uP-L2). APIs that return a `Message` assume that the payload is
 /// protobuf-serialized `com.google.protobuf.Any` (USerializationHint.PROTOBUF), and will
 /// return an error if anything else is passed.
-struct RpcMapper;
+pub struct RpcMapper;
 
 impl RpcMapper {
     /// Maps a `Future` of [`RpcClientResult`]  into a `Future` containing the expected return type of the RPC method, or an [`RpcMapperError`].
@@ -511,7 +511,7 @@ mod tests {
 
             assert!(response.status.is_failed());
             assert_eq!(response.status.code_as_int(), UCode::InvalidArgument as i32);
-            assert_eq!(response.status.msg(), "boom");
+            assert_eq!(response.status.message(), "boom");
         });
     }
 
@@ -580,7 +580,7 @@ mod tests {
 
             assert!(response.status.is_failed());
             assert_eq!(UCode::InvalidArgument as i32, response.status.code_as_int());
-            assert_eq!("boom", response.status.msg());
+            assert_eq!("boom", response.status.message());
         });
     }
 
@@ -606,7 +606,7 @@ mod tests {
 
             assert!(response.status.is_failed());
             assert_eq!(
-                response.status.msg(),
+                response.status.message(),
                 "Unexpected any-payload type type.googleapis.com/Int32Value"
             );
         });
@@ -761,7 +761,7 @@ mod tests {
             let ustatus = UStatus::from(s);
 
             assert_eq!(UCode::Ok as i32, ustatus.code_as_int());
-            assert_eq!("all good", ustatus.msg());
+            assert_eq!("all good", ustatus.message());
         });
     }
 
@@ -783,7 +783,7 @@ mod tests {
 
             assert!(s.status.is_success());
             assert_eq!(s.status.code_as_int(), UCode::Ok as i32);
-            assert_eq!(s.status.msg(), "ok");
+            assert_eq!(s.status.message(), "ok");
         });
     }
 
@@ -839,7 +839,7 @@ mod tests {
 
             assert!(status.is_failed());
             assert_eq!(status.code_as_int(), UCode::Unknown as i32);
-            assert_eq!(status.msg(), "Unknown payload type");
+            assert_eq!(status.message(), "Unknown payload type");
         })
     }
 

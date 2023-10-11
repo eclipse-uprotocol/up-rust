@@ -150,12 +150,12 @@ impl UResource {
     /// ```
     /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
     ///
-    /// let resource = UResource::long_format_with_instance("door".to_string(), None, "front_left".to_string());
+    /// let resource = UResource::long_format_with_instance("door".to_string(), "front_left".to_string(), None);
     /// ```
     pub fn long_format_with_instance(
         name: String,
-        message: Option<String>,
         instance: String,
+        message: Option<String>,
     ) -> Self {
         UResource {
             name,
@@ -226,7 +226,7 @@ impl UResource {
     /// # Returns
     ///
     /// A `UResource` configured to represent a response from RPC calls.
-    pub fn response() -> UResource {
+    pub fn for_rpc_response() -> UResource {
         UResource {
             name: String::from("rpc"),
             instance: Some(String::from("response")),
@@ -321,7 +321,7 @@ impl UResource {
     /// ```
     /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
     ///
-    /// let resource = UResource::long_format_with_instance("name".to_string(), None, "instance".to_string());
+    /// let resource = UResource::long_format_with_instance("name".to_string(), "instance".to_string(), None);
     /// assert_eq!(resource.name_with_instance(), "name.instance");
     /// ```
     pub fn name_with_instance(&self) -> String {
@@ -438,8 +438,8 @@ mod tests {
     fn test_create_resource_with_no_message_using_from_name_with_instance() {
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         assert_eq!("door", resource.name);
         assert!(resource.instance.is_some());
@@ -459,7 +459,7 @@ mod tests {
     #[test]
     fn test_resource_represents_an_rpc_method_call() {
         let resource =
-            UResource::long_format_with_instance("rpc".to_string(), None, "UpdateDoor".to_string());
+            UResource::long_format_with_instance("rpc".to_string(), "UpdateDoor".to_string(), None);
         assert!(resource.is_rpc_method());
     }
 
@@ -473,8 +473,8 @@ mod tests {
     fn test_returning_a_name_with_instance_from_resource_when_name_and_instance_are_configured() {
         let resource = UResource::long_format_with_instance(
             "doors".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         let name_with_instance = resource.name_with_instance();
         assert_eq!("doors.front_left", name_with_instance);
@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_create_rpc_response_using_response_method() {
-        let resource = UResource::response();
+        let resource = UResource::for_rpc_response();
         assert!(!resource.name.is_empty());
         assert_eq!("rpc", resource.name);
         assert_eq!("response", resource.instance.unwrap());
@@ -653,7 +653,7 @@ mod tests {
         assert!(u_resource.is_resolved());
 
         // Second case
-        let u_resource2 = UResource::response();
+        let u_resource2 = UResource::for_rpc_response();
         assert!(u_resource2.is_resolved());
 
         // Third case
@@ -692,8 +692,8 @@ mod tests {
         // Fifth case
         let u_resource5 = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         assert!(!u_resource5.is_resolved());
         assert!(!u_resource5.is_long_form());

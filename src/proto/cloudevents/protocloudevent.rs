@@ -15,6 +15,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use cloudevents::event::ExtensionValue;
 use cloudevents::{AttributesReader, AttributesWriter, Data, EventBuilder};
 use prost::Name;
+
 use std::collections::HashMap;
 use url::Url;
 
@@ -65,7 +66,7 @@ impl From<CloudEventProto> for cloudevents::Event {
                     if key.eq("timestamp") {
                         let naive =
                             NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32).unwrap();
-                        dt = Some(DateTime::<Utc>::from_utc(naive, Utc));
+                        dt = Some(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
                     } else {
                         extensions.insert(key.to_string(), ExtensionValue::String(ts.to_string()));
                     }

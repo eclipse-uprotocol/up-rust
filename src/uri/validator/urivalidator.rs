@@ -86,7 +86,11 @@ impl UriValidator {
         }
 
         let uresource = &uri.resource;
-        if !uresource.is_rpc_method() || !uresource.instance.eq(&UResource::response().instance) {
+        if !uresource.is_rpc_method()
+            || !uresource
+                .instance
+                .eq(&UResource::for_rpc_response().instance)
+        {
             return UStatus::fail_with_msg_and_reason(
                 "Invalid RPC response type.",
                 UCode::InvalidArgument,
@@ -133,7 +137,7 @@ mod tests {
         let status = UriValidator::validate(&uri);
         assert!(uri.is_empty());
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Uri is empty.", status.msg());
+        assert_eq!("Uri is empty.", status.message());
     }
 
     #[test]
@@ -142,7 +146,7 @@ mod tests {
         let status = UriValidator::validate(&uri);
         assert!(uri.is_empty());
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Uri is empty.", status.msg());
+        assert_eq!("Uri is empty.", status.message());
     }
 
     #[test]
@@ -158,7 +162,7 @@ mod tests {
         let status = UriValidator::validate(&uri);
         assert!(uri.is_empty());
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Uri is empty.", status.msg());
+        assert_eq!("Uri is empty.", status.message());
     }
 
     #[test]
@@ -171,7 +175,7 @@ mod tests {
         let status = UriValidator::validate(&uri);
         assert!(!uri.is_empty());
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Uri is missing uSoftware Entity name.", status.msg());
+        assert_eq!("Uri is missing uSoftware Entity name.", status.message());
     }
 
     #[test]
@@ -186,7 +190,7 @@ mod tests {
         let uri = LongUriSerializer::deserialize("/hartley/echo".to_string());
         let status = UriValidator::validate_rpc_method(&uri);
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Invalid RPC method uri. Uri should be the method to be called, or method from response.", status.msg());
+        assert_eq!("Invalid RPC method uri. Uri should be the method to be called, or method from response.", status.message());
     }
 
     #[test]
@@ -195,7 +199,7 @@ mod tests {
         let status = UriValidator::validate_rpc_method(&uri);
         assert!(uri.is_empty());
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Uri is empty.", status.msg());
+        assert_eq!("Uri is empty.", status.message());
     }
 
     #[test]
@@ -211,7 +215,7 @@ mod tests {
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(uri.is_empty());
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Uri is empty.", status.msg());
+        assert_eq!("Uri is empty.", status.message());
     }
 
     #[test]
@@ -219,7 +223,7 @@ mod tests {
         let uri = LongUriSerializer::deserialize("/hartley//dummy.wrong".to_string());
         let status = UriValidator::validate_rpc_response(&uri);
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Invalid RPC response type.", status.msg());
+        assert_eq!("Invalid RPC response type.", status.message());
     }
 
     #[test]
@@ -227,7 +231,7 @@ mod tests {
         let uri = LongUriSerializer::deserialize("/hartley//rpc.wrong".to_string());
         let status = UriValidator::validate_rpc_response(&uri);
         assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-        assert_eq!("Invalid RPC response type.", status.msg());
+        assert_eq!("Invalid RPC response type.", status.message());
     }
 
     #[test]

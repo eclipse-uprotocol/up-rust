@@ -38,10 +38,10 @@ pub trait UAttributesValidator {
         ]
         .into_iter()
         .filter(|status| status.is_failed())
-        .map(|status| status.msg().clone())
+        .map(|status| status.message().clone())
         .collect();
 
-        let error_message = error_messages.join(",");
+        let error_message = error_messages.join(" ");
         if error_message.is_empty() {
             UStatus::ok()
         } else {
@@ -72,7 +72,7 @@ pub trait UAttributesValidator {
     fn is_expired(&self, attributes: &UAttributes) -> UStatus {
         match attributes.ttl {
             None => UStatus::ok_with_id("Not Expired"),
-            Some(0) => UStatus::ok_with_id("Not Expired"),
+            Some(ttl) if ttl == 0 => UStatus::ok_with_id("Not Expired"),
             Some(ttl) => {
                 // Assuming `UuidUtils::get_time` returns a Result
                 if let Ok(time) = UuidUtils::get_time(&attributes.id) {
@@ -442,7 +442,7 @@ mod tests {
 
         let status = validator.validate(&attributes);
         assert!(status.is_success());
-        assert_eq!(status.msg(), "ok");
+        assert_eq!(status.message(), "ok");
     }
 
     // Can't pass invalid Priority value in Rust
@@ -470,7 +470,7 @@ mod tests {
         let status = validator.validate_ttl(&attributes);
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Invalid TTL");
+        assert_eq!(status.message(), "Invalid TTL");
     }
 
     #[test]
@@ -510,7 +510,7 @@ mod tests {
         let status = validator.validate_sink(&attributes);
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Uri is empty.");
+        assert_eq!(status.message(), "Uri is empty.");
     }
 
     #[test]
@@ -550,7 +550,7 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Invalid correlation UUID");
+        assert_eq!(status.message(), "Invalid correlation UUID");
     }
 
     #[test]
@@ -607,7 +607,7 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Invalid Communication Status Code");
+        assert_eq!(status.message(), "Invalid Communication Status Code");
     }
 
     #[test]
@@ -644,7 +644,7 @@ mod tests {
         let status = validator.validate(&attributes);
 
         assert!(status.is_success());
-        assert_eq!(status.msg(), "ok");
+        assert_eq!(status.message(), "ok");
     }
 
     #[test]
@@ -662,9 +662,9 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert!(status.msg().contains("Wrong Attribute Type"));
-        assert!(status.msg().contains("Missing Sink"));
-        assert!(status.msg().contains("Missing TTL"));
+        assert!(status.message().contains("Wrong Attribute Type"));
+        assert!(status.message().contains("Missing Sink"));
+        assert!(status.message().contains("Missing TTL"));
     }
 
     #[test]
@@ -685,7 +685,7 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Invalid TTL");
+        assert_eq!(status.message(), "Invalid TTL");
     }
 
     #[test]
@@ -707,7 +707,7 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Invalid TTL");
+        assert_eq!(status.message(), "Invalid TTL");
     }
 
     #[test]
@@ -729,7 +729,7 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Invalid correlation UUID");
+        assert_eq!(status.message(), "Invalid correlation UUID");
     }
 
     #[test]
@@ -747,7 +747,7 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert_eq!(status.msg(), "Wrong Attribute Type");
+        assert_eq!(status.message(), "Wrong Attribute Type");
     }
 
     #[test]
@@ -765,9 +765,9 @@ mod tests {
 
         assert!(status.is_failed());
         assert_eq!(status.code_as_int(), UCode::InvalidArgument as i32);
-        assert!(status.msg().contains("Wrong Attribute Type"));
-        assert!(status.msg().contains("Missing Sink"));
-        assert!(status.msg().contains("Missing correlation UUID"));
+        assert!(status.message().contains("Wrong Attribute Type"));
+        assert!(status.message().contains("Missing Sink"));
+        assert!(status.message().contains("Missing correlation UUID"));
     }
 
     #[test]
@@ -786,6 +786,6 @@ mod tests {
         let status = validator.validate(&attributes);
 
         assert!(status.is_success());
-        assert_eq!(status.msg(), "ok");
+        assert_eq!(status.message(), "ok");
     }
 }

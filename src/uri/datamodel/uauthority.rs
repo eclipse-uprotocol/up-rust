@@ -178,9 +178,9 @@ impl UAuthority {
     ///
     /// ```
     /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
-    /// let remote_authority = UAuthority::remote_device_domain("VCU".to_string(), "VehicleDomain".to_string());
+    /// let remote_authority = UAuthority::long_remote("VCU".to_string(), "VehicleDomain".to_string());
     /// ```
-    pub fn remote_device_domain(device: String, domain: String) -> Self {
+    pub fn long_remote(device: String, domain: String) -> Self {
         Self::remote(Some(device), Some(domain), None)
     }
 
@@ -193,7 +193,7 @@ impl UAuthority {
     /// # Returns
     ///
     /// * A new `UAuthority` instance that uses the provided `address`.
-    pub fn remote_inet(address: IpAddr) -> Self {
+    pub fn micro_remote(address: IpAddr) -> Self {
         Self::remote(None, None, Some(address))
     }
 
@@ -218,7 +218,7 @@ impl UAuthority {
     ///
     /// ```
     /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
-    /// let remote_authority = UAuthority::remote_device_domain("device".to_string(), "domain".to_string());
+    /// let remote_authority = UAuthority::long_remote("device".to_string(), "domain".to_string());
     /// assert!(remote_authority.is_remote());
     /// ```
     pub fn is_remote(&self) -> bool {
@@ -296,7 +296,7 @@ impl std::fmt::Debug for UAuthority {
             self.domain.as_ref().unwrap_or(&String::from("")),
             self.inet_address
                 .map(|addr| addr.to_string())
-                .unwrap_or_default(),
+                .unwrap_or(String::new()),
             self.marked_remote
         )
     }
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_to_string() {
-        let authority = UAuthority::remote_device_domain("VCU".to_string(), "my_VIN".to_string());
+        let authority = UAuthority::long_remote("VCU".to_string(), "my_VIN".to_string());
         let remote = format!("{:?}", authority);
         let expected_remote =
             "UAuthority { device: 'vcu', domain: 'my_vin', address: '', marked_remote: true }";
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_to_string_case_sensitivity() {
-        let authority = UAuthority::remote_device_domain("vcU".to_string(), "my_VIN".to_string());
+        let authority = UAuthority::long_remote("vcU".to_string(), "my_VIN".to_string());
         let remote = format!("{:?}", authority);
         let expected_remote =
             "UAuthority { device: 'vcu', domain: 'my_vin', address: '', marked_remote: true }";
@@ -348,16 +348,16 @@ mod tests {
 
     #[test]
     fn test_local_uauthority_one_part_empty() {
-        let authority = UAuthority::remote_device_domain("".to_string(), "My_VIN".to_string());
+        let authority = UAuthority::long_remote("".to_string(), "My_VIN".to_string());
         assert!(!authority.is_local());
 
-        let uauthority2 = UAuthority::remote_device_domain("VCU".to_string(), "".to_string());
+        let uauthority2 = UAuthority::long_remote("VCU".to_string(), "".to_string());
         assert!(!uauthority2.is_local());
     }
 
     #[test]
     fn test_remote_uauthority() {
-        let authority = UAuthority::remote_device_domain("VCU".to_string(), "my_VIN".to_string());
+        let authority = UAuthority::long_remote("VCU".to_string(), "my_VIN".to_string());
         assert_eq!("vcu", authority.device.clone().unwrap());
         assert_eq!("my_vin", authority.domain.clone().unwrap());
         assert!(authority.is_remote());
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_remote_uauthority_case_sensitive() {
-        let authority = UAuthority::remote_device_domain("VCu".to_string(), "my_VIN".to_string());
+        let authority = UAuthority::long_remote("VCu".to_string(), "my_VIN".to_string());
         assert_eq!("vcu", authority.device.clone().unwrap());
         assert_eq!("my_vin", authority.domain.clone().unwrap());
         assert!(authority.is_remote());
@@ -375,7 +375,7 @@ mod tests {
 
     #[test]
     fn test_blank_remote_uauthority_is_local() {
-        let authority = UAuthority::remote_device_domain(" ".to_string(), " ".to_string());
+        let authority = UAuthority::long_remote(" ".to_string(), " ".to_string());
         assert!(authority.device.is_none());
         assert!(authority.domain.is_none());
         assert!(authority.is_local());
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn test_is_remote() {
-        let remote = UAuthority::remote_device_domain("VCU".to_string(), "my_VIN".to_string());
+        let remote = UAuthority::long_remote("VCU".to_string(), "my_VIN".to_string());
         assert!(!remote.is_local());
         assert!(remote.is_remote());
         assert!(remote.marked_remote);
@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn test_create_uauthority_with_valid_ip_address() {
         let address = IpAddr::V4(Ipv4Addr::LOCALHOST);
-        let remote = UAuthority::remote_inet(address);
+        let remote = UAuthority::micro_remote(address);
 
         let expected_local = format!(
             "{:?}",
@@ -435,7 +435,7 @@ mod tests {
         let address = IpAddr::V6(Ipv6Addr::new(
             0x2001, 0xdb8, 0x85a3, 0x0, 0x0, 0x8a2e, 0x370, 0x7334,
         ));
-        let remote = UAuthority::remote_inet(address);
+        let remote = UAuthority::micro_remote(address);
 
         let expected_local = format!(
             "{:?}",
@@ -500,7 +500,7 @@ mod tests {
         let address = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100));
         let remote = UAuthority::remote(Some("vcu".to_string()), Some("vin".to_string()), None);
 
-        let remote1 = UAuthority::remote_inet(address);
+        let remote1 = UAuthority::micro_remote(address);
         let remote2 = UAuthority::EMPTY;
 
         assert!(!remote.is_resolved());

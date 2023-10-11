@@ -185,7 +185,7 @@ where
                 f,
                 "Failure(code: {}\nmessage: \"{}\"\n)",
                 status.code_as_int(),
-                status.msg()
+                status.message()
             ),
         }
     }
@@ -300,7 +300,7 @@ mod tests {
             RpcResult::Success(_) => panic!("Expected failure, but got success."),
             RpcResult::Failure(status) => {
                 assert_eq!(UCode::Unknown as i32, status.code_as_int());
-                assert_eq!("2 went boom", status.msg());
+                assert_eq!("2 went boom", status.message());
             }
         }
     }
@@ -317,7 +317,7 @@ mod tests {
             RpcResult::Success(_) => panic!("Expected failure, but got success."),
             RpcResult::Failure(status) => {
                 assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-                assert_eq!("boom", status.msg());
+                assert_eq!("boom", status.message());
             }
         }
     }
@@ -396,7 +396,7 @@ mod tests {
         match validated_result {
             RpcResult::Failure(status) => {
                 assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-                assert_eq!("boom", status.msg());
+                assert_eq!("boom", status.message());
             }
             _ => panic!("Expected Failure but found Success"),
         }
@@ -422,7 +422,7 @@ mod tests {
         match mapped {
             RpcResult::Failure(status) => {
                 assert_eq!(UCode::Unknown as i32, status.code_as_int());
-                assert_eq!("2 went boom", status.msg());
+                assert_eq!("2 went boom", status.message());
             }
             _ => panic!("Expected Failure but found Success"),
         }
@@ -440,7 +440,7 @@ mod tests {
         match flattened {
             RpcResult::Failure(status) => {
                 assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
-                assert_eq!("boom", status.msg());
+                assert_eq!("boom", status.message());
             }
             _ => panic!("Expected Failure but found Success"),
         }

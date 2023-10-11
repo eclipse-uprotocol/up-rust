@@ -135,7 +135,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                     .expect("Wrong slice length");
 
                 let address = IpAddr::V4(Ipv4Addr::from(slice));
-                authority = UAuthority::remote_inet(address);
+                authority = UAuthority::micro_remote(address);
 
                 index += 4;
             }
@@ -145,7 +145,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                     .expect("Wrong slice length");
 
                 let address = IpAddr::V6(Ipv6Addr::from(slice));
-                authority = UAuthority::remote_inet(address);
+                authority = UAuthority::micro_remote(address);
 
                 index += 16;
             }
@@ -224,7 +224,7 @@ mod tests {
         let ipv6_address = "2001:db8:85a3:0:0:8a2e:370:7334";
         let address: std::net::IpAddr = ipv6_address.parse().unwrap();
 
-        let authority = UAuthority::remote_inet(address);
+        let authority = UAuthority::micro_remote(address);
 
         let uprotocol_uri = MicroUriSerializer::serialize(&UUri::new(
             Some(authority),
@@ -388,7 +388,7 @@ mod tests {
         let ipv4_address = "127.0.0.1";
         let address: IpAddr = ipv4_address.parse().unwrap();
 
-        let authority = UAuthority::remote_inet(address);
+        let authority = UAuthority::micro_remote(address);
         let entity = UEntity::new("".to_string(), None, Some(5), false);
         let resource = UResource::micro_format(3);
 
@@ -416,7 +416,7 @@ mod tests {
         let ipv6_address = "2001:db8:85a3:0:0:8a2e:370:7334";
         let address: IpAddr = ipv6_address.parse().unwrap();
 
-        let authority = UAuthority::remote_inet(address);
+        let authority = UAuthority::micro_remote(address);
         let entity = UEntity::new("".to_string(), None, Some(5), false);
         let resource = UResource::micro_format(3);
 
@@ -473,7 +473,7 @@ mod tests {
     fn test_build_micro_uri_from_uri_invalid_address() {
         let address: IpAddr =
             IpAddr::from_str("example.com").unwrap_or(IpAddr::V4("0.0.0.0".parse().unwrap()));
-        let authority = UAuthority::remote_inet(address);
+        let authority = UAuthority::micro_remote(address);
         let entity = UEntity::new(
             "body.access".to_string(),
             Some("1".to_string()),

@@ -16,6 +16,11 @@ pub mod cloudevent {
         pub mod ucloudeventattributes;
         pub mod ucloudeventtype;
     }
+    pub mod serializer {
+        pub mod cloudeventjsonserializer;
+        pub mod cloudeventprotobufserializer;
+        pub mod cloudeventserializer;
+    }
     pub mod validator {
         pub mod cloudeventvalidator;
         pub mod validationresult;

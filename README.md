@@ -2,8 +2,6 @@
 
 ## Overview
 
-kick
-
 The purpose of this module is to provide language specific code that builds the various data types defined in the [uProtocol Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main).
 
 The module contains builder methods and validators for all data types used in uProtocol.

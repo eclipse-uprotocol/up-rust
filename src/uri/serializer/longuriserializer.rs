@@ -79,10 +79,7 @@ impl UriSerializer<String> for LongUriSerializer {
                 return UUri::EMPTY;
             } else {
                 return UUri::new(
-                    Some(UAuthority::remote_device_domain(
-                        "".to_string(),
-                        "".to_string(),
-                    )),
+                    Some(UAuthority::long_remote("".to_string(), "".to_string())),
                     Some(UEntity::EMPTY),
                     Some(UResource::EMPTY),
                 );
@@ -111,7 +108,7 @@ impl UriSerializer<String> for LongUriSerializer {
             if authority_parts.len() > 1 {
                 domain = authority_parts[1..].join(".");
             }
-            authority = UAuthority::remote_device_domain(device, domain);
+            authority = UAuthority::long_remote(device, domain);
 
             if uri_parts.len() > 3 {
                 use_name = uri_parts[3].to_string();
@@ -882,8 +879,8 @@ mod tests {
         let use_entity = UEntity::new("body.access".to_string(), None, None, false);
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         let uri = UUri::new(Some(UAuthority::LOCAL), Some(use_entity), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -901,8 +898,8 @@ mod tests {
         );
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         let uri = UUri::new(Some(UAuthority::LOCAL), Some(use_entity), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -949,8 +946,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_no_version() {
         let use_entity = UEntity::new("body.access".to_string(), None, None, false);
-        let authority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let authority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let uri = UUri::new(Some(authority), Some(use_entity), None);
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
         assert_eq!("//vcu.my_car_vin/body.access", &u_protocol_uri);
@@ -960,7 +956,7 @@ mod tests {
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_no_device_with_domain_with_service_no_version(
     ) {
         let use_case = UEntity::long_format("body.access".to_string(), None);
-        let uauthority = UAuthority::remote_device_domain("".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("".to_string(), "MY_CAR_VIN".to_string());
         let uresource = UResource::EMPTY;
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(uresource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -975,8 +971,7 @@ mod tests {
             None,
             false,
         );
-        let uauthority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let uresource = UResource::EMPTY;
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(uresource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -991,10 +986,8 @@ mod tests {
             None,
             false,
         );
-        let uauthority = UAuthority::remote_device_domain(
-            "cloud".to_string(),
-            "uprotocol.example.com".to_string(),
-        );
+        let uauthority =
+            UAuthority::long_remote("cloud".to_string(), "uprotocol.example.com".to_string());
         let uri = UUri::new(Some(uauthority), Some(use_case), None);
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
         assert_eq!(
@@ -1012,8 +1005,7 @@ mod tests {
             None,
             false,
         );
-        let uauthority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::long_format("door".to_string());
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -1024,8 +1016,7 @@ mod tests {
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_no_version_with_resource(
     ) {
         let use_case = UEntity::new("body.access".to_string(), None, None, false);
-        let uauthority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::long_format("door".to_string());
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -1041,12 +1032,11 @@ mod tests {
             None,
             false,
         );
-        let uauthority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -1065,14 +1055,12 @@ mod tests {
             None,
             false,
         );
-        let uauthority = UAuthority::remote_device_domain(
-            "cloud".to_string(),
-            "uprotocol.example.com".to_string(),
-        );
+        let uauthority =
+            UAuthority::long_remote("cloud".to_string(), "uprotocol.example.com".to_string());
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -1086,12 +1074,11 @@ mod tests {
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_no_version_with_resource_with_instance_no_message(
     ) {
         let use_case = UEntity::new("body.access".to_string(), None, None, false);
-        let uauthority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -1110,8 +1097,7 @@ mod tests {
             None,
             false,
         );
-        let uauthority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::new(
             "door".to_string(),
             Some(String::from("front_left")),
@@ -1131,8 +1117,7 @@ mod tests {
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_no_version_with_resource_with_instance_and_message(
     ) {
         let use_case = UEntity::new("body.access".to_string(), None, None, false);
-        let uauthority =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_CAR_VIN".to_string());
+        let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::new(
             "door".to_string(),
             Some(String::from("front_left")),
@@ -1160,10 +1145,8 @@ mod tests {
 
     #[test]
     fn test_build_protocol_uri_for_source_part_of_rpc_request_where_source_is_remote() {
-        let uauthority = UAuthority::remote_device_domain(
-            "cloud".to_string(),
-            "uprotocol.example.com".to_string(),
-        );
+        let uauthority =
+            UAuthority::long_remote("cloud".to_string(), "uprotocol.example.com".to_string());
         let use_case = UEntity::long_format("petapp".to_string(), None);
         let u_protocol_uri =
             LongUriSerializer::serialize(&UUri::rpc_response(uauthority, use_case));
@@ -1186,7 +1169,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_parts_when_uri_has_remote_authority_service_and_version_with_resource(
     ) {
-        let uauthority = Some(UAuthority::remote_device_domain(
+        let uauthority = Some(UAuthority::long_remote(
             "VCU".to_string(),
             "MY_CAR_VIN".to_string(),
         ));
@@ -1213,7 +1196,7 @@ mod tests {
 
     #[test]
     fn test_custom_scheme_no_scheme() {
-        let authority = Some(UAuthority::remote_device_domain(
+        let authority = Some(UAuthority::long_remote(
             "VCU".to_string(),
             "MY_CAR_VIN".to_string(),
         ));

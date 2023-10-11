@@ -92,7 +92,7 @@ impl UUri {
     /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
     /// use uprotocol_sdk::uri::datamodel::uuri::UUri;
     ///
-    /// let authority = UAuthority::remote_device_domain("VCU".to_string(), "MY_VIN".to_string());
+    /// let authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
     /// let entity = UEntity::new("body.access".to_string(), Some("1".to_string()), None, false);
     /// let resource = UResource::new("door".to_string(), Some("front_left".to_string()), None, None, false);
     ///
@@ -123,7 +123,11 @@ impl UUri {
     ///
     /// Returns a `UUri` constructed for an RPC Response.
     pub fn rpc_response(authority: UAuthority, entity: UEntity) -> Self {
-        Self::new(Some(authority), Some(entity), Some(UResource::response()))
+        Self::new(
+            Some(authority),
+            Some(entity),
+            Some(UResource::for_rpc_response()),
+        )
     }
 
     /// Determines whether this `UUri` is an empty container without any valuable information
@@ -204,8 +208,7 @@ mod tests {
     #[test]
     fn test_to_string() {
         let u_authority_local = UAuthority::LOCAL;
-        let u_authority_remote =
-            UAuthority::remote_device_domain("VCU".to_string(), "MY_VIN".to_string());
+        let u_authority_remote = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
         let u_entity = UEntity::new(
             "body.access".to_string(),
             Some("1".to_string()),
@@ -214,8 +217,8 @@ mod tests {
         );
         let u_resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
 
         let uri = UUri::new(
@@ -252,8 +255,8 @@ mod tests {
         let use_entity = UEntity::long_format("body.access".to_string(), None);
         let u_resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
 
         let uri = UUri::new(
@@ -269,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_create_full_remote_uri() {
-        let u_authority = UAuthority::remote_device_domain("VCU".to_string(), "MY_VIN".to_string());
+        let u_authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
         let use_entity = UEntity::new(
             "body.access".to_string(),
             Some("1".to_string()),
@@ -297,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_create_uri_no_message_with_constructor() {
-        let u_authority = UAuthority::remote_device_domain("VCU".to_string(), "MY_VIN".to_string());
+        let u_authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
         let use_entity = UEntity::new(
             "body.access".to_string(),
             Some("1".to_string()),
@@ -327,8 +330,8 @@ mod tests {
         );
         let u_resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
 
         let uri = UUri::new(None, Some(use_entity.clone()), Some(u_resource.clone()));
@@ -338,11 +341,11 @@ mod tests {
 
     #[test]
     fn test_create_uri_null_use() {
-        let u_authority = UAuthority::remote_device_domain("VCU".to_string(), "MY_VIN".to_string());
+        let u_authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
         let u_resource = UResource::long_format_with_instance(
             "door".to_string(),
-            None,
             "front_left".to_string(),
+            None,
         );
 
         let uri = UUri::new(Some(u_authority.clone()), None, Some(u_resource.clone()));
@@ -352,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_create_uri_null_u_resource() {
-        let u_authority = UAuthority::remote_device_domain("VCU".to_string(), "MY_VIN".to_string());
+        let u_authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
         let u_entity = UEntity::new(
             "body.access".to_string(),
             Some("1".to_string()),
@@ -435,7 +438,7 @@ mod tests {
         assert!(uri4.is_long_form());
 
         let uri5 = UUri::new(
-            Some(UAuthority::remote_device_domain(
+            Some(UAuthority::long_remote(
                 "vcu".to_string(),
                 "vin".to_string(),
             )),
@@ -446,7 +449,7 @@ mod tests {
         assert!(uri5.is_long_form());
 
         let uri6 = UUri::new(
-            Some(UAuthority::remote_device_domain(
+            Some(UAuthority::long_remote(
                 "vcu".to_string(),
                 "vin".to_string(),
             )),

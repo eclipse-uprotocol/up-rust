@@ -632,7 +632,7 @@ mod tests {
         // sink
         let sink_entity = UEntity::long_format("petapp".to_string(), None);
         let sink_uri = UUri::new(
-            Some(UAuthority::remote_device_domain(
+            Some(UAuthority::long_remote(
                 "com.gm.bo".to_string(),
                 "bo".to_string(),
             )),
@@ -781,8 +781,7 @@ mod tests {
     #[test]
     fn test_create_request_cloud_event_from_remote_use() {
         // Uri for the application requesting the RPC
-        let source_use_authority =
-            UAuthority::remote_device_domain("bo".to_string(), "cloud".to_string());
+        let source_use_authority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
         let source_use = UEntity::new("petapp".to_string(), Some("1".to_string()), None, false);
         let application_uri_for_rpc =
             LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
@@ -795,7 +794,7 @@ mod tests {
             false,
         );
         let method_uri = UUri::new(
-            Some(UAuthority::remote_device_domain(
+            Some(UAuthority::long_remote(
                 "VCU".to_string(),
                 "MY_CAR_VIN".to_string(),
             )),
@@ -965,8 +964,7 @@ mod tests {
     #[test]
     fn test_create_response_cloud_event_originating_from_remote_use() {
         // Uri for the application requesting the RPC
-        let source_use_authority =
-            UAuthority::remote_device_domain("bo".to_string(), "cloud".to_string());
+        let source_use_authority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
         let source_use = UEntity::long_format("petapp".to_string(), None);
         let application_uri_for_rpc =
             LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
@@ -979,7 +977,7 @@ mod tests {
             false,
         );
         let method_uri = UUri::new(
-            Some(UAuthority::remote_device_domain(
+            Some(UAuthority::long_remote(
                 "VCU".to_string(),
                 "MY_CAR_VIN".to_string(),
             )),
@@ -1143,8 +1141,7 @@ mod tests {
     #[test]
     fn test_create_a_failed_response_cloud_event_originating_from_remote_use() {
         // Uri for the application requesting the RPC
-        let source_use_authority =
-            UAuthority::remote_device_domain("bo".to_string(), "cloud".to_string());
+        let source_use_authority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
         let source_use = UEntity::long_format("petapp".to_string(), None);
         let application_uri_for_rpc =
             LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
@@ -1157,7 +1154,7 @@ mod tests {
             false,
         );
         let method_uri = UUri::new(
-            Some(UAuthority::remote_device_domain(
+            Some(UAuthority::long_remote(
                 "VCU".to_string(),
                 "MY_CAR_VIN".to_string(),
             )),

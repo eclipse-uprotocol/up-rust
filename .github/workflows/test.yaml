@@ -43,7 +43,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add ./reports/*
+          git add -f ./reports/*
           git commit -m "Add test and coverage reports" || echo "No changes to commit"
           git push
       - name: Upload test results
@@ -60,14 +60,14 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           files: lcov.info
           job_summary: true
-      - name: Publish Test Report
-        uses: codecov/codecov-action@v3
-        with:
-          files: lcov.info
-          flags: unittests # optional
-          name: codecov-umbrella # optional
-          fail_ci_if_error: true # optional (default = false)
-          verbose: true # optional (default = false)
+#      - name: Publish Test Report
+#        uses: codecov/codecov-action@v3
+#        with:
+#          files: lcov.info
+#          flags: unittests # optional
+#          name: codecov-umbrella # optional
+#          fail_ci_if_error: true # optional (default = false)
+#          verbose: true # optional (default = false)  
 #      - name: Upload to CodeCov
 #        uses: codecov/codecov-action@v1
 #        with:

@@ -24,7 +24,7 @@ pub trait CloudEventValidator: std::fmt::Display {
         .map(|status| status.get_message())
         .collect();
 
-        let error_message = error_messages.join(",");
+        let error_message = error_messages.join(" ");
         if error_message.is_empty() {
             UStatus::ok()
         } else {
@@ -128,22 +128,40 @@ pub trait CloudEventValidator: std::fmt::Display {
         }
         ValidationResult::Success
     }
+
+    fn validate_rpc_method(&self, uri: &UUri) -> ValidationResult {
+        let result = self.validate_entity_uri(uri);
+
+        if result.is_failure() {
+            return ValidationResult::Failure(format!(
+                "Invalid RPC method uri. {}",
+                result.get_message()
+            ));
+        }
+
+        let resource = &uri.resource;
+        if !resource.is_rpc_method() {
+            return ValidationResult::Failure("Invalid RPC method uri. UriPart should be the method to be called, or method from response.".to_string());
+        }
+
+        ValidationResult::Success
+    }
 }
 
-pub enum Validators {
+pub enum CloudEventValidators {
     Response,
     Request,
     Publish,
     Notification,
 }
 
-impl Validators {
+impl CloudEventValidators {
     pub fn validator(&self) -> Box<dyn CloudEventValidator> {
         match self {
-            Validators::Response => Box::new(ResponseValidator),
-            Validators::Request => Box::new(RequestValidator),
-            Validators::Publish => Box::new(PublishValidator),
-            Validators::Notification => Box::new(NotificationValidator),
+            CloudEventValidators::Response => Box::new(ResponseValidator),
+            CloudEventValidators::Request => Box::new(RequestValidator),
+            CloudEventValidators::Publish => Box::new(PublishValidator),
+            CloudEventValidators::Notification => Box::new(NotificationValidator),
         }
     }
 
@@ -249,7 +267,7 @@ impl CloudEventValidator for RequestValidator {
     fn validate_sink(&self, cloud_event: &Event) -> ValidationResult {
         if let Some(sink) = UCloudEvent::get_sink(cloud_event) {
             let uri = LongUriSerializer::deserialize(sink.clone());
-            let result = self.validate_rpc_topic_uri(&uri);
+            let result = self.validate_rpc_method(&uri);
             if result.is_failure() {
                 return ValidationResult::failure(&format!(
                     "Invalid RPC Request CloudEvent sink [{}]. {}",
@@ -290,7 +308,7 @@ impl CloudEventValidator for ResponseValidator {
     fn validate_source(&self, cloud_event: &Event) -> ValidationResult {
         let source = cloud_event.source();
         let uri = LongUriSerializer::deserialize(source.clone());
-        let result = self.validate_rpc_topic_uri(&uri);
+        let result = self.validate_rpc_method(&uri);
         if result.is_failure() {
             return ValidationResult::failure(&format!(
                 "Invalid RPC Response CloudEvent source [{}]. {}",
@@ -348,17 +366,20 @@ mod tests {
     use crate::uri::datamodel::uauthority::UAuthority;
     use crate::uri::datamodel::uentity::UEntity;
     use crate::uri::datamodel::uresource::UResource;
+    use crate::uuid::uuidbuilder::{UUIDFactory, UUIDv8Factory};
 
     use super::*;
 
-    use cloudevents::{Data, EventBuilder, EventBuilderV10};
+    use cloudevents::{Data, EventBuilder, EventBuilderV03, EventBuilderV10};
     use prost::Message;
     use prost_types::Any;
+    use uuid::Uuid;
 
     #[test]
     fn test_get_a_publish_cloud_event_validator() {
         let cloud_event = build_base_cloud_event_for_test();
-        let validator: Box<dyn CloudEventValidator> = Validators::get_validator(&cloud_event);
+        let validator: Box<dyn CloudEventValidator> =
+            CloudEventValidators::get_validator(&cloud_event);
         let status = validator.validate_type(&cloud_event);
 
         assert_eq!(status, ValidationResult::Success);
@@ -370,7 +391,8 @@ mod tests {
         let mut cloud_event = build_base_cloud_event_for_test();
         cloud_event.set_extension("sink", "//bo.cloud/petapp");
 
-        let validator: Box<dyn CloudEventValidator> = Validators::Notification.validator();
+        let validator: Box<dyn CloudEventValidator> =
+            CloudEventValidators::Notification.validator();
         let status = validator.validate_type(&cloud_event);
 
         assert_eq!(status, ValidationResult::Success);
@@ -385,14 +407,1164 @@ mod tests {
             .build()
             .unwrap();
 
-        let validator: Box<dyn CloudEventValidator> = Validators::Publish.validator();
+        let validator: Box<dyn CloudEventValidator> = CloudEventValidators::Publish.validator();
         let status = validator.validate_type(&event).to_status();
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid CloudEvent type [res.v1]. CloudEvent of type Publish must have a type of 'pub.v1'",
-            status.msg()
+            status.message()
         );
+    }
+
+    #[test]
+    fn test_notification_cloud_event_type() {
+        let builder = build_base_cloud_event_builder_for_test();
+        let event = builder
+            .ty(UCloudEventType::RESPONSE.to_string())
+            .build()
+            .unwrap();
+
+        let validator: Box<dyn CloudEventValidator> =
+            CloudEventValidators::Notification.validator();
+        let status = validator.validate_type(&event).to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+        "Invalid CloudEvent type [res.v1]. CloudEvent of type Publish must have a type of 'pub.v1'",
+        status.message()
+    );
+    }
+
+    #[test]
+    fn test_get_a_request_cloud_event_validator() {
+        let builder = build_base_cloud_event_builder_for_test();
+        let event = builder
+            .ty(UCloudEventType::REQUEST.to_string())
+            .build()
+            .unwrap();
+
+        let validator: Box<dyn CloudEventValidator> = CloudEventValidators::get_validator(&event);
+        let status = validator.validate_type(&event);
+
+        assert_eq!(ValidationResult::Success, status);
+        assert_eq!("CloudEventValidator.Request", &validator.to_string());
+    }
+
+    #[test]
+    fn test_request_cloud_event_type() {
+        let builder = build_base_cloud_event_builder_for_test();
+        let event = builder
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator: Box<dyn CloudEventValidator> = CloudEventValidators::Request.validator();
+        let status = validator.validate_type(&event).to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+        "Invalid CloudEvent type [pub.v1]. CloudEvent of type Request must have a type of 'req.v1'",
+        status.message()
+    );
+    }
+
+    #[test]
+    fn test_get_a_response_cloud_event_validator() {
+        let builder = build_base_cloud_event_builder_for_test();
+        let event = builder
+            .ty(UCloudEventType::RESPONSE.to_string())
+            .build()
+            .unwrap();
+
+        let validator: Box<dyn CloudEventValidator> = CloudEventValidators::get_validator(&event);
+        let status = validator.validate_type(&event);
+
+        assert_eq!(ValidationResult::success(), status);
+        assert_eq!("CloudEventValidator.Response", &validator.to_string());
+    }
+
+    #[test]
+    fn test_response_cloud_event_type() {
+        let builder = build_base_cloud_event_builder_for_test();
+        let event = builder
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator: Box<dyn CloudEventValidator> = CloudEventValidators::Response.validator();
+        let status = validator.validate_type(&event).to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid CloudEvent type [pub.v1]. CloudEvent of type Response must have a type of 'res.v1'",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_get_a_publish_cloud_event_validator_when_cloud_event_type_is_unknown() {
+        let builder = build_base_cloud_event_builder_for_test();
+        let event = builder.ty("lala.v1".to_string()).build().unwrap();
+
+        let validator: Box<dyn CloudEventValidator> = CloudEventValidators::get_validator(&event);
+        assert_eq!("CloudEventValidator.Publish", &validator.to_string());
+    }
+
+    #[test]
+    fn validate_cloud_event_version_when_valid() {
+        let uuid = UUIDv8Factory::new().create();
+        let builder = build_base_cloud_event_builder_for_test()
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .id(uuid.to_string());
+        let event = builder.build().unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate_version(&event);
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn validate_cloud_event_version_when_not_valid() {
+        let builder = EventBuilderV03::new()
+            .id("id".to_string())
+            .ty("pub.v1".to_string())
+            .source("/body.access".to_string());
+
+        let event = builder.build().unwrap();
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate_version(&event).to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid CloudEvent version [0.3]. CloudEvent version must be 1.0.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn validate_cloud_event_id_when_valid() {
+        let uuid = UUIDv8Factory::new().create();
+        let builder = build_base_cloud_event_builder_for_test()
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .id(uuid.to_string());
+        let event = builder.build().unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate_id(&event);
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn validate_cloud_event_id_when_not_uuidv6_type_id() {
+        let uuid = Uuid::new_v4();
+
+        let builder = build_base_cloud_event_builder_for_test()
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .id(uuid.to_string());
+        let event = builder.build().unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate_id(&event).to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            format!(
+                "Invalid CloudEvent Id [{}]. CloudEvent Id must be of type UUIDv8.",
+                uuid
+            ),
+            status.message()
+        );
+    }
+
+    #[test]
+    fn validate_cloud_event_id_when_not_valid() {
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_id(&event)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid CloudEvent Id [testme]. CloudEvent Id must be of type UUIDv8.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_with_version_when_it_is_valid_remote() {
+        let uri = LongUriSerializer::deserialize("//VCU.MY_CAR_VIN/body.access/1".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_entity_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_no_version_when_it_is_valid_remote() {
+        let uri = LongUriSerializer::deserialize("//VCU.MY_CAR_VIN/body.access".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_entity_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_with_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/body.access/1".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_entity_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_no_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/body.access/".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_entity_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_invalid_when_uri_has_schema_only() {
+        let uri = LongUriSerializer::deserialize(":".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_entity_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_invalid_when_uri_is_remote_no_authority() {
+        let uri = LongUriSerializer::deserialize("//".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_entity_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is configured to be microRemote and is missing uAuthority device name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_invalid_when_uri_is_remote_no_authority_with_use() {
+        let uri = LongUriSerializer::deserialize("///body.access/1".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_entity_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is configured to be microRemote and is missing uAuthority device name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_invalid_when_uri_is_missing_use() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_entity_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_usoftware_entity_uri_invalid_when_uri_is_missing_use_name_local() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin//1".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_entity_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_topic_uri_with_version_when_it_is_valid_remote() {
+        let uri = LongUriSerializer::deserialize(
+            "//VCU.MY_CAR_VIN/body.access/1/door.front_left#Door".to_string(),
+        );
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_topic_uri_no_version_when_it_is_valid_remote() {
+        let uri = LongUriSerializer::deserialize(
+            "//VCU.MY_CAR_VIN/body.access//door.front_left#Door".to_string(),
+        );
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_topic_uri_with_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_topic_uri_no_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/body.access//door.front_left#Door".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_topic_uri_invalid_when_uri_has_schema_only() {
+        let uri = LongUriSerializer::deserialize(":".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_topic_uri_invalid_when_uri_has_empty_use_name_local() {
+        let uri = LongUriSerializer::deserialize("/".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_topic_uri_invalid_when_uri_is_remote_no_authority() {
+        let uri = LongUriSerializer::deserialize("//".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is configured to be microRemote and is missing uAuthority device name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_topic_uri_invalid_when_uri_is_remote_no_authority_with_use() {
+        let uri =
+            LongUriSerializer::deserialize("///body.access/1/door.front_left#Door".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is configured to be microRemote and is missing uAuthority device name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_topic_uri_invalid_when_uri_is_missing_use_remote() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin///door.front_left#Door".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_topic_uri_invalid_when_uri_is_missing_use_name_remote() {
+        let uri = LongUriSerializer::deserialize("/1/door.front_left#Door".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("UriPart is missing uResource name.", status.message());
+    }
+
+    #[test]
+    fn test_topic_uri_invalid_when_uri_is_missing_use_name_local() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin//1".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_topic_uri_when_uri_is_with_authority_with_use_no_version_missing_resource_remote() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin/body.access".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("UriPart is missing uResource name.", status.message());
+    }
+
+    #[test]
+    fn test_topic_uri_when_uri_is_with_authority_with_use_with_version_missing_resource_remote() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin/body.access/".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("UriPart is missing uResource name.", status.message());
+    }
+
+    #[test]
+    fn test_topic_uri_when_uri_is_with_authority_with_use_with_resource_missing_message_remote() {
+        let uri =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/door.front_left".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("UriPart is missing Message information.", status.message());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_with_version_when_it_is_valid_remote() {
+        let uri = LongUriSerializer::deserialize("//bo.cloud/petapp/1/rpc.response".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_no_version_when_it_is_valid_remote() {
+        let uri = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_with_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/petapp/1/rpc.response".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_no_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/petapp//rpc.response".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_invalid_when_uri_has_schema_only() {
+        let uri = LongUriSerializer::deserialize(":".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_with_version_when_it_is_not_valid_missing_rpc_response_local() {
+        let uri = LongUriSerializer::deserialize("/petapp/1/dog".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_with_version_when_it_is_not_valid_missing_rpc_response_remote() {
+        let uri = LongUriSerializer::deserialize("//petapp/1/dog".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_invalid_when_uri_is_remote_no_authority() {
+        let uri = LongUriSerializer::deserialize("//".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_invalid_when_uri_is_remote_no_authority_with_use() {
+        let uri = LongUriSerializer::deserialize("///body.access/1".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_invalid_when_uri_is_missing_use() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin".to_string());
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_remote() {
+        let uri = LongUriSerializer::deserialize("/1".to_string());
+
+        let event = build_base_cloud_event_for_test();
+
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_local() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin//1".to_string());
+
+        let event = build_base_cloud_event_for_test();
+
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_with_version_when_it_is_valid() {
+        let uentity = UEntity::long_format("petapp".to_string(), Some("1".to_string()));
+        let uauthority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
+        let uresource = UResource::for_rpc_response();
+        let uri = UUri::new(Some(uauthority), Some(uentity), Some(uresource));
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_topic_uri(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_topic_uri_with_version_when_it_is_not_valid() {
+        let uentity = UEntity::long_format("petapp".to_string(), Some("1".to_string()));
+        let uauthority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
+        let uresource = UResource::long_format_with_instance(
+            "body.access".to_string(),
+            "front_left".to_string(),
+            None,
+        );
+        let uri = UUri::new(Some(uauthority), Some(uentity), Some(uresource));
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_topic_uri(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC uri application response topic. UriPart is missing rpc.response.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_rpc_method_uri_with_version_when_it_is_valid_remote() {
+        let uri =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_method(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_method_uri_no_version_when_it_is_valid_remote() {
+        let uri =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access//rpc.UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_method(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_method_uri_with_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/body.access/1/rpc.UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_method(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_method_uri_no_version_when_it_is_valid_local() {
+        let uri = LongUriSerializer::deserialize("/body.access//rpc.UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event).validate_rpc_method(&uri);
+
+        assert_eq!(ValidationResult::Success, status);
+    }
+
+    #[test]
+    fn test_rpc_method_uri_invalid_when_uri_has_schema_only() {
+        let uri = LongUriSerializer::deserialize(":".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC method uri. UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_rpc_method_uri_with_version_when_it_is_not_valid_not_rpc_method_local() {
+        let uri = LongUriSerializer::deserialize("/body.access//UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("Invalid RPC method uri. UriPart should be the method to be called, or method from response.", status.message());
+    }
+
+    #[test]
+    fn test_rpc_method_uri_with_version_when_it_is_not_valid_not_rpc_method_remote() {
+        let uri = LongUriSerializer::deserialize("//body.access/1/UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("Invalid RPC method uri. UriPart should be the method to be called, or method from response.", status.message());
+    }
+
+    #[test]
+    fn test_rpc_method_uri_invalid_when_uri_is_remote_no_authority() {
+        let uri = LongUriSerializer::deserialize("//".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("Invalid RPC method uri. UriPart is configured to be microRemote and is missing uAuthority device name.", status.message());
+    }
+
+    #[test]
+    fn test_rpc_method_uri_invalid_when_uri_is_remote_no_authority_with_use() {
+        let uri = LongUriSerializer::deserialize("///body.access/1/rpc.UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("Invalid RPC method uri. UriPart is configured to be microRemote and is missing uAuthority device name.", status.message());
+    }
+
+    #[test]
+    fn test_rpc_method_uri_invalid_when_uri_is_missing_use() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC method uri. UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_rpc_method_uri_invalid_when_uri_is_missing_use_name_local() {
+        let uri = LongUriSerializer::deserialize("/1/rpc.UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!("Invalid RPC method uri. UriPart should be the method to be called, or method from response.", status.message());
+    }
+
+    #[test]
+    fn test_rpc_method_uri_invalid_when_uri_is_missing_use_name_remote() {
+        let uri = LongUriSerializer::deserialize("//VCU.myvin//1/rpc.UpdateDoor".to_string());
+
+        let event = build_base_cloud_event_for_test();
+        let status = CloudEventValidators::get_validator(&event)
+            .validate_rpc_method(&uri)
+            .to_status();
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC method uri. UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_local() {
+        let uuid = UUIDv8Factory::new().create();
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(uri.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate(&event);
+
+        assert_eq!(UStatus::ok(), status);
+    }
+
+    #[test]
+    fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote() {
+        let uuid = UUIDv8Factory::new().create();
+        let uri = LongUriSerializer::deserialize(
+            "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
+        );
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(uri.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate(&event);
+
+        assert_eq!(UStatus::ok(), status);
+    }
+
+    #[test]
+    fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote_with_a_sink() {
+        let uuid = UUIDv8Factory::new().create();
+        let uri = LongUriSerializer::deserialize(
+            "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
+        );
+        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(uri.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate(&event);
+
+        assert_eq!(UStatus::ok(), status);
+    }
+
+    #[test]
+    fn test_publish_type_cloudevent_is_not_valid_when_remote_with_invalid_sink() {
+        let uuid = UUIDv8Factory::new().create();
+        let uri = LongUriSerializer::deserialize(
+            "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
+        );
+        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(uri.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid CloudEvent sink [//bo.cloud/]. UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_publish_type_cloudevent_is_not_valid_when_source_is_empty() {
+        let uuid = UUIDv8Factory::new().create();
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source("/".to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid Publish type CloudEvent source []. UriPart is missing uSoftware Entity name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_publish_type_cloudevent_is_not_valid_when_source_is_missing_authority_and_id_invalid() {
+        let uri = LongUriSerializer::deserialize("/body.access".to_string());
+
+        let event = build_base_cloud_event_builder_for_test()
+            .id("testme".to_string())
+            .source(uri.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::get_validator(&event);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid CloudEvent Id [testme]. CloudEvent Id must be of type UUIDv8. \
+        Invalid Publish type CloudEvent source [/body.access]. UriPart is missing uResource name.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_notification_type_cloudevent_is_valid_when_everything_is_valid() {
+        let uuid = UUIDv8Factory::new().create();
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
+        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(uri.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Notification);
+        let status = validator.validate(&event);
+
+        assert_eq!(UStatus::ok(), status);
+    }
+
+    #[test]
+    fn test_notification_type_cloudevent_is_not_valid_missing_sink() {
+        let uuid = UUIDv8Factory::new().create();
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(uri.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Notification);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid CloudEvent sink. Notification CloudEvent sink must be an uri.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_notification_type_cloudevent_is_not_valid_invalid_sink() {
+        let uuid = UUIDv8Factory::new().create();
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
+        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(uri.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::PUBLISH.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Notification);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+        "Invalid Notification type CloudEvent sink [//bo.cloud/]. UriPart is missing uSoftware Entity name.",
+        status.message()
+        );
+    }
+
+    #[test]
+    fn test_request_type_cloudevent_is_valid_when_everything_is_valid() {
+        let uuid = UUIDv8Factory::new().create();
+        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let sink =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::REQUEST.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Request);
+        let status = validator.validate(&event);
+
+        assert_eq!(UStatus::ok(), status);
+    }
+
+    #[test]
+    fn test_request_type_cloudevent_is_not_valid_invalid_source() {
+        let uuid = UUIDv8Factory::new().create();
+        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//dog".to_string());
+        let sink =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::REQUEST.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Request);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC Request CloudEvent source [//bo.cloud/petapp//dog]. Invalid RPC uri application response topic. UriPart is missing rpc.response.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_request_type_cloudevent_is_not_valid_missing_sink() {
+        let uuid = UUIDv8Factory::new().create();
+        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .ty(UCloudEventType::REQUEST.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Request);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC Request CloudEvent sink. Request CloudEvent sink must be uri for the method to be called.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_request_type_cloudevent_is_not_valid_invalid_sink_not_rpc_command() {
+        let uuid = UUIDv8Factory::new().create();
+        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let sink =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::REQUEST.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Request);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC Request CloudEvent sink [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_response_type_cloudevent_is_valid_when_everything_is_valid() {
+        let uuid = UUIDv8Factory::new().create();
+        let source =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string());
+        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::RESPONSE.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Response);
+        let status = validator.validate(&event);
+
+        assert_eq!(UStatus::ok(), status);
+    }
+
+    #[test]
+    fn test_response_type_cloudevent_is_not_valid_invalid_source() {
+        let uuid = UUIDv8Factory::new().create();
+        let source =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
+        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::RESPONSE.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Response);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+            "Invalid RPC Response CloudEvent source [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
+            status.message()
+        );
+    }
+
+    #[test]
+    fn test_response_type_cloudevent_is_not_valid_missing_sink_and_invalid_source() {
+        let uuid = UUIDv8Factory::new().create();
+        let source =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .ty(UCloudEventType::RESPONSE.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Response);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+        "Invalid RPC Response CloudEvent source [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink. Response CloudEvent sink must be uri of the destination of the response.",
+        status.message()
+    );
+    }
+
+    #[test]
+    fn test_response_type_cloudevent_is_not_valid_invalid_source_not_rpc_command() {
+        let uuid = UUIDv8Factory::new().create();
+        let source = LongUriSerializer::deserialize("//bo.cloud/petapp/1/dog".to_string());
+        let sink =
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
+        let event = build_base_cloud_event_builder_for_test()
+            .id(uuid.to_string())
+            .source(source.to_string())
+            .extension("sink", sink.to_string())
+            .ty(UCloudEventType::RESPONSE.to_string())
+            .build()
+            .unwrap();
+
+        let validator = CloudEventValidators::validator(&CloudEventValidators::Response);
+        let status = validator.validate(&event);
+
+        assert_eq!(UCode::InvalidArgument, status.code());
+        assert_eq!(
+        "Invalid RPC Response CloudEvent source [//bo.cloud/petapp/1/dog]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC uri application response topic. UriPart is missing rpc.response.",
+        status.message()
+    );
     }
 
     fn build_base_cloud_event_builder_for_test() -> EventBuilderV10 {

@@ -90,7 +90,7 @@ impl UStatus {
         !self.is_success()
     }
 
-    pub fn msg(&self) -> String {
+    pub fn message(&self) -> String {
         match self {
             UStatus::Ok(ok_status) => ok_status.id.clone(),
             UStatus::Fail(fail_status) => fail_status.fail_msg.clone(),
@@ -118,7 +118,7 @@ impl fmt::Display for UStatus {
             f,
             "UMessage {} {}",
             if self.is_success() { OK } else { FAILED },
-            self.msg()
+            self.message()
         )
     }
 }
@@ -141,7 +141,7 @@ impl From<UStatus> for ProtoStatus {
 
         ProtoStatus {
             code: source_status.code_as_int(),
-            message: source_status.msg().to_string(),
+            message: source_status.message().to_string(),
             ..Default::default()
         }
     }
@@ -293,7 +293,7 @@ mod tests {
         let ok = UStatus::ok();
         assert!(ok.is_success());
         assert!(!ok.is_failed());
-        assert_eq!("ok", ok.msg());
+        assert_eq!("ok", ok.message());
         assert_eq!(UCode::Ok as i32, ok.code_as_int());
     }
 
@@ -302,7 +302,7 @@ mod tests {
         let ok = UStatus::ok_with_id("boo");
         assert!(ok.is_success());
         assert!(!ok.is_failed());
-        assert_eq!("boo", ok.msg());
+        assert_eq!("boo", ok.message());
         assert_eq!(UCode::Ok as i32, ok.code_as_int());
     }
 
@@ -311,7 +311,7 @@ mod tests {
         let failed = UStatus::fail();
         assert!(!failed.is_success());
         assert!(failed.is_failed());
-        assert_eq!("failed", failed.msg());
+        assert_eq!("failed", failed.message());
         assert_eq!(UCode::Unknown as i32, failed.code_as_int());
     }
 
@@ -320,7 +320,7 @@ mod tests {
         let failed = UStatus::fail_with_msg("boom");
         assert!(!failed.is_success());
         assert!(failed.is_failed());
-        assert_eq!("boom", failed.msg());
+        assert_eq!("boom", failed.message());
         assert_eq!(UCode::Unknown as i32, failed.code_as_int());
     }
 
@@ -329,7 +329,7 @@ mod tests {
         let failed = UStatus::fail_with_msg_and_reason("boom", UCode::InvalidArgument);
         assert!(!failed.is_success());
         assert!(failed.is_failed());
-        assert_eq!("boom", failed.msg());
+        assert_eq!("boom", failed.message());
         assert_eq!(UCode::InvalidArgument as i32, failed.code_as_int());
     }
 
