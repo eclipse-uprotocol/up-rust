@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <testsuites>
-  <testsuite id="0" name="cargo test #0" package="testsuite/cargo test #0" tests="347" errors="0" failures="0" hostname="localhost" timestamp="2023-10-11T15:36:47.130629131Z" time="0">
+  <testsuite id="0" name="cargo test #0" package="testsuite/cargo test #0" tests="431" errors="0" failures="0" hostname="localhost" timestamp="2023-10-11T15:59:32.343882666Z" time="0">
     <testcase name="test_create_valid" time="0" classname="cloudevent::datamodel::ucloudeventattributes::tests" />
     <testcase name="test_hash_code_equals" time="0" classname="cloudevent::datamodel::ucloudeventattributes::tests" />
     <testcase name="test_is_empty_function" time="0" classname="cloudevent::datamodel::ucloudeventattributes::tests" />
@@ -16,6 +16,13 @@
     <testcase name="test_type_for_publish" time="0" classname="cloudevent::datamodel::ucloudeventtype::tests" />
     <testcase name="test_type_for_request" time="0" classname="cloudevent::datamodel::ucloudeventtype::tests" />
     <testcase name="test_type_for_response" time="0" classname="cloudevent::datamodel::ucloudeventtype::tests" />
+    <testcase name="double_serialization_json_to_proto" time="0" classname="cloudevent::serializer::cloudeventprotobufserializer::tests" />
+    <testcase name="double_serialization_proto_to_json" time="0" classname="cloudevent::serializer::cloudeventprotobufserializer::tests" />
+    <testcase name="double_serialization_protobuf" time="0" classname="cloudevent::serializer::cloudeventprotobufserializer::tests" />
+    <testcase name="double_serialization_protobuf_when_creating_cloud_event_with_factory_methods" time="0" classname="cloudevent::serializer::cloudeventprotobufserializer::tests" />
+    <testcase name="serialize_and_deserialize_cloud_event_to_protobuf" time="0" classname="cloudevent::serializer::cloudeventprotobufserializer::tests" />
+    <testcase name="serialize_two_different_cloud_events_are_not_the_same" time="0" classname="cloudevent::serializer::cloudeventprotobufserializer::tests" />
+    <testcase name="serialize_two_same_cloud_events_are_the_same" time="0" classname="cloudevent::serializer::cloudeventprotobufserializer::tests" />
     <testcase name="test_adding_platform_error_to_existing_cloud_event" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_cloud_event_has_no_platform_error_when_platform_error_does_not_exist" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_cloud_event_has_platform_error_when_platform_error_exists" time="0" classname="cloudevent::ucloudevent::tests" />
@@ -73,10 +80,87 @@
     <testcase name="test_create_response_cloud_event_originating_from_remote_use" time="0" classname="cloudevent::ucloudeventbuilder::tests" />
     <testcase name="test_get_a_notification_cloud_event_validator" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
     <testcase name="test_get_a_publish_cloud_event_validator" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_get_a_publish_cloud_event_validator_when_cloud_event_type_is_unknown" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_get_a_request_cloud_event_validator" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_get_a_response_cloud_event_validator" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_cloudevent_is_expired_when_ttl_1_mili" time="0" classname="cloudevent::ucloudevent::tests" />
+    <testcase name="test_notification_cloud_event_type" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_notification_type_cloudevent_is_not_valid_invalid_sink" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_notification_type_cloudevent_is_not_valid_missing_sink" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_notification_type_cloudevent_is_valid_when_everything_is_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
     <testcase name="test_publish_cloud_event_type" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_publish_type_cloudevent_is_not_valid_when_remote_with_invalid_sink" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_publish_type_cloudevent_is_not_valid_when_source_is_empty" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_publish_type_cloudevent_is_not_valid_when_source_is_missing_authority_and_id_invalid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_publish_type_cloudevent_is_valid_when_everything_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote_with_a_sink" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_request_cloud_event_type" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_request_type_cloudevent_is_not_valid_invalid_sink_not_rpc_command" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_request_type_cloudevent_is_not_valid_invalid_source" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_request_type_cloudevent_is_not_valid_missing_sink" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_request_type_cloudevent_is_valid_when_everything_is_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_response_cloud_event_type" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_response_type_cloudevent_is_not_valid_invalid_source" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_response_type_cloudevent_is_not_valid_invalid_source_not_rpc_command" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_response_type_cloudevent_is_not_valid_missing_sink_and_invalid_source" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_response_type_cloudevent_is_valid_when_everything_is_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_invalid_when_uri_has_schema_only" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_invalid_when_uri_is_missing_use" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_invalid_when_uri_is_missing_use_name_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_invalid_when_uri_is_missing_use_name_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_invalid_when_uri_is_remote_no_authority" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_invalid_when_uri_is_remote_no_authority_with_use" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_no_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_no_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_with_version_when_it_is_not_valid_not_rpc_method_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_with_version_when_it_is_not_valid_not_rpc_method_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_with_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_method_uri_with_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_invalid_when_uri_has_schema_only" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_invalid_when_uri_is_missing_use" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_invalid_when_uri_is_remote_no_authority" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_invalid_when_uri_is_remote_no_authority_with_use" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_no_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_no_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_with_version_when_it_is_not_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_with_version_when_it_is_not_valid_missing_rpc_response_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_with_version_when_it_is_not_valid_missing_rpc_response_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_with_version_when_it_is_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_with_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_rpc_topic_uri_with_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_invalid_when_uri_has_empty_use_name_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_invalid_when_uri_has_schema_only" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_invalid_when_uri_is_missing_use_name_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_invalid_when_uri_is_missing_use_name_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_invalid_when_uri_is_missing_use_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_invalid_when_uri_is_remote_no_authority" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_invalid_when_uri_is_remote_no_authority_with_use" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_no_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_no_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_when_uri_is_with_authority_with_use_no_version_missing_resource_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_when_uri_is_with_authority_with_use_with_resource_missing_message_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_when_uri_is_with_authority_with_use_with_version_missing_resource_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_with_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_topic_uri_with_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_invalid_when_uri_has_schema_only" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_invalid_when_uri_is_missing_use" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_invalid_when_uri_is_missing_use_name_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_invalid_when_uri_is_remote_no_authority" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_invalid_when_uri_is_remote_no_authority_with_use" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_no_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_no_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_with_version_when_it_is_valid_local" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="test_usoftware_entity_uri_with_version_when_it_is_valid_remote" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="validate_cloud_event_id_when_not_uuidv6_type_id" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="validate_cloud_event_id_when_not_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="validate_cloud_event_id_when_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="validate_cloud_event_version_when_not_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
+    <testcase name="validate_cloud_event_version_when_valid" time="0" classname="cloudevent::validator::cloudeventvalidator::tests" />
     <testcase name="test_failure_validation_result_is_success" time="0" classname="cloudevent::validator::validationresult::tests" />
     <testcase name="test_failure_validation_result_message" time="0" classname="cloudevent::validator::validationresult::tests" />
-    <testcase name="test_cloudevent_is_expired_when_ttl_1_mili" time="0" classname="cloudevent::ucloudevent::tests" />
     <testcase name="test_failure_validation_result_to_status" time="0" classname="cloudevent::validator::validationresult::tests" />
     <testcase name="test_failure_validation_result_to_string" time="0" classname="cloudevent::validator::validationresult::tests" />
     <testcase name="test_success_validation_result_is_success" time="0" classname="cloudevent::validator::validationresult::tests" />
@@ -94,8 +178,8 @@
     <testcase name="test_compose_happy_path" time="0" classname="rpc::rpcmapper::tests" />
     <testcase name="test_compose_happy_path_with_success_check" time="0" classname="rpc::rpcmapper::tests" />
     <testcase name="test_compose_that_returns_status" time="0" classname="rpc::rpcmapper::tests" />
-    <testcase name="test_fail_invoke_method_when_invoke_method_returns_a_bad_proto_using_map_response" time="0" classname="rpc::rpcmapper::tests" />
     <testcase name="test_compose_with_failure" time="0" classname="rpc::rpcmapper::tests" />
+    <testcase name="test_fail_invoke_method_when_invoke_method_returns_a_bad_proto_using_map_response" time="0" classname="rpc::rpcmapper::tests" />
     <testcase name="test_fail_invoke_method_when_invoke_method_returns_a_bad_proto_using_map_response_to_rpc_response" time="0" classname="rpc::rpcmapper::tests" />
     <testcase name="test_fail_invoke_method_when_invoke_method_returns_a_status_using_map_response" time="0" classname="rpc::rpcmapper::tests" />
     <testcase name="test_fail_invoke_method_when_invoke_method_returns_a_status_using_map_response_to_rpc_response" time="0" classname="rpc::rpcmapper::tests" />
@@ -212,14 +296,14 @@
     <testcase name="test_create_use_with_no_version" time="0" classname="uri::datamodel::uentity::tests" />
     <testcase name="test_create_use_with_no_version_using_from_name" time="0" classname="uri::datamodel::uentity::tests" />
     <testcase name="test_is_empty" time="0" classname="uri::datamodel::uentity::tests" />
-    <testcase name="test_create_empty_using_empty" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_to_string" time="0" classname="uri::datamodel::uentity::tests" />
+    <testcase name="test_create_empty_using_empty" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_create_request_uresource_passing_name_instance_and_id" time="0" classname="uri::datamodel::uresource::tests" />
-    <testcase name="test_create_resource_for_rpc_commands" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_create_resource" time="0" classname="uri::datamodel::uresource::tests" />
+    <testcase name="test_create_resource_for_rpc_commands" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_create_resource_with_no_instance_and_no_message" time="0" classname="uri::datamodel::uresource::tests" />
-    <testcase name="test_create_resource_with_no_message_using_from_name_with_instance" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_create_resource_with_no_instance_and_no_message_using_from_name" time="0" classname="uri::datamodel::uresource::tests" />
+    <testcase name="test_create_resource_with_no_message_using_from_name_with_instance" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_create_response_uresource_by_calling_from_id" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_create_response_uresource_passing_name_instance_and_id" time="0" classname="uri::datamodel::uresource::tests" />
     <testcase name="test_create_rpc_response_using_response_method" time="0" classname="uri::datamodel::uresource::tests" />
@@ -349,10 +433,10 @@
     <testcase name="test_uuid_size" time="0" classname="uuid::uuidbuilder::tests" />
     <testcase name="test_uuid6_build_many" time="0" classname="uuid::uuidbuilder::tests" />
   </testsuite>
-  <testsuite id="1" name="cargo test #1" package="testsuite/cargo test #1" tests="1" errors="0" failures="0" hostname="localhost" timestamp="2023-10-11T15:36:47.130629131Z" time="0">
+  <testsuite id="1" name="cargo test #1" package="testsuite/cargo test #1" tests="1" errors="0" failures="0" hostname="localhost" timestamp="2023-10-11T15:59:32.343882666Z" time="0">
     <testcase name="empty" time="0" classname="" />
   </testsuite>
-  <testsuite id="2" name="cargo test #2" package="testsuite/cargo test #2" tests="26" errors="0" failures="0" hostname="localhost" timestamp="2023-10-11T15:36:47.130629131Z" time="0">
+  <testsuite id="2" name="cargo test #2" package="testsuite/cargo test #2" tests="26" errors="0" failures="0" hostname="localhost" timestamp="2023-10-11T15:59:32.343882666Z" time="0">
     <testcase name="build_base_cloud_event (line 334)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
     <testcase name="notify (line 279)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
     <testcase name="publish (line 233)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
@@ -361,25 +445,25 @@
     <testcase name="response_failed (line 173)" time="0" classname="src/cloudevent/ucloudeventbuilder.rs - cloudevent::ucloudeventbuilder::UCloudEventBuilder" />
     <testcase name="EMPTY (line 56)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
     <testcase name="LOCAL (line 76)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
-    <testcase name="is_remote (line 219)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
     <testcase name="is_local (line 238)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
-    <testcase name="remote_device_domain (line 179)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
+    <testcase name="is_remote (line 219)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
+    <testcase name="long_remote (line 179)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
     <testcase name="new (line 99)" time="0" classname="src/uri/datamodel/uauthority.rs - uri::datamodel::uauthority::UAuthority" />
-    <testcase name="long_format (line 102)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
     <testcase name="is_empty (line 148)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
+    <testcase name="long_format (line 102)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
     <testcase name="EMPTY (line 43)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="new (line 59)" time="0" classname="src/uri/datamodel/uentity.rs - uri::datamodel::uentity::UEntity" />
-    <testcase name="for_rpc_request (line 207)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="is_empty (line 298)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
-    <testcase name="long_format (line 120)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
+    <testcase name="for_rpc_request (line 207)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="is_rpc_method (line 249)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
+    <testcase name="long_format (line 120)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="long_format_with_instance (line 150)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="name_with_instance (line 321)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
     <testcase name="src/uri/datamodel/uuri.rs - uri::datamodel::uuri::UUri (line 33)" time="0">
       <skipped />
     </testcase>
-    <testcase name="EMPTY (line 61)" time="0" classname="src/uri/datamodel/uuri.rs - uri::datamodel::uuri::UUri" />
     <testcase name="new (line 71)" time="0" classname="src/uri/datamodel/uresource.rs - uri::datamodel::uresource::UResource" />
+    <testcase name="EMPTY (line 61)" time="0" classname="src/uri/datamodel/uuri.rs - uri::datamodel::uuri::UUri" />
     <testcase name="new (line 89)" time="0" classname="src/uri/datamodel/uuri.rs - uri::datamodel::uuri::UUri" />
   </testsuite>
 </testsuites>
