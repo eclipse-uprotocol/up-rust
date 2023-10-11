@@ -1,5 +1,0 @@
-resolutions:
-  rule_violations:
-  - message: "License MPL-2.0 found for statically linked package 'Crate::webpki-roots:"
-    reason: "CANT_FIX_EXCEPTION"
-    comment: "This is only pulled in during build, by the ureq crate; as soon as the above scope exclusion works this resolution can be removed."

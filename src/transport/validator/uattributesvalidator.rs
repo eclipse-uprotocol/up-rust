@@ -72,7 +72,7 @@ pub trait UAttributesValidator {
     fn is_expired(&self, attributes: &UAttributes) -> UStatus {
         match attributes.ttl {
             None => UStatus::ok_with_id("Not Expired"),
-            Some(ttl) if ttl == 0 => UStatus::ok_with_id("Not Expired"),
+            Some(0) => UStatus::ok_with_id("Not Expired"),
             Some(ttl) => {
                 // Assuming `UuidUtils::get_time` returns a Result
                 if let Ok(time) = UuidUtils::get_time(&attributes.id) {
