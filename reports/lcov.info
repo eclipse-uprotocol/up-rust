@@ -7208,7 +7208,7 @@ DA:737,2
 DA:738,2
 DA:739,2
 DA:740,2
-DA:742,4
+DA:742,3
 DA:743,2
 DA:745,2
 DA:747,2
@@ -7271,7 +7271,7 @@ DA:831,1
 DA:832,1
 DA:833,1
 DA:834,1
-DA:835,3
+DA:835,4
 DA:836,5
 DA:837,1
 DA:838,1
@@ -7347,7 +7347,7 @@ DA:921,1
 DA:922,1
 DA:923,1
 DA:924,1
-DA:925,1
+DA:925,5
 DA:926,2
 DA:927,1
 DA:928,1
@@ -7429,7 +7429,7 @@ DA:1013,2
 DA:1014,1
 DA:1015,2
 DA:1017,2
-DA:1019,5
+DA:1019,6
 DA:1020,1
 DA:1021,2
 DA:1022,2
@@ -7492,7 +7492,7 @@ DA:1100,2
 DA:1101,1
 DA:1102,2
 DA:1104,2
-DA:1106,6
+DA:1106,5
 DA:1107,1
 DA:1108,2
 DA:1109,2
@@ -11490,9 +11490,8 @@ DA:291,26
 DA:292,78
 DA:295,26
 DA:296,26
-DA:297,39
+DA:297,26
 DA:298,12
-DA:299,13
 DA:302,26
 DA:311,4
 DA:312,2
@@ -11633,8 +11632,8 @@ DA:509,2
 DA:510,2
 DA:511,2
 DA:512,4
-LF:211
-LH:210
+LF:210
+LH:209
 end_of_record
 SF:src/cloudevent/serializer/cloudeventjsonserializer.rs
 FN:22,<uprotocol_sdk::cloudevent::serializer::cloudeventjsonserializer::CloudEventJsonSerializer as uprotocol_sdk::cloudevent::serializer::cloudeventserializer::CloudEventSerializer>::serialize
