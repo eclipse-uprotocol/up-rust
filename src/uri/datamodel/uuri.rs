@@ -12,10 +12,7 @@
  ********************************************************************************/
 
 #![allow(unused)]
-
-use crate::uri::datamodel::uauthority::UAuthority;
-use crate::uri::datamodel::uentity::UEntity;
-use crate::uri::datamodel::uresource::UResource;
+use crate::uri::datamodel::{UAuthority, UEntity, UResource};
 
 use regex::Regex;
 use std::fmt;
@@ -30,7 +27,7 @@ use std::net::IpAddr;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```text
 /// //<device>.<domain>/<service>/<version>/<resource>#<message>
 /// ```
 ///
@@ -59,7 +56,7 @@ impl UUri {
     /// # Examples
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uuri::UUri;
+    /// use uprotocol_sdk::uri::datamodel::UUri;
     /// let empty_uri = UUri::EMPTY;
     /// ```
     pub const EMPTY: UUri = UUri {
@@ -87,13 +84,13 @@ impl UUri {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
-    /// use uprotocol_sdk::uri::datamodel::uentity::UEntity;
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
-    /// use uprotocol_sdk::uri::datamodel::uuri::UUri;
+    /// use uprotocol_sdk::uri::datamodel::UAuthority;
+    /// use uprotocol_sdk::uri::datamodel::UEntity;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UUri;
     ///
     /// let authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
-    /// let entity = UEntity::new("body.access".to_string(), Some("1".to_string()), None, false);
+    /// let entity = UEntity::new("body.access".to_string(), Some(1), None, false);
     /// let resource = UResource::new("door".to_string(), Some("front_left".to_string()), None, None, false);
     ///
     /// let uri = UUri::new(Some(authority), Some(entity), Some(resource));
@@ -136,7 +133,7 @@ impl UUri {
     /// Returns `true` if this `UUri` is an empty container without any valuable information
     /// for building uProtocol sinks or sources.
     pub fn is_empty(&self) -> bool {
-        self.authority.is_local() && self.entity.is_empty() && self.resource.is_empty()
+        self.authority.is_empty() && self.entity.is_empty() && self.resource.is_empty()
     }
 
     /// Returns `true` if the URI contains both names and numeric representations of the names.
@@ -173,7 +170,6 @@ impl fmt::Display for UUri {
                 return write!(f, "{}", uri);
             } else {
                 uri.push_str(&self.entity.to_string());
-                // uri.push_str("/");
             }
             if !self.resource.is_empty() {
                 uri.push_str(&self.resource.to_string());
@@ -182,7 +178,6 @@ impl fmt::Display for UUri {
             let re = Regex::new(r"/+$").unwrap();
             write!(f, "{}", re.replace_all(&uri, ""))
         } else {
-            // write!(f, "{}", self.scheme)
             write!(f, "")
         }
     }
@@ -209,12 +204,7 @@ mod tests {
     fn test_to_string() {
         let u_authority_local = UAuthority::LOCAL;
         let u_authority_remote = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
-        let u_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let u_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let u_resource = UResource::long_format_with_instance(
             "door".to_string(),
             "front_left".to_string(),
@@ -273,12 +263,7 @@ mod tests {
     #[test]
     fn test_create_full_remote_uri() {
         let u_authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
-        let use_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let u_resource = UResource::new(
             "door".to_string(),
             Some(String::from("front_left")),
@@ -301,12 +286,7 @@ mod tests {
     #[test]
     fn test_create_uri_no_message_with_constructor() {
         let u_authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
-        let use_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let u_resource = UResource::long_format("door".to_string());
 
         let uri = UUri::new(
@@ -322,12 +302,7 @@ mod tests {
 
     #[test]
     fn test_create_uri_null_authority() {
-        let use_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let u_resource = UResource::long_format_with_instance(
             "door".to_string(),
             "front_left".to_string(),
@@ -356,12 +331,7 @@ mod tests {
     #[test]
     fn test_create_uri_null_u_resource() {
         let u_authority = UAuthority::long_remote("VCU".to_string(), "MY_VIN".to_string());
-        let u_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let u_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let u_resource = UResource::EMPTY;
 
         let uri = UUri::new(

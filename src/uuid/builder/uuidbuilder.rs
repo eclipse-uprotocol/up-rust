@@ -11,63 +11,89 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use mac_address::get_mac_address;
+use mac_address::{get_mac_address, MacAddress};
 use rand::Rng;
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use uuid::{Builder, Uuid};
+use uuid::{Builder, ClockSequence, Timestamp, Uuid};
 
 const UUIDV8_VERSION: u64 = 8;
-const CLOCK_DRIFT_TOLERANCE: u64 = 10_000_000;
 const MAX_COUNT: u64 = 0xfff;
 const EMPTY_NODE_ID: [u8; 6] = [0, 0, 0, 0, 0, 0];
 
-// enum Factories {
-//     UUIDv6,
-//     UProtocol,
-// }
-
-pub trait UUIDFactory {
-    fn create(&self) -> Uuid;
-    fn create_with_instant(&self, instant: u64) -> Uuid;
+pub struct UuidClockSequence {
+    counter: AtomicU16,
 }
 
-struct UUIDv6Factory;
+impl UuidClockSequence {
+    pub fn new() -> Self {
+        UuidClockSequence {
+            counter: AtomicU16::new(0),
+        }
+    }
+}
 
-impl UUIDFactory for UUIDv6Factory {
-    fn create(&self) -> Uuid {
-        self.create_with_instant(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-        )
+impl Default for UuidClockSequence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ClockSequence for UuidClockSequence {
+    type Output = u16;
+
+    fn generate_sequence(&self, _seconds: u64, _subsec_nanos: u32) -> Self::Output {
+        // For simplicity, we're currently not using seconds or subsec_nanos
+
+        // Increment and wrap the counter safely using atomic operations
+        self.counter.fetch_add(1, Ordering::SeqCst) & 0x3FFF
+    }
+}
+
+pub trait UUIDFactory {
+    fn build(&self) -> Uuid;
+    fn build_with_instant(&self, instant: u64) -> Uuid;
+}
+
+pub struct UUIDv6Factory {
+    address: MacAddress,
+    counter: UuidClockSequence,
+}
+
+impl UUIDv6Factory {
+    pub fn new() -> Self {
+        let address_bytes = match get_mac_address() {
+            Ok(Some(mac)) => mac.bytes(),
+            _ => EMPTY_NODE_ID,
+        };
+
+        UUIDv6Factory {
+            address: MacAddress::from(address_bytes),
+            counter: UuidClockSequence::new(),
+        }
     }
 
-    fn create_with_instant(&self, _instant: u64) -> Uuid {
-        let result = get_mac_address();
-        match result {
-            Ok(maybe_mac) => {
-                match maybe_mac {
-                    Some(mac) => {
-                        // MAC address retrieved successfully
-                        return Uuid::now_v6(&mac.bytes());
-                    }
-                    None => {
-                        // The function succeeded, but there was no MAC address.
-                        println!("No MAC address was found.");
-                    }
-                }
-            }
-            Err(e) => {
-                // The function returned an error.
-                eprintln!(
-                    "An error occurred while trying to retrieve the MAC address: {}",
-                    e
-                );
-            }
-        }
-        Uuid::now_v6(&EMPTY_NODE_ID)
+    pub fn with_mac_address(mut self, address: MacAddress) -> Self {
+        self.address = address;
+        self
+    }
+}
+
+impl Default for UUIDv6Factory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl UUIDFactory for UUIDv6Factory {
+    fn build(&self) -> Uuid {
+        Uuid::now_v6(&self.address.bytes())
+    }
+
+    fn build_with_instant(&self, instant: u64) -> Uuid {
+        let instant = Timestamp::from_rfc4122(instant, self.counter.generate_sequence(0, 0));
+        Uuid::new_v6(instant, &self.address.bytes())
     }
 }
 
@@ -129,52 +155,41 @@ impl Default for UUIDv8Factory {
 }
 
 impl UUIDFactory for UUIDv8Factory {
-    fn create(&self) -> Uuid {
+    fn build(&self) -> Uuid {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        self.create_with_instant(now)
+        self.build_with_instant(now)
     }
 
-    fn create_with_instant(&self, instant: u64) -> Uuid {
+    fn build_with_instant(&self, instant: u64) -> Uuid {
         let new_msb = {
-            // Lock the mutex only for the time it takes to perform the calculations
             let mut msb = self.msb.lock().unwrap();
 
-            // Check if the current time is the same as the previous time or has moved
-            // backwards after a small system clock adjustment or after a leap second.
-            // Drift tolerance = (previous_time - 10s) < current_time <= previous_time
-            if instant <= (*msb >> 16) && instant > ((*msb >> 16) - CLOCK_DRIFT_TOLERANCE) {
+            if instant == (*msb >> 16) {
                 // Increment the counter if we are not at MAX_COUNT
-                if (*msb & 0xFFF) < MAX_COUNT {
+                if (*msb & 0xFFFu64) < MAX_COUNT {
                     *msb += 1;
-                } else {
-                    panic!("Counters out of bounds");
                 }
-
-            // The previous time is not the same tick as the current so we reset msb
             } else {
-                *msb = (instant << 16) | (UUIDV8_VERSION << 12);
+                *msb = (instant << 16) | (8u64 << 12);
             }
 
-            // Clone the msb to use outside of this block
             *msb
         };
 
         let mut bytes = [0u8; 16]; // 8 bytes for msg and 8 bytes for lsb
         bytes[..8].copy_from_slice(&new_msb.to_le_bytes());
         bytes[8..].copy_from_slice(&self.lsb.to_le_bytes());
-
-        let builder = Builder::from_custom_bytes(bytes);
-        builder.into_uuid()
+        Builder::from_custom_bytes(bytes).into_uuid()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::uuid::uuidutils::UuidUtils;
+    use crate::uuid::builder::uuidutils::UuidUtils;
     use base64::{engine::general_purpose, Engine as _};
 
     #[test]
@@ -188,7 +203,7 @@ mod tests {
     #[test]
     fn test_obj_to_string_conversions() {
         let uuid_factory = UUIDv8Factory::new();
-        let uuid1 = uuid_factory.create();
+        let uuid1 = uuid_factory.build();
         let str1 = uuid1.to_string();
         let uuid2 = Uuid::parse_str(&str1).unwrap();
         assert_eq!(str1, uuid2.to_string());
@@ -197,8 +212,8 @@ mod tests {
     #[test]
     fn test_uuid_for_constant_random() {
         let factory = UUIDv8Factory::new();
-        let uuid1 = factory.create();
-        let uuid2 = factory.create();
+        let uuid1 = factory.build();
+        let uuid2 = factory.build();
         assert_eq!(uuid1.to_fields_le().3, uuid2.to_fields_le().3); // Check that the "node" field (least significant 64 bits) is the same
     }
 
@@ -212,7 +227,7 @@ mod tests {
             .as_millis() as u64;
 
         for _ in 0..4096 {
-            let uuid = uuidv8_factory.create_with_instant(now);
+            let uuid = uuidv8_factory.build_with_instant(now);
             uuids.push(uuid);
 
             // Assert that the timestamp is the same as the first UUID
@@ -229,7 +244,7 @@ mod tests {
     #[test]
     fn test_uuid_byte_obj_conversions() {
         let factory = UUIDv8Factory::new();
-        let uuid1 = factory.create();
+        let uuid1 = factory.build();
 
         // Convert the UUID to a byte array
         let bytes = uuid1.as_bytes().to_vec();
@@ -246,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_uuid6_byte_obj_conversions() {
-        let uuid1 = UUIDv6Factory.create();
+        let uuid1 = UUIDv6Factory::new().build();
 
         // Convert the UUID to a byte array
         let bytes = uuid1.as_bytes().to_vec();
@@ -263,16 +278,16 @@ mod tests {
 
     #[test]
     fn test_uuid6_build_many() {
-        let uuidv6_factory = UUIDv6Factory {};
+        let uuidv6_factory = UUIDv6Factory::new();
         let mut uuids = Vec::new();
 
         for _ in 0..4096 {
-            let uuid = uuidv6_factory.create();
+            let uuid = uuidv6_factory.build();
             uuids.push(uuid);
         }
 
         // Try adding one more, but there is no counters in UUIDv6 version, so it doesn't cause any errors
-        let uuid = uuidv6_factory.create();
+        let uuid = uuidv6_factory.build();
         uuids.push(uuid);
 
         // Now we should have 4097 UUIDs
@@ -293,18 +308,12 @@ mod tests {
     #[test]
     fn test_uuid_size() {
         let factory = UUIDv8Factory::new();
-        let uuid1 = factory.create();
+        let uuid1 = factory.build();
         let bytes = uuid1.as_bytes();
 
         let encoded = general_purpose::STANDARD.encode(bytes);
         let decoded = general_purpose::STANDARD.decode(encoded.clone()).unwrap();
         let uuid2 = Uuid::from_slice(&decoded).unwrap();
-
-        println!(
-            "Size of UUID as string is: {}, Length in binary is: {}",
-            uuid1.to_string().len(),
-            encoded.len()
-        );
 
         assert_eq!(bytes, &decoded[..]);
         assert_eq!(uuid1.to_string(), uuid2.to_string());

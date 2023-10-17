@@ -54,7 +54,7 @@ impl UAuthority {
     /// # Examples
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
+    /// use uprotocol_sdk::uri::datamodel::UAuthority;
     /// let empty_authority = UAuthority::EMPTY;
     /// ```
     pub const EMPTY: UAuthority = UAuthority {
@@ -74,7 +74,7 @@ impl UAuthority {
     /// # Examples
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
+    /// use uprotocol_sdk::uri::datamodel::UAuthority;
     /// let local_authority = UAuthority::LOCAL;
     /// ```
     pub const LOCAL: UAuthority = UAuthority {
@@ -97,7 +97,7 @@ impl UAuthority {
     /// # Examples
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
+    /// use uprotocol_sdk::uri::datamodel::UAuthority;
     /// let authority = UAuthority::new(Some("VCU".to_string()), Some("VehicleDomain".to_string()), true, None, false);
     /// ```
     pub fn new(
@@ -173,15 +173,8 @@ impl UAuthority {
     /// # Returns
     ///
     /// * A new `UAuthority` instance that includes the provided `device` and `domain`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
-    /// let remote_authority = UAuthority::long_remote("VCU".to_string(), "VehicleDomain".to_string());
-    /// ```
     pub fn long_remote(device: String, domain: String) -> Self {
-        Self::remote(Some(device), Some(domain), None)
+        Self::new(Some(device), Some(domain), true, None, false)
     }
 
     /// Creates a new `UAuthority` using an IP address.
@@ -217,12 +210,18 @@ impl UAuthority {
     /// # Examples
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
+    /// use uprotocol_sdk::uri::datamodel::UAuthority;
     /// let remote_authority = UAuthority::long_remote("device".to_string(), "domain".to_string());
     /// assert!(remote_authority.is_remote());
     /// ```
     pub fn is_remote(&self) -> bool {
         self.inet_address.is_some() || self.domain.is_some() || self.device.is_some()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.domain.is_none() && self.device.is_none() && self.inet_address.is_none()
+
+        // && (self.instance.as_ref().map_or(false, |s| s.is_empty()))
     }
 
     /// Checks if this `UAuthority` is local.
@@ -236,7 +235,7 @@ impl UAuthority {
     /// # Examples
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uauthority::UAuthority;
+    /// use uprotocol_sdk::uri::datamodel::UAuthority;
     /// let remote_authority = UAuthority::LOCAL;
     /// assert!(remote_authority.is_local());
     /// ```

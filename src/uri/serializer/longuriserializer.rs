@@ -13,14 +13,11 @@
 
 use regex::Regex;
 
-use crate::uri::datamodel::uauthority::UAuthority;
-use crate::uri::datamodel::uentity::UEntity;
-use crate::uri::datamodel::uresource::UResource;
-use crate::uri::datamodel::uuri::UUri;
+use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
 use crate::uri::serializer::uriserializer::UriSerializer;
 
 /// UUri Serializer that serializes a UUri to a string (long format) per
-///  https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc
+/// <https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc>
 pub struct LongUriSerializer;
 
 impl UriSerializer<String> for LongUriSerializer {
@@ -127,9 +124,16 @@ impl UriSerializer<String> for LongUriSerializer {
             }
         }
 
+        let mut version: Option<u32> = None;
+        if let Some(v) = use_version {
+            if let Ok(ver) = v.parse::<u32>() {
+                version = Some(ver)
+            }
+        }
+
         UUri::new(
             Some(authority),
-            Some(UEntity::long_format(use_name, use_version)),
+            Some(UEntity::long_format(use_name, version)),
             Some(resource),
         )
     }
@@ -181,7 +185,7 @@ impl LongUriSerializer {
         uri.push('/');
 
         if let Some(version) = &entity.version {
-            uri.push_str(version);
+            uri.push_str(&version.to_string());
         }
 
         uri
@@ -313,8 +317,7 @@ mod tests {
         assert!(uri.authority.is_local());
         assert!(uri.authority.marked_remote);
         assert!(uri.entity.name.is_empty());
-        assert!(uri.entity.version.is_some());
-        assert_eq!("body.access", uri.entity.version.unwrap());
+        assert!(uri.entity.version.is_none());
         assert!(uri.resource.is_empty());
     }
 
@@ -359,7 +362,7 @@ mod tests {
         assert!(!uri.authority.marked_remote);
         assert_eq!("body.access", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert!(uri.resource.is_empty());
     }
 
@@ -383,7 +386,7 @@ mod tests {
         assert!(uri.authority.is_local());
         assert!(!uri.authority.marked_remote);
         assert_eq!("body.access", uri.entity.name);
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_none());
         assert!(uri.resource.message.is_none());
@@ -410,7 +413,7 @@ mod tests {
         assert!(uri.authority.is_local());
         assert!(!uri.authority.marked_remote);
         assert_eq!("body.access", uri.entity.name);
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("front_left", uri.resource.instance.unwrap());
@@ -441,7 +444,7 @@ mod tests {
         assert!(uri.authority.is_local());
         assert!(!uri.authority.marked_remote);
         assert_eq!("body.access", uri.entity.name);
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("front_left", uri.resource.instance.unwrap());
@@ -470,7 +473,7 @@ mod tests {
         assert!(uri.authority.is_local());
         assert!(!uri.authority.marked_remote);
         assert_eq!("petapp", uri.entity.name);
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("rpc", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("response", uri.resource.instance.unwrap());
@@ -554,7 +557,7 @@ mod tests {
         assert_eq!("my_car_vin", uri.authority.domain.unwrap());
         assert_eq!("body.access", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert!(uri.resource.is_empty());
     }
 
@@ -569,7 +572,7 @@ mod tests {
         assert_eq!("uprotocol.example.com", uri.authority.domain.unwrap());
         assert_eq!("body.access", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert!(uri.resource.is_empty());
     }
 
@@ -615,7 +618,7 @@ mod tests {
         assert!(uri.authority.domain.is_some());
         assert_eq!("my_car_vin", uri.authority.domain.unwrap());
         assert_eq!("body.access", uri.entity.name);
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_none());
         assert!(uri.resource.message.is_none());
@@ -631,7 +634,7 @@ mod tests {
         assert!(uri.authority.domain.is_some());
         assert_eq!("uprotocol.example.com", uri.authority.domain.unwrap());
         assert_eq!("body.access", uri.entity.name);
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_none());
         assert!(uri.resource.message.is_none());
@@ -667,7 +670,7 @@ mod tests {
         assert_eq!("my_car_vin", uri.authority.domain.unwrap());
         assert_eq!("body.access", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("front_left", uri.resource.instance.unwrap());
@@ -724,7 +727,7 @@ mod tests {
         assert_eq!("my_car_vin", uri.authority.domain.unwrap());
         assert_eq!("body.access", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("front_left", uri.resource.instance.unwrap());
@@ -744,7 +747,7 @@ mod tests {
         assert_eq!("uprotocol.example.com", uri.authority.domain.unwrap());
         assert_eq!("body.access", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("front_left", uri.resource.instance.unwrap());
@@ -763,7 +766,7 @@ mod tests {
         assert!(uri.authority.domain.is_none());
         assert_eq!("body.access", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("door", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("front_left", uri.resource.instance.unwrap());
@@ -798,7 +801,7 @@ mod tests {
         assert_eq!("cloud", uri.authority.domain.unwrap());
         assert_eq!("petapp", uri.entity.name);
         assert!(uri.entity.version.is_some());
-        assert_eq!("1", uri.entity.version.unwrap());
+        assert_eq!(1, uri.entity.version.unwrap());
         assert_eq!("rpc", uri.resource.name);
         assert!(uri.resource.instance.is_some());
         assert_eq!("response", uri.resource.instance.unwrap());
@@ -837,12 +840,7 @@ mod tests {
 
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_local_authority_service_and_version() {
-        let use_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let uri = UUri::new(Some(UAuthority::LOCAL), Some(use_entity), None);
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
         assert_eq!("/body.access/1", &u_protocol_uri);
@@ -861,12 +859,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_local_authority_service_and_version_with_resource(
     ) {
-        let use_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let resource = UResource::long_format("door".to_string());
         let uri = UUri::new(Some(UAuthority::LOCAL), Some(use_entity), Some(resource));
         let u_protocol_uri = LongUriSerializer::serialize(&uri);
@@ -890,12 +883,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_local_authority_service_and_version_with_resource_with_instance_no_message(
     ) {
-        let use_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
             "front_left".to_string(),
@@ -925,12 +913,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_local_authority_service_and_version_with_resource_with_instance_with_message(
     ) {
-        let use_entity = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_entity = UEntity::new("body.access".to_string(), Some(1), None, false);
         let resource = UResource::new(
             "door".to_string(),
             Some(String::from("front_left")),
@@ -965,12 +948,7 @@ mod tests {
 
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_and_version() {
-        let use_case = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_case = UEntity::new("body.access".to_string(), Some(1), None, false);
         let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let uresource = UResource::EMPTY;
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(uresource));
@@ -980,12 +958,7 @@ mod tests {
 
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_cloud_authority_service_and_version() {
-        let use_case = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_case = UEntity::new("body.access".to_string(), Some(1), None, false);
         let uauthority =
             UAuthority::long_remote("cloud".to_string(), "uprotocol.example.com".to_string());
         let uri = UUri::new(Some(uauthority), Some(use_case), None);
@@ -999,12 +972,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_and_version_with_resource(
     ) {
-        let use_case = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_case = UEntity::new("body.access".to_string(), Some(1), None, false);
         let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::long_format("door".to_string());
         let uri = UUri::new(Some(uauthority), Some(use_case), Some(resource));
@@ -1026,12 +994,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_and_version_with_resource_with_instance_no_message(
     ) {
-        let use_case = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_case = UEntity::new("body.access".to_string(), Some(1), None, false);
         let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::long_format_with_instance(
             "door".to_string(),
@@ -1049,12 +1012,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_cloud_authority_service_and_version_with_resource_with_instance_no_message(
     ) {
-        let use_case = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_case = UEntity::new("body.access".to_string(), Some(1), None, false);
         let uauthority =
             UAuthority::long_remote("cloud".to_string(), "uprotocol.example.com".to_string());
         let resource = UResource::long_format_with_instance(
@@ -1091,12 +1049,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_has_remote_authority_service_and_version_with_resource_with_instance_and_message(
     ) {
-        let use_case = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let use_case = UEntity::new("body.access".to_string(), Some(1), None, false);
         let uauthority = UAuthority::long_remote("VCU".to_string(), "MY_CAR_VIN".to_string());
         let resource = UResource::new(
             "door".to_string(),
@@ -1136,7 +1089,7 @@ mod tests {
     #[test]
     fn test_build_protocol_uri_for_source_part_of_rpc_request_where_source_is_local() {
         let uauthority = UAuthority::LOCAL;
-        let use_case = UEntity::new("petapp".to_string(), Some("1".to_string()), None, false);
+        let use_case = UEntity::new("petapp".to_string(), Some(1), None, false);
         let u_protocol_uri =
             LongUriSerializer::serialize(&UUri::rpc_response(uauthority, use_case));
 
@@ -1175,7 +1128,7 @@ mod tests {
         ));
         let use_case = Some(UEntity::new(
             "body.access".to_string(),
-            Some("1".to_string()),
+            Some(1),
             None,
             false,
         ));
@@ -1202,7 +1155,7 @@ mod tests {
         ));
         let entity = Some(UEntity::new(
             "body.access".to_string(),
-            Some("1".to_string()),
+            Some(1),
             None,
             false,
         ));

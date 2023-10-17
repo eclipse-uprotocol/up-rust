@@ -11,11 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::uattributes::UAttributes;
-use crate::transport::datamodel::umessagetype::UMessageType;
-use crate::transport::datamodel::ustatus::{UCode, UStatus};
-use crate::uri::validator::urivalidator::UriValidator;
-use crate::uuid::uuidutils::UuidUtils;
+use crate::transport::datamodel::{UAttributes, UCode, UMessageType, UStatus};
+use crate::uri::validator::UriValidator;
+use crate::uuid::builder::UuidUtils;
 
 use std::time::SystemTime;
 
@@ -41,7 +39,7 @@ pub trait UAttributesValidator {
         .map(|status| status.message().clone())
         .collect();
 
-        let error_message = error_messages.join(" ");
+        let error_message = error_messages.join(", ");
         if error_message.is_empty() {
             UStatus::ok()
         } else {
@@ -75,7 +73,7 @@ pub trait UAttributesValidator {
             Some(0) => UStatus::ok_with_id("Not Expired"),
             Some(ttl) => {
                 // Assuming `UuidUtils::get_time` returns a Result
-                if let Ok(time) = UuidUtils::get_time(&attributes.id) {
+                if let Some(time) = UuidUtils::get_time(&attributes.id) {
                     let delta = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .unwrap()
@@ -377,12 +375,9 @@ impl UAttributesValidator for ResponseValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transport::datamodel::uattributes::UAttributesBuilder;
-    use crate::transport::datamodel::upriority::UPriority;
-    use crate::transport::datamodel::userializationhint::USerializationHint;
-    use crate::uri::serializer::longuriserializer::LongUriSerializer;
-    use crate::uri::serializer::uriserializer::UriSerializer;
-    use crate::uuid::uuidbuilder::{UUIDFactory, UUIDv8Factory};
+    use crate::transport::datamodel::{UAttributesBuilder, UPriority};
+    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
+    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
 
     use uuid::Uuid;
 
@@ -390,35 +385,32 @@ mod tests {
     fn test_fetching_validator_for_valid_types() {
         // Test for PUBLISH type
         let publish_attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
-        .build()
-        .unwrap();
+        .build();
         let publish_validator: Box<dyn UAttributesValidator> =
             Validators::get_validator(&publish_attributes);
         assert_eq!(publish_validator.type_name(), "PublishValidator");
 
         // Test for REQUEST type
         let request_attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Request,
             UPriority::Low,
         )
-        .build()
-        .unwrap();
+        .build();
         let request_validator = Validators::get_validator(&request_attributes);
         assert_eq!(request_validator.type_name(), "RequestValidator");
 
         // Test for RESPONSE type
         let response_attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Response,
             UPriority::Low,
         )
-        .build()
-        .unwrap();
+        .build();
         let response_validator = Validators::get_validator(&response_attributes);
         assert_eq!(response_validator.type_name(), "ResponseValidator");
     }
@@ -431,12 +423,11 @@ mod tests {
     #[test]
     fn test_validating_valid_publish_messagetypes() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
 
@@ -456,14 +447,13 @@ mod tests {
     #[test]
     fn test_validating_publish_invalid_ttl_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         // changed this to 0 as the only possible invalid value in Rust implementation
         .with_ttl(0)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
 
@@ -476,13 +466,12 @@ mod tests {
     #[test]
     fn test_validating_valid_ttl_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         .with_ttl(100)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
 
@@ -496,13 +485,12 @@ mod tests {
 
         // Build the attributes
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         .with_sink(uri)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
 
@@ -519,13 +507,12 @@ mod tests {
 
         // Build the attributes
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         .with_sink(uri)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
 
@@ -537,13 +524,12 @@ mod tests {
     #[test]
     fn test_validating_invalid_req_id_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         .with_reqid(Uuid::new_v4())
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
         let status = validator.validate_reqid(&attributes);
@@ -556,13 +542,12 @@ mod tests {
     #[test]
     fn test_validating_valid_req_id_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
-        .with_reqid(UUIDv8Factory::new().create())
-        .build()
-        .unwrap();
+        .with_reqid(UUIDv8Factory::new().build())
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
         let status = validator.validate_reqid(&attributes);
@@ -577,13 +562,12 @@ mod tests {
     #[test]
     fn test_validating_valid_permission_level_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         .with_plevel(0)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
         let status = validator.validate(&attributes);
@@ -594,13 +578,12 @@ mod tests {
     #[test]
     fn test_validating_invalid_commstatus_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         .with_commstatus(100)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
         let status = validator.validate_commstatus(&attributes);
@@ -613,13 +596,12 @@ mod tests {
     #[test]
     fn test_validating_valid_commstatus_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
         .with_commstatus(UCode::Aborted as i32)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
         let status = validator.validate_commstatus(&attributes);
@@ -631,14 +613,13 @@ mod tests {
     fn test_validating_request_message_types() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Request,
             UPriority::Low,
         )
         .with_sink(sink)
         .with_ttl(100)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
         let status = validator.validate(&attributes);
@@ -650,12 +631,11 @@ mod tests {
     #[test]
     fn test_validating_request_validator_with_wrong_messagetype() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::Request.validator();
         let status = validator.validate(&attributes);
@@ -671,14 +651,13 @@ mod tests {
     fn test_validating_request_validator_with_wrong_bad_ttl() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Request,
             UPriority::NetworkControl,
         )
         .with_sink(sink)
         .with_ttl(0)
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::Request.validator();
         let status = validator.validate(&attributes);
@@ -692,15 +671,14 @@ mod tests {
     fn test_validating_response_validator_with_wrong_bad_ttl() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Response,
             UPriority::NetworkControl,
         )
         .with_sink(sink)
         .with_ttl(0)
-        .with_reqid(UUIDv8Factory::new().create())
-        .build()
-        .unwrap();
+        .with_reqid(UUIDv8Factory::new().build())
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::Response.validator();
         let status = validator.validate(&attributes);
@@ -714,15 +692,14 @@ mod tests {
     fn test_validating_response_validator_with_bad_reqid() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Response,
             UPriority::NetworkControl,
         )
         .with_sink(sink)
         .with_ttl(100)
         .with_reqid(Uuid::new_v4())
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::Response.validator();
         let status = validator.validate(&attributes);
@@ -735,12 +712,11 @@ mod tests {
     #[test]
     fn test_validating_publish_validator_with_wrong_messagetype() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Request,
             UPriority::Low,
         )
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::Publish.validator();
         let status = validator.validate(&attributes);
@@ -753,12 +729,11 @@ mod tests {
     #[test]
     fn test_validating_response_validator_with_wrong_messagetype() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::Response.validator();
         let status = validator.validate(&attributes);
@@ -773,14 +748,12 @@ mod tests {
     #[test]
     fn test_validating_request_containing_hint_and_token() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
-        .with_hint(USerializationHint::Json)
         .with_token("null".to_string())
-        .build()
-        .unwrap();
+        .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
         let status = validator.validate(&attributes);

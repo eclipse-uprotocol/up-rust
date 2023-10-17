@@ -26,13 +26,13 @@ pub enum UPriority {
 }
 
 impl UPriority {
-    pub const CS0: &'static str = "CS0";
-    pub const CS1: &'static str = "CS1";
-    pub const CS2: &'static str = "CS2";
-    pub const CS3: &'static str = "CS3";
-    pub const CS4: &'static str = "CS4";
-    pub const CS5: &'static str = "CS5";
-    pub const CS6: &'static str = "CS6";
+    pub const CS0: &'static str = "CS0"; // Low Priority. No bandwidth assurance such as File Transfer.
+    pub const CS1: &'static str = "CS1"; // Standard, undifferentiated application such as General (unclassified).
+    pub const CS2: &'static str = "CS2"; // Operations, Administration, and Management such as Streamer messages (sub, connect, etc…)
+    pub const CS3: &'static str = "CS3"; // Multimedia streaming such as Video Streaming
+    pub const CS4: &'static str = "CS4"; // Real-time interactive such as High priority (rpc events)
+    pub const CS5: &'static str = "CS5"; // Signaling such as Important
+    pub const CS6: &'static str = "CS6"; // Network control such as Safety Critical
 
     pub fn all_priorities() -> Vec<Self> {
         vec![

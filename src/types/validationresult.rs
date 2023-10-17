@@ -1,7 +1,8 @@
 use std::fmt;
 
-use crate::transport::datamodel::ustatus::{UCode, UStatus};
+use crate::transport::datamodel::{UCode, UStatus};
 
+///  ValidationResult of success or failure, wrapping the value of a UStatus.
 #[derive(Debug, PartialEq)]
 pub enum ValidationResult {
     Success,

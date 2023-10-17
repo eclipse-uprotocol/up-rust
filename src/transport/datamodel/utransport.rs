@@ -11,12 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::uattributes::UAttributes;
-use crate::transport::datamodel::ulistener::UListener;
-use crate::transport::datamodel::upayload::UPayload;
-use crate::transport::datamodel::ustatus::UStatus;
-use crate::uri::datamodel::uentity::UEntity;
-use crate::uri::datamodel::uuri::UUri;
+use crate::transport::datamodel::{UAttributes, UListener, UPayload, UStatus};
+use crate::uri::datamodel::{UEntity, UUri};
 
 pub trait UTransport {
     /// API to register the calling uE with the underlying transport implementation.

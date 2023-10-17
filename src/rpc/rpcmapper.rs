@@ -16,9 +16,9 @@
 use crate::proto::{self, Status as ProtoStatus};
 use crate::rpc::rpcclient::{RpcClient, RpcClientResult};
 use crate::rpc::rpcresult::RpcResult;
-use crate::transport::datamodel::upayload::UPayload;
-use crate::transport::datamodel::userializationhint::USerializationHint;
-use crate::transport::datamodel::ustatus::{FailStatus, OkStatus, UCode, UStatus};
+use crate::transport::datamodel::{
+    FailStatus, OkStatus, UCode, UPayload, USerializationHint, UStatus,
+};
 
 use prost::{DecodeError, EncodeError, Message, Name};
 use prost_types::Any;
@@ -110,7 +110,7 @@ impl RpcMapper {
     /// - RpcPayloadResult = Result<RpcPayload, RpcMapperError>
     /// - pub struct RpcPayload {
     ///     status: UStatus,
-    ///     payload: Option<UPayload>,
+    ///     payload: `Option<UPayload>`,
     ///   }
     ///
     /// # Note
@@ -120,8 +120,7 @@ impl RpcMapper {
     /// - is there [`UStatus`] information (transporting info about the status of an operation, sent from a remote service)?
     /// - is there payload data passed in the result, to be decoded by the caller.  
     ///
-    /// This entire thing feels extremely klunky and kludgy; I've built this to match the Java SDK as far as made sense at the time,
-    /// this this needs to be revisited...
+    /// This entire thing feels klunky and kludgy; this this needs to be revisited...
     pub fn map_response_to_result(
         response_future: Pin<Box<dyn Future<Output = RpcClientResult>>>,
     ) -> Pin<Box<dyn Future<Output = RpcPayloadResult>>> {
@@ -321,18 +320,13 @@ impl RpcMapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloudevent::datamodel::ucloudeventtype::UCloudEventType;
+    use crate::cloudevent::datamodel::UCloudEventType;
     use crate::proto::CloudEvent as CloudEventProto;
     use crate::proto::Status as ProtoStatus;
-    use crate::transport::datamodel::uattributes::UAttributes;
-    use crate::transport::datamodel::uattributes::UAttributesBuilder;
-    use crate::uri::datamodel::uauthority::UAuthority;
-    use crate::uri::datamodel::uentity::UEntity;
-    use crate::uri::datamodel::uuri::UUri;
-    use crate::uri::serializer::longuriserializer::LongUriSerializer;
-    use crate::uri::serializer::uriserializer::UriSerializer;
-    use crate::uuid::uuidbuilder::UUIDFactory;
-    use crate::uuid::uuidbuilder::UUIDv8Factory;
+    use crate::transport::datamodel::{UAttributes, UAttributesBuilder};
+    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
+    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
 
     use bytes::{Buf, BufMut};
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
@@ -846,7 +840,7 @@ mod tests {
     fn build_cloud_event_for_test() -> Event {
         EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::REQUEST.to_string())
+            .ty(UCloudEventType::REQUEST)
             .source("http://example.com")
             .build()
             .unwrap()
@@ -866,13 +860,12 @@ mod tests {
 
     fn build_attributes() -> UAttributes {
         UAttributesBuilder::for_rpc_request(
-            UUIDv8Factory::new().create(),
+            UUIDv8Factory::new().build(),
             UUri::rpc_response(
                 UAuthority::EMPTY,
                 UEntity::long_format("hartley".to_string(), None),
             ),
         )
         .build()
-        .unwrap()
     }
 }

@@ -17,28 +17,21 @@ use std::fmt;
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum USerializationHint {
     #[default]
-    Unknown,
-    Protobuf,
-    Json,
-    SomeIp,
-    Raw,
+    Unknown, // Serialization hint is unknown
+    Protobuf, // serialized com.google.protobuf.Any type
+    Json,     // data is a UTF-8 string containing a JSON structure
+    SomeIp,   // data is a UTF-8 string containing a JSON structure
+    Raw,      // Raw binary data that has not been serialized
+    Text,     // Text Format
 }
 
 impl USerializationHint {
-    // Serialization hint is unknown
     const UNKNOWN: &'static str = "";
-
-    // serialized com.google.protobuf.Any type
     const PROTOBUF: &'static str = "application/x-protobuf";
-
-    // data is a UTF-8 string containing a JSON structure
     const JSON: &'static str = "application/json";
-
-    // data is SOME/IP something
     const SOMEIP: &'static str = "application/x-someip";
-
-    // Raw binary data that has not been serialized
     const RAW: &'static str = "application/octet-stream";
+    const TEXT: &'static str = "text/plain";
 
     pub fn hint_number(&self) -> i32 {
         match self {
@@ -47,6 +40,7 @@ impl USerializationHint {
             Self::Json => 2,
             Self::SomeIp => 3,
             Self::Raw => 4,
+            Self::Text => 5,
         }
     }
 
@@ -57,6 +51,7 @@ impl USerializationHint {
             Self::Json => Self::JSON,
             Self::SomeIp => Self::SOMEIP,
             Self::Raw => Self::RAW,
+            Self::Text => Self::TEXT,
         }
     }
 
@@ -67,6 +62,7 @@ impl USerializationHint {
             Self::Json,
             Self::SomeIp,
             Self::Raw,
+            Self::Text,
         ]
     }
 }

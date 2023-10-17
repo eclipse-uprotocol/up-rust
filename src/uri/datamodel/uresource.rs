@@ -41,7 +41,7 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let empty_resource = UResource::EMPTY;
     /// assert!(empty_resource.name.is_empty());
@@ -69,7 +69,7 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let resource = UResource::new("door".to_string(), Some("front_left".to_string()), Some("DoorOpenEvent".to_string()), None, false);
     /// ```
@@ -118,7 +118,7 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let resource = UResource::long_format("door".to_string());
     /// ```
@@ -148,7 +148,7 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let resource = UResource::long_format_with_instance("door".to_string(), "front_left".to_string(), None);
     /// ```
@@ -176,17 +176,7 @@ impl UResource {
     ///
     /// Returns a `UResource` with the given resource id. The name, instance, and message fields will be empty.
     pub fn micro_format(id: u16) -> Self {
-        if id == 0 {
-            Self::new(
-                "rpc".to_string(),
-                Some("response".to_string()),
-                None,
-                Some(id),
-                false,
-            )
-        } else {
-            Self::new(UNKNOWN_NAME.to_string(), None, None, Some(id), false)
-        }
+        Self::new("".to_string(), None, None, Some(id), false)
     }
 
     /// Creates a `UResource` instance representing an RPC command.
@@ -205,7 +195,7 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let rpc_command = UResource::for_rpc_request(Some("UpdateDoor".to_string()), None);
     /// ```
@@ -247,7 +237,7 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let resource = UResource::for_rpc_request(Some("UpdateDoor".to_string()), None);
     /// assert!(resource.is_rpc_method());
@@ -296,15 +286,22 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let empty_resource = UResource::EMPTY;
     /// assert!(empty_resource.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
-        self.name.is_empty()
-            && (self.instance.as_ref().map_or(true, |s| s.is_empty()))
-            && (self.message.as_ref().map_or(true, |s| s.is_empty()))
+        (self.name.trim().is_empty() || self.name.eq("rpc"))
+            && self.instance.is_none()
+            && self.message.is_none()
+            && self.id.is_none()
+
+        // return (name.isBlank() || "rpc".equals(name)) && instance().isEmpty() && message().isEmpty() && id().isEmpty();
+
+        // self.name.is_empty()
+        //     && (self.instance.as_ref().map_or(false, |s| s.is_empty()))
+        //     && (self.message.as_ref().map_or(false, |s| s.is_empty()))
     }
 
     /// Builds a string with the name and instance attributes.
@@ -319,7 +316,7 @@ impl UResource {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::uri::datamodel::uresource::UResource;
+    /// use uprotocol_sdk::uri::datamodel::UResource;
     ///
     /// let resource = UResource::long_format_with_instance("name".to_string(), "instance".to_string(), None);
     /// assert_eq!(resource.name_with_instance(), "name.instance");
@@ -332,6 +329,33 @@ impl UResource {
         }
     }
 
+    /// Constructs a `UResource` that has all elements resolved, making it suitable for serialization
+    /// into both long form `UUri` and micro form `UUri`.
+    ///
+    /// - `name`: Represents the resource as a noun, e.g., `door` or `window`. In cases where the method
+    ///           manipulates the resource, it represents a verb.
+    /// - `instance`: A specific instance of a resource, such as `front_left`.
+    /// - `message`: Corresponds to the protobuf service IDL message name that defines structured data types.
+    ///              A message is a data structure type used to define data that is passed in events and RPC methods.
+    /// - `id`: The numeric representation of this `UResource`.
+    ///
+    /// Returns a `UResource` that contains all the necessary information for serialization into both long
+    /// form and micro form `UUri`.
+    pub fn resolved_format(name: String, instance: String, message: String, id: u16) -> Self {
+        let resolved = name.trim().is_empty();
+        UResource {
+            name,
+            instance: Some(instance),
+            message: Some(message),
+            id: Some(id),
+            marked_resolved: resolved,
+        }
+    }
+    // public static UResource resolvedFormat(String name, String instance, String message, Short id) {
+    //     boolean resolved = name != null && !name.isBlank() && id != null;
+    //     return new UResource(name, instance, message, id, resolved);
+    // }
+
     pub fn is_resolved(&self) -> bool {
         self.id.is_some() && self.is_long_form()
     }
@@ -341,9 +365,9 @@ impl UResource {
             || self.message.is_some()
     }
 
-    // public boolean isResolved() {
-    //     return (id != null) && isLongForm();
-    // }
+    pub fn is_micro_form(&self) -> bool {
+        self.id.is_some()
+    }
 }
 
 impl fmt::Display for UResource {
@@ -583,32 +607,6 @@ mod tests {
     }
 
     #[test]
-    fn test_create_uresource_by_calling_from_id_static_method() {
-        let u_resource = UResource::micro_format(5);
-        assert_eq!("unknown", u_resource.name);
-        assert_eq!(None, u_resource.instance);
-        assert_eq!(None, u_resource.message);
-        assert_eq!(Some(5), u_resource.id);
-        assert_eq!(
-            "UResource { name: 'unknown', instance: '', message: '', id: '5' }",
-            format!("{:?}", u_resource)
-        );
-    }
-
-    #[test]
-    fn test_create_response_uresource_by_calling_from_id() {
-        let u_resource = UResource::micro_format(0);
-        assert_eq!("rpc", u_resource.name);
-        assert_eq!(Some("response".to_string()), u_resource.instance);
-        assert_eq!(None, u_resource.message);
-        assert_eq!(Some(0), u_resource.id);
-        assert_eq!(
-            "UResource { name: 'rpc', instance: 'response', message: '', id: '0' }",
-            format!("{:?}", u_resource)
-        );
-    }
-
-    #[test]
     fn test_create_response_uresource_passing_name_instance_and_id() {
         let u_resource = UResource::new(
             "rpc".to_string(),
@@ -697,25 +695,6 @@ mod tests {
         );
         assert!(!u_resource5.is_resolved());
         assert!(!u_resource5.is_long_form());
-    }
-
-    #[test]
-    fn test_parse_from_string_with_valid_long_form_uresource_string() {
-        let uresource = UResource::parse_from_string("0").unwrap();
-        assert_eq!(
-            format!("{:?}", uresource),
-            "UResource { name: 'rpc', instance: 'response', message: '', id: '0' }"
-        );
-        assert!(uresource.id.is_some());
-        assert_eq!(uresource.id.unwrap(), 0);
-
-        let uresource2 = UResource::parse_from_string("1").unwrap();
-        assert_eq!(
-            format!("{:?}", uresource2),
-            "UResource { name: 'unknown', instance: '', message: '', id: '1' }"
-        );
-        assert!(uresource2.id.is_some());
-        assert_eq!(uresource2.id.unwrap(), 1);
     }
 
     #[test]

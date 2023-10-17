@@ -6,10 +6,12 @@
 
 NOTE: CloudEvent is not, nor was not, meant to be _the only_ message format used below or above the transport layer.
 
-### CloudEventFactory
+### CloudEventBuilder
 
-Factory class that builds the various types of CloudEvents for uProtocol (publish, notification, request, response)
+Builder for various types of CloudEvents for uProtocol (publish, notification, request, response)
 
 ## Examples
 
-The SDK contains comprehensive tests, the best place to look at how all the APIs are used are the unit tests.
+The SDK contains comprehensive tests, the best place to look at how all the APIs are used.
+
+- [ucloudeventbuilder.rs](src/cloudevent/builder/ucloudeventbuilder.rs)

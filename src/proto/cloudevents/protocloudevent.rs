@@ -214,15 +214,10 @@ impl From<cloudevents::Event> for CloudEventProto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloudevent::datamodel::ucloudeventattributes::{Priority, UCloudEventAttributes};
-    use crate::cloudevent::datamodel::ucloudeventtype::UCloudEventType;
-    use crate::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
-    use crate::uri::datamodel::uauthority::UAuthority;
-    use crate::uri::datamodel::uentity::UEntity;
-    use crate::uri::datamodel::uresource::UResource;
-    use crate::uri::datamodel::uuri::UUri;
-    use crate::uri::serializer::longuriserializer::LongUriSerializer;
-    use crate::uri::serializer::uriserializer::UriSerializer;
+    use crate::cloudevent::builder::UCloudEventBuilder;
+    use crate::cloudevent::datamodel::{Priority, UCloudEventAttributes, UCloudEventType};
+    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
     use prost_types::Any;
@@ -269,7 +264,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UCloudEventType::PUBLISH.to_string())
+        event.ty(UCloudEventType::PUBLISH)
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -301,7 +296,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

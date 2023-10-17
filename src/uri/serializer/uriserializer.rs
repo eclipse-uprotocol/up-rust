@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uri::datamodel::uuri::UUri;
+use crate::uri::datamodel::UUri;
 
 pub type UriSerializationError = ();
 

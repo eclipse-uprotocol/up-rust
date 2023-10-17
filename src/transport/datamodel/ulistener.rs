@@ -13,8 +13,8 @@
 
 use crate::transport::datamodel::uattributes::UAttributes;
 use crate::transport::datamodel::upayload::UPayload;
-use crate::transport::datamodel::ustatus::UStatus;
-use crate::uri::datamodel::uuri::UUri;
+use crate::transport::datamodel::UStatus;
+use crate::uri::datamodel::UUri;
 
 /// For any implementation that defines some kind of callback or function that will be called to handle incoming messages.
 pub trait UListener {

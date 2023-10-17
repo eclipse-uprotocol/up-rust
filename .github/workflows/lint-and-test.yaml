@@ -1,0 +1,83 @@
+# ********************************************************************************
+#  Copyright (c) 2023 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************/
+
+name: Lint and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    paths:
+      - "src/**"
+      - "Cargo.*"
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+      group: ${{ github.ref }}-${{ github.workflow }}
+      cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: cargo fmt
+        working-directory: ${{github.workspace}}
+        run: cargo fmt -- --check
+      - name: cargo clippy
+        working-directory: ${{github.workspace}}
+        run: cargo clippy --all-targets -- -W warnings -D warnings
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: |
+          cargo install cargo-tarpaulin
+      - name: Show toolchain information
+        working-directory: ${{github.workspace}}
+        run: |
+          rustup toolchain list
+          cargo --version
+      - name: Run tests and report code coverage
+        run: |
+          cargo tarpaulin -o xml -o lcov -o html
+
+      - name: Upload test results (lcov)
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          check_name: Test Coverage Results (lcov)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: lcov.info
+          job_summary: true
+
+      - name: Upload test results (html)
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          check_name: Test Coverage Results (html)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: tarpaulin-report.html
+          job_summary: true
+
+      # - name: Upload coverage report
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: Code coverage report
+      #     path: cobertura.xml

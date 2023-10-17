@@ -11,66 +11,147 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+//! # uProtocol-SDK-Rust
+//!
+//! The purpose of this crate is to provide Rust specific code that builds the various data types
+//! defined in the [uProtocol Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main).
+//!
+//! The crate contains factory methods and validators for all data types used in uProtocol.
+//!
+//! For the time being, usage examples can be seen in the test cases that are provided for almost every type.
+//! More bespoke examples will be provided asap, once uProtocol runtime components are available.
+//!
+//! ## This crate includes:
+//!
+//! - the [`cloudevent`] module that offers a common way to represent uProtocol messages using the CloudEvent data model
+//! - the [`rpc`] module which offers wrappers for dealing with uProtocol payload in the context of RPC method invokation
+//! - the [`transport`] module as a set of abstractions for various transport-level concerns like status representation and serialization
+//! - the [`uri`] module, providing convenience wrappers for creation and validation of uProtocol-style resource identifiers
+//! - the [`uuid`] module which generates and validates UUIDs as per the uProtocol specification
+//!
+//! ## References
+//! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main)
+
+mod types {
+    pub mod ustatus;
+    pub mod validationresult;
+}
+
 pub mod cloudevent {
+    pub mod builder {
+        mod ucloudeventbuilder;
+
+        pub use ucloudeventbuilder::*;
+    }
     pub mod datamodel {
-        pub mod ucloudeventattributes;
-        pub mod ucloudeventtype;
+        mod ucloudevent;
+        mod ucloudeventattributes;
+        mod ucloudeventtype;
+
+        pub use ucloudevent::*;
+        pub use ucloudeventattributes::*;
+        pub use ucloudeventtype::*;
     }
     pub mod serializer {
-        pub mod cloudeventjsonserializer;
-        pub mod cloudeventprotobufserializer;
-        pub mod cloudeventserializer;
+        mod cloudeventjsonserializer;
+        mod cloudeventprotobufserializer;
+        mod cloudeventserializer;
+
+        pub use cloudeventjsonserializer::*;
+        pub use cloudeventprotobufserializer::*;
+        pub use cloudeventserializer::*;
     }
     pub mod validator {
-        pub mod cloudeventvalidator;
-        pub mod validationresult;
+        mod cloudeventvalidator;
+
+        pub use crate::types::validationresult::*;
+        pub use cloudeventvalidator::*;
     }
-    pub mod ucloudevent;
-    pub mod ucloudeventbuilder;
 }
 
 pub mod uri {
     pub mod datamodel {
-        pub mod uauthority;
-        pub mod uentity;
-        pub mod uresource;
-        pub mod uuri;
+        mod uauthority;
+        mod uentity;
+        mod uresource;
+        mod uuri;
+
+        pub use uauthority::*;
+        pub use uentity::*;
+        pub use uresource::*;
+        pub use uuri::*;
     }
     pub mod validator {
-        pub mod urivalidator;
+        mod urivalidator;
+
+        pub use urivalidator::*;
     }
     pub mod serializer {
-        pub mod longuriserializer;
-        pub mod microuriserializer;
-        pub mod uriserializer;
+        mod longuriserializer;
+        mod microuriserializer;
+        mod shorturiserializer;
+        mod uriserializer;
+
+        pub use longuriserializer::*;
+        pub use microuriserializer::*;
+        pub use shorturiserializer::*;
+        pub use uriserializer::*;
     }
 }
+
 pub mod uuid {
-    pub mod uuidbuilder;
-    pub mod uuidutils;
+    pub mod builder {
+        mod uuidbuilder;
+        mod uuidutils;
+
+        pub use uuidbuilder::*;
+        pub use uuidutils::*;
+    }
+    pub mod validator {
+        mod uuidvalidator;
+
+        pub use crate::types::ustatus::*;
+        pub use crate::types::validationresult::*;
+    }
 }
 
 pub mod transport {
     pub mod datamodel {
-        pub mod uattributes;
-        pub mod ulistener;
-        pub mod umessagetype;
-        pub mod upayload;
-        pub mod upriority;
-        pub mod userializationhint;
-        pub mod ustatus;
+        mod uattributes;
+        mod ulistener;
+        mod umessagetype;
+        mod upayload;
+        mod upriority;
+        mod userializationhint;
+        mod utransport;
+
+        pub use uattributes::*;
+        pub use ulistener::*;
+        pub use umessagetype::*;
+        pub use upayload::*;
+        pub use upriority::*;
+        pub use userializationhint::*;
+        pub use utransport::*;
+
+        pub use crate::types::ustatus::*;
     }
     pub mod validator {
-        pub mod uattributesvalidator;
+        mod uattributesvalidator;
+
+        pub use uattributesvalidator::*;
     }
-    pub mod utransport;
 }
 
 pub mod rpc {
-    pub mod calloptions;
-    pub mod rpcclient;
-    pub mod rpcmapper;
-    pub mod rpcresult;
+    mod calloptions;
+    mod rpcclient;
+    mod rpcmapper;
+    mod rpcresult;
+
+    pub use calloptions::*;
+    pub use rpcclient::*;
+    pub use rpcmapper::*;
+    pub use rpcresult::*;
 }
 
 #[allow(non_snake_case)]

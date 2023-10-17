@@ -34,6 +34,12 @@ impl fmt::Display for UCloudEventType {
     }
 }
 
+impl From<UCloudEventType> for String {
+    fn from(value: UCloudEventType) -> Self {
+        value.to_string()
+    }
+}
+
 /// Convert a `&str` into an `Option<UCloudEventType>`.
 ///
 /// # Arguments

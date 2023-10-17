@@ -11,14 +11,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uuid::uuidbuilder::{UUIDFactory, UUIDv8Factory};
+use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
 use chrono::Utc;
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
 use prost_types::Any;
 use url::{ParseError, Url};
 
-use crate::cloudevent::datamodel::ucloudeventattributes::UCloudEventAttributes;
-use crate::cloudevent::datamodel::ucloudeventtype::UCloudEventType;
+use crate::cloudevent::datamodel::{UCloudEventAttributes, UCloudEventType};
 
 pub struct UCloudEventBuilder;
 
@@ -36,7 +35,7 @@ impl UCloudEventBuilder {
 
     // Returns a UUIDv8 id.
     fn create_cloudevent_id() -> String {
-        UUIDv8Factory::new().create().to_string()
+        UUIDv8Factory::new().build().to_string()
     }
 
     /// Creates a CloudEvent for an event for the use case of an RPC Request message.
@@ -56,8 +55,8 @@ impl UCloudEventBuilder {
     ///
     /// ```rust
     /// use prost_types::Any;
-    /// use uprotocol_sdk::cloudevent::datamodel::ucloudeventattributes::{UCloudEventAttributes, Priority};
-    /// use uprotocol_sdk::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
+    /// use uprotocol_sdk::cloudevent::datamodel::{UCloudEventAttributes, Priority};
+    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
     ///
     /// let rpc_uri = "http://myapp.com/rpc";
     /// let service_method_uri = ":/body.access/1/rpc.UpdateDoor";
@@ -88,7 +87,7 @@ impl UCloudEventBuilder {
             attributes,
         )
         .extension("sink", service_method_uri)
-        .ty(UCloudEventType::REQUEST.to_string())
+        .ty(UCloudEventType::REQUEST)
         .build();
 
         bce.unwrap()
@@ -111,8 +110,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::ucloudeventattributes::UCloudEventAttributes;
+    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
+    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
     /// use prost_types::Any;
     ///
     /// let rpc_uri = "https://example.com/rpc";
@@ -148,7 +147,7 @@ impl UCloudEventBuilder {
         )
         .extension("sink", rpc_uri)
         .extension("reqid", request_id)
-        .ty(UCloudEventType::RESPONSE.to_string())
+        .ty(UCloudEventType::RESPONSE)
         .build();
 
         bce.unwrap()
@@ -171,8 +170,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```rust
-    /// use uprotocol_sdk::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::ucloudeventattributes::UCloudEventAttributes;
+    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
+    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
     /// use prost_types::Any;
     ///
     /// let application_uri = "http://myapplication.com/rpc";
@@ -210,7 +209,7 @@ impl UCloudEventBuilder {
         .extension("sink", rpc_uri)
         .extension("reqid", request_id)
         .extension("commstatus", communication_status as i64)
-        .ty(UCloudEventType::RESPONSE.to_string())
+        .ty(UCloudEventType::RESPONSE)
         .build();
 
         bce.unwrap()
@@ -231,8 +230,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```rust
-    /// use uprotocol_sdk::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::ucloudeventattributes::UCloudEventAttributes;
+    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
+    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
     /// use prost_types::Any;
     ///
     /// let source = "http://myapplication.com/topic";
@@ -253,7 +252,7 @@ impl UCloudEventBuilder {
             &payload.type_url,
             attributes,
         )
-        .ty(UCloudEventType::PUBLISH.to_string())
+        .ty(UCloudEventType::PUBLISH)
         .build();
 
         bce.unwrap()
@@ -277,8 +276,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```rust
-    /// use uprotocol_sdk::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::ucloudeventattributes::UCloudEventAttributes;
+    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
+    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
     /// use prost_types::Any;
     ///
     /// let source = "http://myapplication.com/topic";
@@ -307,7 +306,7 @@ impl UCloudEventBuilder {
             attributes,
         )
         .extension("sink", sink)
-        .ty(UCloudEventType::PUBLISH.to_string())
+        .ty(UCloudEventType::PUBLISH)
         .build();
 
         bce.unwrap()
@@ -333,8 +332,8 @@ impl UCloudEventBuilder {
     ///
     /// ```rust
     /// # use cloudevents::{Event, EventBuilder, EventBuilderV10};
-    /// # use uprotocol_sdk::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
-    /// # use uprotocol_sdk::cloudevent::datamodel::ucloudeventattributes::UCloudEventAttributes;
+    /// # use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
+    /// # use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
     /// # use prost_types::Any;
     ///
     /// let id = "unique_id";
@@ -400,16 +399,10 @@ mod tests {
     use cloudevents::AttributesReader;
 
     use super::*;
-    use crate::cloudevent::datamodel::ucloudeventattributes::Priority;
-    use crate::cloudevent::ucloudevent::UCloudEvent;
-    use crate::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
-    use crate::transport::datamodel::ustatus::UCode;
-    use crate::uri::datamodel::uauthority::UAuthority;
-    use crate::uri::datamodel::uentity::UEntity;
-    use crate::uri::datamodel::uresource::UResource;
-    use crate::uri::datamodel::uuri::UUri;
-    use crate::uri::serializer::longuriserializer::LongUriSerializer;
-    use crate::uri::serializer::uriserializer::UriSerializer;
+    use crate::cloudevent::datamodel::{Priority, UCloudEvent};
+    use crate::transport::datamodel::UCode;
+    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
 
@@ -444,7 +437,7 @@ mod tests {
             &proto_payload.type_url,
             &ucloud_event_attributes,
         )
-        .ty(UCloudEventType::PUBLISH.to_string())
+        .ty(UCloudEventType::PUBLISH)
         .build()
         .unwrap();
 
@@ -509,7 +502,7 @@ mod tests {
             &proto_payload.type_url,
             &ucloud_event_attributes,
         )
-        .ty(UCloudEventType::PUBLISH.to_string())
+        .ty(UCloudEventType::PUBLISH)
         .build()
         .unwrap();
 
@@ -700,12 +693,8 @@ mod tests {
             LongUriSerializer::serialize(&UUri::rpc_response(UAuthority::LOCAL, source_use));
 
         // service Method Uri
-        let method_software_entity_service = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let method_software_entity_service =
+            UEntity::new("body.access".to_string(), Some(1), None, false);
         let method_uri = UUri::new(
             Some(UAuthority::LOCAL),
             Some(method_software_entity_service),
@@ -782,17 +771,13 @@ mod tests {
     fn test_create_request_cloud_event_from_remote_use() {
         // Uri for the application requesting the RPC
         let source_use_authority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
-        let source_use = UEntity::new("petapp".to_string(), Some("1".to_string()), None, false);
+        let source_use = UEntity::new("petapp".to_string(), Some(1), None, false);
         let application_uri_for_rpc =
             LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
 
         // service Method Uri
-        let method_software_entity_service = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let method_software_entity_service =
+            UEntity::new("body.access".to_string(), Some(1), None, false);
         let method_uri = UUri::new(
             Some(UAuthority::long_remote(
                 "VCU".to_string(),
@@ -874,17 +859,13 @@ mod tests {
     #[test]
     fn test_create_response_cloud_event_originating_from_local_use() {
         // Uri for the application requesting the RPC
-        let source_use = UEntity::new("petapp".to_string(), Some("1".to_string()), None, false);
+        let source_use = UEntity::new("petapp".to_string(), Some(1), None, false);
         let application_uri_for_rpc =
             LongUriSerializer::serialize(&UUri::rpc_response(UAuthority::LOCAL, source_use));
 
         // service Method Uri
-        let method_software_entity_service = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let method_software_entity_service =
+            UEntity::new("body.access".to_string(), Some(1), None, false);
         let method_uri = UUri::new(
             Some(UAuthority::LOCAL),
             Some(method_software_entity_service),
@@ -970,12 +951,8 @@ mod tests {
             LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
 
         // service Method Uri
-        let method_software_entity_service = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let method_software_entity_service =
+            UEntity::new("body.access".to_string(), Some(1), None, false);
         let method_uri = UUri::new(
             Some(UAuthority::long_remote(
                 "VCU".to_string(),
@@ -1058,17 +1035,13 @@ mod tests {
     #[test]
     fn test_create_a_failed_response_cloud_event_originating_from_local_use() {
         // Uri for the application requesting the RPC
-        let source_use = UEntity::new("petapp".to_string(), Some("1".to_string()), None, false);
+        let source_use = UEntity::new("petapp".to_string(), Some(1), None, false);
         let application_uri_for_rpc =
             LongUriSerializer::serialize(&UUri::rpc_response(UAuthority::LOCAL, source_use));
 
         // Service Method Uri
-        let method_software_entity_service = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let method_software_entity_service =
+            UEntity::new("body.access".to_string(), Some(1), None, false);
         let method_uri = UUri::new(
             Some(UAuthority::LOCAL),
             Some(method_software_entity_service),
@@ -1147,12 +1120,8 @@ mod tests {
             LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
 
         // Service Method Uri
-        let method_software_entity_service = UEntity::new(
-            "body.access".to_string(),
-            Some("1".to_string()),
-            None,
-            false,
-        );
+        let method_software_entity_service =
+            UEntity::new("body.access".to_string(), Some(1), None, false);
         let method_uri = UUri::new(
             Some(UAuthority::long_remote(
                 "VCU".to_string(),
@@ -1232,7 +1201,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("https://example.com")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

@@ -20,8 +20,8 @@ use prost_types::Any;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use crate::transport::datamodel::ustatus::UCode;
-use crate::uuid::uuidutils::UuidUtils;
+use crate::transport::datamodel::UCode;
+use crate::uuid::builder::UuidUtils;
 
 /// Code to extract information from a CloudEvent
 #[derive(Debug)]
@@ -224,7 +224,7 @@ impl UCloudEvent {
     pub fn get_timestamp(event: &Event) -> Option<u64> {
         let id = event.id();
         match Uuid::parse_str(id) {
-            Ok(uuid) => UuidUtils::get_time(&uuid).ok(),
+            Ok(uuid) => UuidUtils::get_time(&uuid),
             Err(_) => None,
         }
     }
@@ -486,17 +486,13 @@ impl UCloudEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::ucloudeventattributes::{Priority, UCloudEventAttributes};
     use crate::cloudevent::datamodel::ucloudeventtype::UCloudEventType;
-    use crate::cloudevent::ucloudeventbuilder::UCloudEventBuilder;
     use crate::proto::CloudEvent;
-    use crate::uri::datamodel::uauthority::UAuthority;
-    use crate::uri::datamodel::uentity::UEntity;
-    use crate::uri::datamodel::uresource::UResource;
-    use crate::uri::datamodel::uuri::UUri;
-    use crate::uri::serializer::longuriserializer::LongUriSerializer;
-    use crate::uri::serializer::uriserializer::UriSerializer;
-    use crate::uuid::uuidbuilder::{UUIDFactory, UUIDv8Factory};
+    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
+    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
 
     use chrono::{offset, TimeZone, Utc};
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
@@ -761,7 +757,7 @@ mod tests {
 
     #[test]
     fn test_extract_creation_timestamp_from_cloud_event_uuidv8_id_when_uuidv8_id_is_valid() {
-        let uuid = UUIDv8Factory::new().create();
+        let uuid = UUIDv8Factory::new().build();
         let builder = build_base_cloud_event_for_test();
         let cloud_event = builder.id(uuid.to_string()).build().unwrap();
 
@@ -818,7 +814,7 @@ mod tests {
 
         let builder = cloudevents::EventBuilderV10::new()
             .id("id")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .source("/body.accss//door.front_left#Door")
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -894,7 +890,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_minus_one() {
-        let uuid = UUIDv8Factory::new().create();
+        let uuid = UUIDv8Factory::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", -1)
             .id(uuid.to_string());
@@ -905,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_large_number_mili() {
-        let uuid = UUIDv8Factory::new().create();
+        let uuid = UUIDv8Factory::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", i64::MAX)
             .id(uuid.to_string());
@@ -919,7 +915,7 @@ mod tests {
         use std::thread;
         use std::time::Duration;
 
-        let uuid = UUIDv8Factory::new().create();
+        let uuid = UUIDv8Factory::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 1)
             .id(uuid.to_string());
@@ -932,7 +928,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_has_a_v8_uuid() {
-        let uuid = UUIDv8Factory::new().create();
+        let uuid = UUIDv8Factory::new().build();
         let builder = build_base_cloud_event_for_test().id(uuid.to_string());
         let cloud_event = builder.build().unwrap();
 
@@ -966,7 +962,7 @@ mod tests {
 
         let builder = cloudevents::EventBuilderV10::new()
             .id("someid")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .source("/body.accss//door.front_left#Door")
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -989,7 +985,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             // The url crate does not accept URLs without a base
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
@@ -1012,7 +1008,7 @@ mod tests {
     fn test_extract_payload_from_cloud_event_when_payload_is_bad_proto_object() {
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             // The url crate does not accept URLs without a base
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
@@ -1040,7 +1036,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1060,7 +1056,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1080,7 +1076,7 @@ mod tests {
         // Creating a protobuf CloudEvent message
         let source_event = cloudevents::EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .source(Url::parse("up://VCU.MY_CAR_VIN/someService").unwrap())
             .ty("example.demo")
             .data(
@@ -1096,7 +1092,7 @@ mod tests {
         // Creating the CloudEvent
         let cloud_event = EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1206,7 +1202,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UCloudEventType::PUBLISH.to_string())
+        event.ty(UCloudEventType::PUBLISH)
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -1238,7 +1234,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UCloudEventType::PUBLISH.to_string())
+            .ty(UCloudEventType::PUBLISH)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

@@ -36,14 +36,19 @@ To set up VSCode to run clippy per default every time you save your code, have a
 
 Similarly, the project requests that markdown is formatted and linted properly - to help with this, it is recommended to use [markdown linters](https://marketplace.visualstudio.com/items?itemName=DavidAnson.vscode-markdownlint).
 
-At the moment, the GH actions pipeline will generate test results and test code coverage reports on modifications to main. These reports are pushed into the repo in the ./reports directory. If you use VSCode with the [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters) extension, you can enable display of code coverage information with these settings:
+There exists a helper script in ./tools to generate test results and test code coverage reports. These reports are placed in the `./target/tarpaulin` directory. If you use VSCode with the [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters) extension, you can enable display of code coverage information with these settings:
 
 ``` json
   "coverage-gutters.coverageBaseDir": "**",
   "coverage-gutters.coverageFileNames": [
-    "reports/lcov.info",
+    "target/tarpaulin/lcov.info",
   ],
 ```
+
+## DevContainer
+
+All of these prerequisites are made available as a VSCode devcontainer, configured at the usual place (`.devcontainer`).
+
 
 ## Contact
 

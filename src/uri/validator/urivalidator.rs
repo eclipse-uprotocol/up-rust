@@ -11,11 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::ustatus::{UCode, UStatus};
-use crate::uri::datamodel::uresource::UResource;
-use crate::uri::datamodel::uuri::UUri;
-use crate::uri::serializer::longuriserializer::LongUriSerializer;
-use crate::uri::serializer::uriserializer::UriSerializer;
+use crate::transport::datamodel::{UCode, UStatus};
+use crate::uri::datamodel::{UResource, UUri};
+use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
 /// Struct to encapsulate Uri validation logic.
 pub struct UriValidator;
@@ -127,9 +125,7 @@ impl UriValidator {
 mod tests {
     use super::*;
 
-    use crate::transport::datamodel::ustatus::UCode;
-    use crate::uri::datamodel::uauthority::UAuthority;
-    use crate::uri::datamodel::uentity::UEntity;
+    use crate::uri::datamodel::{UAuthority, UEntity};
 
     #[test]
     fn test_validate_blank_uri() {
