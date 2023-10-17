@@ -60,21 +60,25 @@ jobs:
         run: |
           cargo tarpaulin -o xml -o lcov -o html
 
-      - name: Upload test results (lcov)
+      - name: Upload test results (xml)
         uses: EnricoMi/publish-unit-test-result-action@v1
         with:
-          check_name: Test Coverage Results (lcov)
+          check_name: Test Coverage Results (xml)
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          files: lcov.info
+          files: cobertura.xml
           job_summary: true
 
-      - name: Upload test results (html)
-        uses: EnricoMi/publish-unit-test-result-action@v1
+      - name: Upload test results (lcov)
+        uses: actions/upload-artifact@v3
         with:
-          check_name: Test Coverage Results (html)
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          files: tarpaulin-report.html
-          job_summary: true
+          name: Test Coverage Results (lcov)
+          path: lcov.info
+
+      - name: Upload test results (html)
+        uses: actions/upload-artifact@v3
+        with:
+          name: Test Coverage Results (html)
+          path: tarpaulin-report.html
 
       # - name: Upload coverage report
       #   uses: actions/upload-artifact@v3
