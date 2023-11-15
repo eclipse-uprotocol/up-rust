@@ -492,7 +492,7 @@ mod tests {
     use crate::proto::CloudEvent;
     use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
+    use crate::uuid::builder::UUIDv8Factory;
 
     use chrono::{offset, TimeZone, Utc};
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};

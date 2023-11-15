@@ -474,7 +474,7 @@ mod tests {
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::{Priority, UCloudEventAttributesBuilder};
     use crate::uri::datamodel::{UAuthority, UEntity, UResource};
-    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
+    use crate::uuid::builder::UUIDv8Factory;
 
     use super::*;
 

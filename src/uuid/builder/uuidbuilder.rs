@@ -51,14 +51,20 @@ impl ClockSequence for UuidClockSequence {
     }
 }
 
-pub trait UUIDFactory {
-    fn build(&self) -> Uuid;
-    fn build_with_instant(&self, instant: u64) -> Uuid;
-}
+// pub trait UUIDFactory {
+//     fn build(&self) -> Uuid;
+//     fn build_with_instant(&self, instant: u64) -> Uuid;
+// }
 
 pub struct UUIDv6Factory {
     address: MacAddress,
     counter: UuidClockSequence,
+}
+
+impl Default for UUIDv6Factory {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl UUIDv6Factory {
@@ -78,20 +84,14 @@ impl UUIDv6Factory {
         self.address = address;
         self
     }
-}
+    // }
 
-impl Default for UUIDv6Factory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl UUIDFactory for UUIDv6Factory {
-    fn build(&self) -> Uuid {
+    // impl UUIDFactory for UUIDv6Factory {
+    pub fn build(&self) -> Uuid {
         Uuid::now_v6(&self.address.bytes())
     }
 
-    fn build_with_instant(&self, instant: u64) -> Uuid {
+    pub fn build_with_instant(&self, instant: u64) -> Uuid {
         let instant = Timestamp::from_rfc4122(instant, self.counter.generate_sequence(0, 0));
         Uuid::new_v6(instant, &self.address.bytes())
     }
@@ -133,6 +133,12 @@ pub struct UUIDv8Factory {
     lsb: u64,
 }
 
+impl Default for UUIDv8Factory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UUIDv8Factory {
     // The java-sdk implementation uses a signed 64 bit integer here, which can lead to the below operation to overflow. In Rust,
     // we therefore make lsb an unsigned value. To be be identical with the java SDK implementation, _lsb would need to be an i64,
@@ -146,16 +152,10 @@ impl UUIDv8Factory {
             lsb: _lsb,
         }
     }
-}
+    // }
 
-impl Default for UUIDv8Factory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl UUIDFactory for UUIDv8Factory {
-    fn build(&self) -> Uuid {
+    // impl UUIDFactory for UUIDv8Factory {
+    pub fn build(&self) -> Uuid {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -163,7 +163,7 @@ impl UUIDFactory for UUIDv8Factory {
         self.build_with_instant(now)
     }
 
-    fn build_with_instant(&self, instant: u64) -> Uuid {
+    pub fn build_with_instant(&self, instant: u64) -> Uuid {
         let new_msb = {
             let mut msb = self.msb.lock().unwrap();
 

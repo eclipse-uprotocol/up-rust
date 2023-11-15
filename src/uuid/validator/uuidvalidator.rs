@@ -127,7 +127,7 @@ impl UuidValidator for UUIDv8Validator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::uuid::builder::{UUIDFactory, UUIDv6Factory, UUIDv8Factory};
+    use crate::uuid::builder::{UUIDv6Factory, UUIDv8Factory};
 
     #[test]
     fn test_validator_with_good_uuid() {

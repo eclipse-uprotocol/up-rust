@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
+use crate::uuid::builder::UUIDv8Factory;
 use chrono::Utc;
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
 use prost_types::Any;

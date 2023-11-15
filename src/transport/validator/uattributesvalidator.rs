@@ -377,7 +377,7 @@ mod tests {
     use super::*;
     use crate::transport::datamodel::{UAttributesBuilder, UPriority};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
+    use crate::uuid::builder::UUIDv8Factory;
 
     use uuid::Uuid;
 

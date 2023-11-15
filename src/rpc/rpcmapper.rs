@@ -326,7 +326,7 @@ mod tests {
     use crate::transport::datamodel::{UAttributes, UAttributesBuilder};
     use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
+    use crate::uuid::builder::UUIDv8Factory;
 
     use bytes::{Buf, BufMut};
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
