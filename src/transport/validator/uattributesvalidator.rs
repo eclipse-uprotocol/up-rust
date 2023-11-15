@@ -377,7 +377,7 @@ mod tests {
     use super::*;
     use crate::transport::datamodel::{UAttributesBuilder, UPriority};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::UUIDv8Factory;
+    use crate::uuid::builder::UUIDv8Builder;
 
     use uuid::Uuid;
 
@@ -385,7 +385,7 @@ mod tests {
     fn test_fetching_validator_for_valid_types() {
         // Test for PUBLISH type
         let publish_attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -396,7 +396,7 @@ mod tests {
 
         // Test for REQUEST type
         let request_attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Request,
             UPriority::Low,
         )
@@ -406,7 +406,7 @@ mod tests {
 
         // Test for RESPONSE type
         let response_attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Response,
             UPriority::Low,
         )
@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn test_validating_valid_publish_messagetypes() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -447,7 +447,7 @@ mod tests {
     #[test]
     fn test_validating_publish_invalid_ttl_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn test_validating_valid_ttl_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -485,7 +485,7 @@ mod tests {
 
         // Build the attributes
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -507,7 +507,7 @@ mod tests {
 
         // Build the attributes
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -524,7 +524,7 @@ mod tests {
     #[test]
     fn test_validating_invalid_req_id_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -542,11 +542,11 @@ mod tests {
     #[test]
     fn test_validating_valid_req_id_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
-        .with_reqid(UUIDv8Factory::new().build())
+        .with_reqid(UUIDv8Builder::new().build())
         .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::get_validator(&attributes);
@@ -562,7 +562,7 @@ mod tests {
     #[test]
     fn test_validating_valid_permission_level_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -578,7 +578,7 @@ mod tests {
     #[test]
     fn test_validating_invalid_commstatus_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -596,7 +596,7 @@ mod tests {
     #[test]
     fn test_validating_valid_commstatus_attribute() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -613,7 +613,7 @@ mod tests {
     fn test_validating_request_message_types() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Request,
             UPriority::Low,
         )
@@ -631,7 +631,7 @@ mod tests {
     #[test]
     fn test_validating_request_validator_with_wrong_messagetype() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -651,7 +651,7 @@ mod tests {
     fn test_validating_request_validator_with_wrong_bad_ttl() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Request,
             UPriority::NetworkControl,
         )
@@ -671,13 +671,13 @@ mod tests {
     fn test_validating_response_validator_with_wrong_bad_ttl() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Response,
             UPriority::NetworkControl,
         )
         .with_sink(sink)
         .with_ttl(0)
-        .with_reqid(UUIDv8Factory::new().build())
+        .with_reqid(UUIDv8Builder::new().build())
         .build();
 
         let validator: Box<dyn UAttributesValidator> = Validators::Response.validator();
@@ -692,7 +692,7 @@ mod tests {
     fn test_validating_response_validator_with_bad_reqid() {
         let sink = LongUriSerializer::deserialize("/hartley/1/rpc.response".to_string());
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Response,
             UPriority::NetworkControl,
         )
@@ -712,7 +712,7 @@ mod tests {
     #[test]
     fn test_validating_publish_validator_with_wrong_messagetype() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Request,
             UPriority::Low,
         )
@@ -729,7 +729,7 @@ mod tests {
     #[test]
     fn test_validating_response_validator_with_wrong_messagetype() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn test_validating_request_containing_hint_and_token() {
         let attributes = UAttributesBuilder::new(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UMessageType::Publish,
             UPriority::Low,
         )

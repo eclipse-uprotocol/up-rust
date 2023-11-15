@@ -51,30 +51,25 @@ impl ClockSequence for UuidClockSequence {
     }
 }
 
-// pub trait UUIDFactory {
-//     fn build(&self) -> Uuid;
-//     fn build_with_instant(&self, instant: u64) -> Uuid;
-// }
-
-pub struct UUIDv6Factory {
+pub struct UUIDv6Builder {
     address: MacAddress,
     counter: UuidClockSequence,
 }
 
-impl Default for UUIDv6Factory {
+impl Default for UUIDv6Builder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl UUIDv6Factory {
+impl UUIDv6Builder {
     pub fn new() -> Self {
         let address_bytes = match get_mac_address() {
             Ok(Some(mac)) => mac.bytes(),
             _ => EMPTY_NODE_ID,
         };
 
-        UUIDv6Factory {
+        UUIDv6Builder {
             address: MacAddress::from(address_bytes),
             counter: UuidClockSequence::new(),
         }
@@ -84,9 +79,7 @@ impl UUIDv6Factory {
         self.address = address;
         self
     }
-    // }
 
-    // impl UUIDFactory for UUIDv6Factory {
     pub fn build(&self) -> Uuid {
         Uuid::now_v6(&self.address.bytes())
     }
@@ -128,18 +121,18 @@ impl UUIDv6Factory {
 /// | var        | MUST be the The 2 bit variant defined by Section 4.1 of RFC
 /// | rand_b     | MUST 62 bits random number that is generated at initialization time of the uE only and reused otherwise |
 
-pub struct UUIDv8Factory {
+pub struct UUIDv8Builder {
     msb: Arc<Mutex<u64>>,
     lsb: u64,
 }
 
-impl Default for UUIDv8Factory {
+impl Default for UUIDv8Builder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl UUIDv8Factory {
+impl UUIDv8Builder {
     // The java-sdk implementation uses a signed 64 bit integer here, which can lead to the below operation to overflow. In Rust,
     // we therefore make lsb an unsigned value. To be be identical with the java SDK implementation, _lsb would need to be an i64,
     // and we need the compiler directive to allow overflowing literals: #[allow(overflowing_literals)]
@@ -147,14 +140,12 @@ impl UUIDv8Factory {
         let mut rng = rand::thread_rng();
         let _lsb: u64 = (rng.gen::<u64>() & 0x3fffffffffffffff) | 0x8000000000000000;
 
-        UUIDv8Factory {
+        UUIDv8Builder {
             msb: Arc::new(Mutex::new(UUIDV8_VERSION << 12)),
             lsb: _lsb,
         }
     }
-    // }
 
-    // impl UUIDFactory for UUIDv8Factory {
     pub fn build(&self) -> Uuid {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -202,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_obj_to_string_conversions() {
-        let uuid_factory = UUIDv8Factory::new();
+        let uuid_factory = UUIDv8Builder::new();
         let uuid1 = uuid_factory.build();
         let str1 = uuid1.to_string();
         let uuid2 = Uuid::parse_str(&str1).unwrap();
@@ -211,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_uuid_for_constant_random() {
-        let factory = UUIDv8Factory::new();
+        let factory = UUIDv8Builder::new();
         let uuid1 = factory.build();
         let uuid2 = factory.build();
         assert_eq!(uuid1.to_fields_le().3, uuid2.to_fields_le().3); // Check that the "node" field (least significant 64 bits) is the same
@@ -219,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_uuid_create_test_counters() {
-        let uuidv8_factory = UUIDv8Factory::new();
+        let uuidv8_factory = UUIDv8Builder::new();
         let mut uuids = Vec::new();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -243,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_uuid_byte_obj_conversions() {
-        let factory = UUIDv8Factory::new();
+        let factory = UUIDv8Builder::new();
         let uuid1 = factory.build();
 
         // Convert the UUID to a byte array
@@ -261,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_uuid6_byte_obj_conversions() {
-        let uuid1 = UUIDv6Factory::new().build();
+        let uuid1 = UUIDv6Builder::new().build();
 
         // Convert the UUID to a byte array
         let bytes = uuid1.as_bytes().to_vec();
@@ -278,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_uuid6_build_many() {
-        let uuidv6_factory = UUIDv6Factory::new();
+        let uuidv6_factory = UUIDv6Builder::new();
         let mut uuids = Vec::new();
 
         for _ in 0..4096 {
@@ -307,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_uuid_size() {
-        let factory = UUIDv8Factory::new();
+        let factory = UUIDv8Builder::new();
         let uuid1 = factory.build();
         let bytes = uuid1.as_bytes();
 

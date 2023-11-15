@@ -326,7 +326,7 @@ mod tests {
     use crate::transport::datamodel::{UAttributes, UAttributesBuilder};
     use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::UUIDv8Factory;
+    use crate::uuid::builder::UUIDv8Builder;
 
     use bytes::{Buf, BufMut};
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
@@ -860,7 +860,7 @@ mod tests {
 
     fn build_attributes() -> UAttributes {
         UAttributesBuilder::for_rpc_request(
-            UUIDv8Factory::new().build(),
+            UUIDv8Builder::new().build(),
             UUri::rpc_response(
                 UAuthority::EMPTY,
                 UEntity::long_format("hartley".to_string(), None),

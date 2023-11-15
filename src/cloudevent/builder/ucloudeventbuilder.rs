@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uuid::builder::UUIDv8Factory;
+use crate::uuid::builder::UUIDv8Builder;
 use chrono::Utc;
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
 use prost_types::Any;
@@ -35,7 +35,7 @@ impl UCloudEventBuilder {
 
     // Returns a UUIDv8 id.
     fn create_cloudevent_id() -> String {
-        UUIDv8Factory::new().build().to_string()
+        UUIDv8Builder::new().build().to_string()
     }
 
     /// Creates a CloudEvent for an event for the use case of an RPC Request message.

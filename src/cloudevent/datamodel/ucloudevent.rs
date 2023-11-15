@@ -492,7 +492,7 @@ mod tests {
     use crate::proto::CloudEvent;
     use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::UUIDv8Factory;
+    use crate::uuid::builder::UUIDv8Builder;
 
     use chrono::{offset, TimeZone, Utc};
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
@@ -757,7 +757,7 @@ mod tests {
 
     #[test]
     fn test_extract_creation_timestamp_from_cloud_event_uuidv8_id_when_uuidv8_id_is_valid() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test();
         let cloud_event = builder.id(uuid.to_string()).build().unwrap();
 
@@ -890,7 +890,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_minus_one() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", -1)
             .id(uuid.to_string());
@@ -901,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_large_number_mili() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", i64::MAX)
             .id(uuid.to_string());
@@ -915,7 +915,7 @@ mod tests {
         use std::thread;
         use std::time::Duration;
 
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 1)
             .id(uuid.to_string());
@@ -928,7 +928,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_has_a_v8_uuid() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test().id(uuid.to_string());
         let cloud_event = builder.build().unwrap();
 

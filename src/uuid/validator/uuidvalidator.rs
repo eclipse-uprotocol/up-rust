@@ -127,18 +127,18 @@ impl UuidValidator for UUIDv8Validator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::uuid::builder::{UUIDv6Factory, UUIDv8Factory};
+    use crate::uuid::builder::{UUIDv6Builder, UUIDv8Builder};
 
     #[test]
     fn test_validator_with_good_uuid() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let status = UuidValidators::get_validator(&uuid).validate(&uuid);
         assert_eq!(UStatus::ok(), status);
     }
 
     #[test]
     fn test_good_uuid_string() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let status = UuidValidators::UUIDv8.validator().validate(&uuid);
         assert_eq!(UStatus::ok(), status);
     }
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_invalid_time_uuid() {
-        let uuid = UUIDv8Factory::new().build_with_instant(0);
+        let uuid = UUIDv8Builder::new().build_with_instant(0);
         let status = UuidValidators::UUIDv8.validator().validate(&uuid);
         assert_eq!(UCode::Ok, status.code());
         // assert_eq!("Not a UUIDv8 uuid, Invalid UUID Time", status.message());
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_uuidv8_with_invalid_types() {
-        let uuidv6 = UUIDv6Factory::new().build();
+        let uuidv6 = UUIDv6Builder::new().build();
         let uuid = Uuid::nil();
         let uuidv4 = Uuid::new_v4();
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_good_uuidv6() {
-        let uuid = UUIDv6Factory::new().build();
+        let uuid = UUIDv6Builder::new().build();
         let validator = UuidValidators::get_validator(&uuid);
         assert!(UuidUtils::is_v6(&uuid));
         assert_eq!(UCode::Ok, validator.validate(&uuid).code());
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_uuidv6_with_uuidv8() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let validator = UuidValidators::UUIDv6.validator();
         let status = validator.validate(&uuid);
         assert_eq!("Not a UUIDv6 uuid", status.message());
