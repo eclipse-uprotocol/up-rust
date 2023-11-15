@@ -20,8 +20,15 @@ fn main() -> std::io::Result<()> {
     std::env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path().unwrap());
 
     if let Err(err) = get_and_build_protos(
-        &["https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
-        "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/status.proto"]
+        &[
+            // external proto definitions
+            "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
+            "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/status.proto",
+            // uProtocol-project proto definitions
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uuid.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uri.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uattributes.proto",
+        ]
     ) {
         let error_message = format!("Failed to fetch and build protobuf file: {:?}", err);
         return Err(std::io::Error::new(std::io::ErrorKind::Other, error_message));

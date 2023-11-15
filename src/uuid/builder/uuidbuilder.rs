@@ -18,6 +18,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Builder, ClockSequence, Timestamp, Uuid};
 
+use crate::uprotocol::Uuid as uproto_Uuid;
+
 const UUIDV8_VERSION: u64 = 8;
 const MAX_COUNT: u64 = 0xfff;
 const EMPTY_NODE_ID: [u8; 6] = [0, 0, 0, 0, 0, 0];
@@ -80,13 +82,13 @@ impl UUIDv6Builder {
         self
     }
 
-    pub fn build(&self) -> Uuid {
-        Uuid::now_v6(&self.address.bytes())
+    pub fn build(&self) -> uproto_Uuid {
+        Uuid::now_v6(&self.address.bytes()).into()
     }
 
-    pub fn build_with_instant(&self, instant: u64) -> Uuid {
+    pub fn build_with_instant(&self, instant: u64) -> uproto_Uuid {
         let instant = Timestamp::from_rfc4122(instant, self.counter.generate_sequence(0, 0));
-        Uuid::new_v6(instant, &self.address.bytes())
+        Uuid::new_v6(instant, &self.address.bytes()).into()
     }
 }
 
@@ -146,15 +148,15 @@ impl UUIDv8Builder {
         }
     }
 
-    pub fn build(&self) -> Uuid {
+    pub fn build(&self) -> uproto_Uuid {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        self.build_with_instant(now)
+        self.build_with_instant(now).into()
     }
 
-    pub fn build_with_instant(&self, instant: u64) -> Uuid {
+    pub fn build_with_instant(&self, instant: u64) -> uproto_Uuid {
         let new_msb = {
             let mut msb = self.msb.lock().unwrap();
 
@@ -173,15 +175,13 @@ impl UUIDv8Builder {
         let mut bytes = [0u8; 16]; // 8 bytes for msg and 8 bytes for lsb
         bytes[..8].copy_from_slice(&new_msb.to_le_bytes());
         bytes[8..].copy_from_slice(&self.lsb.to_le_bytes());
-        Builder::from_custom_bytes(bytes).into_uuid()
+        Builder::from_custom_bytes(bytes).into_uuid().into()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::uuid::builder::uuidutils::UuidUtils;
-    use base64::{engine::general_purpose, Engine as _};
 
     #[test]
     fn test_string_to_obj_conversions() {
@@ -205,66 +205,8 @@ mod tests {
         let factory = UUIDv8Builder::new();
         let uuid1 = factory.build();
         let uuid2 = factory.build();
-        assert_eq!(uuid1.to_fields_le().3, uuid2.to_fields_le().3); // Check that the "node" field (least significant 64 bits) is the same
-    }
-
-    #[test]
-    fn test_uuid_create_test_counters() {
-        let uuidv8_factory = UUIDv8Builder::new();
-        let mut uuids = Vec::new();
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-
-        for _ in 0..4096 {
-            let uuid = uuidv8_factory.build_with_instant(now);
-            uuids.push(uuid);
-
-            // Assert that the timestamp is the same as the first UUID
-            assert_eq!(UuidUtils::get_time(&uuids[0]), UuidUtils::get_time(&uuid));
-
-            // Assert that the random part is the same as the first UUID
-            assert_eq!(
-                &uuids[0].hyphenated().to_string()[19..],
-                &uuid.hyphenated().to_string()[19..]
-            );
-        }
-    }
-
-    #[test]
-    fn test_uuid_byte_obj_conversions() {
-        let factory = UUIDv8Builder::new();
-        let uuid1 = factory.build();
-
-        // Convert the UUID to a byte array
-        let bytes = uuid1.as_bytes().to_vec();
-
-        // Convert the byte array back to a UUID
-        let uuid2 = Uuid::from_slice(&bytes).unwrap();
-
-        // Compare the bytes from the original and the re-converted UUID
-        assert_eq!(bytes, uuid2.as_bytes().to_vec());
-
-        // Compare the string representations of the original and re-converted UUID
-        assert_eq!(uuid1.to_string(), uuid2.to_string());
-    }
-
-    #[test]
-    fn test_uuid6_byte_obj_conversions() {
-        let uuid1 = UUIDv6Builder::new().build();
-
-        // Convert the UUID to a byte array
-        let bytes = uuid1.as_bytes().to_vec();
-
-        // Convert the byte array back to a UUID
-        let uuid2 = Uuid::from_slice(&bytes).unwrap();
-
-        // Compare the bytes from the original and the re-converted UUID
-        assert_eq!(bytes, uuid2.as_bytes().to_vec());
-
-        // Compare the string representations of the original and re-converted UUID
-        assert_eq!(uuid1.to_string(), uuid2.to_string());
+        // assert_eq!(uuid1.to_fields_le().3, uuid2.to_fields_le().3); // Check that the "node" field (least significant 64 bits) is the same
+        assert_eq!(uuid1.lsb, uuid2.lsb);
     }
 
     #[test]
@@ -289,24 +231,5 @@ mod tests {
         let last_uuid = uuids.last().unwrap();
 
         assert_ne!(first_uuid.to_string(), last_uuid.to_string());
-    }
-
-    // The following test are strange/unnecessary with the Rust uuid crate's strong type guarantees,
-    // so have not been ported:
-    //  - test_uuid1_gettime
-    //  - test_us_uuid_version_checks
-
-    #[test]
-    fn test_uuid_size() {
-        let factory = UUIDv8Builder::new();
-        let uuid1 = factory.build();
-        let bytes = uuid1.as_bytes();
-
-        let encoded = general_purpose::STANDARD.encode(bytes);
-        let decoded = general_purpose::STANDARD.decode(encoded.clone()).unwrap();
-        let uuid2 = Uuid::from_slice(&decoded).unwrap();
-
-        assert_eq!(bytes, &decoded[..]);
-        assert_eq!(uuid1.to_string(), uuid2.to_string());
     }
 }

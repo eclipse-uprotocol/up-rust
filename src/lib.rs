@@ -107,6 +107,11 @@ pub mod uuid {
         pub use uuidbuilder::*;
         pub use uuidutils::*;
     }
+    pub mod serializer {
+        pub mod longuuidserializer;
+        pub mod microuuidserializer;
+        pub mod uuidserializer;
+    }
     pub mod validator {
         mod uuidvalidator;
 
@@ -154,6 +159,12 @@ pub mod rpc {
     pub use rpcresult::*;
 }
 
+pub mod uprotocol {
+    include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
+
+    pub use crate::proto::uprotocol::uuid;
+}
+
 #[allow(non_snake_case)]
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/io.cloudevents.v1.rs"));
@@ -164,5 +175,9 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.rpc.rs"));
     pub mod google {
         pub mod protostatus;
+    }
+
+    pub mod uprotocol {
+        pub mod uuid;
     }
 }

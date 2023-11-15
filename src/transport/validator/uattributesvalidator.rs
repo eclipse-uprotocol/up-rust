@@ -102,7 +102,7 @@ pub trait UAttributesValidator {
     ///
     /// Returns a `UStatus` indicating whether the UUID is valid or not.
     fn validate_id(&self, attributes: &UAttributes) -> UStatus {
-        if UuidUtils::is_valid_uuid(&attributes.id) {
+        if UuidUtils::is_uuid(&attributes.id) {
             UStatus::ok()
         } else {
             UStatus::fail_with_msg_and_reason("Invalid UUID", UCode::InvalidArgument)
@@ -120,7 +120,7 @@ pub trait UAttributesValidator {
     /// Returns a `UStatus` indicating whether the `correlationId` is valid or not.
     fn validate_reqid(&self, attributes: &UAttributes) -> UStatus {
         if let Some(reqid) = attributes.reqid {
-            if !UuidUtils::is_valid_uuid(&reqid) {
+            if !UuidUtils::is_uuid(&reqid) {
                 return UStatus::fail_with_msg_and_reason(
                     "Invalid correlation UUID",
                     UCode::InvalidArgument,
@@ -358,7 +358,7 @@ impl UAttributesValidator for ResponseValidator {
     /// Returns a `UStatus` indicating whether the `correlationId` is valid or not.
     fn validate_reqid(&self, attributes: &UAttributes) -> UStatus {
         if let Some(reqid) = attributes.reqid {
-            if UuidUtils::is_valid_uuid(&reqid) {
+            if UuidUtils::is_uuid(&reqid) {
                 UStatus::ok()
             } else {
                 UStatus::fail_with_msg_and_reason(
