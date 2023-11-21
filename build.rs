@@ -21,9 +21,14 @@ fn main() -> std::io::Result<()> {
 
     if let Err(err) = get_and_build_protos(
         &[
-            // external proto definitions
-            "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
+            // grpc proto definitions
+            "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/code.proto",
             "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/status.proto",
+            "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/error_details.proto",
+            
+            // cloudevent proto definitions
+            "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
+
             // uProtocol-project proto definitions
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uuid.proto",
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uri.proto",
@@ -39,20 +44,24 @@ fn main() -> std::io::Result<()> {
 
 // Fetch protobuf definitions from `url`, and build them with prost_build
 fn get_and_build_protos(urls: &[&str]) -> core::result::Result<(), Box<dyn std::error::Error>> {
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let mut proto_files = Vec::new();
+
     for url in urls.iter() {
         // Extract filename from the URL
         let filename = url.rsplit('/').next().unwrap_or_default();
-        let out_dir = env::var_os("OUT_DIR").unwrap();
         let dest_path = Path::new(&out_dir).join(filename);
 
-        // fetch cloudevents protobuf
+        // Download the .proto file
         if let Err(err) = download_and_write_file(url, filename) {
             panic!("Failed to download and write file: {:?}", err);
         }
-
-        // build cloudevents protobuf
-        prost_build::compile_protos(&[dest_path], &[out_dir.to_str().unwrap()])?;
+        proto_files.push(dest_path);
     }
+
+    // Compile all .proto files together
+    prost_build::compile_protos(&proto_files, &[&out_dir])?;
+
     Ok(())
 }
 
@@ -73,11 +82,7 @@ fn download_and_write_file(
         Ok(response) => {
             let out_dir = env::var_os("OUT_DIR").unwrap();
             let dest_path = Path::new(&out_dir).join(destination);
-
-            println!("file dest: {:?}", dest_path.to_str());
-
-            // let dest_path = Path::new(destination);
-            let mut out_file = fs::File::create(&dest_path)?;
+            let mut out_file = fs::File::create(dest_path)?;
 
             // Write the response body directly to the file
             let _ = std::io::copy(&mut response.into_reader(), &mut out_file);

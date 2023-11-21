@@ -11,189 +11,39 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
-use crate::uri::serializer::uriserializer::UriSerializer;
-
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::WriteBytesExt;
 use std::io::Cursor;
 use std::io::Write;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-/// UUri Serializer that serializes a UUri to byte[] (micro format) per
-///  <https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc>
-pub struct MicroUriSerializer;
+use crate::uprotocol::u_authority::Remote;
+use crate::uprotocol::{UAuthority, UEntity, UResource, UUri};
+use crate::uri::serializer::uriserializer::UriSerializer;
+use crate::uri::validator::UriValidator;
 
-impl UriSerializer<Vec<u8>> for MicroUriSerializer {
-    /// Build a Micro-URI `Vec<u8>` using a passed `UUri` object.
-    ///
-    /// # Arguments
-    ///
-    /// * `uri` - The URI data object.
-    ///
-    /// # Returns
-    ///
-    /// Returns the short form uProtocol URI as a `Vec<u8>` from a `UUri` data object.
-    ///    #[allow(arithmetic_overflow)]
-    fn serialize(uri: &UUri) -> Vec<u8> {
-        if uri.is_empty() || uri.entity.id.is_none() || uri.resource.id.is_none() {
-            return vec![];
-        }
+const LOCAL_MICRO_URI_LENGTH: usize = 8; // local micro URI length
+const IPV4_MICRO_URI_LENGTH: usize = 12; // IPv4 micro URI length
+const IPV6_MICRO_URI_LENGTH: usize = 24; // IPv6 micro URI length
+const UP_VERSION: u8 = 0x1; // UP version
 
-        let mut cursor = Cursor::new(Vec::new());
-        let address = uri.authority.inet_address;
-
-        // UP_VERSION
-        cursor.write_u8(0x1).unwrap();
-
-        // TYPE
-        if uri.authority.is_local() {
-            cursor.write_u8(0x0).unwrap();
-        } else {
-            cursor
-                .write_u8(match address.unwrap() {
-                    IpAddr::V4(_) => 1,
-                    IpAddr::V6(_) => 2,
-                })
-                .unwrap();
-        }
-
-        // URESOURCE_ID
-        cursor
-            .write_u16::<BigEndian>(uri.resource.id.unwrap())
-            .unwrap();
-
-        // UAUTHORITY_ADDRESS
-        if !uri.authority.is_local() {
-            match address.unwrap() {
-                IpAddr::V4(addr) => cursor.write_all(&addr.octets()).unwrap(),
-                IpAddr::V6(addr) => cursor.write_all(&addr.octets()).unwrap(),
-            }
-        }
-
-        // UENTITY_ID
-        cursor
-            .write_u16::<BigEndian>(uri.entity.id.unwrap())
-            .unwrap();
-
-        // UENTITY_VERSION
-        // if let Some(version) = uri.entity.version.clone() {
-        //     let parts: Vec<&str> = version.split('.').collect();
-        //     if parts.len() > 1 {
-        //         let mut major = parts[0].parse::<u8>().unwrap() << 3;
-        //         let mut minor = (parts[1].parse::<u16>().unwrap() >> 8) as u8;
-
-        //         major += minor;
-        //         minor = parts[1].parse::<u16>().unwrap() as u8;
-
-        //         cursor.write_u8(major).unwrap();
-        //         cursor.write_u8(minor).unwrap();
-        //     } else {
-        //         let major = parts[0].parse::<u8>().unwrap() << 3;
-        //         cursor.write_u8(major).unwrap();
-        //         cursor.write_u8(0).unwrap();
-        //     }
-        // } else {
-        //     cursor.write_u16::<BigEndian>(std::i16::MAX as u16).unwrap();
-        // }
-        if let Some(version) = uri.entity.version {
-            cursor.write_u32::<BigEndian>(version).unwrap();
-        }
-
-        cursor.into_inner()
-    }
-
-    /// Creates a `UUri` data object from a uProtocol micro URI.
-    ///
-    /// # Arguments
-    ///
-    /// * `micro_uri` - A byte slice representing the uProtocol micro URI.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `UUri` data object.
-    fn deserialize(micro_uri: Vec<u8>) -> UUri {
-        if micro_uri.is_empty() || micro_uri.len() < 8 {
-            return UUri::EMPTY;
-        }
-
-        // Need to be version 1
-        if micro_uri[0] != 0x1 {
-            return UUri::EMPTY;
-        }
-
-        let u_resource_id = u16::from_be_bytes(micro_uri[2..4].try_into().unwrap());
-
-        let address_type = AddressType::try_from(micro_uri[1] as i32)
-            .expect("Address type decoding should have worked");
-
-        let mut index = 4;
-        let authority: UAuthority;
-
-        match address_type {
-            AddressType::IPv4 => {
-                let slice: [u8; 4] = micro_uri[index..index + 4]
-                    .try_into()
-                    .expect("Wrong slice length");
-
-                let address = IpAddr::V4(Ipv4Addr::from(slice));
-                authority = UAuthority::micro_remote(address);
-
-                index += 4;
-            }
-            AddressType::IPv6 => {
-                let slice: [u8; 16] = micro_uri[index..index + 16]
-                    .try_into()
-                    .expect("Wrong slice length");
-
-                let address = IpAddr::V6(Ipv6Addr::from(slice));
-                authority = UAuthority::micro_remote(address);
-
-                index += 16;
-            }
-            AddressType::Local => {
-                authority = UAuthority::LOCAL;
-            }
-        }
-
-        let ue_id = u16::from_be_bytes(micro_uri[index..index + 2].try_into().unwrap());
-        index += 2;
-        let ue_version = u32::from_be_bytes(micro_uri[index..index + 2].try_into().unwrap());
-
-        // let mut ue_version_string = (ue_version >> 11).to_string();
-        // if ue_version & 0x7FF != 0 {
-        //     ue_version_string.push_str(&format!(".{}", ue_version & 0x7FF));
-        // }
-
-        UUri::new(
-            Some(authority),
-            Some(UEntity::micro_format(Some(ue_id), Some(ue_version))),
-            Some(UResource::micro_format(u_resource_id)),
-        )
-    }
-}
-
-/// The type of address used for Micro URI.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AddressType {
-    Local,
-    IPv4,
-    IPv6,
+#[derive(Debug, PartialEq)]
+enum AddressType {
+    Local = 0,
+    IPv4 = 1,
+    IPv6 = 2,
+    ID = 3,
 }
 
 impl AddressType {
-    pub fn value(&self) -> i32 {
-        match *self {
-            AddressType::Local => 0,
-            AddressType::IPv4 => 1,
-            AddressType::IPv6 => 2,
-        }
+    fn value(&self) -> u8 {
+        *self as u8
     }
 
-    pub fn from(value: i32) -> Option<AddressType> {
+    fn from(value: u8) -> Option<AddressType> {
         match value {
             0 => Some(AddressType::Local),
             1 => Some(AddressType::IPv4),
             2 => Some(AddressType::IPv6),
+            3 => Some(AddressType::ID),
             _ => None,
         }
     }
@@ -203,197 +53,444 @@ impl TryFrom<i32> for AddressType {
     type Error = ();
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        AddressType::from(value).ok_or(())
+        if let Ok(v) = u8::try_from(value) {
+            return AddressType::from(v).ok_or(());
+        } else {
+            return Err(());
+        }
+    }
+}
+
+/// UUri Serializer that serializes a UUri to byte[] (micro format) per
+///  <https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc>
+pub struct MicroUriSerializer;
+
+impl UriSerializer<Vec<u8>> for MicroUriSerializer {
+    /// Serializes a `UUri` into a `Vec<u8>` following the Micro-URI specifications.
+    ///
+    /// # Parameters
+    /// * `uri`: A reference to the `UUri` data object.
+    ///
+    /// # Returns
+    /// A `Vec<u8>` representing the serialized `UUri`.
+    fn serialize(uri: &UUri) -> Vec<u8> {
+        if UriValidator::is_empty(uri) || !UriValidator::is_micro_form(uri) {
+            return vec![];
+        }
+
+        let mut cursor = Cursor::new(Vec::new());
+        let mut address_type = AddressType::Local;
+        let mut authority_id: Option<Vec<u8>> = None;
+        let mut remote_ip: Option<Vec<u8>> = None;
+
+        // UP_VERSION
+        cursor.write_u8(UP_VERSION).unwrap();
+
+        // ADDRESS_TYPE
+        if let Some(Remote::Id(id)) = uri.authority.and_then(|authority| authority.remote) {
+            authority_id = Some(id);
+            address_type = AddressType::ID;
+        } else if let Some(Remote::Ip(ip)) = uri.authority.and_then(|authority| authority.remote) {
+            match ip.len() {
+                4 => address_type = AddressType::IPv4,
+                16 => address_type = AddressType::IPv6,
+                _ => return vec![],
+            }
+            remote_ip = Some(ip);
+        } else if let Some(Remote::Name(name)) =
+            uri.authority.and_then(|authority| authority.remote)
+        {
+            // Handle Remote::Name case
+        }
+        cursor.write_u8(address_type.value()).unwrap();
+
+        // URESOURCE_ID
+        if let Some(id) = uri.resource.and_then(|resource| resource.id) {
+            cursor.write_all(&[(id >> 8) as u8]).unwrap();
+            cursor.write_all(&[id as u8]).unwrap();
+        }
+
+        // UENTITY_ID
+        if let Some(id) = uri.entity.and_then(|entity| entity.id) {
+            cursor.write_all(&[(id >> 8) as u8]).unwrap();
+            cursor.write_all(&[id as u8]).unwrap();
+        }
+
+        // UENTITY_VERSION
+        let version = uri
+            .entity
+            .and_then(|entity| entity.version_major)
+            .unwrap_or(0);
+        cursor.write_u8(version as u8).unwrap();
+
+        // UNUSED
+        cursor.write_u8(0).unwrap();
+
+        // UAUTHORITY
+        if address_type != AddressType::Local {
+            if address_type == AddressType::ID && authority_id.is_some() {
+                cursor.write_u8(authority_id.unwrap().len() as u8).unwrap();
+            }
+
+            if let Some(id) = authority_id {
+                cursor.write_all(&id).unwrap();
+            } else if let Some(ip) = remote_ip {
+                cursor.write_all(&ip).unwrap();
+            }
+        }
+
+        cursor.into_inner()
+    }
+
+    /// Creates a `UUri` data object from a uProtocol micro URI.
+    ///
+    /// # Arguments
+    ///
+    /// * `micro_uri` - A byte vec representing the uProtocol micro URI.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `UUri` data object.
+    fn deserialize(micro_uri: Vec<u8>) -> UUri {
+        if micro_uri.len() < LOCAL_MICRO_URI_LENGTH {
+            return UUri::default();
+        }
+
+        // Need to be version 1
+        if micro_uri[0] != 0x1 {
+            return UUri::default();
+        }
+
+        // RESOURCE_ID
+        let uresource_id = u16::from_be_bytes(micro_uri[2..4].try_into().unwrap());
+
+        let address_type = AddressType::from(micro_uri[1]);
+        if address_type.is_none() {
+            return UUri::default();
+        }
+
+        match address_type.unwrap() {
+            AddressType::Local => {
+                if micro_uri.len() != LOCAL_MICRO_URI_LENGTH {
+                    return UUri::default();
+                }
+            }
+            AddressType::IPv4 => {
+                if micro_uri.len() != IPV4_MICRO_URI_LENGTH {
+                    return UUri::default();
+                }
+            }
+            AddressType::IPv6 => {
+                if micro_uri.len() != IPV6_MICRO_URI_LENGTH {
+                    return UUri::default();
+                }
+            }
+            _ => {}
+        }
+
+        // UENTITY_ID
+        let ue_id = u16::from_be_bytes(micro_uri[4..6].try_into().unwrap());
+
+        // VERSION_ID
+        let ue_version = u32::from(micro_uri[6]);
+
+        // Calculate uAuthority
+        let mut authority: Option<UAuthority> = None;
+        match address_type.unwrap() {
+            AddressType::IPv4 => {
+                let slice: [u8; 4] = micro_uri[8..12].try_into().expect("Wrong slice length");
+                authority = Some(UAuthority {
+                    remote: Some(Remote::Ip(slice.to_vec())),
+                    ..Default::default()
+                });
+            }
+            AddressType::IPv6 => {
+                let slice: [u8; 16] = micro_uri[8..24].try_into().expect("Wrong slice length");
+                authority = Some(UAuthority {
+                    remote: Some(Remote::Ip(slice.to_vec())),
+                    ..Default::default()
+                });
+            }
+            AddressType::ID => {
+                authority = Some(UAuthority {
+                    remote: Some(Remote::Id(micro_uri[9..].to_vec())),
+                    ..Default::default()
+                });
+            }
+            _ => {}
+        }
+
+        UUri {
+            authority,
+            entity: Some(UEntity {
+                id: Some(ue_id.into()),
+                version_major: Some(ue_version),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(uresource_id.into()),
+                ..Default::default()
+            }),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
-    use std::str::FromStr;
+    use crate::uri::builder::resourcebuilder::UResourceBuilder;
 
     #[test]
     fn test_empty() {
-        let uri = UUri::EMPTY;
+        let uri = UUri::default();
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert_eq!(0, uprotocol_uri.len());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert!(UriValidator::is_empty(&uri))
     }
 
     #[test]
-    fn test_build_micro_uri_from_remote_uri_missing_uentity() {
-        let ipv6_address = "2001:db8:85a3:0:0:8a2e:370:7334";
-        let address: std::net::IpAddr = ipv6_address.parse().unwrap();
-
-        let authority = UAuthority::micro_remote(address);
-
-        let uprotocol_uri = MicroUriSerializer::serialize(&UUri::new(
-            Some(authority),
-            Some(UEntity::EMPTY),
-            Some(UResource::EMPTY),
-        ));
-
-        assert_eq!(0, uprotocol_uri.len());
+    fn test_serialize_uri() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(19999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert_eq!(uri, uri2)
     }
 
     #[test]
-    fn test_build_micro_uri_from_local_uri_simple_version() {
-        let authority = UAuthority::LOCAL;
-        let entity = UEntity::new("body.access".to_string(), Some(1), Some(5), false);
-        let resource = UResource::new(
-            "door".to_string(),
-            Some("front_left".to_string()),
-            Some("Door".to_string()),
-            Some(3),
-            false,
-        );
-
-        let uprotocol_uri = MicroUriSerializer::serialize(&UUri::new(
-            Some(authority),
-            Some(entity),
-            Some(resource),
-        ));
-
-        assert_eq!(10, uprotocol_uri.len());
-        assert_eq!(1, uprotocol_uri[0]); // version 1
-        assert_eq!(0, uprotocol_uri[1]); // local
-        assert_eq!(0, uprotocol_uri[2]); // UResource ID (MSB)
-        assert_eq!(3, uprotocol_uri[3]); // UResource ID (LSB)
-        assert_eq!(0, uprotocol_uri[4]); // UEntity ID (MSB)
-        assert_eq!(5, uprotocol_uri[5]); // UEntity ID (LSB)
-        assert_eq!(0, uprotocol_uri[6]); // UEntity Version (Byte 1)
-        assert_eq!(0, uprotocol_uri[7]); // UEntity Version (Byte 2)
-        assert_eq!(0, uprotocol_uri[8]); // UEntity Version (Byte 3)
-        assert_eq!(1, uprotocol_uri[9]); // UEntity Version (Byte 4)
+    fn test_serialize_remote_uri_without_address() {
+        let uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("vcu.vin".to_string())),
+                ..Default::default()
+            }),
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(19999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_empty())
     }
 
     #[test]
-    fn test_build_micro_uri_from_local_uri_no_version() {
-        let uauthority = UAuthority::LOCAL;
-        let entity = UEntity::new("body.access".to_string(), None, Some(5), false);
-        let uresource = UResource::new(
-            "door".to_string(),
-            Some("front_left".to_string()),
-            Some("Door".to_string()),
-            Some(3),
-            false,
-        );
-
-        let uuri = UUri::new(Some(uauthority), Some(entity), Some(uresource));
-        let uprotocol_uri = MicroUriSerializer::serialize(&uuri);
-
-        assert_eq!(6, uprotocol_uri.len());
-        assert_eq!(1, uprotocol_uri[0]); // version 1
-        assert_eq!(0, uprotocol_uri[1]); // local
-        assert_eq!(0, uprotocol_uri[2]); // UResource ID (MSB)
-        assert_eq!(3, uprotocol_uri[3]); // UResource ID (LSB)
-        assert_eq!(0, uprotocol_uri[4]); // UEntity ID (MSB)
-        assert_eq!(5, uprotocol_uri[5]); // UEntity ID (LSB)
+    fn test_serialize_uri_missing_ids() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "hartley".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_response()),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_empty())
     }
 
     #[test]
-    fn test_build_micro_uri_from_remote_ipv4_address() {
-        let ipv4_address = "127.0.0.1";
-        let address: IpAddr = ipv4_address.parse().unwrap();
+    fn test_serialize_uri_missing_resource_ids() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "hartley".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_empty())
+    }
 
-        let authority = UAuthority::micro_remote(address);
-        let entity = UEntity::new("".to_string(), None, Some(5), false);
-        let resource = UResource::micro_format(3);
+    #[test]
+    fn test_deserialize_bad_microuri_length() {
+        let bad_uri: Vec<u8> = vec![0x1, 0x0, 0x0, 0x0, 0x0];
+        let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
+        assert!(UriValidator::is_empty(&uprotocol_uri));
+    }
 
-        let uri = UUri::new(Some(authority), Some(entity), Some(resource));
+    #[test]
+    fn test_deserialize_bad_microuri_not_version_1() {
+        let bad_uri: Vec<u8> = vec![0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
+        let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
+        assert!(UriValidator::is_empty(&uprotocol_uri));
+    }
+
+    #[test]
+    fn test_deserialize_bad_microuri_not_valid_address_type() {
+        let bad_uri: Vec<u8> = vec![0x1, 0x5, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
+        let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
+        assert!(UriValidator::is_empty(&uprotocol_uri));
+    }
+
+    #[test]
+    fn test_deserialize_bad_microuri_valid_address_type_invalid_length() {
+        let bad_uri: Vec<u8> = vec![0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
+        let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
+        assert!(UriValidator::is_empty(&uprotocol_uri));
+
+        let bad_uri: Vec<u8> = vec![0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
+        let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
+        assert!(UriValidator::is_empty(&uprotocol_uri));
+
+        let bad_uri: Vec<u8> = vec![0x1, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
+        let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
+        assert!(UriValidator::is_empty(&uprotocol_uri));
+    }
+
+    #[test]
+    fn test_serialize_good_ipv4_based_authority() {
+        let address: Ipv4Addr = "10.0.3.3".parse().unwrap();
+        let uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Ip(address.octets().to_vec())),
+                ..Default::default()
+            }),
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(None, Some(99))),
+            ..Default::default()
+        };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert_eq!(10, uprotocol_uri.len()); // Check URI length
-        assert_eq!(1, uprotocol_uri[0]); // version 1
-        assert_eq!(AddressType::IPv4.value() as u8, uprotocol_uri[1]);
-        assert_eq!(0, uprotocol_uri[2]); // UResource ID (MSB)
-        assert_eq!(3, uprotocol_uri[3]); // UResource ID (LSB)
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
 
-        let addr_bytes: [u8; 4] = uprotocol_uri[4..8].try_into().unwrap();
-        let addr = IpAddr::from(addr_bytes);
-        assert_eq!(address, addr);
-
-        assert_eq!(0, uprotocol_uri[8]); // UEntity ID (MSB)
-        assert_eq!(5, uprotocol_uri[9]); // UEntity ID (LSB)
-
-        // assert_eq!((std::i16::MAX >> 8) as u8, uprotocol_uri[10]); // UEntity Version (MSB)
-        // assert_eq!(std::i16::MAX as u8, uprotocol_uri[11]); // UEntity Version (LSB)
+        assert!(!uprotocol_uri.is_empty());
+        assert!(UriValidator::is_micro_form(&uri));
+        assert!(UriValidator::is_micro_form(&uri2));
+        assert_eq!(uri.to_string(), uri2.to_string());
+        assert_eq!(uri, uri2);
     }
 
     #[test]
-    fn test_build_micro_uri_from_remote_ipv6_address() {
-        let ipv6_address = "2001:db8:85a3:0:0:8a2e:370:7334";
-        let address: IpAddr = ipv6_address.parse().unwrap();
-
-        let authority = UAuthority::micro_remote(address);
-        let entity = UEntity::new("".to_string(), Some(1), Some(5), false);
-        let resource = UResource::micro_format(3);
-
-        let uri = UUri::new(Some(authority), Some(entity), Some(resource));
+    fn test_serialize_good_ipv6_based_authority() {
+        let address: Ipv6Addr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse().unwrap();
+        let uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Ip(address.octets().to_vec())),
+                ..Default::default()
+            }),
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(19999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
 
-        assert_eq!(26, uprotocol_uri.len());
-        assert_eq!(1, uprotocol_uri[0]); // version 1
-        assert_eq!(AddressType::IPv6.value() as u8, uprotocol_uri[1]);
-        assert_eq!(0, uprotocol_uri[2]); // UResource ID (MSB)
-        assert_eq!(3, uprotocol_uri[3]); // UResource ID (LSB)
-
-        let addr_bytes: [u8; 16] = uprotocol_uri[4..20].try_into().unwrap();
-        let addr = IpAddr::from(addr_bytes);
-        assert_eq!(address, addr);
-
-        assert_eq!(0, uprotocol_uri[20]); // UEntity ID (MSB)
-        assert_eq!(5, uprotocol_uri[21]); // UEntity ID (LSB)
-
-        assert_eq!(0, uprotocol_uri[22]); // UEntity Version (Byte 1)
-        assert_eq!(0, uprotocol_uri[23]); // UEntity Version (Byte 2)
-        assert_eq!(0, uprotocol_uri[24]); // UEntity Version (Byte 3)
-        assert_eq!(1, uprotocol_uri[25]); // UEntity Version (Byte 4)
-    }
-
-    // Can't pass null/None to this function in Rust
-    // #[test]
-    // fn test_build_micro_uri_from_null_uri() {}
-
-    #[test]
-    fn test_build_micro_uri_from_empty_uri() {
-        let empty_uri = UUri::EMPTY;
-        let uprotocol_uri = MicroUriSerializer::serialize(&empty_uri);
-        assert_eq!(0, uprotocol_uri.len());
+        assert!(!uprotocol_uri.is_empty());
+        assert!(UriValidator::is_micro_form(&uri));
+        assert!(UriValidator::is_micro_form(&uri2));
+        assert_eq!(uri.to_string(), uri2.to_string());
+        assert_eq!(uri, uri2);
     }
 
     #[test]
-    fn test_build_micro_uri_from_uri_missing_uresource_id() {
-        let authority = UAuthority::LOCAL;
-        let entity = UEntity::new("body.access".to_string(), Some(1), Some(5), false);
-        let resource = UResource::EMPTY;
+    fn test_serialize_id_based_authority() {
+        let size = 13;
+        let bytes: Vec<u8> = (0..size).map(|i| i as u8).collect();
 
-        let uri = UUri::new(Some(authority), Some(entity), Some(resource));
+        let uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Id(bytes)),
+                ..Default::default()
+            }),
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(19999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert_eq!(0, uprotocol_uri.len());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+
+        assert!(!uprotocol_uri.is_empty());
+        assert!(UriValidator::is_micro_form(&uri));
+        assert!(UriValidator::is_micro_form(&uri2));
+        assert_eq!(uri.to_string(), uri2.to_string());
+        assert_eq!(uri, uri2);
     }
 
     #[test]
-    fn test_build_micro_uri_from_uri_invalid_address() {
-        let address: IpAddr =
-            IpAddr::from_str("example.com").unwrap_or(IpAddr::V4("0.0.0.0".parse().unwrap()));
-        let authority = UAuthority::micro_remote(address);
-        let entity = UEntity::new("body.access".to_string(), Some(1), Some(5), false);
-        let resource = UResource::long_format("door".to_string());
+    fn test_serialize_bad_length_ip_based_authority() {
+        let bad_bytes: Vec<u8> = vec![127, 1, 23, 123, 12, 6];
+        let uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Ip(bad_bytes)),
+                ..Default::default()
+            }),
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(None, Some(99))),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_empty());
+    }
 
-        let uri = UUri::new(Some(authority), Some(entity), Some(resource));
+    #[test]
+    fn test_serialize_id_size_255_based_authority() {
+        let size = 129;
+        let bytes: Vec<u8> = (0..size).map(|i| i as u8).collect();
+
+        let uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Id(bytes)),
+                ..Default::default()
+            }),
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(19999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert_eq!(0, uprotocol_uri.len());
-    }
-
-    #[test]
-    fn test_parse_micro_uri_from_empty_byte_array() {
-        let uprotocol_uri: Vec<u8> = vec![];
-        let uri = MicroUriSerializer::deserialize(uprotocol_uri);
-
-        assert_eq!(UUri::EMPTY, uri);
+        assert_eq!(uprotocol_uri.len(), 9 + size);
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert!(UriValidator::is_micro_form(&uri));
+        assert!(UriValidator::is_micro_form(&uri2));
+        assert_eq!(uri, uri2);
     }
 }

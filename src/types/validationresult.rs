@@ -1,6 +1,19 @@
+/********************************************************************************
+ * Copyright (c) 2023 Contributors to the Eclipse Foundation
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information regarding copyright ownership.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Apache License Version 2.0 which is available at
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ ********************************************************************************/
+
 use std::fmt;
 
-use crate::transport::datamodel::{UCode, UStatus};
+use crate::proto::{Code, Status};
 
 ///  ValidationResult of success or failure, wrapping the value of a UStatus.
 #[derive(Debug, PartialEq)]
@@ -9,13 +22,18 @@ pub enum ValidationResult {
     Failure(String),
 }
 
-impl From<ValidationResult> for UStatus {
+impl From<ValidationResult> for Status {
     fn from(value: ValidationResult) -> Self {
         match value {
-            ValidationResult::Success => UStatus::ok(),
-            ValidationResult::Failure(message) => {
-                UStatus::fail_with_msg_and_reason(&message, UCode::InvalidArgument)
-            }
+            ValidationResult::Success => Status {
+                code: Code::Ok.into(),
+                ..Default::default()
+            },
+            ValidationResult::Failure(message) => Status {
+                code: Code::InvalidArgument.into(),
+                message,
+                ..Default::default()
+            },
         }
     }
 }
@@ -58,12 +76,17 @@ impl ValidationResult {
         ValidationResult::Failure(message.to_string())
     }
 
-    pub fn to_status(&self) -> UStatus {
+    pub fn to_status(&self) -> Status {
         match self {
-            Self::Success => UStatus::ok(),
-            Self::Failure(error) => {
-                UStatus::fail_with_msg_and_reason(error, UCode::InvalidArgument)
-            }
+            Self::Success => Status {
+                code: Code::Ok.into(),
+                ..Default::default()
+            },
+            Self::Failure(error) => Status {
+                code: Code::InvalidArgument.into(),
+                message: *error,
+                ..Default::default()
+            },
         }
     }
 }
@@ -114,14 +137,21 @@ mod tests {
     #[test]
     fn test_success_validation_result_to_status() {
         let success = ValidationResult::success();
-        let status_success = UStatus::ok();
-        assert_eq!(status_success, UStatus::from(success));
+        let status_success = Status {
+            code: Code::Ok.into(),
+            ..Default::default()
+        };
+        assert_eq!(status_success, Status::from(success));
     }
 
     #[test]
     fn test_failure_validation_result_to_status() {
         let failure = ValidationResult::failure("boom");
-        let status_failure = UStatus::fail_with_msg_and_reason("boom", UCode::InvalidArgument);
-        assert_eq!(status_failure, UStatus::from(failure));
+        let status_failure = Status {
+            code: Code::InvalidArgument.into(),
+            message: "boom".into(),
+            ..Default::default()
+        };
+        assert_eq!(status_failure, Status::from(failure));
     }
 }

@@ -11,35 +11,71 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uri::datamodel::UUri;
+use crate::uprotocol::UUri;
 
 pub type UriSerializationError = ();
 
-/// UUri serializer that will serialize a UUri object to either a `String` or `Vec<u8>`.
+/// `UUri`s are used in transport layers and hence need to be serialized.
 ///
-/// For more information, please refer to the [uprotocol specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc)
+/// Each transport supports different serialization formats. For more information,
+/// please refer to the [uProtocol URI specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc).
 ///
-/// - `T`: The serialization format
+/// # Type Parameters
+/// * `T`: The data structure that the `UUri` will be serialized into.
+///   For example, `String` or `Vec<u8>` (to represent byte arrays).
 pub trait UriSerializer<T> {
-    /// Deserialize from the given format to a UUri.
+    /// Deserialize from the format to a `UUri`.
     ///
     /// # Arguments
-    ///
-    /// * `uri`: The serialized UUri.
+    /// * `uri` - The serialized `UUri`.
     ///
     /// # Returns
-    ///
-    /// The deserialized UUri object.
+    /// Returns a `UUri` object from the serialized format from the wire.
     fn deserialize(uri: T) -> UUri;
 
-    /// Serialize from a UUri to the given format.
+    /// Serializes a `UUri` into a specific serialization format.
     ///
     /// # Arguments
-    ///
-    /// * `uri`: The UUri object to be serialized.
+    /// * `uri` - The `UUri` object to be serialized into the format `T`.
     ///
     /// # Returns
-    ///
-    /// The serialized UUri.
+    /// Returns the `UUri` in the transport serialized format.
     fn serialize(uri: &UUri) -> T;
+
+    fn build_resolved(long_uri: &str, micro_uri: &[u8]) -> Option<UUri> {
+        if long_uri.is_empty() && micro_uri.is_empty() {
+            return Some(UUri {
+                ..Default::default()
+            });
+        }
+
+        todo!()
+    }
 }
+
+// default Optional<UUri> buildResolved(String longUri, byte[] microUri) {
+
+//     if ((longUri == null || longUri.isEmpty()) && (microUri == null || microUri.length == 0)) {
+//         return Optional.of(UUri.getDefaultInstance());
+//     }
+
+//     UUri longUUri = LongUriSerializer.instance().deserialize(longUri);
+//     UUri microUUri = MicroUriSerializer.instance().deserialize(microUri);
+
+//     final UAuthority.Builder uAuthorityBuilder =
+//         UAuthority.newBuilder(microUUri.getAuthority())
+//             .setName(longUUri.getAuthority().getName());
+
+//     final UEntity.Builder uEntityBuilder = UEntity.newBuilder(microUUri.getEntity())
+//         .setName(longUUri.getEntity().getName());
+
+//     final UResource.Builder uResourceBuilder = UResource.newBuilder(longUUri.getResource())
+//         .setId(microUUri.getResource().getId());
+
+//     UUri uUri = UUri.newBuilder()
+//         .setAuthority(uAuthorityBuilder)
+//         .setEntity(uEntityBuilder)
+//         .setResource(uResourceBuilder)
+//         .build();
+//     return UriValidator.isResolved(uUri) ? Optional.of(uUri) : Optional.empty();
+// }

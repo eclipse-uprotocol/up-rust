@@ -70,16 +70,8 @@ pub mod cloudevent {
 }
 
 pub mod uri {
-    pub mod datamodel {
-        mod uauthority;
-        mod uentity;
-        mod uresource;
-        mod uuri;
-
-        pub use uauthority::*;
-        pub use uentity::*;
-        pub use uresource::*;
-        pub use uuri::*;
+    pub mod builder {
+        pub mod resourcebuilder;
     }
     pub mod validator {
         mod urivalidator;
@@ -89,12 +81,10 @@ pub mod uri {
     pub mod serializer {
         mod longuriserializer;
         mod microuriserializer;
-        mod shorturiserializer;
         mod uriserializer;
 
         pub use longuriserializer::*;
         pub use microuriserializer::*;
-        pub use shorturiserializer::*;
         pub use uriserializer::*;
     }
 }
@@ -162,7 +152,9 @@ pub mod rpc {
 pub mod uprotocol {
     include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
 
+    pub use crate::proto::uprotocol::uresource;
     pub use crate::proto::uprotocol::uuid;
+    pub use crate::proto::uprotocol::uuri;
 }
 
 #[allow(non_snake_case)]
@@ -178,6 +170,8 @@ pub mod proto {
     }
 
     pub mod uprotocol {
+        pub mod uresource;
         pub mod uuid;
+        pub mod uuri;
     }
 }
