@@ -15,6 +15,7 @@ use std::fmt::Display;
 use uuid::Uuid;
 
 use crate::uprotocol::Uuid as uproto_Uuid;
+use crate::uuid::serializer::{LongUuidSerializer, MicroUuidSerializer, UuidSerializer};
 
 impl From<uproto_Uuid> for Uuid {
     fn from(value: uproto_Uuid) -> Self {
@@ -28,6 +29,30 @@ impl From<Uuid> for uproto_Uuid {
             msb: value.as_u64_pair().0,
             lsb: value.as_u64_pair().1,
         }
+    }
+}
+
+impl From<uproto_Uuid> for String {
+    fn from(value: uproto_Uuid) -> Self {
+        LongUuidSerializer::serialize(&value)
+    }
+}
+
+impl From<String> for uproto_Uuid {
+    fn from(value: String) -> Self {
+        LongUuidSerializer::deserialize(value).unwrap_or_default()
+    }
+}
+
+impl From<uproto_Uuid> for [u8; 16] {
+    fn from(value: uproto_Uuid) -> Self {
+        MicroUuidSerializer::serialize(&value)
+    }
+}
+
+impl From<[u8; 16]> for uproto_Uuid {
+    fn from(value: [u8; 16]) -> Self {
+        MicroUuidSerializer::deserialize(value).unwrap_or_default()
     }
 }
 

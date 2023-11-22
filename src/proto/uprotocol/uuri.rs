@@ -14,7 +14,31 @@
 use std::fmt::Display;
 
 use crate::uprotocol::UUri as uproto_Uuri;
-use crate::uri::serializer::{LongUriSerializer, UriSerializer};
+use crate::uri::serializer::{LongUriSerializer, MicroUriSerializer, UriSerializer};
+
+impl From<uproto_Uuri> for String {
+    fn from(value: uproto_Uuri) -> Self {
+        LongUriSerializer::serialize(&value)
+    }
+}
+
+impl From<String> for uproto_Uuri {
+    fn from(value: String) -> Self {
+        LongUriSerializer::deserialize(value)
+    }
+}
+
+impl From<uproto_Uuri> for Vec<u8> {
+    fn from(value: uproto_Uuri) -> Self {
+        MicroUriSerializer::serialize(&value)
+    }
+}
+
+impl From<Vec<u8>> for uproto_Uuri {
+    fn from(value: Vec<u8>) -> Self {
+        MicroUriSerializer::deserialize(value)
+    }
+}
 
 impl Display for uproto_Uuri {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::cloudevent::validator::ValidationResult;
+use crate::types::ValidationResult;
 use crate::uprotocol::{UAuthority, UUri};
 
 /// Struct to encapsulate Uri validation logic.

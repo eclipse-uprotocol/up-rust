@@ -216,7 +216,7 @@ mod tests {
     use super::*;
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::{Priority, UCloudEventAttributes, UCloudEventType};
-    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::uprotocol::{UEntity, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
@@ -232,18 +232,17 @@ mod tests {
     }
 
     fn build_base_cloud_event_for_test() -> EventBuilderV10 {
-        let ue = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(ue),
-            Some(UResource::new(
-                "door".to_string(),
-                Some(String::from("front_left")),
-                Some(String::from("Door")),
-                None,
-                false,
-            )),
-        );
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
         let source = LongUriSerializer::serialize(&uri);
 
         // fake payload

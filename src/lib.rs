@@ -35,6 +35,8 @@
 mod types {
     pub mod ustatus;
     pub mod validationresult;
+
+    pub use validationresult::*;
 }
 
 pub mod cloudevent {
@@ -64,7 +66,6 @@ pub mod cloudevent {
     pub mod validator {
         mod cloudeventvalidator;
 
-        pub use crate::types::validationresult::*;
         pub use cloudeventvalidator::*;
     }
 }
@@ -98,9 +99,13 @@ pub mod uuid {
         pub use uuidutils::*;
     }
     pub mod serializer {
-        pub mod longuuidserializer;
-        pub mod microuuidserializer;
-        pub mod uuidserializer;
+        mod longuuidserializer;
+        mod microuuidserializer;
+        mod uuidserializer;
+
+        pub use longuuidserializer::*;
+        pub use microuuidserializer::*;
+        pub use uuidserializer::*;
     }
     pub mod validator {
         mod uuidvalidator;
@@ -111,21 +116,16 @@ pub mod uuid {
 }
 
 pub mod transport {
+    pub mod builder {
+        mod uattributesbuilder;
+
+        pub use uattributesbuilder::*;
+    }
     pub mod datamodel {
-        mod uattributes;
         mod ulistener;
-        mod umessagetype;
-        mod upayload;
-        mod upriority;
-        mod userializationhint;
         mod utransport;
 
-        pub use uattributes::*;
         pub use ulistener::*;
-        pub use umessagetype::*;
-        pub use upayload::*;
-        pub use upriority::*;
-        pub use userializationhint::*;
         pub use utransport::*;
 
         pub use crate::types::ustatus::*;
@@ -155,6 +155,8 @@ pub mod uprotocol {
     pub use crate::proto::uprotocol::uresource;
     pub use crate::proto::uprotocol::uuid;
     pub use crate::proto::uprotocol::uuri;
+
+    pub use u_authority::Remote;
 }
 
 #[allow(non_snake_case)]

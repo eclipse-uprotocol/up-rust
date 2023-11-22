@@ -33,6 +33,7 @@ fn main() -> std::io::Result<()> {
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uuid.proto",
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uri.proto",
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/uattributes.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/upayload.proto",
         ]
     ) {
         let error_message = format!("Failed to fetch and build protobuf file: {:?}", err);

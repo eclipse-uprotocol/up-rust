@@ -401,25 +401,26 @@ mod tests {
     use super::*;
     use crate::cloudevent::datamodel::{Priority, UCloudEvent};
     use crate::transport::datamodel::UCode;
-    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::uprotocol::{Remote, UAuthority, UEntity, UResource, UUri};
+    use crate::uri::builder::resourcebuilder::UResourceBuilder;
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
 
     #[test]
     fn test_create_base_cloud_event() {
-        let entity = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(entity),
-            Some(UResource::new(
-                "door".to_string(),
-                Some(String::from("front_left")),
-                Some(String::from("Door")),
-                None,
-                false,
-            )),
-        );
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
         let source = uri.to_string();
         let proto_payload = pack_event_into_any(&build_proto_payload_for_test());
 
@@ -480,18 +481,17 @@ mod tests {
 
     #[test]
     fn test_create_base_cloud_event_without_attributes() {
-        let entity = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(entity),
-            Some(UResource::new(
-                "door".to_string(),
-                Some(String::from("front_left")),
-                Some(String::from("Door")),
-                None,
-                false,
-            )),
-        );
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
         let source = uri.to_string();
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
         let ucloud_event_attributes = UCloudEventAttributes::default();
@@ -541,18 +541,17 @@ mod tests {
 
     #[test]
     fn test_create_publish_cloud_event() {
-        let entity = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(entity),
-            Some(UResource::new(
-                "door".to_string(),
-                Some(String::from("front_left")),
-                Some(String::from("Door")),
-                None,
-                false,
-            )),
-        );
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
         let source = uri.to_string();
 
         // fake payload
@@ -608,30 +607,34 @@ mod tests {
     #[test]
     fn test_create_notification_cloud_event() {
         // source
-        let entity = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(entity),
-            Some(UResource::new(
-                "door".to_string(),
-                Some(String::from("front_left")),
-                Some(String::from("Door")),
-                None,
-                false,
-            )),
-        );
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
         let source = uri.to_string();
 
         // sink
-        let sink_entity = UEntity::long_format("petapp".to_string(), None);
-        let sink_uri = UUri::new(
-            Some(UAuthority::long_remote(
-                "com.gm.bo".to_string(),
-                "bo".to_string(),
-            )),
-            Some(sink_entity),
-            Some(UResource::long_format("OK".to_string())),
-        );
+        let sink_uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("com.gm.bo".into())),
+            }),
+            entity: Some(UEntity {
+                name: "petapp".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "OK".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
         let sink = sink_uri.to_string();
 
         // fake payload
@@ -688,22 +691,29 @@ mod tests {
     #[test]
     fn test_create_request_cloud_event_from_local_use() {
         // Uri for the application requesting the RPC
-        let source_use = UEntity::long_format("petapp".to_string(), None);
-        let application_uri_for_rpc =
-            LongUriSerializer::serialize(&UUri::rpc_response(UAuthority::LOCAL, source_use));
+        let rpc_uri = UUri {
+            entity: Some(UEntity {
+                name: "petapp".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_response()),
+            ..Default::default()
+        };
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
 
         // service Method Uri
-        let method_software_entity_service =
-            UEntity::new("body.access".to_string(), Some(1), None, false);
-        let method_uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(method_software_entity_service),
-            Some(UResource::for_rpc_request(
-                Some("UpdateDoor".to_string()),
+        let method_uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(
+                Some("UpdateDoor".into()),
                 None,
             )),
-        );
-        let service_method_uri = method_uri.to_string();
+            ..Default::default()
+        };
+        let service_method_uri = LongUriSerializer::serialize(&rpc_uri);
 
         // fake payload
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
@@ -770,26 +780,35 @@ mod tests {
     #[test]
     fn test_create_request_cloud_event_from_remote_use() {
         // Uri for the application requesting the RPC
-        let source_use_authority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
-        let source_use = UEntity::new("petapp".to_string(), Some(1), None, false);
-        let application_uri_for_rpc =
-            LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
+        let rpc_uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("bo".into())),
+            }),
+            entity: Some(UEntity {
+                name: "petapp".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_response()),
+            ..Default::default()
+        };
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
 
         // service Method Uri
-        let method_software_entity_service =
-            UEntity::new("body.access".to_string(), Some(1), None, false);
-        let method_uri = UUri::new(
-            Some(UAuthority::long_remote(
-                "VCU".to_string(),
-                "MY_CAR_VIN".to_string(),
-            )),
-            Some(method_software_entity_service),
-            Some(UResource::for_rpc_request(
-                Some("UpdateDoor".to_string()),
+        let method_uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("VCU".into())),
+            }),
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(
+                Some("UpdateDoor".into()),
                 None,
             )),
-        );
-        let service_method_uri = method_uri.to_string();
+            ..Default::default()
+        };
+        let service_method_uri = LongUriSerializer::serialize(&rpc_uri);
 
         // fake payload
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
@@ -859,22 +878,31 @@ mod tests {
     #[test]
     fn test_create_response_cloud_event_originating_from_local_use() {
         // Uri for the application requesting the RPC
-        let source_use = UEntity::new("petapp".to_string(), Some(1), None, false);
-        let application_uri_for_rpc =
-            LongUriSerializer::serialize(&UUri::rpc_response(UAuthority::LOCAL, source_use));
+        let rpc_uri = UUri {
+            entity: Some(UEntity {
+                name: "petapp".to_string(),
+                version_major: Some(1),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_response()),
+            ..Default::default()
+        };
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
 
         // service Method Uri
-        let method_software_entity_service =
-            UEntity::new("body.access".to_string(), Some(1), None, false);
-        let method_uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(method_software_entity_service),
-            Some(UResource::for_rpc_request(
-                Some("UpdateDoor".to_string()),
+        let method_uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                version_major: Some(1),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(
+                Some("UpdateDoor".into()),
                 None,
             )),
-        );
-        let service_method_uri = method_uri.to_string();
+            ..Default::default()
+        };
+        let service_method_uri = LongUriSerializer::serialize(&rpc_uri);
 
         // fake payload
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
@@ -945,26 +973,35 @@ mod tests {
     #[test]
     fn test_create_response_cloud_event_originating_from_remote_use() {
         // Uri for the application requesting the RPC
-        let source_use_authority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
-        let source_use = UEntity::long_format("petapp".to_string(), None);
-        let application_uri_for_rpc =
-            LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
+        let rpc_uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("bo.cloud".into())),
+            }),
+            entity: Some(UEntity {
+                name: "petapp".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_response()),
+            ..Default::default()
+        };
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
 
         // service Method Uri
-        let method_software_entity_service =
-            UEntity::new("body.access".to_string(), Some(1), None, false);
-        let method_uri = UUri::new(
-            Some(UAuthority::long_remote(
-                "VCU".to_string(),
-                "MY_CAR_VIN".to_string(),
-            )),
-            Some(method_software_entity_service),
-            Some(UResource::for_rpc_request(
-                Some("UpdateDoor".to_string()),
+        let method_uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("VCU".into())),
+            }),
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(
+                Some("UpdateDoor".into()),
                 None,
             )),
-        );
-        let service_method_uri = method_uri.to_string();
+            ..Default::default()
+        };
+        let service_method_uri = LongUriSerializer::serialize(&rpc_uri);
 
         // fake payload
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
@@ -1035,22 +1072,31 @@ mod tests {
     #[test]
     fn test_create_a_failed_response_cloud_event_originating_from_local_use() {
         // Uri for the application requesting the RPC
-        let source_use = UEntity::new("petapp".to_string(), Some(1), None, false);
-        let application_uri_for_rpc =
-            LongUriSerializer::serialize(&UUri::rpc_response(UAuthority::LOCAL, source_use));
+        let rpc_uri = UUri {
+            entity: Some(UEntity {
+                name: "petapp".to_string(),
+                version_major: Some(1),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_response()),
+            ..Default::default()
+        };
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
 
         // Service Method Uri
-        let method_software_entity_service =
-            UEntity::new("body.access".to_string(), Some(1), None, false);
-        let method_uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(method_software_entity_service),
-            Some(UResource::for_rpc_request(
-                Some("UpdateDoor".to_string()),
+        let method_uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                version_major: Some(1),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(
+                Some("UpdateDoor".into()),
                 None,
             )),
-        );
-        let service_method_uri = method_uri.to_string();
+            ..Default::default()
+        };
+        let service_method_uri = LongUriSerializer::serialize(&rpc_uri);
 
         // Additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
@@ -1114,26 +1160,35 @@ mod tests {
     #[test]
     fn test_create_a_failed_response_cloud_event_originating_from_remote_use() {
         // Uri for the application requesting the RPC
-        let source_use_authority = UAuthority::long_remote("bo".to_string(), "cloud".to_string());
-        let source_use = UEntity::long_format("petapp".to_string(), None);
-        let application_uri_for_rpc =
-            LongUriSerializer::serialize(&UUri::rpc_response(source_use_authority, source_use));
+        let rpc_uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("bo.cloud".into())),
+            }),
+            entity: Some(UEntity {
+                name: "petapp".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_response()),
+            ..Default::default()
+        };
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
 
         // Service Method Uri
-        let method_software_entity_service =
-            UEntity::new("body.access".to_string(), Some(1), None, false);
-        let method_uri = UUri::new(
-            Some(UAuthority::long_remote(
-                "VCU".to_string(),
-                "MY_CAR_VIN".to_string(),
-            )),
-            Some(method_software_entity_service),
-            Some(UResource::for_rpc_request(
-                Some("UpdateDoor".to_string()),
+        let method_uri = UUri {
+            authority: Some(UAuthority {
+                remote: Some(Remote::Name("VCU".into())),
+            }),
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResourceBuilder::for_rpc_request(
+                Some("UpdateDoor".into()),
                 None,
             )),
-        );
-        let service_method_uri = method_uri.to_string();
+            ..Default::default()
+        };
+        let service_method_uri = LongUriSerializer::serialize(&rpc_uri);
 
         // Additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
