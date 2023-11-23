@@ -13,45 +13,15 @@
 
 use std::fmt;
 
-/// Priority according to SDV 202 Quality of Service (QoS) and Prioritization.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Priority {
-    // Low Priority. No bandwidth assurance such as File Transfer.
-    Low,
-    // Standard, undifferentiated application such as General (unclassified).
-    Standard,
-    // Operations, Administration, and Management such as Streamer messages (sub, connect, etc…)
-    Operations,
-    // Multimedia streaming such as Video Streaming
-    MultimediaStreaming,
-    // Real-time interactive such as High priority (rpc events)
-    RealtimeInteractive,
-    // Signaling such as Important
-    Signaling,
-    // Network control such as Safety Critical
-    NetworkControl,
-}
+use crate::uprotocol::UPriority;
 
-impl fmt::Display for Priority {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Priority::Low => write!(f, "Low"),
-            Priority::Standard => write!(f, "Standard"),
-            Priority::Operations => write!(f, "Operations"),
-            Priority::MultimediaStreaming => write!(f, "MultimediaStreaming"),
-            Priority::RealtimeInteractive => write!(f, "RealtimeInteractive"),
-            Priority::Signaling => write!(f, "Signaling"),
-            Priority::NetworkControl => write!(f, "NetworkControl"),
-        }
-    }
-}
 /// Specifies the properties that can configure the UCloudEvent.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct UCloudEventAttributes {
     /// An HMAC generated on the data portion of the CloudEvent message using the device key.
     pub hash: Option<String>,
     /// uProtocol Prioritization classifications defined at QoS in SDV-202.
-    pub priority: Option<Priority>,
+    pub priority: Option<UPriority>,
     /// How long this event should live for after it was generated (in milliseconds).
     /// Events without this attribute (or value is 0) MUST NOT timeout.
     pub ttl: Option<u32>,
@@ -69,7 +39,7 @@ impl UCloudEventAttributes {
         &self.hash
     }
 
-    pub fn priority(&self) -> &Option<Priority> {
+    pub fn priority(&self) -> &Option<UPriority> {
         &self.priority
     }
 
@@ -89,7 +59,7 @@ impl UCloudEventAttributes {
 #[derive(Default)]
 pub struct UCloudEventAttributesBuilder {
     hash: Option<String>,
-    priority: Option<Priority>,
+    priority: Option<UPriority>,
     ttl: Option<u32>,
     token: Option<String>,
 }
@@ -111,7 +81,7 @@ impl UCloudEventAttributesBuilder {
         self
     }
 
-    pub fn with_priority(mut self, priority: Priority) -> Self {
+    pub fn with_priority(mut self, priority: UPriority) -> Self {
         self.priority = Some(priority);
         self
     }
@@ -156,14 +126,14 @@ mod tests {
     fn test_hash_code_equals() {
         let attributes1 = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
 
         let attributes2 = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -175,7 +145,7 @@ mod tests {
     fn test_to_string() {
         let attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -187,13 +157,13 @@ mod tests {
     fn test_create_valid() {
         let attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::NetworkControl)
+            .with_priority(UPriority::UpriorityCs6)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
 
         assert_eq!(attributes.hash(), &Some("somehash".to_string()));
-        assert_eq!(attributes.priority(), &Some(Priority::NetworkControl));
+        assert_eq!(attributes.priority(), &Some(UPriority::UpriorityCs6));
         assert_eq!(attributes.ttl(), &Some(3));
         assert_eq!(attributes.token(), &Some("someOAuthToken".to_string()));
     }
@@ -238,7 +208,7 @@ mod tests {
         assert!(!attributes3.is_empty());
 
         let attributes4 = UCloudEventAttributes::builder()
-            .with_priority(Priority::Low)
+            .with_priority(UPriority::UpriorityUnspecified)
             .build();
 
         assert!(!attributes4.is_empty());

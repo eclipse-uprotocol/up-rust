@@ -17,7 +17,8 @@ use cloudevents::{Event, EventBuilder, EventBuilderV10};
 use prost_types::Any;
 use url::{ParseError, Url};
 
-use crate::cloudevent::datamodel::{UCloudEventAttributes, UCloudEventType};
+use crate::cloudevent::datamodel::UCloudEventAttributes;
+use crate::uprotocol::UMessageType;
 
 pub struct UCloudEventBuilder;
 
@@ -87,7 +88,7 @@ impl UCloudEventBuilder {
             attributes,
         )
         .extension("sink", service_method_uri)
-        .ty(UCloudEventType::REQUEST)
+        .ty(UMessageType::UmessageTypeRequest)
         .build();
 
         bce.unwrap()
@@ -147,7 +148,7 @@ impl UCloudEventBuilder {
         )
         .extension("sink", rpc_uri)
         .extension("reqid", request_id)
-        .ty(UCloudEventType::RESPONSE)
+        .ty(UMessageType::UmessageTypeResponse)
         .build();
 
         bce.unwrap()
@@ -209,7 +210,7 @@ impl UCloudEventBuilder {
         .extension("sink", rpc_uri)
         .extension("reqid", request_id)
         .extension("commstatus", communication_status as i64)
-        .ty(UCloudEventType::RESPONSE)
+        .ty(UMessageType::UmessageTypeResponse)
         .build();
 
         bce.unwrap()
@@ -252,7 +253,7 @@ impl UCloudEventBuilder {
             &payload.type_url,
             attributes,
         )
-        .ty(UCloudEventType::PUBLISH)
+        .ty(UMessageType::UmessageTypePublish)
         .build();
 
         bce.unwrap()
@@ -306,7 +307,7 @@ impl UCloudEventBuilder {
             attributes,
         )
         .extension("sink", sink)
-        .ty(UCloudEventType::PUBLISH)
+        .ty(UMessageType::UmessageTypePublish)
         .build();
 
         bce.unwrap()
@@ -372,7 +373,7 @@ impl UCloudEventBuilder {
             eb = eb.extension("ttl", ttl_value as i64);
         }
         if let Some(priority_value) = &attributes.priority {
-            eb = eb.extension("priority", priority_value.to_string());
+            eb = eb.extension("priority", priority_value.as_str_name());
         }
         if let Some(hash_value) = &attributes.hash {
             eb = eb.extension("hash", hash_value.clone());
@@ -399,9 +400,9 @@ mod tests {
     use cloudevents::AttributesReader;
 
     use super::*;
-    use crate::cloudevent::datamodel::{Priority, UCloudEvent};
+    use crate::cloudevent::builder::UCloudEventUtils;
     use crate::transport::datamodel::UCode;
-    use crate::uprotocol::{Remote, UAuthority, UEntity, UResource, UUri};
+    use crate::uprotocol::{Remote, UAuthority, UEntity, UPriority, UResource, UUri};
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
@@ -426,7 +427,7 @@ mod tests {
 
         let ucloud_event_attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -438,14 +439,17 @@ mod tests {
             &proto_payload.type_url,
             &ucloud_event_attributes,
         )
-        .ty(UCloudEventType::PUBLISH)
+        .ty(UMessageType::UmessageTypePublish)
         .build()
         .unwrap();
 
         assert_eq!("1.0", cloud_event.specversion().to_string());
         assert_eq!("testme", cloud_event.id());
         assert_eq!(source, cloud_event.source().to_string());
-        assert_eq!(UCloudEventType::PUBLISH.to_string(), cloud_event.ty());
+        assert_eq!(
+            UMessageType::UmessageTypePublish.as_str_name(),
+            cloud_event.ty()
+        );
         assert!(!cloud_event
             .iter_extensions()
             .any(|(name, _value)| name.contains("sink")));
@@ -465,7 +469,7 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Standard.to_string(),
+            UPriority::UpriorityCs0.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!("3", cloud_event.extension("ttl").unwrap().to_string());
@@ -475,7 +479,7 @@ mod tests {
         );
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -502,14 +506,17 @@ mod tests {
             &proto_payload.type_url,
             &ucloud_event_attributes,
         )
-        .ty(UCloudEventType::PUBLISH)
+        .ty(UMessageType::UmessageTypePublish)
         .build()
         .unwrap();
 
         assert_eq!("1.0", cloud_event.specversion().to_string());
         assert_eq!("testme", cloud_event.id());
         assert_eq!(source, cloud_event.source().to_string());
-        assert_eq!(UCloudEventType::PUBLISH.to_string(), cloud_event.ty());
+        assert_eq!(
+            UMessageType::UmessageTypePublish.as_str_name(),
+            cloud_event.ty()
+        );
         assert!(!cloud_event
             .iter_extensions()
             .any(|(name, _value)| name.contains("sink")));
@@ -535,7 +542,7 @@ mod tests {
             .any(|(name, _value)| name.contains("ttl")));
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -560,7 +567,7 @@ mod tests {
         // additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Standard),
+            priority: Some(UPriority::UpriorityCs0),
             ttl: Some(3),
             token: None,
         };
@@ -571,7 +578,10 @@ mod tests {
         assert_eq!("1.0", cloud_event.specversion().to_string());
         assert!(!cloud_event.id().is_empty());
         assert_eq!(source, cloud_event.source().to_string());
-        assert_eq!(UCloudEventType::PUBLISH.to_string(), cloud_event.ty());
+        assert_eq!(
+            UMessageType::UmessageTypePublish.as_str_name(),
+            cloud_event.ty()
+        );
         assert!(!cloud_event
             .iter_extensions()
             .any(|(name, _value)| name.contains("sink")));
@@ -591,16 +601,16 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Standard.to_string(),
+            UPriority::UpriorityCs0.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -643,7 +653,7 @@ mod tests {
         // additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Operations),
+            priority: Some(UPriority::UpriorityCs2),
             ttl: Some(3),
             token: None,
         };
@@ -658,7 +668,10 @@ mod tests {
             .iter_extensions()
             .any(|(name, _value)| name.contains("sink")));
         assert_eq!(sink, cloud_event.extension("sink").unwrap().to_string());
-        assert_eq!(UCloudEventType::PUBLISH.to_string(), cloud_event.ty());
+        assert_eq!(
+            UMessageType::UmessageTypePublish.as_str_name(),
+            cloud_event.ty()
+        );
         assert_eq!(
             UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
             cloud_event.datacontenttype().unwrap()
@@ -675,16 +688,16 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Operations.to_string(),
+            UPriority::UpriorityCs2.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -721,7 +734,7 @@ mod tests {
         // additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Operations),
+            priority: Some(UPriority::UpriorityCs2),
             ttl: Some(3),
             token: Some("someOAuthToken".to_string()),
         };
@@ -760,12 +773,12 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Operations.to_string(),
+            UPriority::UpriorityCs2.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             "someOAuthToken",
@@ -773,7 +786,7 @@ mod tests {
         );
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -816,7 +829,7 @@ mod tests {
         // additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Operations),
+            priority: Some(UPriority::UpriorityCs2),
             ttl: Some(3),
             token: Some("someOAuthToken".to_string()),
         };
@@ -858,12 +871,12 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Operations.to_string(),
+            UPriority::UpriorityCs2.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             "someOAuthToken",
@@ -871,7 +884,7 @@ mod tests {
         );
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -910,9 +923,9 @@ mod tests {
         // additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Operations),
+            priority: Some(UPriority::UpriorityCs2),
             ttl: Some(3),
-            token: None, // There's no token in this case
+            token: None,
         };
 
         let cloud_event = UCloudEventBuilder::response(
@@ -953,12 +966,12 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Operations.to_string(),
+            UPriority::UpriorityCs2.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             "requestIdFromRequestCloudEvent",
@@ -966,7 +979,7 @@ mod tests {
         );
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -1009,7 +1022,7 @@ mod tests {
         // additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Operations),
+            priority: Some(UPriority::UpriorityCs2),
             ttl: Some(3),
             token: None, // There's no token in this case
         };
@@ -1052,12 +1065,12 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Operations.to_string(),
+            UPriority::UpriorityCs2.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             "requestIdFromRequestCloudEvent",
@@ -1065,7 +1078,7 @@ mod tests {
         );
         assert_eq!(
             proto_payload.value,
-            UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap()
+            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
         );
     }
 
@@ -1101,7 +1114,7 @@ mod tests {
         // Additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Operations),
+            priority: Some(UPriority::UpriorityCs2),
             ttl: Some(3),
             token: None,
         };
@@ -1140,16 +1153,17 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Operations.to_string(),
+            UPriority::UpriorityCs2.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             UCode::InvalidArgument as i32,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "commstatus").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "commstatus")
+                .unwrap()
         );
         assert_eq!(
             "requestIdFromRequestCloudEvent",
@@ -1193,7 +1207,7 @@ mod tests {
         // Additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
             hash: Some("somehash".to_string()),
-            priority: Some(Priority::Operations),
+            priority: Some(UPriority::UpriorityCs2),
             ttl: Some(3),
             token: None,
         };
@@ -1235,16 +1249,17 @@ mod tests {
             cloud_event.extension("hash").unwrap().to_string()
         );
         assert_eq!(
-            Priority::Operations.to_string(),
+            UPriority::UpriorityCs2.as_str_name(),
             cloud_event.extension("priority").unwrap().to_string()
         );
         assert_eq!(
             3,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
         );
         assert_eq!(
             UCode::InvalidArgument as i32,
-            UCloudEvent::extract_integer_value_from_extension(&cloud_event, "commstatus").unwrap()
+            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "commstatus")
+                .unwrap()
         );
         assert_eq!(
             "requestIdFromRequestCloudEvent",
@@ -1256,7 +1271,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("https://example.com")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

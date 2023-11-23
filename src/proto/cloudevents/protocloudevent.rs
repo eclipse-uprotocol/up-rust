@@ -215,8 +215,8 @@ impl From<cloudevents::Event> for CloudEventProto {
 mod tests {
     use super::*;
     use crate::cloudevent::builder::UCloudEventBuilder;
-    use crate::cloudevent::datamodel::{Priority, UCloudEventAttributes, UCloudEventType};
-    use crate::uprotocol::{UEntity, UResource, UUri};
+    use crate::cloudevent::datamodel::UCloudEventAttributes;
+    use crate::uprotocol::{UEntity, UMessageType, UPriority, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
@@ -251,7 +251,7 @@ mod tests {
         // additional attributes
         let attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -263,7 +263,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UCloudEventType::PUBLISH)
+        event.ty(UMessageType::UmessageTypePublish)
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -295,7 +295,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

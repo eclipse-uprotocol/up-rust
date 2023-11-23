@@ -19,11 +19,11 @@ edition = "2021"
 [dependencies]
 byteorder = "1.4"
 bytes = "1.4"
-chrono = "0.4.31"
-cloudevents-sdk = { version = "0.7.0" }
+chrono = "0.4"
+cloudevents-sdk = { version = "0.7" }
 mac_address = "1.1"
-serde = "1.0.188"
-serde_json = "1.0.107"
+serde = "1.0"
+serde_json = "1.0"
 prost = "0.12"
 prost-types = "0.12"
 rand = "0.8"

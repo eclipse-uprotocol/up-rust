@@ -42,17 +42,15 @@ mod types {
 pub mod cloudevent {
     pub mod builder {
         mod ucloudeventbuilder;
+        mod ucloudeventutils;
 
         pub use ucloudeventbuilder::*;
+        pub use ucloudeventutils::*;
     }
     pub mod datamodel {
-        mod ucloudevent;
         mod ucloudeventattributes;
-        mod ucloudeventtype;
 
-        pub use ucloudevent::*;
         pub use ucloudeventattributes::*;
-        pub use ucloudeventtype::*;
     }
     pub mod serializer {
         mod cloudeventjsonserializer;
@@ -152,6 +150,7 @@ pub mod rpc {
 pub mod uprotocol {
     include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
 
+    pub use crate::proto::uprotocol::umessagetype;
     pub use crate::proto::uprotocol::uresource;
     pub use crate::proto::uprotocol::uuid;
     pub use crate::proto::uprotocol::uuri;
@@ -172,6 +171,7 @@ pub mod proto {
     }
 
     pub mod uprotocol {
+        pub mod umessagetype;
         pub mod uresource;
         pub mod uuid;
         pub mod uuri;
