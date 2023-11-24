@@ -150,6 +150,8 @@ pub mod rpc {
 pub mod uprotocol {
     include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
 
+    pub use crate::proto::uprotocol::uauthority;
+    pub use crate::proto::uprotocol::uentity;
     pub use crate::proto::uprotocol::umessagetype;
     pub use crate::proto::uprotocol::upayload;
     pub use crate::proto::uprotocol::uresource;
@@ -173,6 +175,8 @@ pub mod proto {
     }
 
     pub mod uprotocol {
+        pub mod uauthority;
+        pub mod uentity;
         pub mod umessagetype;
         pub mod upayload;
         pub mod uresource;

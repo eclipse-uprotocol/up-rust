@@ -16,7 +16,8 @@ use std::io::Cursor;
 use std::io::Write;
 
 use crate::uprotocol::u_authority::Remote;
-use crate::uprotocol::{UAuthority, UEntity, UResource, UUri};
+use crate::uprotocol::{UAuthority, UEntity, UUri};
+use crate::uri::builder::resourcebuilder::UResourceBuilder;
 use crate::uri::serializer::uriserializer::UriSerializer;
 use crate::uri::validator::UriValidator;
 
@@ -87,31 +88,22 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
         cursor.write_u8(UP_VERSION).unwrap();
 
         // ADDRESS_TYPE
-        if let Some(Remote::Id(id)) = uri
-            .authority
-            .as_ref()
-            .and_then(|authority| authority.remote.as_ref())
-        {
-            authority_id = Some(id.clone());
-            address_type = AddressType::ID;
-        } else if let Some(Remote::Ip(ip)) = uri
-            .authority
-            .as_ref()
-            .and_then(|authority| authority.remote.as_ref())
-        {
-            match ip.len() {
-                4 => address_type = AddressType::IPv4,
-                16 => address_type = AddressType::IPv6,
-                _ => return vec![],
+        if let Some(authority) = &uri.authority {
+            if authority.remote.is_none() {
+                address_type = AddressType::Local;
+            } else if let Some(id) = UAuthority::get_id(authority) {
+                authority_id = Some(id.clone());
+                address_type = AddressType::ID;
+            } else if let Some(ip) = UAuthority::get_ip(authority) {
+                match ip.len() {
+                    4 => address_type = AddressType::IPv4,
+                    16 => address_type = AddressType::IPv6,
+                    _ => return vec![],
+                }
+                remote_ip = Some(ip.clone());
             }
-            remote_ip = Some(ip.clone());
-        } else if let Some(Remote::Name(_name)) = uri
-            .authority
-            .as_ref()
-            .and_then(|authority| authority.remote.as_ref())
-        {
-            todo!("Handle Remote::Name case")
         }
+
         cursor.write_u8(address_type.value()).unwrap();
 
         // URESOURCE_ID
@@ -236,10 +228,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                 version_major: Some(ue_version),
                 ..Default::default()
             }),
-            resource: Some(UResource {
-                id: Some(uresource_id.into()),
-                ..Default::default()
-            }),
+            resource: Some(UResourceBuilder::from_id(uresource_id as u32)),
         }
     }
 }
@@ -249,6 +238,7 @@ mod tests {
     use super::*;
     use std::net::{Ipv4Addr, Ipv6Addr};
 
+    use crate::uprotocol::UResource;
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
 
     #[test]

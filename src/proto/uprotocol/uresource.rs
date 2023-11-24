@@ -13,6 +13,12 @@
 
 use crate::uprotocol::UResource;
 
+impl UResource {
+    pub fn has_id(resource: &UResource) -> bool {
+        resource.id.is_some()
+    }
+}
+
 impl From<String> for UResource {
     fn from(value: String) -> Self {
         let parts: Vec<&str> = value.split('#').collect();
@@ -20,19 +26,18 @@ impl From<String> for UResource {
         let name_and_instance_parts: Vec<&str> = name_and_instance.split('.').collect();
 
         let resource_name: String = name_and_instance_parts[0].to_string();
-        let resource_instance: String = name_and_instance_parts
+        let resource_instance: Option<String> = name_and_instance_parts
             .get(1)
-            .map_or_else(|| "".to_string(), |s| s.to_string());
+            .map_or_else(|| None, |s| Some(s.to_string()));
 
-        let resource_message: String = parts
-            .get(1)
-            .map_or_else(|| "".to_string(), |s| s.to_string());
+        let resource_message: Option<String> =
+            parts.get(1).map_or_else(|| None, |s| Some(s.to_string()));
 
         UResource {
             name: resource_name,
             id: None,
-            instance: Some(resource_instance),
-            message: Some(resource_message),
+            instance: resource_instance,
+            message: resource_message,
         }
     }
 }

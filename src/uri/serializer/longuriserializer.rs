@@ -115,6 +115,8 @@ impl UriSerializer<String> for LongUriSerializer {
         if !version.is_empty() {
             if let Ok(version) = version.parse::<u32>() {
                 ve = Some(version);
+            } else {
+                return UUri::default();
             }
         }
 
