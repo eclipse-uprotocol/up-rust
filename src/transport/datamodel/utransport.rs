@@ -29,7 +29,7 @@ pub trait UTransport {
     /// # Returns
     /// Returns `OKSTATUS` if authentication was successful, `FAILSTATUS` if the calling `uE`
     /// is not authenticated.
-    fn authenticate(uEntity: UEntity) -> UStatus;
+    fn authenticate(&self, entity: UEntity) -> UStatus;
 
     /// Transmits `UPayload` to the topic using the attributes defined in `UTransportAttributes`.
     ///

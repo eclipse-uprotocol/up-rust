@@ -15,8 +15,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use crate::rpc::rpcmapper::RpcMapperError;
-use crate::transport::datamodel::{UAttributes, UPayload};
-use crate::uri::datamodel::UUri;
+use crate::uprotocol::{UAttributes, UPayload, UUri};
 
 pub type RpcClientResult = Result<UPayload, RpcMapperError>;
 

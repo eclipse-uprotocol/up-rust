@@ -151,11 +151,13 @@ pub mod uprotocol {
     include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
 
     pub use crate::proto::uprotocol::umessagetype;
+    pub use crate::proto::uprotocol::upayload;
     pub use crate::proto::uprotocol::uresource;
     pub use crate::proto::uprotocol::uuid;
     pub use crate::proto::uprotocol::uuri;
 
     pub use u_authority::Remote;
+    pub use u_payload::Data;
 }
 
 #[allow(non_snake_case)]
@@ -172,6 +174,7 @@ pub mod proto {
 
     pub mod uprotocol {
         pub mod umessagetype;
+        pub mod upayload;
         pub mod uresource;
         pub mod uuid;
         pub mod uuri;

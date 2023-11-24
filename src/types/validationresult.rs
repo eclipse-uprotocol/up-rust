@@ -84,7 +84,7 @@ impl ValidationResult {
             },
             Self::Failure(error) => Status {
                 code: Code::InvalidArgument.into(),
-                message: *error,
+                message: error.to_string(),
                 ..Default::default()
             },
         }

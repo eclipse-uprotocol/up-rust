@@ -20,7 +20,7 @@ pub struct MicroUuidSerializer;
 
 impl UuidSerializer<[u8; 16]> for MicroUuidSerializer {
     fn serialize(uuid: &uproto_Uuid) -> [u8; 16] {
-        *Uuid::from(*uuid).as_bytes()
+        *Uuid::from(uuid.clone()).as_bytes()
     }
 
     fn deserialize(uuid: [u8; 16]) -> Result<uproto_Uuid, UuidSerializationError> {

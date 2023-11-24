@@ -50,12 +50,14 @@ pub trait UuidValidator {
     fn validate_variant(&self, uuid: &uproto_Uuid) -> ValidationResult;
 }
 
+#[allow(dead_code)]
 pub enum UuidValidators {
     Invalid,
     UUIDv6,
     UUIDv8,
 }
 
+#[allow(dead_code)]
 impl UuidValidators {
     pub fn validator(&self) -> Box<dyn UuidValidator> {
         match self {
@@ -66,10 +68,10 @@ impl UuidValidators {
     }
 
     pub fn get_validator(uuid: &uproto_Uuid) -> Box<dyn UuidValidator> {
-        if UuidUtils::is_v6(&(*uuid).into()) {
+        if UuidUtils::is_v6(&(uuid.clone())) {
             return Box::new(UUIDv6Validator);
         }
-        if UuidUtils::is_uprotocol(&(*uuid).into()) {
+        if UuidUtils::is_uprotocol(&(uuid.clone())) {
             return Box::new(UUIDv8Validator);
         }
         Box::new(InvalidValidator)

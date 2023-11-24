@@ -34,7 +34,7 @@ impl UuidUtils {
     ///
     /// * `Vec<u8>` - The byte array representation of the UUID
     pub fn to_bytes(uuid: &uproto_Uuid) -> Vec<u8> {
-        Uuid::from(*uuid).as_bytes().to_vec()
+        Uuid::from(uuid.clone()).as_bytes().to_vec()
     }
 
     /// Converts a byte array to a UUID
@@ -61,7 +61,7 @@ impl UuidUtils {
     /// * `Result<Uuid, Error>` - The UUID object representation of the string
     pub fn from_string(uuid_str: &str) -> Result<uproto_Uuid, Error> {
         match Uuid::from_str(uuid_str) {
-            Ok(uuid) => return Ok(uuid.into()),
+            Ok(uuid) => Ok(uuid.into()),
             Err(err) => Err(err),
         }
     }
@@ -76,7 +76,7 @@ impl UuidUtils {
     ///
     /// * `uuid::Version` - The version of the UUID
     pub fn get_version(uuid: &uproto_Uuid) -> Option<Version> {
-        Version::from_value(Uuid::from(*uuid).get_version_num())
+        Version::from_value(Uuid::from(uuid.clone()).get_version_num())
     }
 
     /// Verify uuid is either v6 or v8
@@ -102,7 +102,7 @@ impl UuidUtils {
     ///
     /// * `bool` - True if UUID has variant RFC4122
     pub fn is_rf4122(uuid: &uproto_Uuid) -> bool {
-        Uuid::from(*uuid).get_variant() == Variant::RFC4122
+        Uuid::from(uuid.clone()).get_variant() == Variant::RFC4122
     }
 
     /// Verifies if the version is a formal UUIDv8 uProtocol ID
@@ -141,14 +141,18 @@ impl UuidUtils {
     ///
     /// * `Option<u64>` - The number of milliseconds since Unix epoch if the UUID version is supported, otherwise None.
     pub fn get_time(uuid: &uproto_Uuid) -> Option<u64> {
-        if let Some(version) = UuidUtils::get_version(&uuid) {
+        if let Some(version) = UuidUtils::get_version(uuid) {
             match version {
                 Version::VersionTimeOrdered => {
-                    let time = Uuid::from(*uuid).get_timestamp().unwrap().to_rfc4122();
+                    let time = Uuid::from(uuid.clone())
+                        .get_timestamp()
+                        .unwrap()
+                        .to_rfc4122();
                     Some(time.0)
                 }
                 Version::VersionUprotocol => {
-                    let uuid_bytes = Uuid::from(*uuid).as_bytes();
+                    let uuid = Uuid::from(uuid.clone());
+                    let uuid_bytes = uuid.as_bytes();
                     // Re-assemble the original msb (u64)
                     let msb = u64::from_le_bytes(uuid_bytes[..8].try_into().unwrap());
                     let time = msb >> 16;

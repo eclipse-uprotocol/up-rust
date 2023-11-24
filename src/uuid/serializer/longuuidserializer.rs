@@ -26,8 +26,8 @@ impl UuidSerializer<String> for LongUuidSerializer {
 
     fn deserialize(uuid: String) -> Result<uproto_Uuid, UuidSerializationError> {
         match Uuid::from_str(&uuid) {
-            Ok(uuid) => return Ok(uuid.into()),
-            Err(err) => Err(()),
+            Ok(uuid) => Ok(uuid.into()),
+            Err(_err) => Err(()),
         }
     }
 }

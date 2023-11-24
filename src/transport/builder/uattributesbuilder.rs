@@ -124,9 +124,9 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured ttl.
-    pub fn with_ttl(&mut self, ttl: u32) -> UAttributesBuilder {
+    pub fn with_ttl(&mut self, ttl: u32) -> &mut UAttributesBuilder {
         self.ttl = Some(ttl as i32);
-        *self
+        self
     }
 
     /// Adds the authorization token used for TAP.
@@ -136,9 +136,9 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured token.
-    pub fn with_token(&mut self, token: String) -> UAttributesBuilder {
+    pub fn with_token(&mut self, token: String) -> &mut UAttributesBuilder {
         self.token = Some(token);
-        *self
+        self
     }
 
     /// Adds the explicit destination URI.
@@ -148,9 +148,9 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured sink.
-    pub fn with_sink(&mut self, sink: UUri) -> UAttributesBuilder {
+    pub fn with_sink(&mut self, sink: UUri) -> &mut UAttributesBuilder {
         self.sink = Some(sink);
-        *self
+        self
     }
 
     /// Adds the permission level of the message.
@@ -160,9 +160,9 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured permission level.
-    pub fn with_permission_level(&mut self, plevel: u32) -> UAttributesBuilder {
+    pub fn with_permission_level(&mut self, plevel: u32) -> &mut UAttributesBuilder {
         self.plevel = Some(plevel as i32);
-        *self
+        self
     }
 
     /// Adds the communication status of the message.
@@ -172,9 +172,9 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured communication status.
-    pub fn with_commstatus(&mut self, commstatus: i32) -> UAttributesBuilder {
+    pub fn with_commstatus(&mut self, commstatus: i32) -> &mut UAttributesBuilder {
         self.commstatus = Some(commstatus);
-        *self
+        self
     }
 
     /// Adds the request ID.
@@ -184,9 +184,9 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured request ID.
-    pub fn with_reqid(&mut self, reqid: Uuid) -> UAttributesBuilder {
+    pub fn with_reqid(&mut self, reqid: Uuid) -> &mut UAttributesBuilder {
         self.reqid = Some(reqid);
-        *self
+        self
     }
 
     /// Constructs the `UAttributes` from the builder.
@@ -195,15 +195,15 @@ impl UAttributesBuilder {
     /// Returns a constructed `UAttributes` instance based on the builder's configuration.
     pub fn build(&self) -> UAttributes {
         UAttributes {
-            id: Some(self.id),
+            id: Some(self.id.clone()),
             r#type: self.message_type.into(),
             priority: self.priority.into(),
             ttl: self.ttl,
-            token: self.token,
-            sink: self.sink,
+            token: self.token.clone(),
+            sink: self.sink.clone(),
             permission_level: self.plevel,
             commstatus: self.commstatus,
-            reqid: self.reqid,
+            reqid: self.reqid.clone(),
         }
     }
 }

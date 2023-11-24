@@ -174,7 +174,7 @@ pub trait CloudEventValidator: std::fmt::Display {
             return result;
         }
 
-        if let Some(resource) = uri.resource {
+        if let Some(resource) = &uri.resource {
             if resource.name.trim().is_empty() {
                 return ValidationResult::failure("UriPart is missing uResource name.");
             }
@@ -205,8 +205,11 @@ pub trait CloudEventValidator: std::fmt::Display {
             ));
         }
 
-        if let Some(resource) = uri.resource {
-            if resource.name == "rpc" && resource.instance.unwrap_or_default() == "response" {
+        if let Some(resource) = &uri.resource {
+            if resource.name == "rpc"
+                && resource.instance.as_ref().is_some()
+                && resource.instance.as_ref().unwrap() == "response"
+            {
                 return ValidationResult::Success;
             } else {
                 return ValidationResult::failure(
@@ -769,7 +772,7 @@ mod tests {
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid CloudEvent sink [//bo.cloud/]. UriPart is missing uSoftware Entity name.",
             status.message()
@@ -789,7 +792,7 @@ mod tests {
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid Publish type CloudEvent source []. UriPart is missing uSoftware Entity name.",
             status.message()
@@ -810,7 +813,7 @@ mod tests {
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid CloudEvent Id [testme]. CloudEvent Id must be of type UUIDv8. \
         Invalid Publish type CloudEvent source [/body.access]. UriPart is missing uResource name.",
@@ -832,7 +835,7 @@ mod tests {
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid CloudEvent Id [testme]. CloudEvent Id must be of type UUIDv8. \
         Invalid Publish type CloudEvent source [/body.access/1/door.front_left]. UriPart is missing uResource name.",
@@ -873,7 +876,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Notification);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid CloudEvent sink. Notification CloudEvent sink must be an uri.",
             status.message()
@@ -896,7 +899,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Notification);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
         "Invalid Notification type CloudEvent sink [//bo.cloud/]. UriPart is missing uSoftware Entity name.",
         status.message()
@@ -940,7 +943,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Request);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid RPC Request CloudEvent source [//bo.cloud/petapp//dog]. Invalid RPC uri application response topic. UriPart is missing rpc.response.",
             status.message()
@@ -961,7 +964,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Request);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid RPC Request CloudEvent sink. Request CloudEvent sink must be uri for the method to be called.",
             status.message()
@@ -985,7 +988,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Request);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid RPC Request CloudEvent sink [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
             status.message()
@@ -1029,7 +1032,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Response);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid RPC Response CloudEvent source [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
             status.message()
@@ -1051,7 +1054,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Response);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
         "Invalid RPC Response CloudEvent source [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink. Response CloudEvent sink must be uri of the destination of the response.",
         status.message()
@@ -1075,7 +1078,7 @@ mod tests {
         let validator = CloudEventValidators::validator(&CloudEventValidators::Response);
         let status = validator.validate(&event);
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code()));
+        assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
         "Invalid RPC Response CloudEvent source [//bo.cloud/petapp/1/dog]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC uri application response topic. UriPart is missing rpc.response.",
         status.message()

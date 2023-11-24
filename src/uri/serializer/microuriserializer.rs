@@ -25,7 +25,7 @@ const IPV4_MICRO_URI_LENGTH: usize = 12; // IPv4 micro URI length
 const IPV6_MICRO_URI_LENGTH: usize = 24; // IPv6 micro URI length
 const UP_VERSION: u8 = 0x1; // UP version
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum AddressType {
     Local = 0,
     IPv4 = 1,
@@ -54,9 +54,9 @@ impl TryFrom<i32> for AddressType {
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         if let Ok(v) = u8::try_from(value) {
-            return AddressType::from(v).ok_or(());
+            AddressType::from(v).ok_or(())
         } else {
-            return Err(());
+            Err(())
         }
     }
 }
@@ -87,31 +87,41 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
         cursor.write_u8(UP_VERSION).unwrap();
 
         // ADDRESS_TYPE
-        if let Some(Remote::Id(id)) = uri.authority.and_then(|authority| authority.remote) {
-            authority_id = Some(id);
+        if let Some(Remote::Id(id)) = uri
+            .authority
+            .as_ref()
+            .and_then(|authority| authority.remote.as_ref())
+        {
+            authority_id = Some(id.clone());
             address_type = AddressType::ID;
-        } else if let Some(Remote::Ip(ip)) = uri.authority.and_then(|authority| authority.remote) {
+        } else if let Some(Remote::Ip(ip)) = uri
+            .authority
+            .as_ref()
+            .and_then(|authority| authority.remote.as_ref())
+        {
             match ip.len() {
                 4 => address_type = AddressType::IPv4,
                 16 => address_type = AddressType::IPv6,
                 _ => return vec![],
             }
-            remote_ip = Some(ip);
-        } else if let Some(Remote::Name(name)) =
-            uri.authority.and_then(|authority| authority.remote)
+            remote_ip = Some(ip.clone());
+        } else if let Some(Remote::Name(_name)) = uri
+            .authority
+            .as_ref()
+            .and_then(|authority| authority.remote.as_ref())
         {
-            // Handle Remote::Name case
+            todo!("Handle Remote::Name case")
         }
         cursor.write_u8(address_type.value()).unwrap();
 
         // URESOURCE_ID
-        if let Some(id) = uri.resource.and_then(|resource| resource.id) {
+        if let Some(id) = uri.resource.as_ref().and_then(|resource| resource.id) {
             cursor.write_all(&[(id >> 8) as u8]).unwrap();
             cursor.write_all(&[id as u8]).unwrap();
         }
 
         // UENTITY_ID
-        if let Some(id) = uri.entity.and_then(|entity| entity.id) {
+        if let Some(id) = uri.entity.as_ref().and_then(|entity| entity.id) {
             cursor.write_all(&[(id >> 8) as u8]).unwrap();
             cursor.write_all(&[id as u8]).unwrap();
         }
@@ -119,6 +129,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
         // UENTITY_VERSION
         let version = uri
             .entity
+            .as_ref()
             .and_then(|entity| entity.version_major)
             .unwrap_or(0);
         cursor.write_u8(version as u8).unwrap();
@@ -129,7 +140,8 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
         // UAUTHORITY
         if address_type != AddressType::Local {
             if address_type == AddressType::ID && authority_id.is_some() {
-                cursor.write_u8(authority_id.unwrap().len() as u8).unwrap();
+                let len = authority_id.as_ref().unwrap().len() as u8;
+                cursor.write_u8(len).unwrap();
             }
 
             if let Some(id) = authority_id {
@@ -201,20 +213,17 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                 let slice: [u8; 4] = micro_uri[8..12].try_into().expect("Wrong slice length");
                 authority = Some(UAuthority {
                     remote: Some(Remote::Ip(slice.to_vec())),
-                    ..Default::default()
                 });
             }
             AddressType::IPv6 => {
                 let slice: [u8; 16] = micro_uri[8..24].try_into().expect("Wrong slice length");
                 authority = Some(UAuthority {
                     remote: Some(Remote::Ip(slice.to_vec())),
-                    ..Default::default()
                 });
             }
             AddressType::ID => {
                 authority = Some(UAuthority {
                     remote: Some(Remote::Id(micro_uri[9..].to_vec())),
-                    ..Default::default()
                 });
             }
             _ => {}
@@ -247,8 +256,8 @@ mod tests {
         let uri = UUri::default();
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert_eq!(0, uprotocol_uri.len());
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
-        assert!(UriValidator::is_empty(&uri))
+        let uri2: UUri = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert!(UriValidator::is_empty(&uri2))
     }
 
     #[test]
@@ -275,7 +284,6 @@ mod tests {
         let uri = UUri {
             authority: Some(UAuthority {
                 remote: Some(Remote::Name("vcu.vin".to_string())),
-                ..Default::default()
             }),
             entity: Some(UEntity {
                 id: Some(29999),
@@ -286,7 +294,6 @@ mod tests {
                 id: Some(19999),
                 ..Default::default()
             }),
-            ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_empty())
@@ -361,7 +368,6 @@ mod tests {
         let uri = UUri {
             authority: Some(UAuthority {
                 remote: Some(Remote::Ip(address.octets().to_vec())),
-                ..Default::default()
             }),
             entity: Some(UEntity {
                 id: Some(29999),
@@ -369,13 +375,11 @@ mod tests {
                 ..Default::default()
             }),
             resource: Some(UResourceBuilder::for_rpc_request(None, Some(99))),
-            ..Default::default()
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
-
         assert!(!uprotocol_uri.is_empty());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
         assert!(UriValidator::is_micro_form(&uri));
         assert!(UriValidator::is_micro_form(&uri2));
         assert_eq!(uri.to_string(), uri2.to_string());
@@ -388,7 +392,6 @@ mod tests {
         let uri = UUri {
             authority: Some(UAuthority {
                 remote: Some(Remote::Ip(address.octets().to_vec())),
-                ..Default::default()
             }),
             entity: Some(UEntity {
                 id: Some(29999),
@@ -399,13 +402,11 @@ mod tests {
                 id: Some(19999),
                 ..Default::default()
             }),
-            ..Default::default()
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
-
         assert!(!uprotocol_uri.is_empty());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
         assert!(UriValidator::is_micro_form(&uri));
         assert!(UriValidator::is_micro_form(&uri2));
         assert_eq!(uri.to_string(), uri2.to_string());
@@ -420,7 +421,6 @@ mod tests {
         let uri = UUri {
             authority: Some(UAuthority {
                 remote: Some(Remote::Id(bytes)),
-                ..Default::default()
             }),
             entity: Some(UEntity {
                 id: Some(29999),
@@ -431,13 +431,11 @@ mod tests {
                 id: Some(19999),
                 ..Default::default()
             }),
-            ..Default::default()
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
-
         assert!(!uprotocol_uri.is_empty());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
         assert!(UriValidator::is_micro_form(&uri));
         assert!(UriValidator::is_micro_form(&uri2));
         assert_eq!(uri.to_string(), uri2.to_string());
@@ -450,7 +448,6 @@ mod tests {
         let uri = UUri {
             authority: Some(UAuthority {
                 remote: Some(Remote::Ip(bad_bytes)),
-                ..Default::default()
             }),
             entity: Some(UEntity {
                 id: Some(29999),
@@ -458,7 +455,6 @@ mod tests {
                 ..Default::default()
             }),
             resource: Some(UResourceBuilder::for_rpc_request(None, Some(99))),
-            ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_empty());
@@ -472,7 +468,6 @@ mod tests {
         let uri = UUri {
             authority: Some(UAuthority {
                 remote: Some(Remote::Id(bytes)),
-                ..Default::default()
             }),
             entity: Some(UEntity {
                 id: Some(29999),
@@ -483,7 +478,6 @@ mod tests {
                 id: Some(19999),
                 ..Default::default()
             }),
-            ..Default::default()
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);

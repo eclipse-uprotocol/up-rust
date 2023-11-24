@@ -153,7 +153,7 @@ impl UUIDv8Builder {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        self.build_with_instant(now).into()
+        self.build_with_instant(now)
     }
 
     pub fn build_with_instant(&self, instant: u64) -> uproto_Uuid {

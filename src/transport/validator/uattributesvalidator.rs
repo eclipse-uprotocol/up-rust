@@ -75,8 +75,8 @@ pub trait UAttributesValidator {
             None => 0,
         };
 
-        if let Some(uuid) = attributes.id {
-            if let Some(time) = UuidUtils::get_time(&uuid) {
+        if let Some(uuid) = &attributes.id {
+            if let Some(time) = UuidUtils::get_time(uuid) {
                 let delta = SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap()
@@ -176,8 +176,8 @@ pub trait UAttributesValidator {
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
     fn validate_reqid(&self, attributes: &UAttributes) -> ValidationResult {
-        if let Some(reqid) = attributes.reqid {
-            if !UuidUtils::is_uuid(&reqid) {
+        if let Some(reqid) = &attributes.reqid {
+            if !UuidUtils::is_uuid(reqid) {
                 return ValidationResult::Failure("Invalid UUID".into());
             }
         }
@@ -391,8 +391,8 @@ impl UAttributesValidator for ResponseValidator {
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
     fn validate_reqid(&self, attributes: &UAttributes) -> ValidationResult {
-        if let Some(reqid) = attributes.reqid {
-            if UuidUtils::is_uuid(&reqid) {
+        if let Some(reqid) = &attributes.reqid {
+            if UuidUtils::is_uuid(reqid) {
                 ValidationResult::Success
             } else {
                 ValidationResult::Failure(format!("Invalid correlation UUID {}", reqid))
@@ -856,7 +856,6 @@ mod tests {
                 remote: Some(Remote::Name(
                     "vcu.someVin.veh.uprotocol.corp.com".to_string(),
                 )),
-                ..Default::default()
             }),
             entity: Some(UEntity {
                 name: "petapp.uprotocol.corp.com".to_string(),
@@ -864,7 +863,6 @@ mod tests {
                 ..Default::default()
             }),
             resource: Some(UResourceBuilder::for_rpc_response()),
-            ..Default::default()
         }
     }
 }

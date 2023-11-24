@@ -29,12 +29,12 @@ impl UriValidator {
         if Self::is_empty(uri) {
             return ValidationResult::Failure("Uri is empty".into());
         }
-        if let Some(authority) = uri.authority {
-            if !Self::is_remote(&authority) {
+        if let Some(authority) = &uri.authority {
+            if !Self::is_remote(authority) {
                 return ValidationResult::Failure("Uri is remote missing uAuthority".into());
             }
         }
-        if let Some(entity) = uri.entity {
+        if let Some(entity) = &uri.entity {
             if entity.name.trim().is_empty() {
                 return ValidationResult::Failure("Uri is missing uSoftware Entity name".into());
             }
@@ -117,10 +117,19 @@ impl UriValidator {
     /// Returns `true` if the URI is of type RPC.
     pub fn is_rpc_method(uri: &UUri) -> bool {
         !Self::is_empty(uri)
-            && uri.resource.unwrap().name.contains("rpc")
-            && (uri.resource.unwrap().instance.is_some()
-                && !uri.resource.unwrap().instance.unwrap().trim().is_empty()
-                || uri.resource.unwrap().id.is_some() && (uri.resource.unwrap().id.unwrap() != 0))
+            && uri.resource.as_ref().unwrap().name.contains("rpc")
+            && (uri.resource.as_ref().unwrap().instance.is_some()
+                && !uri
+                    .resource
+                    .as_ref()
+                    .unwrap()
+                    .instance
+                    .as_ref()
+                    .unwrap()
+                    .trim()
+                    .is_empty()
+                || uri.resource.as_ref().unwrap().id.is_some()
+                    && (uri.resource.as_ref().unwrap().id.unwrap() != 0))
     }
 
     /// Checks if the URI is of type RPC response.
@@ -132,9 +141,17 @@ impl UriValidator {
     /// Returns `true` if the URI is of type RPC response.
     pub fn is_rpc_response(uri: &UUri) -> bool {
         Self::is_rpc_method(uri)
-            && ((uri.resource.unwrap().instance.is_some()
-                && uri.resource.unwrap().instance.unwrap().contains("response"))
-                || uri.resource.unwrap().id.is_some() && (uri.resource.unwrap().id.unwrap() != 0))
+            && ((uri.resource.as_ref().unwrap().instance.is_some()
+                && uri
+                    .resource
+                    .as_ref()
+                    .unwrap()
+                    .instance
+                    .as_ref()
+                    .unwrap()
+                    .contains("response"))
+                || uri.resource.as_ref().unwrap().id.is_some()
+                    && (uri.resource.as_ref().unwrap().id.unwrap() != 0))
     }
 
     /// Checks if a `UAuthority` is of type remote
@@ -156,10 +173,11 @@ impl UriValidator {
     /// # Returns
     /// Returns `true` if the URI contains numbers, allowing it to be serialized into micro format.
     pub fn is_micro_form(uri: &UUri) -> bool {
+        // return !isEmpty(uri) && uri.getEntity().hasId() && uri.getResource().hasId() && (!uri.hasAuthority() || uri.getAuthority().hasIp() || uri.getAuthority().hasId());
         !Self::is_empty(uri)
-            && uri.entity.unwrap().id.is_some()
-            && uri.resource.unwrap().id.is_some()
-            && (!uri.authority.unwrap().remote.is_some())
+            && uri.entity.as_ref().unwrap().id.is_some()
+            && uri.resource.as_ref().unwrap().id.is_some()
+            && (uri.authority.as_ref().unwrap().remote.is_none())
     }
 
     /// Checks if the URI contains names so that it can be serialized into long format.
@@ -174,26 +192,21 @@ impl UriValidator {
             return false;
         }
 
-        let mut aname: String;
-        if let Some(authority) = uri.authority {
-            if let Some(remote) = authority.remote {
-                match remote {
-                    crate::uprotocol::u_authority::Remote::Name(name) => {
-                        aname = name;
-                    }
-                    _ => {}
-                }
+        let mut aname = String::new();
+        if let Some(authority) = &uri.authority {
+            if let Some(crate::uprotocol::u_authority::Remote::Name(name)) = &authority.remote {
+                aname = name.to_string();
             }
         }
 
-        let mut ename: String;
-        if let Some(entity) = uri.entity {
-            ename = entity.name;
+        let mut ename = String::new();
+        if let Some(entity) = &uri.entity {
+            ename = entity.name.to_string();
         }
 
-        let mut rname: String;
-        if let Some(resource) = uri.resource {
-            rname = resource.name;
+        let mut rname = String::new();
+        if let Some(resource) = &uri.resource {
+            rname = resource.name.to_string();
         }
 
         !aname.is_empty() && !ename.trim().is_empty() && !rname.trim().is_empty()
