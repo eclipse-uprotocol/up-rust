@@ -11,9 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::UUri;
-
-pub type UriSerializationError = ();
+use crate::uprotocol::{Remote, UUri};
+use crate::uri::validator::UriValidator;
 
 /// `UUri`s are used in transport layers and hence need to be serialized.
 ///
@@ -42,6 +41,15 @@ pub trait UriSerializer<T> {
     /// Returns the `UUri` in the transport serialized format.
     fn serialize(uri: &UUri) -> T;
 
+    /// Builds a fully resolved `UUri` from the serialized long format and the serialized micro format.
+    ///
+    /// # Arguments
+    /// * `long_uri` - `UUri` serialized as a string.
+    /// * `micro_uri` - `UUri` serialized as a byte slice.
+    ///
+    /// # Returns
+    /// Returns an `Option<UUri>` object serialized from one of the forms. Returns `None` if the URI
+    /// cannot be resolved.
     fn build_resolved(long_uri: &str, micro_uri: &[u8]) -> Option<UUri> {
         if long_uri.is_empty() && micro_uri.is_empty() {
             return Some(UUri {
@@ -49,33 +57,31 @@ pub trait UriSerializer<T> {
             });
         }
 
-        todo!()
+        let long_uri = UUri::from(long_uri.to_string());
+        let micro_uri = UUri::from(micro_uri.to_vec());
+
+        let mut auth = micro_uri.authority.unwrap_or_default();
+        let mut ue = micro_uri.entity.unwrap_or_default();
+        let mut ure = long_uri.resource.unwrap_or_default();
+
+        if let Some(authority) = long_uri.authority {
+            if let Some(Remote::Name(name)) = authority.remote {
+                auth.remote = Some(Remote::Name(name));
+            }
+        }
+        if let Some(entity) = long_uri.entity {
+            ue.name = entity.name;
+        }
+        if let Some(resource) = micro_uri.resource {
+            ure.id = resource.id;
+        }
+
+        let uri = UUri {
+            authority: Some(auth),
+            entity: Some(ue),
+            resource: Some(ure),
+        };
+
+        UriValidator::is_resolved(&uri).then_some(uri)
     }
 }
-
-// default Optional<UUri> buildResolved(String longUri, byte[] microUri) {
-
-//     if ((longUri == null || longUri.isEmpty()) && (microUri == null || microUri.length == 0)) {
-//         return Optional.of(UUri.getDefaultInstance());
-//     }
-
-//     UUri longUUri = LongUriSerializer.instance().deserialize(longUri);
-//     UUri microUUri = MicroUriSerializer.instance().deserialize(microUri);
-
-//     final UAuthority.Builder uAuthorityBuilder =
-//         UAuthority.newBuilder(microUUri.getAuthority())
-//             .setName(longUUri.getAuthority().getName());
-
-//     final UEntity.Builder uEntityBuilder = UEntity.newBuilder(microUUri.getEntity())
-//         .setName(longUUri.getEntity().getName());
-
-//     final UResource.Builder uResourceBuilder = UResource.newBuilder(longUUri.getResource())
-//         .setId(microUUri.getResource().getId());
-
-//     UUri uUri = UUri.newBuilder()
-//         .setAuthority(uAuthorityBuilder)
-//         .setEntity(uEntityBuilder)
-//         .setResource(uResourceBuilder)
-//         .build();
-//     return UriValidator.isResolved(uUri) ? Optional.of(uUri) : Optional.empty();
-// }

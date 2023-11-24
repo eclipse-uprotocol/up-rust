@@ -34,7 +34,7 @@ pub trait UuidSerializer<T> {
     /// # Returns
     ///
     /// The deserialized Uuid object.
-    fn deserialize(uuid: T) -> Result<Uuid, UuidSerializationError>;
+    fn deserialize(uuid: T) -> Uuid;
 
     /// Serialize from a Uuid to the given format.
     ///

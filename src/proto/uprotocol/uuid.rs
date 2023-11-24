@@ -40,7 +40,7 @@ impl From<uproto_Uuid> for String {
 
 impl From<String> for uproto_Uuid {
     fn from(value: String) -> Self {
-        LongUuidSerializer::deserialize(value).unwrap_or_default()
+        LongUuidSerializer::deserialize(value)
     }
 }
 
@@ -52,7 +52,7 @@ impl From<uproto_Uuid> for [u8; 16] {
 
 impl From<[u8; 16]> for uproto_Uuid {
     fn from(value: [u8; 16]) -> Self {
-        MicroUuidSerializer::deserialize(value).unwrap_or_default()
+        MicroUuidSerializer::deserialize(value)
     }
 }
 

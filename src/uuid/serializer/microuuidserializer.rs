@@ -14,7 +14,9 @@
 use uuid::Uuid;
 
 use crate::uprotocol::Uuid as uproto_Uuid;
-use crate::uuid::serializer::uuidserializer::{UuidSerializationError, UuidSerializer};
+use crate::uuid::serializer::uuidserializer::UuidSerializer;
+
+/// UUID Serializer interface used to serialize/deserialize UUIDs to/from a byte array
 
 pub struct MicroUuidSerializer;
 
@@ -23,7 +25,7 @@ impl UuidSerializer<[u8; 16]> for MicroUuidSerializer {
         *Uuid::from(uuid.clone()).as_bytes()
     }
 
-    fn deserialize(uuid: [u8; 16]) -> Result<uproto_Uuid, UuidSerializationError> {
-        Ok(Uuid::from_bytes(uuid).into())
+    fn deserialize(uuid: [u8; 16]) -> uproto_Uuid {
+        Uuid::from_bytes(uuid).into()
     }
 }

@@ -15,8 +15,9 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::uprotocol::Uuid as uproto_Uuid;
-use crate::uuid::serializer::uuidserializer::{UuidSerializationError, UuidSerializer};
+use crate::uuid::serializer::uuidserializer::UuidSerializer;
 
+/// UUID Serializer interface used to serialize/deserialize UUIDs to/from a string
 pub struct LongUuidSerializer;
 
 impl UuidSerializer<String> for LongUuidSerializer {
@@ -24,10 +25,10 @@ impl UuidSerializer<String> for LongUuidSerializer {
         uuid.to_string()
     }
 
-    fn deserialize(uuid: String) -> Result<uproto_Uuid, UuidSerializationError> {
+    fn deserialize(uuid: String) -> uproto_Uuid {
         match Uuid::from_str(&uuid) {
-            Ok(uuid) => Ok(uuid.into()),
-            Err(_err) => Err(()),
+            Ok(uuid) => uuid.into(),
+            Err(_err) => uproto_Uuid::default(),
         }
     }
 }
