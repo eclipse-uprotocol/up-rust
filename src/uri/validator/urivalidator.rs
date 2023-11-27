@@ -29,10 +29,8 @@ impl UriValidator {
         if Self::is_empty(uri) {
             return ValidationResult::Failure("Uri is empty".into());
         }
-        if let Some(authority) = &uri.authority {
-            if !Self::is_remote(authority) {
-                return ValidationResult::Failure("Uri is remote missing uAuthority".into());
-            }
+        if uri.authority.is_some() && !Self::is_remote(uri) {
+            return ValidationResult::Failure("Uri is remote missing uAuthority".into());
         }
         if uri
             .entity
@@ -166,8 +164,8 @@ impl UriValidator {
     ///
     /// # Returns
     /// Returns `true` if the `UAuthority` is of type remote.
-    pub fn is_remote(authority: &UAuthority) -> bool {
-        authority.remote.is_some()
+    pub fn is_remote(uri: &UUri) -> bool {
+        uri.authority.is_some() && uri.authority.as_ref().unwrap().remote.is_some()
     }
 
     /// Checks if the URI contains numbers so that it can be serialized into micro format.

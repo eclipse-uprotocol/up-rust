@@ -17,6 +17,20 @@ impl UResource {
     pub fn has_id(resource: &UResource) -> bool {
         resource.id.is_some()
     }
+
+    pub fn get_message(resource: &UResource) -> Option<&String> {
+        match &resource.message {
+            Some(message) => Some(message),
+            _ => None,
+        }
+    }
+
+    pub fn get_instance(resource: &UResource) -> Option<&String> {
+        match &resource.instance {
+            Some(instance) => Some(instance),
+            _ => None,
+        }
+    }
 }
 
 impl From<String> for UResource {
