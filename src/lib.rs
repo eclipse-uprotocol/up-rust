@@ -33,7 +33,6 @@
 //! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main)
 
 mod types {
-    pub mod ustatus;
     pub mod validationresult;
 
     pub use validationresult::*;
@@ -108,7 +107,6 @@ pub mod uuid {
     pub mod validator {
         mod uuidvalidator;
 
-        pub use crate::types::ustatus::*;
         pub use crate::types::validationresult::*;
     }
 }
@@ -125,8 +123,6 @@ pub mod transport {
 
         pub use ulistener::*;
         pub use utransport::*;
-
-        pub use crate::types::ustatus::*;
     }
     pub mod validator {
         mod uattributesvalidator;
@@ -155,6 +151,7 @@ pub mod uprotocol {
     pub use crate::proto::uprotocol::umessagetype;
     pub use crate::proto::uprotocol::upayload;
     pub use crate::proto::uprotocol::uresource;
+    pub use crate::proto::uprotocol::ustatus;
     pub use crate::proto::uprotocol::uuid;
     pub use crate::proto::uprotocol::uuri;
 
@@ -180,6 +177,7 @@ pub mod proto {
         pub mod umessagetype;
         pub mod upayload;
         pub mod uresource;
+        pub mod ustatus;
         pub mod uuid;
         pub mod uuri;
     }

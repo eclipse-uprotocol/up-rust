@@ -11,8 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::UStatus;
-use crate::uprotocol::{UAttributes, UPayload, UUri};
+use crate::uprotocol::{UAttributes, UPayload, UStatus, UUri};
 
 /// For any implementation that defines some kind of callback or function that will be called to handle incoming messages.
 pub trait UListener {

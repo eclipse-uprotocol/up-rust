@@ -13,9 +13,8 @@
 
 use std::time::SystemTime;
 
-use crate::transport::datamodel::UCode;
 use crate::types::ValidationResult;
-use crate::uprotocol::{UAttributes, UMessageType, Uuid};
+use crate::uprotocol::{UAttributes, UCode, UMessageType, Uuid};
 use crate::uri::validator::UriValidator;
 use crate::uuid::builder::UuidUtils;
 
@@ -162,7 +161,7 @@ pub trait UAttributesValidator {
     /// Returns a `ValidationResult` that is success or failed with a failure message.
     fn validate_commstatus(&self, attributes: &UAttributes) -> ValidationResult {
         if let Some(cs) = attributes.commstatus {
-            if UCode::from(cs) == UCode::Unspecified {
+            if UCode::try_from(cs).is_err() {
                 return ValidationResult::Failure("Invalid Communication Status Code".into());
             }
         }

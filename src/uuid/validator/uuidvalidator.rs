@@ -11,10 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::UStatus;
-use crate::uprotocol::Uuid as uproto_Uuid;
+use crate::uprotocol::{UCode, UStatus, Uuid as uproto_Uuid};
 use crate::uuid::builder::UuidUtils;
-use crate::uuid::validator::{UCode, ValidationResult};
+use crate::uuid::validator::ValidationResult;
 
 pub trait UuidValidator {
     fn validate(&self, uuid: &uproto_Uuid) -> UStatus {
@@ -32,7 +31,7 @@ pub trait UuidValidator {
         if error_message.is_empty() {
             UStatus::ok()
         } else {
-            UStatus::fail_with_msg_and_reason(&error_message, UCode::InvalidArgument)
+            UStatus::fail_with_code(UCode::InvalidArgument, &error_message)
         }
     }
 

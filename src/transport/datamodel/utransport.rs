@@ -11,8 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::{UListener, UStatus};
-use crate::uprotocol::{UAttributes, UEntity, UPayload, UUri};
+use crate::transport::datamodel::UListener;
+use crate::uprotocol::{UAttributes, UEntity, UPayload, UStatus, UUri};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
 ///

@@ -18,8 +18,7 @@ use std::future::Future;
 
 use crate::proto::Status as ProtoStatus;
 use crate::rpc::rpcclient::RpcClientResult;
-use crate::transport::datamodel::{UCode, UStatus};
-use crate::uprotocol::{Data, UPayload, UPayloadFormat};
+use crate::uprotocol::{Data, UCode, UPayload, UPayloadFormat, UStatus};
 
 pub type RpcPayloadResult = Result<RpcPayload, RpcMapperError>;
 
@@ -134,20 +133,22 @@ impl RpcMapper {
                 if any != Any::default() {
                     match Self::unpack_any::<ProtoStatus>(any.clone()) {
                         // in this branch, we have successfully unpacked a protobuf-status from the (now consumed) payload
-                        Ok(proto_status) => match UCode::from(proto_status.code) {
-                            UCode::Ok => Ok(RpcPayload {
-                                status: UStatus::ok(),
-                                payload: None,
-                            }),
-                            _ => Ok(RpcPayload {
-                                status: UStatus::from(proto_status),
-                                payload: None,
-                            }),
-                        },
+                        Ok(proto_status) => {
+                            match UCode::try_from(proto_status.code).unwrap_or(UCode::Unknown) {
+                                UCode::Ok => Ok(RpcPayload {
+                                    status: UStatus::ok(),
+                                    payload: None,
+                                }),
+                                _ => Ok(RpcPayload {
+                                    status: UStatus::from(proto_status),
+                                    payload: None,
+                                }),
+                            }
+                        }
                         // in this branch, we couldn't decode the payload into a protobuf-status, but there is something else there to pass on
                         Err(_error) => {
                             Ok(RpcPayload {
-                                status: UStatus::fail_with_msg(&format!(
+                                status: UStatus::fail(&format!(
                                     "Unexpected any-payload type {}",
                                     any.type_url
                                 )),
@@ -373,10 +374,7 @@ mod tests {
             _payload: UPayload,
             _attributes: UAttributes,
         ) -> RpcClientResult {
-            let status = ProtoStatus::from(UStatus::fail_with_msg_and_reason(
-                "boom",
-                UCode::InvalidArgument,
-            ));
+            let status = ProtoStatus::from(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
 
             let any = RpcMapper::pack_any(status.clone()).unwrap();
             let payload = any.into();
@@ -394,8 +392,7 @@ mod tests {
             _payload: UPayload,
             _attributes: UAttributes,
         ) -> RpcClientResult {
-            let status =
-                ProtoStatus::from(UStatus::fail_with_msg_and_reason("all good", UCode::Ok));
+            let status = ProtoStatus::from(UStatus::fail_with_code(UCode::Ok, "all good"));
 
             let any = RpcMapper::pack_any(status.clone()).unwrap();
             let payload = any.into();
@@ -513,7 +510,7 @@ mod tests {
                 .unwrap();
 
             assert!(response.status.is_failed());
-            assert_eq!(response.status.code_as_int(), UCode::InvalidArgument as i32);
+            assert_eq!(response.status.code, UCode::InvalidArgument as i32);
             assert_eq!(response.status.message(), "boom");
         });
     }
@@ -582,7 +579,7 @@ mod tests {
                 .unwrap();
 
             assert!(response.status.is_failed());
-            assert_eq!(UCode::InvalidArgument as i32, response.status.code_as_int());
+            assert_eq!(UCode::InvalidArgument as i32, response.status.code);
             assert_eq!("boom", response.status.message());
         });
     }
@@ -740,7 +737,7 @@ mod tests {
                 .unwrap();
             let ustatus = UStatus::from(s);
 
-            assert_eq!(UCode::Ok as i32, ustatus.code_as_int());
+            assert_eq!(UCode::Ok as i32, ustatus.code);
             assert_eq!("all good", ustatus.message());
         });
     }
@@ -762,8 +759,7 @@ mod tests {
                 .unwrap();
 
             assert!(s.status.is_success());
-            assert_eq!(s.status.code_as_int(), UCode::Ok as i32);
-            assert_eq!(s.status.message(), "ok");
+            assert_eq!(s.status.code, UCode::Ok as i32);
         });
     }
 

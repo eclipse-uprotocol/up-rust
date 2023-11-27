@@ -402,8 +402,7 @@ mod tests {
 
     use super::*;
     use crate::cloudevent::builder::UCloudEventUtils;
-    use crate::transport::datamodel::UCode;
-    use crate::uprotocol::{Remote, UAuthority, UEntity, UPriority, UResource, UUri};
+    use crate::uprotocol::{Remote, UAuthority, UCode, UEntity, UPriority, UResource, UUri};
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 

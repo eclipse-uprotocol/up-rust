@@ -15,9 +15,8 @@ use cloudevents::event::SpecVersion;
 use cloudevents::{AttributesReader, Event};
 
 use crate::cloudevent::builder::UCloudEventUtils;
-use crate::transport::datamodel::{UCode, UStatus};
 use crate::types::ValidationResult;
-use crate::uprotocol::{UMessageType, UResource, UUri};
+use crate::uprotocol::{UCode, UMessageType, UResource, UStatus, UUri};
 use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 use crate::uri::validator::UriValidator;
 
@@ -51,7 +50,7 @@ pub trait CloudEventValidator: std::fmt::Display {
         if error_message.is_empty() {
             UStatus::ok()
         } else {
-            UStatus::fail_with_msg_and_reason(&error_message, UCode::InvalidArgument)
+            UStatus::fail_with_code(UCode::InvalidArgument, &error_message)
         }
     }
 
@@ -511,7 +510,7 @@ mod tests {
         let validator: Box<dyn CloudEventValidator> = CloudEventValidators::Publish.validator();
         let status = validator.validate_type(&event).to_status();
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code));
+        assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent type [res.v1]. CloudEvent of type Publish must have a type of 'pub.v1'",
             status.message
@@ -530,7 +529,7 @@ mod tests {
             CloudEventValidators::Notification.validator();
         let status = validator.validate_type(&event).to_status();
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code));
+        assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
         "Invalid CloudEvent type [res.v1]. CloudEvent of type Publish must have a type of 'pub.v1'",
         status.message
@@ -563,7 +562,7 @@ mod tests {
         let validator: Box<dyn CloudEventValidator> = CloudEventValidators::Request.validator();
         let status = validator.validate_type(&event).to_status();
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code));
+        assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
         "Invalid CloudEvent type [pub.v1]. CloudEvent of type Request must have a type of 'req.v1'",
         status.message
@@ -596,7 +595,7 @@ mod tests {
         let validator: Box<dyn CloudEventValidator> = CloudEventValidators::Response.validator();
         let status = validator.validate_type(&event).to_status();
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code));
+        assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent type [pub.v1]. CloudEvent of type Response must have a type of 'res.v1'",
             status.message
@@ -636,7 +635,7 @@ mod tests {
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate_version(&event).to_status();
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code));
+        assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent version [0.3]. CloudEvent version must be 1.0.",
             status.message
@@ -668,7 +667,7 @@ mod tests {
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate_id(&event).to_status();
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code));
+        assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             format!(
                 "Invalid CloudEvent Id [{}]. CloudEvent Id must be of type UUIDv8.",
@@ -685,7 +684,7 @@ mod tests {
             .validate_id(&event)
             .to_status();
 
-        assert_eq!(UCode::InvalidArgument, UCode::from(status.code));
+        assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent Id [testme]. CloudEvent Id must be of type UUIDv8.",
             status.message

@@ -19,8 +19,7 @@ use prost::Message;
 use prost_types::Any;
 use std::time::SystemTime;
 
-use crate::transport::datamodel::UCode;
-use crate::uprotocol::Uuid;
+use crate::uprotocol::{UCode, Uuid};
 use crate::uuid::builder::UuidUtils;
 
 /// Code to extract information from a CloudEvent
