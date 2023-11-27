@@ -11,8 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::future::Future;
-use std::pin::Pin;
+use async_trait::async_trait;
 
 use crate::rpc::rpcmapper::RpcMapperError;
 use crate::uprotocol::{UAttributes, UPayload, UUri};
@@ -28,6 +27,7 @@ pub type RpcClientResult = Result<UPayload, RpcMapperError>;
 ///
 /// For more details, please refer to the
 /// [RpcClient Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l2/README.adoc).
+#[async_trait]
 pub trait RpcClient {
     /// Support for RPC method invocation.
     ///
@@ -40,9 +40,9 @@ pub trait RpcClient {
     /// # Returns
     ///
     /// Returns a Future with the result or error.
-    fn invoke_method(
+    async fn invoke_method(
         topic: UUri,
         payload: UPayload,
         attributes: UAttributes,
-    ) -> Pin<Box<dyn Future<Output = RpcClientResult>>>;
+    ) -> RpcClientResult;
 }
