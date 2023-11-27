@@ -14,6 +14,7 @@
 use std::env;
 use std::fs;
 use std::path::Path;
+use prost_build::Config;
 
 fn main() -> std::io::Result<()> {
     // use vendored protoc instead of relying on user provided protobuf installation
@@ -62,7 +63,12 @@ fn get_and_build_protos(urls: &[&str]) -> core::result::Result<(), Box<dyn std::
     }
 
     // Compile all .proto files together
-    prost_build::compile_protos(&proto_files, &[&out_dir])?;
+    let mut config = Config::new();
+
+    // Some proto files contain comments that will be interpreted as rustdoc comments (and fail to compile)
+    config.disable_comments(["."]);
+
+    config.compile_protos(&proto_files, &[&out_dir])?;
 
     Ok(())
 }

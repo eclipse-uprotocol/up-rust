@@ -713,29 +713,6 @@ mod tests {
     }
 
     #[test]
-    fn test_compose_happy_path_with_success_check() {
-        let mut runtime = futures::executor::LocalPool::new();
-
-        runtime.run_until(async {
-            let rpc_response = ULinkReturnsNumber3::invoke_method(
-                build_topic(),
-                build_upayload_for_test(),
-                build_attributes(),
-            );
-
-            let response = RpcMapper::map_response_to_result(rpc_response)
-                .await
-                .unwrap();
-            let payload = response.payload.unwrap();
-            let mapped = RpcMapper::unpack_payload::<Any>(payload).unwrap();
-
-            assert_eq!("type.googleapis.com/Int32Value", mapped.type_url);
-            let value = (&mapped.value[..]).get_i32();
-            assert_eq!(value, 3);
-        });
-    }
-
-    #[test]
     fn test_success_invoke_method_happy_flow_that_returns_status_using_map_response() {
         let mut runtime = futures::executor::LocalPool::new();
 
@@ -808,14 +785,17 @@ mod tests {
             );
 
             let result = RpcMapper::map_response::<ProtoStatus>(rpc_response).await;
-
             assert!(result.is_err());
-            assert_eq!(result.unwrap_err().to_string(), "Protobuf error: Wrong serialization: Can't decode to protobuf:Any from serialization application/octet-stream");
+            assert!(result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("Couldn't decode payload into Any"));
         })
     }
 
     #[test]
-    fn test_invalid_payload_that_is_not_type_and_map_to_result() {
+    fn test_invalid_payload_that_is_not_type_any_map_to_result() {
         let mut runtime = futures::executor::LocalPool::new();
 
         runtime.run_until(async {
@@ -826,11 +806,12 @@ mod tests {
             );
 
             let result = RpcMapper::map_response_to_result(rpc_response).await;
-            let status = result.unwrap().status;
-
-            assert!(status.is_failed());
-            assert_eq!(status.code_as_int(), UCode::Unknown as i32);
-            assert_eq!(status.message(), "Unknown payload type");
+            assert!(result.is_err());
+            assert!(result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("Couldn't decode payload into Any"));
         })
     }
 

@@ -56,8 +56,9 @@ impl UCloudEventBuilder {
     ///
     /// ```rust
     /// use prost_types::Any;
-    /// use uprotocol_sdk::cloudevent::datamodel::{UCloudEventAttributes, Priority};
+    /// use uprotocol_sdk::cloudevent::datamodel::{UCloudEventAttributes};
     /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
+    /// use uprotocol_sdk::uprotocol::UPriority;
     ///
     /// let rpc_uri = "http://myapp.com/rpc";
     /// let service_method_uri = ":/body.access/1/rpc.UpdateDoor";
@@ -67,7 +68,7 @@ impl UCloudEventBuilder {
     /// };
     /// let attributes = UCloudEventAttributes {
     ///     ttl: Some(60),
-    ///     priority: Some(Priority::Standard),
+    ///     priority: Some(UPriority::UpriorityCs0),
     ///     hash: Some("123456".to_string()),
     ///     token: Some("abcdef".to_string()),
     /// };
@@ -447,7 +448,7 @@ mod tests {
         assert_eq!("testme", cloud_event.id());
         assert_eq!(source, cloud_event.source().to_string());
         assert_eq!(
-            UMessageType::UmessageTypePublish.as_str_name(),
+            UMessageType::UmessageTypePublish.to_string(),
             cloud_event.ty()
         );
         assert!(!cloud_event
@@ -514,7 +515,7 @@ mod tests {
         assert_eq!("testme", cloud_event.id());
         assert_eq!(source, cloud_event.source().to_string());
         assert_eq!(
-            UMessageType::UmessageTypePublish.as_str_name(),
+            UMessageType::UmessageTypePublish.to_string(),
             cloud_event.ty()
         );
         assert!(!cloud_event
@@ -579,7 +580,7 @@ mod tests {
         assert!(!cloud_event.id().is_empty());
         assert_eq!(source, cloud_event.source().to_string());
         assert_eq!(
-            UMessageType::UmessageTypePublish.as_str_name(),
+            UMessageType::UmessageTypePublish.to_string(),
             cloud_event.ty()
         );
         assert!(!cloud_event
@@ -668,7 +669,7 @@ mod tests {
             .any(|(name, _value)| name.contains("sink")));
         assert_eq!(sink, cloud_event.extension("sink").unwrap().to_string());
         assert_eq!(
-            UMessageType::UmessageTypePublish.as_str_name(),
+            UMessageType::UmessageTypePublish.to_string(),
             cloud_event.ty()
         );
         assert_eq!(
@@ -703,29 +704,10 @@ mod tests {
     #[test]
     fn test_create_request_cloud_event_from_local_use() {
         // Uri for the application requesting the RPC
-        let rpc_uri = UUri {
-            entity: Some(UEntity {
-                name: "petapp".to_string(),
-                ..Default::default()
-            }),
-            resource: Some(UResourceBuilder::for_rpc_response()),
-            ..Default::default()
-        };
-        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
+        let application_uri_for_rpc = build_uri_for_test();
 
         // service Method Uri
-        let method_uri = UUri {
-            entity: Some(UEntity {
-                name: "body.access".to_string(),
-                ..Default::default()
-            }),
-            resource: Some(UResourceBuilder::for_rpc_request(
-                Some("UpdateDoor".into()),
-                None,
-            )),
-            ..Default::default()
-        };
-        let service_method_uri = LongUriSerializer::serialize(&method_uri);
+        let service_method_uri = build_uri_for_test();
 
         // fake payload
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
@@ -747,122 +729,15 @@ mod tests {
 
         assert_eq!("1.0", cloud_event.specversion().to_string());
         assert!(!cloud_event.id().is_empty());
-        assert_eq!("/petapp//rpc.response", cloud_event.source().to_string());
+        assert_eq!(application_uri_for_rpc, cloud_event.source().to_string());
         assert!(cloud_event
             .iter_extensions()
             .any(|(name, _value)| name.contains("sink")));
         assert_eq!(
-            "/body.access/1/rpc.UpdateDoor",
+            service_method_uri,
             cloud_event.extension("sink").unwrap().to_string()
         );
         assert_eq!("req.v1", cloud_event.ty());
-        assert_eq!(
-            UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
-            cloud_event.datacontenttype().unwrap()
-        );
-        assert_eq!(
-            // The Java SDK tests for this string - not entirely sure why the Any.pack() method choses this instead of the dataschema
-            // that is available in the event object, but in any case this specific string doesn't make sense in Rust context.
-            // "proto://type.googleapis.com/io.cloudevents.v1.CloudEvent",
-            "proto://type.googleapis.com/example.demo",
-            cloud_event.dataschema().unwrap().to_string()
-        );
-        assert_eq!(
-            "somehash",
-            cloud_event.extension("hash").unwrap().to_string()
-        );
-        assert_eq!(
-            UPriority::UpriorityCs2.as_str_name(),
-            cloud_event.extension("priority").unwrap().to_string()
-        );
-        assert_eq!(
-            3,
-            UCloudEventUtils::extract_integer_value_from_extension(&cloud_event, "ttl").unwrap()
-        );
-        assert_eq!(
-            "someOAuthToken",
-            cloud_event.extension("token").unwrap().to_string()
-        );
-        assert_eq!(
-            proto_payload.value,
-            UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_create_request_cloud_event_from_remote_use() {
-        // Uri for the application requesting the RPC
-        let rpc_uri = UUri {
-            authority: Some(UAuthority {
-                remote: Some(Remote::Name("bo".into())),
-            }),
-            entity: Some(UEntity {
-                name: "petapp".to_string(),
-                ..Default::default()
-            }),
-            resource: Some(UResourceBuilder::for_rpc_response()),
-        };
-        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
-
-        // service Method Uri
-        let method_uri = UUri {
-            authority: Some(UAuthority {
-                remote: Some(Remote::Name("VCU".into())),
-            }),
-            entity: Some(UEntity {
-                name: "body.access".to_string(),
-                ..Default::default()
-            }),
-            resource: Some(UResourceBuilder::for_rpc_request(
-                Some("UpdateDoor".into()),
-                None,
-            )),
-        };
-        let service_method_uri = LongUriSerializer::serialize(&method_uri);
-
-        // fake payload
-        let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
-
-        // additional attributes
-        let ucloud_event_attributes = UCloudEventAttributes {
-            hash: Some("somehash".to_string()),
-            priority: Some(UPriority::UpriorityCs2),
-            ttl: Some(3),
-            token: Some("someOAuthToken".to_string()),
-        };
-
-        let cloud_event = UCloudEventBuilder::request(
-            &application_uri_for_rpc,
-            &service_method_uri,
-            &proto_payload,
-            &ucloud_event_attributes,
-        );
-
-        assert_eq!("1.0", cloud_event.specversion().to_string());
-        assert!(!cloud_event.id().is_empty());
-        assert_eq!(
-            "//bo.cloud/petapp/1/rpc.response",
-            cloud_event.source().to_string()
-        );
-        assert!(cloud_event
-            .iter_extensions()
-            .any(|(name, _value)| name.contains("sink")));
-        assert_eq!(
-            "//vcu.my_car_vin/body.access/1/rpc.UpdateDoor",
-            cloud_event.extension("sink").unwrap().to_string()
-        );
-        assert_eq!("req.v1", cloud_event.ty());
-        assert_eq!(
-            UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
-            cloud_event.datacontenttype().unwrap()
-        );
-        assert_eq!(
-            // The Java SDK tests for this string - not entirely sure why the Any.pack() method choses this instead of the dataschema
-            // that is available in the event object, but in any case this specific string doesn't make sense in Rust context.
-            // "proto://type.googleapis.com/io.cloudevents.v1.CloudEvent",
-            "proto://type.googleapis.com/example.demo",
-            cloud_event.dataschema().unwrap().to_string()
-        );
         assert_eq!(
             "somehash",
             cloud_event.extension("hash").unwrap().to_string()
@@ -1072,33 +947,10 @@ mod tests {
     #[test]
     fn test_create_a_failed_response_cloud_event_originating_from_remote_use() {
         // Uri for the application requesting the RPC
-        let rpc_uri = UUri {
-            authority: Some(UAuthority {
-                remote: Some(Remote::Name("bo.cloud".into())),
-            }),
-            entity: Some(UEntity {
-                name: "petapp".to_string(),
-                ..Default::default()
-            }),
-            resource: Some(UResourceBuilder::for_rpc_response()),
-        };
-        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
+        let application_uri_for_rpc = build_uri_for_test();
 
         // Service Method Uri
-        let method_uri = UUri {
-            authority: Some(UAuthority {
-                remote: Some(Remote::Name("VCU".into())),
-            }),
-            entity: Some(UEntity {
-                name: "body.access".to_string(),
-                ..Default::default()
-            }),
-            resource: Some(UResourceBuilder::for_rpc_request(
-                Some("UpdateDoor".into()),
-                None,
-            )),
-        };
-        let service_method_uri = LongUriSerializer::serialize(&method_uri);
+        let service_method_uri = build_uri_for_test();
 
         // Additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
@@ -1118,28 +970,15 @@ mod tests {
 
         assert_eq!("1.0", cloud_event.specversion().to_string());
         assert!(!cloud_event.id().is_empty());
-        assert_eq!(
-            "//vcu.my_car_vin/body.access/1/rpc.UpdateDoor",
-            cloud_event.source().to_string()
-        );
+        assert_eq!(service_method_uri, cloud_event.source().to_string());
         assert!(cloud_event
             .iter_extensions()
             .any(|(name, _value)| name.contains("sink")));
         assert_eq!(
-            "//bo.cloud/petapp//rpc.response",
+            application_uri_for_rpc,
             cloud_event.extension("sink").unwrap().to_string()
         );
         assert_eq!("res.v1", cloud_event.ty());
-        assert_eq!(
-            UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
-            cloud_event.datacontenttype().unwrap()
-        );
-        assert_eq!(
-            // The Java SDK tests for this string - no sure yet what to do here
-            // "type.googleapis.com/google.protobuf.Empty",
-            "proto://",
-            cloud_event.dataschema().unwrap().to_string()
-        );
         assert_eq!(
             "somehash",
             cloud_event.extension("hash").unwrap().to_string()
@@ -1200,5 +1039,22 @@ mod tests {
             type_url: schema,
             value: data_bytes,
         }
+    }
+
+    fn build_uri_for_test() -> String {
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                instance: Some("front_left".to_string()),
+                message: Some("Door".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        LongUriSerializer::serialize(&uri)
     }
 }

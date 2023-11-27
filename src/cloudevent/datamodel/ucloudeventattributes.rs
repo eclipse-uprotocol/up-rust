@@ -150,7 +150,7 @@ mod tests {
             .with_token("someOAuthToken".to_string())
             .build();
 
-        assert_eq!(attributes.to_string(), "UCloudEventAttributes { hash: Some(\"somehash\"), priority: Some(Standard), ttl: Some(3), token: Some(\"someOAuthToken\") }");
+        assert_eq!(attributes.to_string(), "UCloudEventAttributes { hash: Some(\"somehash\"), priority: Some(UpriorityCs0), ttl: Some(3), token: Some(\"someOAuthToken\") }");
     }
 
     #[test]

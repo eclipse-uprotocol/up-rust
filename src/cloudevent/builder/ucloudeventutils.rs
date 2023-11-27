@@ -470,7 +470,7 @@ mod tests {
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::UCloudEventAttributes;
     use crate::proto::CloudEvent;
-    use crate::uprotocol::{UAuthority, UEntity, UMessageType, UPriority, UResource, UUri};
+    use crate::uprotocol::{UEntity, UMessageType, UPriority, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
     use crate::uuid::builder::UUIDv8Builder;
 
@@ -1154,9 +1154,6 @@ mod tests {
             name: "body.access".into(),
             ..Default::default()
         };
-        let authority = UAuthority {
-            ..Default::default()
-        };
         let resource = UResource {
             name: "door".into(),
             instance: Some("front_left".into()),
@@ -1166,7 +1163,7 @@ mod tests {
         let uri = UUri {
             entity: Some(entity),
             resource: Some(resource),
-            authority: Some(authority),
+            authority: None,
         };
 
         let source = LongUriSerializer::serialize(&uri);

@@ -17,7 +17,7 @@ use cloudevents::{AttributesReader, Event};
 use crate::cloudevent::builder::UCloudEventUtils;
 use crate::transport::datamodel::{UCode, UStatus};
 use crate::types::ValidationResult;
-use crate::uprotocol::{UMessageType, UUri};
+use crate::uprotocol::{UMessageType, UResource, UUri};
 use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 use crate::uri::validator::UriValidator;
 
@@ -174,14 +174,15 @@ pub trait CloudEventValidator: std::fmt::Display {
             return result;
         }
 
-        if let Some(resource) = &uri.resource {
-            if resource.name.trim().is_empty() {
-                return ValidationResult::failure("UriPart is missing uResource name.");
-            }
-            if resource.message.is_none() {
-                return ValidationResult::failure("UriPart is missing Message information.");
-            }
+        let default = UResource::default();
+        let resource = uri.resource.as_ref().unwrap_or(&default);
+        if resource.name.trim().is_empty() {
+            return ValidationResult::failure("UriPart is missing uResource name.");
         }
+        if resource.message.is_none() {
+            return ValidationResult::failure("UriPart is missing Message information.");
+        }
+
         ValidationResult::Success
     }
 
@@ -274,14 +275,11 @@ impl CloudEventValidators {
     ///
     /// Returns a `CloudEventValidator` according to the `type` attribute in the `CloudEvent`.
     pub fn get_validator(cloud_event: &Event) -> Box<dyn CloudEventValidator> {
-        if let Some(message_type) = UMessageType::from_str_name(cloud_event.ty()) {
-            match message_type {
-                UMessageType::UmessageTypeResponse => return Box::new(ResponseValidator),
-                UMessageType::UmessageTypeRequest => return Box::new(RequestValidator),
-                _ => return Box::new(PublishValidator),
-            }
+        match UMessageType::from(cloud_event.ty().to_string()) {
+            UMessageType::UmessageTypeResponse => Box::new(ResponseValidator),
+            UMessageType::UmessageTypeRequest => Box::new(RequestValidator),
+            _ => Box::new(PublishValidator),
         }
-        Box::new(PublishValidator)
     }
 }
 
@@ -302,10 +300,8 @@ impl CloudEventValidator for PublishValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> ValidationResult {
-        if let Some(event_type) = UMessageType::from_str_name(cloud_event.ty()) {
-            if event_type.eq(&UMessageType::UmessageTypePublish) {
-                return ValidationResult::Success;
-            }
+        if UMessageType::UmessageTypePublish.eq(&UMessageType::from(cloud_event.ty().to_string())) {
+            return ValidationResult::Success;
         }
         ValidationResult::failure(&format!(
             "Invalid CloudEvent type [{}]. CloudEvent of type Publish must have a type of 'pub.v1'",
@@ -396,10 +392,8 @@ impl CloudEventValidator for RequestValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> ValidationResult {
-        if let Some(event_type) = UMessageType::from_str_name(cloud_event.ty()) {
-            if event_type.eq(&UMessageType::UmessageTypeRequest) {
-                return ValidationResult::Success;
-            }
+        if UMessageType::UmessageTypeRequest.eq(&UMessageType::from(cloud_event.ty().to_string())) {
+            return ValidationResult::Success;
         }
         ValidationResult::failure(&format!(
             "Invalid CloudEvent type [{}]. CloudEvent of type Request must have a type of 'req.v1'",
@@ -451,10 +445,9 @@ impl CloudEventValidator for ResponseValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> ValidationResult {
-        if let Some(event_type) = UMessageType::from_str_name(cloud_event.ty()) {
-            if event_type.eq(&UMessageType::UmessageTypeResponse) {
-                return ValidationResult::Success;
-            }
+        if UMessageType::UmessageTypeResponse.eq(&UMessageType::from(cloud_event.ty().to_string()))
+        {
+            return ValidationResult::Success;
         }
         ValidationResult::failure(&format!(
             "Invalid CloudEvent type [{}]. CloudEvent of type Response must have a type of 'res.v1'",
@@ -718,14 +711,14 @@ mod tests {
     fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote() {
         let uuid = UUIDv8Builder::new().build();
         let uri = LongUriSerializer::deserialize(
-            ", //VCU.myvin/body.access/1/door.front_left#Door".to_string(),
+            "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
         );
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(uri.to_string())
             .ty(UMessageType::UmessageTypePublish)
-            .build()
-            .unwrap();
+            .build();
+        let event = event.unwrap();
 
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate(&event);
@@ -774,7 +767,7 @@ mod tests {
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
-            "Invalid CloudEvent sink [//bo.cloud/]. UriPart is missing uSoftware Entity name.",
+            "Invalid CloudEvent sink [//bo.cloud]. Uri is missing uSoftware Entity name",
             status.message()
         );
     }
@@ -794,7 +787,7 @@ mod tests {
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
-            "Invalid Publish type CloudEvent source []. UriPart is missing uSoftware Entity name.",
+            "Invalid Publish type CloudEvent source []. Uri is empty",
             status.message()
         );
     }
@@ -838,7 +831,7 @@ mod tests {
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
             "Invalid CloudEvent Id [testme]. CloudEvent Id must be of type UUIDv8. \
-        Invalid Publish type CloudEvent source [/body.access/1/door.front_left]. UriPart is missing uResource name.",
+        Invalid Publish type CloudEvent source [/body.access/1/door.front_left]. UriPart is missing Message information.",
             status.message()
         );
     }
@@ -901,7 +894,7 @@ mod tests {
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
-        "Invalid Notification type CloudEvent sink [//bo.cloud/]. UriPart is missing uSoftware Entity name.",
+        "Invalid Notification type CloudEvent sink [//bo.cloud]. Uri is missing uSoftware Entity name",
         status.message()
         );
     }
@@ -990,7 +983,7 @@ mod tests {
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
-            "Invalid RPC Request CloudEvent sink [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
+            "Invalid RPC Request CloudEvent sink [//VCU.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
             status.message()
         );
     }
@@ -1034,7 +1027,7 @@ mod tests {
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
-            "Invalid RPC Response CloudEvent source [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
+            "Invalid RPC Response CloudEvent source [//VCU.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response.",
             status.message()
         );
     }
@@ -1056,7 +1049,7 @@ mod tests {
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
-        "Invalid RPC Response CloudEvent source [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink. Response CloudEvent sink must be uri of the destination of the response.",
+        "Invalid RPC Response CloudEvent source [//VCU.myvin/body.access/1/UpdateDoor]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink. Response CloudEvent sink must be uri of the destination of the response.",
         status.message()
     );
     }
@@ -1080,7 +1073,7 @@ mod tests {
 
         assert_eq!(UCode::InvalidArgument, status.code());
         assert_eq!(
-        "Invalid RPC Response CloudEvent source [//bo.cloud/petapp/1/dog]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink [//vcu.myvin/body.access/1/UpdateDoor]. Invalid RPC uri application response topic. UriPart is missing rpc.response.",
+        "Invalid RPC Response CloudEvent source [//bo.cloud/petapp/1/dog]. Invalid RPC method uri. UriPart should be the method to be called, or method from response. Invalid RPC Response CloudEvent sink [//VCU.myvin/body.access/1/UpdateDoor]. Invalid RPC uri application response topic. UriPart is missing rpc.response.",
         status.message()
     );
     }

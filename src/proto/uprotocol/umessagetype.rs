@@ -11,16 +11,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use std::fmt::Display;
+
 use crate::uprotocol::UMessageType;
 
 impl From<UMessageType> for String {
     fn from(value: UMessageType) -> Self {
-        match value {
-            UMessageType::UmessageTypePublish => "pub.v1".to_string(),
-            UMessageType::UmessageTypeRequest => "req.v1".to_string(),
-            UMessageType::UmessageTypeResponse => "res.v1".to_string(),
-            UMessageType::UmessageTypeUnspecified => "unspec.v1".to_string(),
-        }
+        value.to_string()
     }
 }
 
@@ -31,6 +28,17 @@ impl From<String> for UMessageType {
             "req.v1" => UMessageType::UmessageTypeRequest,
             "res.v1" => UMessageType::UmessageTypeResponse,
             _ => UMessageType::UmessageTypeUnspecified,
+        }
+    }
+}
+
+impl Display for UMessageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UMessageType::UmessageTypePublish => write!(f, "pub.v1"),
+            UMessageType::UmessageTypeRequest => write!(f, "req.v1"),
+            UMessageType::UmessageTypeResponse => write!(f, "res.v1"),
+            UMessageType::UmessageTypeUnspecified => write!(f, "unspec.v1"),
         }
     }
 }
