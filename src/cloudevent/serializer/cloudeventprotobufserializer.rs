@@ -14,9 +14,7 @@
 use cloudevents::Event as CloudEvent;
 use prost::Message;
 
-use crate::cloudevent::serializer::cloudeventserializer::{
-    CloudEventSerializationError, CloudEventSerializer,
-};
+use crate::cloudevent::serializer::{CloudEventSerializationError, CloudEventSerializer};
 use crate::proto::CloudEvent as CloudEventProto;
 
 /// Serialize and deserialize CloudEvents to protobuf format.

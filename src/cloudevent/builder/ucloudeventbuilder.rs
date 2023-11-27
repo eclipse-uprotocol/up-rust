@@ -11,7 +11,6 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uuid::builder::UUIDv8Builder;
 use chrono::Utc;
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
 use prost_types::Any;
@@ -19,6 +18,7 @@ use url::{ParseError, Url};
 
 use crate::cloudevent::datamodel::UCloudEventAttributes;
 use crate::uprotocol::UMessageType;
+use crate::uuid::builder::UUIDv8Builder;
 
 pub struct UCloudEventBuilder;
 

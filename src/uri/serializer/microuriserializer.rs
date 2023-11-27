@@ -15,8 +15,7 @@ use byteorder::WriteBytesExt;
 use std::io::Cursor;
 use std::io::Write;
 
-use crate::uprotocol::u_authority::Remote;
-use crate::uprotocol::{UAuthority, UEntity, UUri};
+use crate::uprotocol::{Remote, UAuthority, UEntity, UUri};
 use crate::uri::builder::resourcebuilder::UResourceBuilder;
 use crate::uri::serializer::uriserializer::UriSerializer;
 use crate::uri::validator::UriValidator;

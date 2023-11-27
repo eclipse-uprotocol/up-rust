@@ -13,8 +13,7 @@
 
 use regex::Regex;
 
-use crate::uprotocol::u_authority::Remote;
-use crate::uprotocol::{UAuthority, UEntity, UResource, UUri};
+use crate::uprotocol::{Remote, UAuthority, UEntity, UResource, UUri};
 use crate::uri::serializer::uriserializer::UriSerializer;
 use crate::uri::validator::UriValidator;
 

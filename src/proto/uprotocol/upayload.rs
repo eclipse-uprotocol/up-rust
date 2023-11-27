@@ -15,8 +15,7 @@ use prost::Message;
 use prost_types::Any;
 use std::slice;
 
-use crate::uprotocol::u_payload::Data;
-use crate::uprotocol::UPayload;
+use crate::uprotocol::{Data, UPayload};
 
 impl From<Any> for UPayload {
     fn from(value: Any) -> Self {
