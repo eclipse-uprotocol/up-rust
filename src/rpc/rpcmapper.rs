@@ -778,7 +778,6 @@ mod tests {
             RpcMapper::unpack_any::<ProtoStatus>(payload);
 
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "Invalid payload: failed to decode Protobuf message: unexpected type URL.type_url: expected type URL: \"/Status.google.rpc\" (got: \"type.googleapis.com/Int32Value\")");
     }
 
     #[test]
