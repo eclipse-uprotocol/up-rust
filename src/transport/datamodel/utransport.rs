@@ -11,14 +11,17 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::UListener;
-use crate::uprotocol::{UAttributes, UEntity, UPayload, UStatus, UUri};
+use async_trait::async_trait;
+use std::sync::mpsc::Sender;
+
+use crate::uprotocol::{UAttributes, UEntity, UMessage, UPayload, UStatus, UUri};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
 ///
 /// Implementations of `UTransport` contain the details for connecting to the underlying transport technology and
 /// sending `UMessage` using the configured technology. For more information, please refer to
 /// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
+#[async_trait]
 pub trait UTransport {
     /// Authenticates with the underlying transport layer that the `uEntity` passed
     /// matches the transport specific identity. This method requires a resolved `UUri`.
@@ -29,7 +32,7 @@ pub trait UTransport {
     /// # Returns
     /// Returns `OKSTATUS` if authentication was successful, `FAILSTATUS` if the calling `uE`
     /// is not authenticated.
-    fn authenticate(&self, entity: UEntity) -> UStatus;
+    async fn authenticate(&self, entity: UEntity) -> UStatus;
 
     /// Transmits `UPayload` to the topic using the attributes defined in `UTransportAttributes`.
     ///
@@ -41,7 +44,7 @@ pub trait UTransport {
     /// # Returns
     /// Returns `OKSTATUS` if the payload has been successfully sent (ACK'ed), otherwise returns
     /// `FAILSTATUS` with the appropriate failure.
-    fn send(&self, topic: UUri, payload: UPayload, attributes: UAttributes) -> UStatus;
+    async fn send(&self, topic: UUri, payload: UPayload, attributes: UAttributes) -> UStatus;
 
     /// Registers a listener to be called when `UPayload` is received for the specific topic.
     ///
@@ -52,7 +55,7 @@ pub trait UTransport {
     /// # Returns
     /// Returns `OKSTATUS` if the listener is registered correctly, otherwise returns `FAILSTATUS`
     /// with the appropriate failure.
-    fn register_listener(&self, topic: UUri, listener: dyn UListener) -> UStatus;
+    async fn register_listener(&self, topic: UUri, listener: Sender<UMessage>) -> UStatus;
 
     /// Unregister a listener for a given topic. Messages arriving on this topic will no longer be processed
     /// by this listener.
@@ -64,5 +67,5 @@ pub trait UTransport {
     /// # Returns
     /// Returns `OKSTATUS` if the listener is unregistered correctly, otherwise returns `FAILSTATUS`
     /// with the appropriate failure.
-    fn unregister_listener(&self, topic: UUri, listener: dyn UListener) -> UStatus;
+    async fn unregister_listener(&self, topic: UUri, listener: Sender<UMessage>) -> UStatus;
 }

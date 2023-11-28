@@ -118,10 +118,8 @@ pub mod transport {
         pub use uattributesbuilder::*;
     }
     pub mod datamodel {
-        mod ulistener;
         mod utransport;
 
-        pub use ulistener::*;
         pub use utransport::*;
     }
     pub mod validator {
