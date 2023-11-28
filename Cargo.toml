@@ -27,7 +27,7 @@ exclude = [
 ]
 keywords = ["uProtocol", "SDK"]
 license = "Apache-2.0"
-name = "uprotocol_sdk"
+name = "uprotocol-sdk"
 readme = "README.md"
 repository = "https://github.com/eclipse-uprotocol/uprotocol-rust"
 rust-version = "1.66"
