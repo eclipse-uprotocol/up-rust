@@ -15,6 +15,14 @@
 name = "uprotocol_sdk"
 version = "0.1.5"
 edition = "2021"
+authors = ["AnotherDaniel <dk.mailbox@gmx.net>"]
+description = "Rust implementation of the Eclipse uProtocol SDK"
+license = "Apache-2.0"
+repository = "https://github.com/eclipse-uprotocol/uprotocol-rust"
+keywords = ["uProtocol", "SDK"]
+categories = ["api-bindings"]
+readme = "README.md"
+
 
 [dependencies]
 async-trait = "0.1"
