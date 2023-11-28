@@ -75,7 +75,7 @@ impl From<CloudEventProto> for cloudevents::Event {
                     // dataschema
                     // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
                     if key.eq("dataschema") {
-                        if let Ok(url) = Url::parse(uri) {
+                        if let Ok(url) = Url::parse(uri.as_str()) {
                             dataschema = Some(url);
                         }
                         // if Url::parse() doesn't work, this attribute is lost
@@ -105,7 +105,7 @@ impl From<CloudEventProto> for cloudevents::Event {
         let mut cloud_event = event_builder.build().unwrap();
 
         // Extract data - the proto serialization knows a protobuf.Any type!... something there?
-        let event_data: Option<Data> = match source_event.data.clone() {
+        let event_data: Option<Data> = match source_event.data {
             Some(CloudEventData::BinaryData(data)) => Some(Data::Binary(data)),
             Some(CloudEventData::TextData(text)) => Some(Data::String(text)),
             _ => None,

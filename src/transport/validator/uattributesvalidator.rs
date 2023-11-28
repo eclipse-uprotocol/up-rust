@@ -45,7 +45,7 @@ pub trait UAttributesValidator {
         ]
         .into_iter()
         .filter(|status| status.is_failure())
-        .map(|status| status.get_message().clone())
+        .map(|status| status.get_message())
         .collect();
 
         let error_message = error_messages.join(", ");

@@ -376,7 +376,7 @@ mod tests {
         ) -> RpcClientResult {
             let status = ProtoStatus::from(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
 
-            let any = RpcMapper::pack_any(status.clone()).unwrap();
+            let any = RpcMapper::pack_any(status).unwrap();
             let payload = any.into();
 
             Ok(payload)
@@ -394,7 +394,7 @@ mod tests {
         ) -> RpcClientResult {
             let status = ProtoStatus::from(UStatus::fail_with_code(UCode::Ok, "all good"));
 
-            let any = RpcMapper::pack_any(status.clone()).unwrap();
+            let any = RpcMapper::pack_any(status).unwrap();
             let payload = any.into();
 
             Ok(payload)

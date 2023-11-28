@@ -200,8 +200,7 @@ impl UCloudEventUtils {
     ///
     /// Returns `true` if the provided `CloudEvent` is marked with having a platform delivery problem.
     pub fn has_communication_problem(event: &Event) -> bool {
-        UCloudEventUtils::get_communication_status(event)
-            .is_some_and(|c: i64| c != UCode::Ok as i64)
+        matches!(UCloudEventUtils::get_communication_status(event), Some(c) if c != UCode::Ok as i64)
     }
 
     /// Returns a new `Event` from the supplied `Event`, with the platform communication added.
@@ -945,7 +944,7 @@ mod tests {
             .source("/body.accss//door.front_left#Door")
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
-                format!("proto://{}", any_payload.type_url.clone()),
+                format!("proto://{}", any_payload.type_url),
                 any_bytes,
             )
             .extension("ttl", 3);
@@ -1065,7 +1064,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let proto_event = CloudEvent::from(source_event.clone());
+        let proto_event = CloudEvent::from(source_event);
         let bytes = proto_event.encode_to_vec();
 
         // Creating the CloudEvent
