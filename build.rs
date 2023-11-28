@@ -11,10 +11,10 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use prost_build::Config;
 use std::env;
 use std::fs;
 use std::path::Path;
-use prost_build::Config;
 
 fn main() -> std::io::Result<()> {
     // use vendored protoc instead of relying on user provided protobuf installation
@@ -26,7 +26,7 @@ fn main() -> std::io::Result<()> {
             "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/code.proto",
             "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/status.proto",
             "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/error_details.proto",
-            
+
             // cloudevent proto definitions
             "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
 
