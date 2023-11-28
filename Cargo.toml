@@ -15,13 +15,23 @@
 name = "uprotocol_sdk"
 version = "0.1.5"
 edition = "2021"
-authors = ["AnotherDaniel <dk.mailbox@gmx.net>"]
+rust-version = "1.66"
+authors = ["Daniel Krippner <dk.mailbox@gmx.net>"]
+documentation = "https://github.com/eclipse-uprotocol/uprotocol-spec#readme"
 description = "Rust implementation of the Eclipse uProtocol SDK"
 license = "Apache-2.0"
 repository = "https://github.com/eclipse-uprotocol/uprotocol-rust"
 keywords = ["uProtocol", "SDK"]
 categories = ["api-bindings"]
 readme = "README.md"
+exclude = [
+    "tests/*",
+    "tools/*",
+    ".devcontainer/*",
+    ".vscode/*",
+    ".github/*",
+    ".gitignore",
+]
 
 
 [dependencies]
