@@ -12,18 +12,11 @@
 ################################################################################
 
 [package]
-name = "uprotocol_sdk"
-version = "0.1.5"
-edition = "2021"
-rust-version = "1.66"
 authors = ["Daniel Krippner <dk.mailbox@gmx.net>"]
-documentation = "https://github.com/eclipse-uprotocol/uprotocol-spec#readme"
-description = "Rust implementation of the Eclipse uProtocol SDK"
-license = "Apache-2.0"
-repository = "https://github.com/eclipse-uprotocol/uprotocol-rust"
-keywords = ["uProtocol", "SDK"]
 categories = ["api-bindings"]
-readme = "README.md"
+description = "Rust implementation of the Eclipse uProtocol SDK"
+documentation = "https://github.com/eclipse-uprotocol/uprotocol-spec#readme"
+edition = "2021"
 exclude = [
     "tests/*",
     "tools/*",
@@ -32,7 +25,13 @@ exclude = [
     ".github/*",
     ".gitignore",
 ]
-
+keywords = ["uProtocol", "SDK"]
+license = "Apache-2.0"
+name = "uprotocol_sdk"
+readme = "README.md"
+repository = "https://github.com/eclipse-uprotocol/uprotocol-rust"
+rust-version = "1.66"
+version = "0.1.5"
 
 [dependencies]
 async-trait = "0.1"
