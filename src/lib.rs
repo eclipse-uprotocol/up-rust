@@ -164,11 +164,6 @@ pub mod proto {
         pub mod protocloudevent;
     }
 
-    include!(concat!(env!("OUT_DIR"), "/google.rpc.rs"));
-    pub mod google {
-        pub mod protostatus;
-    }
-
     pub mod uprotocol {
         pub mod uauthority;
         pub mod uentity;

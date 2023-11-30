@@ -16,7 +16,6 @@ use std::default::Default;
 use std::fmt;
 use std::future::Future;
 
-use crate::proto::Status as ProtoStatus;
 use crate::rpc::rpcclient::RpcClientResult;
 use crate::uprotocol::{Data, UCode, UPayload, UPayloadFormat, UStatus};
 
@@ -131,7 +130,7 @@ impl RpcMapper {
             Ok(payload) => {
                 let any: Any = payload.into();
                 if any != Any::default() {
-                    match Self::unpack_any::<ProtoStatus>(any.clone()) {
+                    match Self::unpack_any::<UStatus>(any.clone()) {
                         // in this branch, we have successfully unpacked a protobuf-status from the (now consumed) payload
                         Ok(proto_status) => {
                             match UCode::try_from(proto_status.code).unwrap_or(UCode::Unknown) {
@@ -140,7 +139,7 @@ impl RpcMapper {
                                     payload: None,
                                 }),
                                 _ => Ok(RpcPayload {
-                                    status: UStatus::from(proto_status),
+                                    status: proto_status,
                                     payload: None,
                                 }),
                             }
@@ -323,7 +322,6 @@ mod tests {
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
 
     use crate::proto::CloudEvent as CloudEventProto;
-    use crate::proto::Status as ProtoStatus;
     use crate::rpc::RpcClient;
     use crate::transport::builder::UAttributesBuilder;
     use crate::uprotocol::{UAttributes, UEntity, UMessageType, UUri};
@@ -374,7 +372,7 @@ mod tests {
             _payload: UPayload,
             _attributes: UAttributes,
         ) -> RpcClientResult {
-            let status = ProtoStatus::from(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
+            let status = UStatus::fail_with_code(UCode::InvalidArgument, "boom");
 
             let any = RpcMapper::pack_any(status).unwrap();
             let payload = any.into();
@@ -392,7 +390,7 @@ mod tests {
             _payload: UPayload,
             _attributes: UAttributes,
         ) -> RpcClientResult {
-            let status = ProtoStatus::from(UStatus::fail_with_code(UCode::Ok, "all good"));
+            let status = UStatus::fail_with_code(UCode::Ok, "all good");
 
             let any = RpcMapper::pack_any(status).unwrap();
             let payload = any.into();
@@ -732,10 +730,10 @@ mod tests {
                 build_attributes(),
             );
 
-            let s = RpcMapper::map_response::<ProtoStatus, _>(rpc_response)
+            let s = RpcMapper::map_response::<UStatus, _>(rpc_response)
                 .await
                 .unwrap();
-            let ustatus = UStatus::from(s);
+            let ustatus = s;
 
             assert_eq!(UCode::Ok as i32, ustatus.code);
             assert_eq!("all good", ustatus.message());
@@ -774,8 +772,7 @@ mod tests {
             },
         };
 
-        let result: Result<ProtoStatus, RpcMapperError> =
-            RpcMapper::unpack_any::<ProtoStatus>(payload);
+        let result: Result<UStatus, RpcMapperError> = RpcMapper::unpack_any::<UStatus>(payload);
 
         assert!(result.is_err());
     }
@@ -791,7 +788,7 @@ mod tests {
                 build_attributes(),
             );
 
-            let result = RpcMapper::map_response::<ProtoStatus, _>(rpc_response).await;
+            let result = RpcMapper::map_response::<UStatus, _>(rpc_response).await;
             assert!(result.is_err());
             assert!(result
                 .err()

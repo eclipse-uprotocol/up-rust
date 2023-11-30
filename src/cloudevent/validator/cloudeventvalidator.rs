@@ -513,7 +513,7 @@ mod tests {
         assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent type [res.v1]. CloudEvent of type Publish must have a type of 'pub.v1'",
-            status.message
+            status.message.unwrap()
         );
     }
 
@@ -532,7 +532,7 @@ mod tests {
         assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
         "Invalid CloudEvent type [res.v1]. CloudEvent of type Publish must have a type of 'pub.v1'",
-        status.message
+        status.message.unwrap()
     );
     }
 
@@ -565,7 +565,7 @@ mod tests {
         assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
         "Invalid CloudEvent type [pub.v1]. CloudEvent of type Request must have a type of 'req.v1'",
-        status.message
+        status.message.unwrap()
     );
     }
 
@@ -598,7 +598,7 @@ mod tests {
         assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent type [pub.v1]. CloudEvent of type Response must have a type of 'res.v1'",
-            status.message
+            status.message.unwrap()
         );
     }
 
@@ -638,7 +638,7 @@ mod tests {
         assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent version [0.3]. CloudEvent version must be 1.0.",
-            status.message
+            status.message.unwrap()
         );
     }
 
@@ -673,7 +673,7 @@ mod tests {
                 "Invalid CloudEvent Id [{}]. CloudEvent Id must be of type UUIDv8.",
                 uuid
             ),
-            status.message
+            status.message.unwrap()
         );
     }
 
@@ -687,7 +687,7 @@ mod tests {
         assert_eq!(UCode::InvalidArgument as i32, status.code);
         assert_eq!(
             "Invalid CloudEvent Id [testme]. CloudEvent Id must be of type UUIDv8.",
-            status.message
+            status.message.unwrap()
         );
     }
 

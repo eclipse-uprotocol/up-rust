@@ -11,7 +11,14 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use prost::Name;
+
 use crate::uprotocol::{UCode, UStatus};
+
+impl Name for UStatus {
+    const NAME: &'static str = "UStatus";
+    const PACKAGE: &'static str = "uprotocol.v1";
+}
 
 impl UStatus {
     pub fn ok() -> Self {

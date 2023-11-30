@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-use crate::proto::{Code, Status};
+use crate::uprotocol::{UCode, UStatus};
 
 ///  ValidationResult of success or failure, wrapping the value of a UStatus.
 #[derive(Debug, PartialEq)]
@@ -22,16 +22,16 @@ pub enum ValidationResult {
     Failure(String),
 }
 
-impl From<ValidationResult> for Status {
+impl From<ValidationResult> for UStatus {
     fn from(value: ValidationResult) -> Self {
         match value {
-            ValidationResult::Success => Status {
-                code: Code::Ok.into(),
+            ValidationResult::Success => UStatus {
+                code: UCode::Ok.into(),
                 ..Default::default()
             },
-            ValidationResult::Failure(message) => Status {
-                code: Code::InvalidArgument.into(),
-                message,
+            ValidationResult::Failure(message) => UStatus {
+                code: UCode::InvalidArgument.into(),
+                message: message.into(),
                 ..Default::default()
             },
         }
@@ -76,15 +76,15 @@ impl ValidationResult {
         ValidationResult::Failure(message.to_string())
     }
 
-    pub fn to_status(&self) -> Status {
+    pub fn to_status(&self) -> UStatus {
         match self {
-            Self::Success => Status {
-                code: Code::Ok.into(),
+            Self::Success => UStatus {
+                code: UCode::Ok.into(),
                 ..Default::default()
             },
-            Self::Failure(error) => Status {
-                code: Code::InvalidArgument.into(),
-                message: error.to_string(),
+            Self::Failure(error) => UStatus {
+                code: UCode::InvalidArgument.into(),
+                message: Some(error.to_string()),
                 ..Default::default()
             },
         }
@@ -137,21 +137,21 @@ mod tests {
     #[test]
     fn test_success_validation_result_to_status() {
         let success = ValidationResult::success();
-        let status_success = Status {
-            code: Code::Ok.into(),
+        let status_success = UStatus {
+            code: UCode::Ok.into(),
             ..Default::default()
         };
-        assert_eq!(status_success, Status::from(success));
+        assert_eq!(status_success, UStatus::from(success));
     }
 
     #[test]
     fn test_failure_validation_result_to_status() {
         let failure = ValidationResult::failure("boom");
-        let status_failure = Status {
-            code: Code::InvalidArgument.into(),
-            message: "boom".into(),
+        let status_failure = UStatus {
+            code: UCode::InvalidArgument.into(),
+            message: Some("boom".to_string()),
             ..Default::default()
         };
-        assert_eq!(status_failure, Status::from(failure));
+        assert_eq!(status_failure, UStatus::from(failure));
     }
 }

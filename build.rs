@@ -22,11 +22,6 @@ fn main() -> std::io::Result<()> {
 
     if let Err(err) = get_and_build_protos(
         &[
-            // grpc proto definitions
-            "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/code.proto",
-            "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/status.proto",
-            "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/error_details.proto",
-
             // cloudevent proto definitions
             "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
 
