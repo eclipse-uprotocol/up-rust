@@ -82,7 +82,7 @@ impl UriSerializer<String> for LongUriSerializer {
                 version = uri_parts[2].to_string();
             }
             if uri_parts.len() > 3 {
-                resource = Some(UResource::from(uri_parts[3].to_string()));
+                resource = Some(UResource::from(uri_parts[3].as_str()));
             }
         } else {
             if uri_parts.len() > 2 {
@@ -100,7 +100,7 @@ impl UriSerializer<String> for LongUriSerializer {
                     version = uri_parts[4].to_string();
                 }
                 if uri_parts.len() > 5 {
-                    resource = Some(UResource::from(uri_parts[5].to_string()));
+                    resource = Some(UResource::from(uri_parts[5].as_str()));
                 }
             } else {
                 return UUri {

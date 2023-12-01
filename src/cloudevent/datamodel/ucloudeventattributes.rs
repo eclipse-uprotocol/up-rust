@@ -35,20 +35,20 @@ impl UCloudEventAttributes {
         UCloudEventAttributesBuilder::default()
     }
 
-    pub fn hash(&self) -> &Option<String> {
-        &self.hash
+    pub fn hash(&self) -> Option<&str> {
+        self.hash.as_deref()
     }
 
-    pub fn priority(&self) -> &Option<UPriority> {
-        &self.priority
+    pub fn priority(&self) -> Option<UPriority> {
+        self.priority
     }
 
-    pub fn ttl(&self) -> &Option<u32> {
-        &self.ttl
+    pub fn ttl(&self) -> Option<u32> {
+        self.ttl
     }
 
-    pub fn token(&self) -> &Option<String> {
-        &self.token
+    pub fn token(&self) -> Option<&str> {
+        self.token.as_deref()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -74,7 +74,11 @@ impl UCloudEventAttributesBuilder {
         }
     }
 
-    pub fn with_hash(mut self, hash: String) -> Self {
+    pub fn with_hash<T>(mut self, hash: T) -> Self
+    where
+        T: Into<String>,
+    {
+        let hash = hash.into();
         if !hash.trim().is_empty() {
             self.hash = Some(hash.trim().to_string());
         }
@@ -91,7 +95,11 @@ impl UCloudEventAttributesBuilder {
         self
     }
 
-    pub fn with_token(mut self, token: String) -> Self {
+    pub fn with_token<T>(mut self, token: T) -> Self
+    where
+        T: Into<String>,
+    {
+        let token = token.into();
         if !token.trim().is_empty() {
             self.token = Some(token.trim().to_string());
         }
@@ -162,10 +170,10 @@ mod tests {
             .with_token("someOAuthToken".to_string())
             .build();
 
-        assert_eq!(attributes.hash(), &Some("somehash".to_string()));
-        assert_eq!(attributes.priority(), &Some(UPriority::UpriorityCs6));
-        assert_eq!(attributes.ttl(), &Some(3));
-        assert_eq!(attributes.token(), &Some("someOAuthToken".to_string()));
+        assert_eq!(attributes.hash(), Some("somehash"));
+        assert_eq!(attributes.priority(), Some(UPriority::UpriorityCs6));
+        assert_eq!(attributes.ttl(), Some(3));
+        assert_eq!(attributes.token(), Some("someOAuthToken"));
     }
 
     #[test]

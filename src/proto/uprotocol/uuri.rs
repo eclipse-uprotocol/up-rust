@@ -22,9 +22,9 @@ impl From<uproto_Uuri> for String {
     }
 }
 
-impl From<String> for uproto_Uuri {
-    fn from(value: String) -> Self {
-        LongUriSerializer::deserialize(value)
+impl From<&str> for uproto_Uuri {
+    fn from(value: &str) -> Self {
+        LongUriSerializer::deserialize(value.into())
     }
 }
 

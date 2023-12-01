@@ -91,7 +91,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
             if authority.remote.is_none() {
                 address_type = AddressType::Local;
             } else if let Some(id) = UAuthority::get_id(authority) {
-                authority_id = Some(id.clone());
+                authority_id = Some(id.to_vec());
                 address_type = AddressType::ID;
             } else if let Some(ip) = UAuthority::get_ip(authority) {
                 match ip.len() {
@@ -99,7 +99,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                     16 => address_type = AddressType::IPv6,
                     _ => return vec![],
                 }
-                remote_ip = Some(ip.clone());
+                remote_ip = Some(ip.to_vec());
             }
         }
 

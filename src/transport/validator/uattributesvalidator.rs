@@ -824,7 +824,7 @@ mod tests {
     #[test]
     fn test_validating_request_containing_token() {
         let attributes = UAttributesBuilder::publish(UPriority::UpriorityCs0)
-            .with_token("None".into())
+            .with_token("None")
             .build();
 
         let validator = Validators::get_validator(&attributes);

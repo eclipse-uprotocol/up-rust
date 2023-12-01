@@ -274,7 +274,7 @@ impl CloudEventValidators {
     ///
     /// Returns a `CloudEventValidator` according to the `type` attribute in the `CloudEvent`.
     pub fn get_validator(cloud_event: &Event) -> Box<dyn CloudEventValidator> {
-        match UMessageType::from(cloud_event.ty().to_string()) {
+        match UMessageType::from(cloud_event.ty()) {
             UMessageType::UmessageTypeResponse => Box::new(ResponseValidator),
             UMessageType::UmessageTypeRequest => Box::new(RequestValidator),
             _ => Box::new(PublishValidator),
@@ -299,7 +299,7 @@ impl CloudEventValidator for PublishValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> ValidationResult {
-        if UMessageType::UmessageTypePublish.eq(&UMessageType::from(cloud_event.ty().to_string())) {
+        if UMessageType::UmessageTypePublish.eq(&UMessageType::from(cloud_event.ty())) {
             return ValidationResult::Success;
         }
         ValidationResult::failure(&format!(
@@ -391,7 +391,7 @@ impl CloudEventValidator for RequestValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> ValidationResult {
-        if UMessageType::UmessageTypeRequest.eq(&UMessageType::from(cloud_event.ty().to_string())) {
+        if UMessageType::UmessageTypeRequest.eq(&UMessageType::from(cloud_event.ty())) {
             return ValidationResult::Success;
         }
         ValidationResult::failure(&format!(
@@ -444,8 +444,7 @@ impl CloudEventValidator for ResponseValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> ValidationResult {
-        if UMessageType::UmessageTypeResponse.eq(&UMessageType::from(cloud_event.ty().to_string()))
-        {
+        if UMessageType::UmessageTypeResponse.eq(&UMessageType::from(cloud_event.ty())) {
             return ValidationResult::Success;
         }
         ValidationResult::failure(&format!(

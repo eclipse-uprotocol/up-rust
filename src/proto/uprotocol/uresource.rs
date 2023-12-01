@@ -18,14 +18,14 @@ impl UResource {
         resource.id.is_some()
     }
 
-    pub fn get_message(resource: &UResource) -> Option<&String> {
+    pub fn get_message(resource: &UResource) -> Option<&str> {
         match &resource.message {
             Some(message) => Some(message),
             _ => None,
         }
     }
 
-    pub fn get_instance(resource: &UResource) -> Option<&String> {
+    pub fn get_instance(resource: &UResource) -> Option<&str> {
         match &resource.instance {
             Some(instance) => Some(instance),
             _ => None,
@@ -33,8 +33,8 @@ impl UResource {
     }
 }
 
-impl From<String> for UResource {
-    fn from(value: String) -> Self {
+impl From<&str> for UResource {
+    fn from(value: &str) -> Self {
         let parts: Vec<&str> = value.split('#').collect();
         let name_and_instance: String = parts[0].to_string();
         let name_and_instance_parts: Vec<&str> = name_and_instance.split('.').collect();

@@ -250,8 +250,7 @@ impl UCloudEventUtils {
     ///
     /// An `Option<u64>` containing the timestamp from the UUIDV8 `Event` Id or `None` if the timestamp can't be extracted.
     pub fn get_creation_timestamp(event: &Event) -> Option<u64> {
-        let id = event.id().to_string();
-        UuidUtils::get_time(&Uuid::from(id))
+        UuidUtils::get_time(&Uuid::from(event.id()))
     }
 
     /// Calculates if an `Event` configured with a creation time and a `ttl` attribute is expired.
@@ -295,7 +294,7 @@ impl UCloudEventUtils {
         let maybe_ttl = UCloudEventUtils::get_ttl(event);
         match maybe_ttl {
             Some(ttl) if ttl > 0 => {
-                let uuid = Uuid::from(event.id().to_string());
+                let uuid = Uuid::from(event.id());
                 if let Some(event_time) = UuidUtils::get_time(&uuid) {
                     let now = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -321,7 +320,7 @@ impl UCloudEventUtils {
     ///
     /// Returns `true` if the `Event` has a valid UUIDv8 id.
     pub fn is_cloud_event_id(event: &Event) -> bool {
-        UuidUtils::is_uuid(&Uuid::from(event.id().to_string()))
+        UuidUtils::is_uuid(&Uuid::from(event.id()))
     }
 
     /// Extracts the payload from the `Event` as a protobuf `Any` object.

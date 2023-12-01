@@ -57,7 +57,7 @@ pub trait UriSerializer<T> {
             });
         }
 
-        let long_uri = UUri::from(long_uri.to_string());
+        let long_uri = UUri::from(long_uri);
         let micro_uri = UUri::from(micro_uri.to_vec());
 
         let mut auth = micro_uri.authority.unwrap_or_default();

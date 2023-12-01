@@ -15,51 +15,54 @@ use crate::uprotocol::{Remote, UAuthority};
 
 /// Helper functions to deal with UAuthority::Remote structure
 impl UAuthority {
-    pub fn has_name(authority: &UAuthority) -> bool {
-        matches!(authority.remote, Some(Remote::Name(_)))
+    pub fn has_name(&self) -> bool {
+        matches!(self.remote, Some(Remote::Name(_)))
     }
 
-    pub fn has_ip(authority: &UAuthority) -> bool {
-        matches!(authority.remote, Some(Remote::Ip(_)))
+    pub fn has_ip(&self) -> bool {
+        matches!(self.remote, Some(Remote::Ip(_)))
     }
 
-    pub fn has_id(authority: &UAuthority) -> bool {
-        matches!(authority.remote, Some(Remote::Id(_)))
+    pub fn has_id(&self) -> bool {
+        matches!(self.remote, Some(Remote::Id(_)))
     }
 
-    pub fn get_name(authority: &UAuthority) -> Option<&String> {
-        match &authority.remote {
+    pub fn get_name(&self) -> Option<&str> {
+        match &self.remote {
             Some(Remote::Name(name)) => Some(name),
             _ => None,
         }
     }
 
-    pub fn get_ip(authority: &UAuthority) -> Option<&Vec<u8>> {
-        match &authority.remote {
+    pub fn get_ip(&self) -> Option<&[u8]> {
+        match &self.remote {
             Some(Remote::Ip(ip)) => Some(ip),
             _ => None,
         }
     }
 
-    pub fn get_id(authority: &UAuthority) -> Option<&Vec<u8>> {
-        match &authority.remote {
+    pub fn get_id(&self) -> Option<&[u8]> {
+        match &self.remote {
             Some(Remote::Id(id)) => Some(id),
             _ => None,
         }
     }
 
-    pub fn set_name(authority: &mut UAuthority, name: String) -> &mut UAuthority {
-        authority.remote = Some(Remote::Name(name));
+    pub fn set_name<T>(authority: &mut UAuthority, name: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
+        authority.remote = Some(Remote::Name(name.into()));
         authority
     }
 
-    pub fn set_ip(authority: &mut UAuthority, ip: Vec<u8>) -> &mut UAuthority {
-        authority.remote = Some(Remote::Ip(ip));
-        authority
+    pub fn set_ip(&mut self, ip: Vec<u8>) -> &mut Self {
+        self.remote = Some(Remote::Ip(ip));
+        self
     }
 
-    pub fn set_id(authority: &mut UAuthority, id: Vec<u8>) -> &mut UAuthority {
-        authority.remote = Some(Remote::Id(id));
-        authority
+    pub fn set_id(&mut self, id: Vec<u8>) -> &mut Self {
+        self.remote = Some(Remote::Id(id));
+        self
     }
 }

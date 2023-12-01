@@ -38,9 +38,9 @@ impl From<uproto_Uuid> for String {
     }
 }
 
-impl From<String> for uproto_Uuid {
-    fn from(value: String) -> Self {
-        LongUuidSerializer::deserialize(value)
+impl From<&str> for uproto_Uuid {
+    fn from(value: &str) -> Self {
+        LongUuidSerializer::deserialize(value.into())
     }
 }
 

@@ -21,9 +21,9 @@ impl From<UMessageType> for String {
     }
 }
 
-impl From<String> for UMessageType {
-    fn from(value: String) -> Self {
-        match value.as_str() {
+impl From<&str> for UMessageType {
+    fn from(value: &str) -> Self {
+        match value {
             "pub.v1" => UMessageType::UmessageTypePublish,
             "req.v1" => UMessageType::UmessageTypeRequest,
             "res.v1" => UMessageType::UmessageTypeResponse,

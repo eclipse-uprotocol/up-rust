@@ -136,8 +136,11 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured token.
-    pub fn with_token(&mut self, token: String) -> &mut UAttributesBuilder {
-        self.token = Some(token);
+    pub fn with_token<T>(&mut self, token: T) -> &mut UAttributesBuilder
+    where
+        T: Into<String>,
+    {
+        self.token = Some(token.into());
         self
     }
 
