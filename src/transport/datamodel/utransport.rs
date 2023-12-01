@@ -14,7 +14,7 @@
 use async_trait::async_trait;
 use std::sync::mpsc::Sender;
 
-use crate::uprotocol::{UAttributes, UEntity, UMessage, UPayload, UStatus, UUri};
+use crate::uprotocol::{UAttributes, UEntity, UMessage, UPayload, UStatus, UUri, Uuid};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
 ///
@@ -30,9 +30,8 @@ pub trait UTransport {
     /// * `uEntity` - Resolved `UEntity`.
     ///
     /// # Returns
-    /// Returns `OKSTATUS` if authentication was successful, `FAILSTATUS` if the calling `uE`
-    /// is not authenticated.
-    async fn authenticate(&self, entity: UEntity) -> UStatus;
+    /// Returns () on success, otherwise an Err(UStatus) with the appropriate failure information.
+    async fn authenticate(&self, entity: UEntity) -> Result<(), UStatus>;
 
     /// Transmits `UPayload` to the topic using the attributes defined in `UTransportAttributes`.
     ///
@@ -42,9 +41,13 @@ pub trait UTransport {
     /// * `attributes` - Additional transport attributes.
     ///
     /// # Returns
-    /// Returns `OKSTATUS` if the payload has been successfully sent (ACK'ed), otherwise returns
-    /// `FAILSTATUS` with the appropriate failure.
-    async fn send(&self, topic: UUri, payload: UPayload, attributes: UAttributes) -> UStatus;
+    /// Returns () on success, otherwise an Err(UStatus) with the appropriate failure information.
+    async fn send(
+        &self,
+        topic: UUri,
+        payload: UPayload,
+        attributes: UAttributes,
+    ) -> Result<(), UStatus>;
 
     /// Registers a listener to be called when `UPayload` is received for the specific topic.
     ///
@@ -53,19 +56,21 @@ pub trait UTransport {
     /// * `listener` - The method to execute to process the data for the topic.
     ///
     /// # Returns
-    /// Returns `OKSTATUS` if the listener is registered correctly, otherwise returns `FAILSTATUS`
-    /// with the appropriate failure.
-    async fn register_listener(&self, topic: UUri, listener: Sender<UMessage>) -> UStatus;
+    /// Returns a Uuid on success that can be used for unregistering later, otherwise an Err(UStatus) with the appropriate failure information.
+    async fn register_listener(
+        &self,
+        topic: UUri,
+        listener: Sender<UMessage>,
+    ) -> Result<Uuid, UStatus>;
 
     /// Unregister a listener for a given topic. Messages arriving on this topic will no longer be processed
     /// by this listener.
     ///
     /// # Arguments
     /// * `topic` - Resolved `UUri` for where the listener was registered to receive messages from.
-    /// * `listener` - The method to execute to process the data for the topic.
+    /// * `listener` - A Uuid to identify the listener that should be unregistered.
     ///
     /// # Returns
-    /// Returns `OKSTATUS` if the listener is unregistered correctly, otherwise returns `FAILSTATUS`
-    /// with the appropriate failure.
-    async fn unregister_listener(&self, topic: UUri, listener: Sender<UMessage>) -> UStatus;
+    /// Returns () on success, otherwise an Err(UStatus) with the appropriate failure information.
+    async fn unregister_listener(&self, topic: UUri, listener: Uuid) -> Result<(), UStatus>;
 }
