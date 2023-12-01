@@ -76,11 +76,10 @@ pub trait UAttributesValidator {
 
         if let Some(uuid) = &attributes.id {
             if let Some(time) = UuidUtils::get_time(uuid) {
-                let delta = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64
-                    - time;
+                let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                    Ok(duration) => duration.as_millis() as u64 - time,
+                    Err(e) => return ValidationResult::Failure(e.to_string()),
+                };
 
                 if ttl <= 0 {
                     return ValidationResult::Success;
@@ -162,7 +161,10 @@ pub trait UAttributesValidator {
     fn validate_commstatus(&self, attributes: &UAttributes) -> ValidationResult {
         if let Some(cs) = attributes.commstatus {
             if UCode::try_from(cs).is_err() {
-                return ValidationResult::Failure("Invalid Communication Status Code".into());
+                return ValidationResult::Failure(format!(
+                    "Invalid Communication Status Code {}",
+                    cs,
+                ));
             }
         }
         ValidationResult::Success
@@ -534,7 +536,9 @@ mod tests {
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
         assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid Communication Status Code");
+        assert!(status
+            .get_message()
+            .contains("Invalid Communication Status Code"));
     }
 
     #[test]
@@ -636,7 +640,9 @@ mod tests {
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
         assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid Communication Status Code");
+        assert!(status
+            .get_message()
+            .contains("Invalid Communication Status Code"));
     }
 
     #[test]
@@ -742,7 +748,9 @@ mod tests {
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
         assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid Communication Status Code");
+        assert!(status
+            .get_message()
+            .contains("Invalid Communication Status Code"));
     }
 
     #[test]

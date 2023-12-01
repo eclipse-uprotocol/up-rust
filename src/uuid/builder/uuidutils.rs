@@ -11,12 +11,53 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use prost::Message;
 use std::str::FromStr;
-use uuid::{Error, Uuid, Variant};
+use uuid::{Uuid, Variant};
 
 use crate::uprotocol::Uuid as uproto_Uuid;
 
+#[derive(Debug)]
+pub struct UuidConversionError {
+    message: String,
+}
+
+impl UuidConversionError {
+    pub fn new(message: &str) -> UuidConversionError {
+        UuidConversionError {
+            message: message.to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for UuidConversionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error converting Uuid: {}", self.message)
+    }
+}
+
+impl std::error::Error for UuidConversionError {}
+
 pub struct UuidUtils;
+
+impl TryFrom<&[u8; 16]> for uproto_Uuid {
+    type Error = UuidConversionError;
+
+    fn try_from(bytes: &[u8; 16]) -> Result<Self, Self::Error> {
+        Ok(Uuid::from_bytes(*bytes).into())
+    }
+}
+
+impl TryFrom<String> for uproto_Uuid {
+    type Error = UuidConversionError;
+
+    fn try_from(uuid_str: String) -> Result<Self, Self::Error> {
+        match Uuid::from_str(&uuid_str) {
+            Ok(uuid) => Ok(uuid.into()),
+            Err(err) => Err(UuidConversionError::new(&err.to_string())),
+        }
+    }
+}
 
 impl UuidUtils {
     /// Converts the UUID to a String
@@ -34,36 +75,9 @@ impl UuidUtils {
     ///
     /// * `Vec<u8>` - The byte array representation of the UUID
     pub fn to_bytes(uuid: &uproto_Uuid) -> Vec<u8> {
-        Uuid::from(uuid.clone()).as_bytes().to_vec()
-    }
-
-    /// Converts a byte array to a UUID
-    ///
-    /// # Arguments
-    ///
-    /// * `bytes` - A byte array representing a UUID
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Uuid, Error>` - UUID object built from the byte array
-    pub fn from_bytes(bytes: &[u8; 16]) -> Result<uproto_Uuid, Error> {
-        Ok(Uuid::from_bytes(*bytes).into())
-    }
-
-    /// Creates a UUID from a string
-    ///
-    /// # Arguments
-    ///
-    /// * `string` - The string representation of the UUID
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Uuid, Error>` - The UUID object representation of the string
-    pub fn from_string(uuid_str: &str) -> Result<uproto_Uuid, Error> {
-        match Uuid::from_str(uuid_str) {
-            Ok(uuid) => Ok(uuid.into()),
-            Err(err) => Err(err),
-        }
+        let mut v = uuid.msb.encode_to_vec();
+        v.extend(uuid.lsb.encode_to_vec());
+        v
     }
 
     /// Fetches the UUID version
@@ -115,7 +129,7 @@ impl UuidUtils {
     ///
     /// * `bool` - True if the UUID is a formal UUIDv8 uProtocol ID
     pub fn is_uprotocol(uuid: &uproto_Uuid) -> bool {
-        matches!(UuidUtils::get_version(uuid), Some(o) if o == Version::VersionUprotocol)
+        matches!(UuidUtils::get_version(uuid), Some(o) if o == Version::Uprotocol)
     }
 
     /// Verifies if the version is UUID version 6
@@ -128,7 +142,7 @@ impl UuidUtils {
     ///
     /// * `bool` - True if the UUID is version 6
     pub fn is_v6(uuid: &uproto_Uuid) -> bool {
-        matches!(UuidUtils::get_version(uuid), Some(o) if o == Version::VersionTimeOrdered)
+        matches!(UuidUtils::get_version(uuid), Some(o) if o == Version::TimeOrdered)
     }
 
     /// Returns the number of milliseconds since Unix epoch for the provided UUID
@@ -143,14 +157,14 @@ impl UuidUtils {
     pub fn get_time(uuid: &uproto_Uuid) -> Option<u64> {
         if let Some(version) = UuidUtils::get_version(uuid) {
             match version {
-                Version::VersionTimeOrdered => {
+                Version::TimeOrdered => {
                     let time = Uuid::from(uuid.clone())
                         .get_timestamp()
                         .unwrap()
                         .to_rfc4122();
                     Some(time.0)
                 }
-                Version::VersionUprotocol => {
+                Version::Uprotocol => {
                     let uuid = Uuid::from(uuid.clone());
                     let uuid_bytes = uuid.as_bytes();
                     // Re-assemble the original msb (u64)
@@ -167,15 +181,16 @@ impl UuidUtils {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(usize)]
 pub enum Version {
     /// An unknown version.
-    VersionUnknown = 0,
+    Unknown = 0,
     /// The randomly or pseudo-randomly generated version specified in RFC-4122.
-    VersionRandomBased = 4,
+    RandomBased = 4,
     /// The time-ordered version with gregorian epoch proposed by Peabody and Davis.
-    VersionTimeOrdered = 6,
+    TimeOrdered = 6,
     /// The custom or free-form version proposed by Peabody and Davis.
-    VersionUprotocol = 8,
+    Uprotocol = 8,
 }
 
 impl Version {
@@ -183,10 +198,10 @@ impl Version {
     /// Returns `None` if the value is not a valid version.
     pub fn from_value(value: usize) -> Option<Self> {
         match value {
-            0 => Some(Version::VersionUnknown),
-            4 => Some(Version::VersionRandomBased),
-            6 => Some(Version::VersionTimeOrdered),
-            8 => Some(Version::VersionUprotocol),
+            0 => Some(Version::Unknown),
+            4 => Some(Version::RandomBased),
+            6 => Some(Version::TimeOrdered),
+            8 => Some(Version::Uprotocol),
             _ => None,
         }
     }

@@ -13,8 +13,8 @@
 
 use mac_address::{get_mac_address, MacAddress};
 use rand::Rng;
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::{Arc, Mutex};
+use std::convert::Into;
+use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Builder, ClockSequence, Timestamp, Uuid};
 
@@ -124,7 +124,7 @@ impl UUIDv6Builder {
 /// | rand_b     | MUST 62 bits random number that is generated at initialization time of the uE only and reused otherwise |
 
 pub struct UUIDv8Builder {
-    msb: Arc<Mutex<u64>>,
+    msb: AtomicU64,
     lsb: u64,
 }
 
@@ -135,15 +135,12 @@ impl Default for UUIDv8Builder {
 }
 
 impl UUIDv8Builder {
-    // The java-sdk implementation uses a signed 64 bit integer here, which can lead to the below operation to overflow. In Rust,
-    // we therefore make lsb an unsigned value. To be be identical with the java SDK implementation, _lsb would need to be an i64,
-    // and we need the compiler directive to allow overflowing literals: #[allow(overflowing_literals)]
     pub fn new() -> Self {
         let mut rng = rand::thread_rng();
         let _lsb: u64 = (rng.gen::<u64>() & 0x3fffffffffffffff) | 0x8000000000000000;
 
         UUIDv8Builder {
-            msb: Arc::new(Mutex::new(UUIDV8_VERSION << 12)),
+            msb: AtomicU64::new(UUIDV8_VERSION << 12),
             lsb: _lsb,
         }
     }
@@ -158,21 +155,21 @@ impl UUIDv8Builder {
 
     pub fn build_with_instant(&self, instant: u64) -> uproto_Uuid {
         let new_msb = {
-            let mut msb = self.msb.lock().unwrap();
+            let current_msb = self.msb.load(Ordering::SeqCst);
 
-            if instant == (*msb >> 16) {
-                // Increment the counter if we are not at MAX_COUNT
-                if (*msb & 0xFFFu64) < MAX_COUNT {
-                    *msb += 1;
+            if instant == (current_msb >> 16) {
+                if (current_msb & MAX_COUNT) < MAX_COUNT {
+                    self.msb.fetch_add(1, Ordering::SeqCst);
                 }
             } else {
-                *msb = (instant << 16) | (8u64 << 12);
+                self.msb
+                    .store((instant << 16) | (8u64 << 12), Ordering::SeqCst);
             }
 
-            *msb
+            self.msb.load(Ordering::SeqCst)
         };
 
-        let mut bytes = [0u8; 16]; // 8 bytes for msg and 8 bytes for lsb
+        let mut bytes = [0u8; 16];
         bytes[..8].copy_from_slice(&new_msb.to_le_bytes());
         bytes[8..].copy_from_slice(&self.lsb.to_le_bytes());
         Builder::from_custom_bytes(bytes).into_uuid().into()

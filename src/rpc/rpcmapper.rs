@@ -72,29 +72,16 @@ impl RpcMapper {
         T: prost::Message + Default,
         F: Future<Output = RpcClientResult>,
     {
-        match response_future.await {
-            Ok(payload) => {
-                // we got some useable response payload
-                let any: Any = payload.into();
-                if any != Any::default() {
-                    match T::decode(any.value.as_slice()) {
-                        Ok(result) => {
-                            // expected response type could be decoded
-                            Ok(result)
-                        }
-                        Err(error) => {
-                            // ... or not
-                            Err(RpcMapperError::InvalidPayload(error.to_string()))
-                        }
-                    }
-                } else {
-                    // we got a payload, but it's not a protobuf
-                    Err(RpcMapperError::UnknownType(
-                        "Couldn't decode payload into Any".to_string(),
-                    ))
-                }
-            }
-            Err(error) => Err(error),
+        let payload = response_future.await?; // Directly returns in case of error
+        let any: Any = payload.into();
+        if any != Any::default() {
+            T::decode(any.value.as_slice())
+                .map_err(|error| RpcMapperError::InvalidPayload(error.to_string()))
+        } else {
+            // we got a payload, but it's not a protobuf
+            Err(RpcMapperError::UnknownType(
+                "Couldn't decode payload into Any".to_string(),
+            ))
         }
     }
 
@@ -236,10 +223,8 @@ impl RpcMapper {
     ) -> Result<T, RpcMapperError> {
         let any: Any = payload.into();
         if any != Any::default() {
-            match T::decode(any.value.as_slice()) {
-                Ok(result) => Ok(result),
-                Err(error) => Err(RpcMapperError::InvalidPayload(error.to_string())),
-            }
+            T::decode(any.value.as_slice())
+                .map_err(|error| RpcMapperError::InvalidPayload(error.to_string()))
         } else {
             Err(RpcMapperError::UnknownType(
                 "Couldn't decode payload".to_string(),
@@ -374,7 +359,7 @@ mod tests {
         ) -> RpcClientResult {
             let status = UStatus::fail_with_code(UCode::InvalidArgument, "boom");
 
-            let any = RpcMapper::pack_any(status).unwrap();
+            let any = RpcMapper::pack_any(status)?;
             let payload = any.into();
 
             Ok(payload)
@@ -392,7 +377,7 @@ mod tests {
         ) -> RpcClientResult {
             let status = UStatus::fail_with_code(UCode::Ok, "all good");
 
-            let any = RpcMapper::pack_any(status).unwrap();
+            let any = RpcMapper::pack_any(status)?;
             let payload = any.into();
 
             Ok(payload)

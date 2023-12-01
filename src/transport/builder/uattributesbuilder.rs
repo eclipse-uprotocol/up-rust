@@ -125,7 +125,7 @@ impl UAttributesBuilder {
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured ttl.
     pub fn with_ttl(&mut self, ttl: u32) -> &mut UAttributesBuilder {
-        self.ttl = Some(ttl as i32);
+        self.ttl = Some(i32::try_from(ttl).unwrap_or(i32::MAX));
         self
     }
 

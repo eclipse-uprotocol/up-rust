@@ -20,11 +20,13 @@ use crate::uprotocol::{Data, UPayload};
 impl From<Any> for UPayload {
     fn from(value: Any) -> Self {
         let vec = value.encode_to_vec();
-        let len = vec.len() as i32;
-        UPayload {
-            data: Some(Data::Value(vec)),
-            length: Some(len),
-            ..Default::default()
+        match i32::try_from(vec.len()) {
+            Ok(len) => UPayload {
+                data: Some(Data::Value(vec)),
+                length: Some(len),
+                ..Default::default()
+            },
+            Err(_) => UPayload::default(),
         }
     }
 }
@@ -45,7 +47,7 @@ fn data_to_slice(payload: &UPayload) -> Option<&[u8]> {
         match data {
             Data::Reference(bytes) => {
                 if let Some(length) = payload.length {
-                    return Some(read_memory(*bytes, length));
+                    return Some(unsafe { read_memory(*bytes, length) });
                 }
             }
             Data::Value(bytes) => {
@@ -57,12 +59,10 @@ fn data_to_slice(payload: &UPayload) -> Option<&[u8]> {
 }
 
 // Please no one use this...
-fn read_memory(address: u64, length: i32) -> &'static [u8] {
-    unsafe {
-        // Convert the raw address to a pointer
-        let ptr = address as *const u8;
+unsafe fn read_memory(address: u64, length: i32) -> &'static [u8] {
+    // Convert the raw address to a pointer
+    let ptr = address as *const u8;
 
-        // Create a slice from the pointer and the length
-        slice::from_raw_parts(ptr, length as usize)
-    }
+    // Create a slice from the pointer and the length
+    slice::from_raw_parts(ptr, length as usize)
 }

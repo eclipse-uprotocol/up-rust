@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_uuidv6_with_bad_variant() {
-        if let Ok(uuid) = UuidUtils::from_string("1ee57e66-d33a-65e0-4a77-3c3f061c1e9e") {
+        if let Ok(uuid) = uproto_Uuid::try_from("1ee57e66-d33a-65e0-4a77-3c3f061c1e9e") {
             let validator = UuidValidators::get_validator(&uuid);
             let status = validator.validate(&uuid);
             assert_eq!("Invalid UUIDv6 variant", status.message());

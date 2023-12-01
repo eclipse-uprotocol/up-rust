@@ -19,33 +19,26 @@ impl UResource {
     }
 
     pub fn get_message(resource: &UResource) -> Option<&str> {
-        match &resource.message {
-            Some(message) => Some(message),
-            _ => None,
-        }
+        resource.message.as_deref()
     }
 
     pub fn get_instance(resource: &UResource) -> Option<&str> {
-        match &resource.instance {
-            Some(instance) => Some(instance),
-            _ => None,
-        }
+        resource.instance.as_deref()
     }
 }
 
 impl From<&str> for UResource {
     fn from(value: &str) -> Self {
-        let parts: Vec<&str> = value.split('#').collect();
-        let name_and_instance: String = parts[0].to_string();
-        let name_and_instance_parts: Vec<&str> = name_and_instance.split('.').collect();
+        let mut parts = value.split('#');
+        let name_and_instance = parts.next().unwrap_or_default();
+        let resource_message = parts.next().map(|s| s.to_string());
 
-        let resource_name: String = name_and_instance_parts[0].to_string();
-        let resource_instance: Option<String> = name_and_instance_parts
-            .get(1)
-            .map_or_else(|| None, |s| Some(s.to_string()));
-
-        let resource_message: Option<String> =
-            parts.get(1).map_or_else(|| None, |s| Some(s.to_string()));
+        let mut name_and_instance_parts = name_and_instance.split('.');
+        let resource_name = name_and_instance_parts
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let resource_instance = name_and_instance_parts.next().map(|s| s.to_string());
 
         UResource {
             name: resource_name,

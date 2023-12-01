@@ -12,9 +12,11 @@
  ********************************************************************************/
 
 use std::fmt::Display;
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::uprotocol::Uuid as uproto_Uuid;
+use crate::uuid::builder::UuidConversionError;
 use crate::uuid::serializer::{LongUuidSerializer, MicroUuidSerializer, UuidSerializer};
 
 impl From<uproto_Uuid> for Uuid {
@@ -41,6 +43,17 @@ impl From<uproto_Uuid> for String {
 impl From<&str> for uproto_Uuid {
     fn from(value: &str) -> Self {
         LongUuidSerializer::deserialize(value.into())
+    }
+}
+
+impl FromStr for uproto_Uuid {
+    type Err = UuidConversionError;
+
+    fn from_str(uuid_str: &str) -> Result<Self, Self::Err> {
+        match Uuid::from_str(uuid_str) {
+            Ok(uuid) => Ok(uuid.into()),
+            Err(err) => Err(UuidConversionError::new(&err.to_string())),
+        }
     }
 }
 
