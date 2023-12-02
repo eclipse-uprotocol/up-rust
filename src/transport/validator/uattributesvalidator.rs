@@ -13,7 +13,7 @@
 
 use std::time::SystemTime;
 
-use crate::types::ValidationResult;
+use crate::types::ValidationError;
 use crate::uprotocol::{UAttributes, UCode, UMessageType, Uuid};
 use crate::uri::validator::UriValidator;
 use crate::uuid::builder::UuidUtils;
@@ -34,8 +34,8 @@ pub trait UAttributesValidator {
     /// # Returns
     /// Returns a `UStatus` that indicates success or failure. If failed, it includes a message containing
     /// all validation errors for invalid configurations.
-    fn validate(&self, attributes: &UAttributes) -> ValidationResult {
-        let error_messages: Vec<String> = vec![
+    fn validate(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
+        let error_message = vec![
             self.validate_type(attributes),
             self.validate_ttl(attributes),
             self.validate_sink(attributes),
@@ -44,15 +44,15 @@ pub trait UAttributesValidator {
             self.validate_reqid(attributes),
         ]
         .into_iter()
-        .filter(|status| status.is_failure())
-        .map(|status| status.get_message())
-        .collect();
+        .filter_map(Result::err)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("; ");
 
-        let error_message = error_messages.join(", ");
         if error_message.is_empty() {
-            ValidationResult::Success
+            Ok(())
         } else {
-            ValidationResult::Failure(error_message)
+            Err(ValidationError::new(error_message))
         }
     }
 
@@ -67,10 +67,10 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn is_expired(&self, attributes: &UAttributes) -> ValidationResult {
+    fn is_expired(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         let ttl = match attributes.ttl {
             Some(t) if t > 0 => t,
-            Some(_) => return ValidationResult::Success,
+            Some(_) => return Ok(()),
             None => 0,
         };
 
@@ -78,19 +78,19 @@ pub trait UAttributesValidator {
             if let Some(time) = UuidUtils::get_time(uuid) {
                 let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                     Ok(duration) => duration.as_millis() as u64 - time,
-                    Err(e) => return ValidationResult::Failure(e.to_string()),
+                    Err(e) => return Err(ValidationError::new(e.to_string())),
                 };
 
                 if ttl <= 0 {
-                    return ValidationResult::Success;
+                    return Ok(());
                 }
 
                 if delta >= ttl as u64 {
-                    return ValidationResult::Failure("Payload is expired".to_string());
+                    return Err(ValidationError::new("Payload is expired"));
                 }
             }
         }
-        ValidationResult::Success
+        Ok(())
     }
 
     /// Validate the time to live configuration. If the UAttributes does not contain a time to live
@@ -103,13 +103,13 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_ttl(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(ttl) = attributes.ttl {
             if ttl < 1 {
-                return ValidationResult::Failure(format!("Invalid TTL [{}]", ttl));
+                return Err(ValidationError::new(format!("Invalid TTL [{}]", ttl)));
             }
         }
-        ValidationResult::Success
+        Ok(())
     }
 
     /// Validates the sink URI for the default case. If the UAttributes does not contain a sink
@@ -122,11 +122,11 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_sink(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(sink) = &attributes.sink {
             return UriValidator::validate(sink);
         }
-        ValidationResult::Success
+        Ok(())
     }
 
     /// Validates the permission level for the default case. If the UAttributes does not contain
@@ -139,13 +139,13 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_permission_level(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_permission_level(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(plevel) = &attributes.permission_level {
             if *plevel < 1 {
-                return ValidationResult::Failure("Invalid Permission Level".to_string());
+                return Err(ValidationError::new("Invalid Permission Level"));
             }
         }
-        ValidationResult::Success
+        Ok(())
     }
 
     /// Validates the communication status (`commStatus`) for the default case. If the UAttributes
@@ -158,16 +158,16 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_commstatus(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_commstatus(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(cs) = attributes.commstatus {
             if UCode::try_from(cs).is_err() {
-                return ValidationResult::Failure(format!(
-                    "Invalid Communication Status Code {}",
+                return Err(ValidationError::new(format!(
+                    "Invalid Communication Status Code [{}]",
                     cs,
-                ));
+                )));
             }
         }
-        ValidationResult::Success
+        Ok(())
     }
 
     /// Validates the `correlationId` for the default case. If the UAttributes does not contain
@@ -180,13 +180,13 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_reqid(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(reqid) = &attributes.reqid {
             if !UuidUtils::is_uuid(reqid) {
-                return ValidationResult::Failure("Invalid UUID".into());
+                return Err(ValidationError::new("Invalid UUID"));
             }
         }
-        ValidationResult::Success
+        Ok(())
     }
 
     /// Validates the `MessageType` of `UAttributes`.
@@ -198,7 +198,7 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_type(&self, attributes: &UAttributes) -> ValidationResult;
+    fn validate_type(&self, attributes: &UAttributes) -> Result<(), ValidationError>;
 }
 
 /// Enum that hold the implementations of uattributesValidator according to type.
@@ -247,19 +247,22 @@ impl UAttributesValidator for PublishValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_type(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_type(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Ok(mt) = UMessageType::try_from(attributes.r#type) {
             match mt {
-                UMessageType::UmessageTypePublish => return ValidationResult::Success,
+                UMessageType::UmessageTypePublish => return Ok(()),
                 _ => {
-                    return ValidationResult::Failure(format!(
+                    return Err(ValidationError::new(format!(
                         "Wrong Attribute Type [{}]",
                         mt.as_str_name()
-                    ));
+                    )));
                 }
             }
         }
-        ValidationResult::Failure(format!("Unknown Attribute Type [{}]", attributes.r#type))
+        Err(ValidationError::new(format!(
+            "Unknown Attribute Type [{}]",
+            attributes.r#type
+        )))
     }
 }
 
@@ -280,19 +283,22 @@ impl UAttributesValidator for RequestValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_type(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_type(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Ok(mt) = UMessageType::try_from(attributes.r#type) {
             match mt {
-                UMessageType::UmessageTypeRequest => return ValidationResult::Success,
+                UMessageType::UmessageTypeRequest => return Ok(()),
                 _ => {
-                    return ValidationResult::Failure(format!(
+                    return Err(ValidationError::new(format!(
                         "Wrong Attribute Type [{}]",
                         mt.as_str_name()
-                    ));
+                    )));
                 }
             }
         }
-        ValidationResult::Failure(format!("Unknown Attribute Type [{}]", attributes.r#type))
+        Err(ValidationError::new(format!(
+            "Unknown Attribute Type [{}]",
+            attributes.r#type
+        )))
     }
 
     /// Validates that attributes for a message meant for an RPC request has a destination sink.
@@ -305,11 +311,11 @@ impl UAttributesValidator for RequestValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_sink(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(sink) = &attributes.sink {
             UriValidator::validate_rpc_response(sink)
         } else {
-            ValidationResult::Failure("Missing Sink".to_string())
+            Err(ValidationError::new("Missing Sink"))
         }
     }
 
@@ -323,15 +329,15 @@ impl UAttributesValidator for RequestValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_ttl(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(ttl) = attributes.ttl {
             if ttl > 0 {
-                ValidationResult::Success
+                Ok(())
             } else {
-                ValidationResult::Failure(format!("Invalid TTL [{}]", ttl))
+                Err(ValidationError::new(format!("Invalid TTL [{}]", ttl)))
             }
         } else {
-            ValidationResult::Failure("Missing TTL".to_string())
+            Err(ValidationError::new("Missing TTL"))
         }
     }
 }
@@ -353,19 +359,22 @@ impl UAttributesValidator for ResponseValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_type(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_type(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Ok(mt) = UMessageType::try_from(attributes.r#type) {
             match mt {
-                UMessageType::UmessageTypeResponse => return ValidationResult::Success,
+                UMessageType::UmessageTypeResponse => return Ok(()),
                 _ => {
-                    return ValidationResult::Failure(format!(
+                    return Err(ValidationError::new(format!(
                         "Wrong Attribute Type [{}]",
                         mt.as_str_name()
-                    ));
+                    )));
                 }
             }
         }
-        ValidationResult::Failure(format!("Unknown Attribute Type {}", attributes.r#type))
+        Err(ValidationError::new(format!(
+            "Unknown Attribute Type [{}]",
+            attributes.r#type
+        )))
     }
 
     /// Validates that attributes for a message meant for an RPC response has a destination sink.
@@ -378,11 +387,11 @@ impl UAttributesValidator for ResponseValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_sink(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(sink) = &attributes.sink {
             UriValidator::validate_rpc_method(sink)
         } else {
-            ValidationResult::Failure("Missing Sink".to_string())
+            Err(ValidationError::new("Missing Sink"))
         }
     }
 
@@ -395,16 +404,16 @@ impl UAttributesValidator for ResponseValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_reqid(&self, attributes: &UAttributes) -> ValidationResult {
+    fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(reqid) = &attributes.reqid {
             if *reqid == Uuid::default() {
-                return ValidationResult::Failure("Missing correlation Id".to_string());
+                return Err(ValidationError::new("Missing correlation Id"));
             }
             if UuidUtils::is_uuid(reqid) {
-                return ValidationResult::Success;
+                return Ok(());
             }
         }
-        ValidationResult::Failure("Missing correlation Id".to_string())
+        Err(ValidationError::new("Missing correlation Id"))
     }
 }
 
@@ -452,8 +461,7 @@ mod tests {
         let attributes = UAttributesBuilder::publish(UPriority::UpriorityCs0).build();
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -467,8 +475,7 @@ mod tests {
             .build();
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -482,9 +489,9 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
+        assert!(status.is_err());
         assert_eq!(
-            status.get_message(),
+            status.unwrap_err().to_string(),
             "Wrong Attribute Type [UMESSAGE_TYPE_RESPONSE]"
         );
     }
@@ -497,8 +504,8 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid TTL [0]");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid TTL [0]");
     }
 
     #[test]
@@ -509,8 +516,8 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Uri is empty");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
     }
 
     #[test]
@@ -523,8 +530,8 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid Permission Level");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid Permission Level");
     }
 
     #[test]
@@ -535,10 +542,11 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert!(status
-            .get_message()
-            .contains("Invalid Communication Status Code"));
+        assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid Communication Status Code [-42]"
+        );
     }
 
     #[test]
@@ -549,8 +557,8 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid UUID");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid UUID");
     }
 
     #[test]
@@ -560,8 +568,7 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -574,8 +581,7 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -590,9 +596,9 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
+        assert!(status.is_err());
         assert_eq!(
-            status.get_message(),
+            status.unwrap_err().to_string(),
             "Wrong Attribute Type [UMESSAGE_TYPE_RESPONSE]"
         );
     }
@@ -604,8 +610,8 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid TTL [0]");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid TTL [0]");
     }
 
     #[test]
@@ -615,8 +621,8 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Uri is empty");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
     }
 
     #[test]
@@ -627,8 +633,8 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid Permission Level");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid Permission Level");
     }
 
     #[test]
@@ -639,10 +645,11 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert!(status
-            .get_message()
-            .contains("Invalid Communication Status Code"));
+        assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid Communication Status Code [-42]"
+        );
     }
 
     #[test]
@@ -653,8 +660,8 @@ mod tests {
 
         let validator = Validators::Request.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid UUID");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid UUID");
     }
 
     #[test]
@@ -668,8 +675,7 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -685,8 +691,7 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -696,11 +701,17 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
+        assert!(status.is_err());
         assert!(status
-            .get_message()
+            .as_ref()
+            .unwrap_err()
+            .to_string()
             .contains("Wrong Attribute Type [UMESSAGE_TYPE_PUBLISH]"));
-        assert!(status.get_message().contains("Missing correlation Id"));
+        assert!(status
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Missing correlation Id"));
     }
 
     #[test]
@@ -715,8 +726,8 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid TTL [0]");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid TTL [0]");
     }
 
     #[test]
@@ -731,8 +742,8 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Invalid Permission Level");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Invalid Permission Level");
     }
 
     #[test]
@@ -747,10 +758,11 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert!(status
-            .get_message()
-            .contains("Invalid Communication Status Code"));
+        assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid Communication Status Code [-42]"
+        );
     }
 
     #[test]
@@ -761,8 +773,8 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Missing correlation Id");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Missing correlation Id");
     }
 
     #[test]
@@ -777,8 +789,8 @@ mod tests {
 
         let validator = Validators::Response.validator();
         let status = validator.validate(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Missing correlation Id");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Missing correlation Id");
     }
 
     #[test]
@@ -786,9 +798,8 @@ mod tests {
         let attributes = UAttributesBuilder::publish(UPriority::UpriorityCs0).build();
 
         let validator = Validators::Publish.validator();
-        let status = validator.is_expired(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        let status: Result<(), ValidationError> = validator.is_expired(&attributes);
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -799,8 +810,7 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.is_expired(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -811,8 +821,7 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.is_expired(&attributes);
-        assert!(status.is_success());
-        assert_eq!(status.get_message(), "");
+        assert!(status.is_ok());
     }
 
     #[test]
@@ -825,8 +834,8 @@ mod tests {
 
         let validator = Validators::Publish.validator();
         let status = validator.is_expired(&attributes);
-        assert!(status.is_failure());
-        assert_eq!(status.get_message(), "Payload is expired");
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Payload is expired");
     }
 
     #[test]
@@ -838,7 +847,7 @@ mod tests {
         let validator = Validators::get_validator(&attributes);
         assert_eq!("UAttributesValidator.Publish", validator.type_name());
         let status = validator.validate(&attributes);
-        assert!(status.is_success());
+        assert!(status.is_ok());
     }
 
     fn build_sink() -> UUri {

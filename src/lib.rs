@@ -33,9 +33,11 @@
 //! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main)
 
 mod types {
-    pub mod validationresult;
+    pub mod validationerror;
+    // pub mod validationresult;
 
-    pub use validationresult::*;
+    pub use validationerror::*;
+    // pub use validationresult::*;
 }
 
 pub mod cloudevent {
@@ -106,8 +108,6 @@ pub mod uuid {
     }
     pub mod validator {
         mod uuidvalidator;
-
-        pub use crate::types::validationresult::*;
     }
 }
 

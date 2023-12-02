@@ -13,52 +13,52 @@
     "invalidUris": [
         {
             "uri": "/",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Empty Uri"
         },
         {
             "uri": "//",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Empty Uri"
         },
         {
             "uri": "//vcu",
-            "status_message": "Uri is missing uSoftware Entity name.",
-            "reason": "Missing entity name."
+            "status_message": "Uri is missing uSoftware Entity name",
+            "reason": "Missing entity name"
         },
         {
             "uri": "//vcu.vin/",
-            "status_message": "Uri is missing uSoftware Entity name.",
-            "reason": "Missing entity name."
+            "status_message": "Uri is missing uSoftware Entity name",
+            "reason": "Missing entity name"
         },
         {
             "uri": "",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Empty Uri"
         },
         {
             "uri": ":",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Contains only schema"
         },
         {
             "uri": "///",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Empty Authority"
         },
         {
             "uri": "////",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Empty Uri"
         },
         {
             "uri": "1",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Invalid Uri, must begin with \"\/\""
         },
         {
             "uri": "a",
-            "status_message": "Uri is empty.",
+            "status_message": "Uri is empty",
             "reason": "Invalid Uri, must begin with \"\/\""
         }
     ],
@@ -76,32 +76,32 @@
         {
             "uri": "/petapp//",
             "reason": "Missing uE version",
-            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response."
+            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response"
         },
         {
             "uri": "/petapp",
             "reason": "Missing uE version",
-            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response."
+            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response"
         },
         {
             "uri": "/petapp/1/",
             "reason": "Missing RPC Method Name",
-            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response."
+            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response"
         },
         {
             "uri": "/petapp/1/rpc",
             "reason": "Missing RPC Method Name",
-            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response."
+            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response"
         },
         {
             "uri": "/petapp/1/dummy",
             "reason": "Missing RPC Method Name",
-            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response."
+            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response"
         },
         {
             "uri": "/petapp/1/rpc_dummy",
             "reason": "Missing RPC Method Name",
-            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response."
+            "status_message": "Invalid RPC method uri. Uri should be the method to be called, or method from response"
         }
     ]
 }
