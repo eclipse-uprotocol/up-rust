@@ -15,7 +15,7 @@ use std::fmt;
 
 use crate::uprotocol::UPriority;
 
-/// Specifies the properties that can configure the UCloudEvent.
+/// Specifies the properties that can configure the `UCloudEvent`.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct UCloudEventAttributes {
     /// An HMAC generated on the data portion of the CloudEvent message using the device key.
@@ -74,6 +74,7 @@ impl UCloudEventAttributesBuilder {
         }
     }
 
+    #[must_use]
     pub fn with_hash<T>(mut self, hash: T) -> Self
     where
         T: Into<String>,
@@ -85,16 +86,19 @@ impl UCloudEventAttributesBuilder {
         self
     }
 
+    #[must_use]
     pub fn with_priority(mut self, priority: UPriority) -> Self {
         self.priority = Some(priority);
         self
     }
 
+    #[must_use]
     pub fn with_ttl(mut self, ttl: u32) -> Self {
         self.ttl = Some(ttl);
         self
     }
 
+    #[must_use]
     pub fn with_token<T>(mut self, token: T) -> Self
     where
         T: Into<String>,

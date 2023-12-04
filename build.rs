@@ -34,7 +34,7 @@ fn main() -> std::io::Result<()> {
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/main/src/main/proto/ustatus.proto",
         ]
     ) {
-        let error_message = format!("Failed to fetch and build protobuf file: {:?}", err);
+        let error_message = format!("Failed to fetch and build protobuf file: {err:?}");
         return Err(std::io::Error::new(std::io::ErrorKind::Other, error_message));
     }
 
@@ -46,14 +46,14 @@ fn get_and_build_protos(urls: &[&str]) -> core::result::Result<(), Box<dyn std::
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let mut proto_files = Vec::new();
 
-    for url in urls.iter() {
+    for url in urls {
         // Extract filename from the URL
         let filename = url.rsplit('/').next().unwrap_or_default();
         let dest_path = Path::new(&out_dir).join(filename);
 
         // Download the .proto file
         if let Err(err) = download_and_write_file(url, filename) {
-            panic!("Failed to download and write file: {:?}", err);
+            panic!("Failed to download and write file: {err:?}");
         }
         proto_files.push(dest_path);
     }

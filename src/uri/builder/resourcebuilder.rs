@@ -66,7 +66,7 @@ impl UResourceBuilder {
         }
 
         UResource {
-            name: String::from(""),
+            name: String::new(),
             instance: None,
             id: Some(id),
             message: None,

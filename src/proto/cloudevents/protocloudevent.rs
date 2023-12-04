@@ -38,7 +38,7 @@ impl From<CloudEventProto> for cloudevents::Event {
 
         // extensions
         let mut extensions = HashMap::<String, ExtensionValue>::new();
-        for (key, value) in source_event.attributes.iter() {
+        for (key, value) in &source_event.attributes {
             match value.attr.as_ref().unwrap() {
                 Attr::CeBoolean(b) => {
                     extensions.insert(key.to_string(), ExtensionValue::Boolean(*b));
@@ -47,7 +47,7 @@ impl From<CloudEventProto> for cloudevents::Event {
                     // TODO not quite sure whether/how to map this to ExtensionValue::String
                 }
                 Attr::CeInteger(i) => {
-                    extensions.insert(key.to_string(), ExtensionValue::Integer(*i as i64));
+                    extensions.insert(key.to_string(), ExtensionValue::Integer(i64::from(*i)));
                 }
                 Attr::CeString(s) => {
                     // contenttype
@@ -116,7 +116,7 @@ impl From<CloudEventProto> for cloudevents::Event {
         cloud_event.set_datacontenttype(contenttype);
         cloud_event.set_dataschema(dataschema);
 
-        for (key, value) in extensions.iter() {
+        for (key, value) in &extensions {
             cloud_event.set_extension(key, value.clone());
         }
 
@@ -184,6 +184,7 @@ impl From<cloudevents::Event> for CloudEventProto {
                     };
                     ext_list.insert(key.to_string(), ext);
                 }
+                #[allow(clippy::cast_possible_truncation)]
                 ExtensionValue::Integer(i) => {
                     let ext = CloudEventAttributeValue {
                         attr: Some(Attr::CeInteger(*i as i32)),

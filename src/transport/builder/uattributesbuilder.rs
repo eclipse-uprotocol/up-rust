@@ -14,7 +14,7 @@
 use crate::uprotocol::{UAttributes, UMessageType, UPriority, UUri, Uuid};
 use crate::uuid::builder::UUIDv8Builder;
 
-/// Builder for easy construction of the UAttributes object.
+/// Builder for easy construction of the `UAttributes` object.
 pub struct UAttributesBuilder {
     id: Uuid,
     message_type: UMessageType,
@@ -164,7 +164,7 @@ impl UAttributesBuilder {
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured permission level.
     pub fn with_permission_level(&mut self, plevel: u32) -> &mut UAttributesBuilder {
-        self.plevel = Some(plevel as i32);
+        self.plevel = Some(i32::try_from(plevel).unwrap_or(i32::MAX));
         self
     }
 

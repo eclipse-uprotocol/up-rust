@@ -17,7 +17,7 @@ use prost::Message;
 use crate::cloudevent::serializer::{CloudEventSerializationError, CloudEventSerializer};
 use crate::proto::CloudEvent as CloudEventProto;
 
-/// Serialize and deserialize CloudEvents to protobuf format.
+/// Serialize and deserialize `CloudEvents` to protobuf format.
 pub struct CloudEventProtobufSerializer;
 impl CloudEventSerializer for CloudEventProtobufSerializer {
     fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, CloudEventSerializationError> {
@@ -218,9 +218,9 @@ mod tests {
         let cloud_event3 = serializer.deserialize(&bytes2).unwrap();
         let cloud_event3_payload = UCloudEventUtils::get_payload(&cloud_event3);
 
-        let pay1 = Event::from(RpcMapper::unpack_any::<CloudEventProto>(proto_payload).unwrap());
+        let pay1 = Event::from(RpcMapper::unpack_any::<CloudEventProto>(&proto_payload).unwrap());
         let pay2 =
-            Event::from(RpcMapper::unpack_any::<CloudEventProto>(cloud_event3_payload).unwrap());
+            Event::from(RpcMapper::unpack_any::<CloudEventProto>(&cloud_event3_payload).unwrap());
 
         assert_cloud_events_are_the_same(&pay1, &pay2);
 
@@ -254,9 +254,9 @@ mod tests {
         let cloud_event3_payload = UCloudEventUtils::get_payload(&cloud_event3);
 
         let pay1 =
-            Event::from(RpcMapper::unpack_any::<CloudEventProto>(cloud_event_proto).unwrap());
+            Event::from(RpcMapper::unpack_any::<CloudEventProto>(&cloud_event_proto).unwrap());
         let pay2 =
-            Event::from(RpcMapper::unpack_any::<CloudEventProto>(cloud_event3_payload).unwrap());
+            Event::from(RpcMapper::unpack_any::<CloudEventProto>(&cloud_event3_payload).unwrap());
 
         assert_eq!(pay1, pay2);
 
@@ -404,6 +404,6 @@ mod tests {
 
     fn pack_event_into_any(event: &Event) -> Any {
         let proto_event = CloudEventProto::from(event.clone());
-        RpcMapper::pack_any(proto_event).unwrap()
+        RpcMapper::pack_any(&proto_event).unwrap()
     }
 }

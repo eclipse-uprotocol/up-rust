@@ -26,20 +26,20 @@ impl UCloudEventBuilder {
     pub const PROTOBUF_CONTENT_TYPE: &'static str = "application/x-protobuf";
 
     /// In this module, we provide functions to generate concrete objects of the same type,
-    /// adhering to the CloudEvents specification.
+    /// adhering to the `CloudEvents` specification.
     ///
-    /// CloudEvents is a specification for describing events in a common way.
-    /// We use CloudEvents to formulate all kinds of events (messages)
+    /// `CloudEvents` is a specification for describing events in a common way.
+    /// We use `CloudEvents` to formulate all kinds of events (messages)
     /// that will be sent to and from devices.
     ///
-    /// This module provides the functionality to generate CloudEvents of the 4 core types: `Request`, `Response`, `Publish`, and `Notify`.
+    /// This module provides the functionality to generate `CloudEvents` of the 4 core types: `Request`, `Response`, `Publish`, and `Notify`.
 
     // Returns a UUIDv8 id.
     fn create_cloudevent_id() -> String {
         UUIDv8Builder::new().build().to_string()
     }
 
-    /// Creates a CloudEvent for an event for the use case of an RPC Request message.
+    /// Creates a `CloudEvent` for an event for the use case of an RPC Request message.
     ///
     /// # Arguments
     ///
@@ -50,7 +50,7 @@ impl UCloudEventBuilder {
     ///
     /// # Returns
     ///
-    /// * `Event` - Returns a request CloudEvent.
+    /// * `Event` - Returns a request `CloudEvent`.
     ///
     /// # Example
     ///
@@ -95,7 +95,7 @@ impl UCloudEventBuilder {
         bce.unwrap()
     }
 
-    /// Creates a CloudEvent for the use case of: RPC Response message.
+    /// Creates a `CloudEvent` for the use case of a RPC Response message.
     ///
     /// # Arguments
     ///
@@ -107,7 +107,7 @@ impl UCloudEventBuilder {
     ///
     /// # Returns
     ///
-    /// Returns a response CloudEvent.
+    /// Returns a response `CloudEvent`.
     ///
     /// # Example
     ///
@@ -155,19 +155,19 @@ impl UCloudEventBuilder {
         bce.unwrap()
     }
 
-    /// Create a CloudEvent for an event for the use case of: RPC Response message that failed.
+    /// Create a `CloudEvent` for an event for the use case of a RPC Response message that failed.
     ///
     /// # Arguments
     ///
     /// * `applicationUriForRPC` - The destination of the response. The uri for the original application that requested the RPC and this response is for.
     /// * `serviceMethodUri` - The uri for the method that was called on the service Ex.: :/body.access/1/rpc.UpdateDoor
     /// * `requestId` - The cloud event id from the original request cloud event that this response if for.
-    /// * `communicationStatus` - A `Code` value that indicates of a platform communication error while delivering this CloudEvent.
+    /// * `communicationStatus` - A `Code` value that indicates of a platform communication error while delivering this `CloudEvent`.
     /// * `attributes` - Additional attributes such as ttl, hash and priority.
     ///
     /// # Returns
     ///
-    /// Returns a response CloudEvent Response for the use case of RPC Response message that failed.
+    /// Returns a response `CloudEvent` Response for the use case of RPC Response message that failed.
     ///
     /// # Example
     ///
@@ -210,14 +210,14 @@ impl UCloudEventBuilder {
         )
         .extension("sink", rpc_uri)
         .extension("reqid", request_id)
-        .extension("commstatus", communication_status as i64)
+        .extension("commstatus", i64::from(communication_status))
         .ty(UMessageType::UmessageTypeResponse)
         .build();
 
         bce.unwrap()
     }
 
-    /// Create a CloudEvent for an event for the use case of: Publish generic message.
+    /// Create a `CloudEvent` for an event for the use case of Publishing a generic message.
     ///
     /// # Arguments
     ///
@@ -227,7 +227,7 @@ impl UCloudEventBuilder {
     ///
     /// # Returns
     ///
-    /// Returns a publish CloudEvent.
+    /// Returns a publish `CloudEvent`.
     ///
     /// # Example
     ///
@@ -260,7 +260,7 @@ impl UCloudEventBuilder {
         bce.unwrap()
     }
 
-    /// Create a CloudEvent for an event for the use case of: Publish a notification message.
+    /// Create a `CloudEvent` for an event for the use case of: Publish a notification message.
     /// A published event containing the sink (destination) is often referred to as a notification,
     /// it is an event sent to a specific consumer.
     ///
@@ -273,7 +273,7 @@ impl UCloudEventBuilder {
     ///
     /// # Returns
     ///
-    /// Returns a publish CloudEvent.
+    /// Returns a publish `CloudEvent`
     ///
     /// # Example
     ///
@@ -314,7 +314,7 @@ impl UCloudEventBuilder {
         bce.unwrap()
     }
 
-    /// Base CloudEvent builder that is the same for all CloudEvent types.
+    /// Base `CloudEvent` builder that is the same for all `CloudEvent` types.
     ///
     /// # Arguments
     ///
@@ -324,7 +324,7 @@ impl UCloudEventBuilder {
     /// * `payload_schema` - The schema of the proto payload bytes, for example you can use `proto://proto_payload.type_url` on your service/app object.
     /// * `attributes` - Additional cloud event attributes that can be passed in. All attributes are optional and will be added only if they were configured.
     ///
-    /// ATTENTION: This will prefix the payload_schema url with "proto://" if no schema is provided, because the cloudevent builder uses the url crate for this, which will balk if there's no schema provided.
+    /// ATTENTION: This will prefix the `payload_schema` url with "proto://" if no schema is provided, because the cloudevent builder uses the url crate for this, which will balk if there's no schema provided.
     ///
     /// # Returns
     ///
@@ -371,7 +371,7 @@ impl UCloudEventBuilder {
             .time(Utc::now());
 
         if let Some(ttl_value) = attributes.ttl {
-            eb = eb.extension("ttl", ttl_value as i64);
+            eb = eb.extension("ttl", i64::from(ttl_value));
         }
         if let Some(priority_value) = &attributes.priority {
             eb = eb.extension("priority", priority_value.as_str_name());
@@ -389,9 +389,8 @@ impl UCloudEventBuilder {
     // cloudevent data_with_schema() uses url crate parser, and this requires a schema to accept an url as valid
     pub fn payload_schema_prefixed(url: &str) -> String {
         match Url::parse(url) {
-            Ok(_) => url.to_string(),
-            Err(ParseError::RelativeUrlWithoutBase) => format!("proto://{}", url),
-            Err(_) => url.to_string(), // Handle other parse errors without prefixing.
+            Err(ParseError::RelativeUrlWithoutBase) => format!("proto://{url}"),
+            Ok(_) | Err(_) => url.to_string(), // Handle other cases without prefixing.
         }
     }
 }

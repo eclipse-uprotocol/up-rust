@@ -34,8 +34,8 @@ enum AddressType {
 }
 
 impl AddressType {
-    fn value(&self) -> u8 {
-        *self as u8
+    fn value(self) -> u8 {
+        self as u8
     }
 
     fn from(value: u8) -> Option<AddressType> {
@@ -61,7 +61,7 @@ impl TryFrom<i32> for AddressType {
     }
 }
 
-/// UUri Serializer that serializes a UUri to byte[] (micro format) per
+/// `UriSerializer` that serializes a `UUri` to byte[] (micro format) per
 ///  <https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc>
 pub struct MicroUriSerializer;
 
@@ -188,7 +188,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                     return UUri::default();
                 }
             }
-            _ => {}
+            AddressType::ID => {}
         }
 
         // UENTITY_ID
@@ -217,7 +217,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                     remote: Some(Remote::Id(micro_uri[9..].to_vec())),
                 });
             }
-            _ => {}
+            AddressType::Local => {}
         }
 
         UUri {
@@ -227,7 +227,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                 version_major: Some(ue_version),
                 ..Default::default()
             }),
-            resource: Some(UResourceBuilder::from_id(uresource_id as u32)),
+            resource: Some(UResourceBuilder::from_id(u32::from(uresource_id))),
         }
     }
 }

@@ -17,7 +17,7 @@ use crate::uprotocol::{Remote, UAuthority, UEntity, UResource, UUri};
 use crate::uri::serializer::uriserializer::UriSerializer;
 use crate::uri::validator::UriValidator;
 
-/// UUri Serializer that serializes a UUri to a string (long format) per
+/// `UriSerializer` that serializes a `UUri` to a string (long format) per
 /// <https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc>
 pub struct LongUriSerializer;
 
@@ -88,11 +88,10 @@ impl UriSerializer<String> for LongUriSerializer {
             if uri_parts.len() > 2 {
                 if uri_parts[2].trim().is_empty() {
                     return UUri::default();
-                } else {
-                    authority = Some(UAuthority {
-                        remote: Some(Remote::Name(uri_parts[2].to_string())),
-                    });
                 }
+                authority = Some(UAuthority {
+                    remote: Some(Remote::Name(uri_parts[2].to_string())),
+                });
             }
             if uri_parts.len() > 3 {
                 name = uri_parts[3].to_string();
@@ -205,7 +204,10 @@ impl LongUriSerializer {
     // `String[] java.lang.String.split(String regex)` method.
     fn java_split(input: &str, pattern: &str) -> Vec<String> {
         let re = Regex::new(pattern).unwrap();
-        let mut result: Vec<String> = re.split(input).map(|x| x.to_string()).collect();
+        let mut result: Vec<String> = re
+            .split(input)
+            .map(std::string::ToString::to_string)
+            .collect();
 
         // Remove trailing empty strings, to emulate Java's behavior
         while let Some(last) = result.last() {

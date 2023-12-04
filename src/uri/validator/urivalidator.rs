@@ -25,6 +25,14 @@ impl UriValidator {
     ///
     /// # Returns
     /// Returns `ValidationResult` containing a success or a failure with the error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - If the `UUri` is empty. The error message in this case will be "Uri is empty", indicating that the URI does not contain any data and is therefore considered invalid.
+    /// - If the `UUri` is supposed to be remote (as indicated by the presence of an authority component) but fails the `is_remote` validation check. The error message will be "Uri is remote missing uAuthority", suggesting that the URI lacks a necessary authority component for remote URIs.
+    /// - If the `UUri` is missing the name of the `uSoftware Entity` or the name is present but empty. The error message for this scenario will be "Uri is missing uSoftware Entity name", indicating that a critical component of the URI is absent or not properly specified.
     pub fn validate(uri: &UUri) -> Result<(), ValidationError> {
         if Self::is_empty(uri) {
             return Err(ValidationError::new("Uri is empty"));
@@ -39,7 +47,6 @@ impl UriValidator {
         {
             return Err(ValidationError::new("Uri is missing uSoftware Entity name"));
         }
-
         Ok(())
     }
 
@@ -51,6 +58,13 @@ impl UriValidator {
     ///
     /// # Returns
     /// Returns `ValidationResult` containing a success or a failure with the error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - If the `UUri` fails the basic validation checks performed by `Self::validate`. The error message will detail the specific issue with the `UUri` as identified by the `Self::validate` method.
+    /// - If the `UUri` is not recognized as a valid RPC method URI. The error message in this case will be "Invalid RPC method uri. Uri should be the method to be called, or method from response", indicating that the `UUri` does not conform to the expected format or designation for RPC method URIs.
     pub fn validate_rpc_method(uri: &UUri) -> Result<(), ValidationError> {
         Self::validate(uri)?;
         if !Self::is_rpc_method(uri) {
@@ -69,6 +83,13 @@ impl UriValidator {
     /// # Returns
     ///
     /// Returns a `UStatus` containing either a success or a failure, along with the corresponding error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - If the `UUri` fails the basic validation checks performed by `Self::validate`. The error message will contain details about what aspect of the `UUri` was invalid, as determined by the validation logic in `Self::validate`.
+    /// - If the `UUri` is not of the correct type to be used as an RPC response. In this case, the error message will be "Invalid RPC response type", indicating that the `UUri` does not meet the specific criteria for RPC response URIs.
     pub fn validate_rpc_response(uri: &UUri) -> Result<(), ValidationError> {
         Self::validate(uri)?;
         if !Self::is_rpc_response(uri) {

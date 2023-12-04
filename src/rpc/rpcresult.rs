@@ -37,7 +37,6 @@ impl<T> RpcResult<T> {
     }
 
     /// Unwraps the value if the `RpcResult` is a `Success` variant, otherwise invokes the provided closure `op` and returns its result.
-    /// (was 'getOrElse()' in the Java SDK)
     pub fn unwrap_or_else<F: FnOnce() -> T>(self, op: F) -> T {
         match self {
             RpcResult::Success(val) => val,
@@ -79,6 +78,7 @@ impl<T> RpcResult<T> {
     /// If it returns `false`, or if the `RpcResult` is a `Failure`,
     /// a `Failure` variant with a `FailedPrecondition` status is returned.
     /// (was 'filter()' in the Java SDK)
+    #[must_use]
     pub fn validate<F>(self, predicate: F) -> Self
     where
         F: FnOnce(&T) -> bool,
@@ -99,7 +99,7 @@ impl<T> RpcResult<T> {
             RpcResult::Failure(status) => {
                 Some(UCode::try_from(status.code).unwrap_or(UCode::Unknown))
             }
-            _ => None,
+            RpcResult::Success(_) => None,
         }
     }
 
@@ -107,7 +107,7 @@ impl<T> RpcResult<T> {
     pub fn success_value(&self) -> Option<&T> {
         match self {
             RpcResult::Success(value) => Some(value),
-            _ => None,
+            RpcResult::Failure(_) => None,
         }
     }
 
@@ -116,17 +116,30 @@ impl<T> RpcResult<T> {
         RpcResult::Success(value)
     }
 
-    // pub fn failure(status: Code) -> Self {
-    //     RpcResult::Failure(Status::new(status, ""))
-    // }
-
     /// Attempts to create an `RpcResult` from another `RpcResult` with a different inner type.
-    /// Returns the original failure status if the provided `RpcResult` is a failure variant,
-    /// otherwise returns an error.
+    /// This function is specifically designed to handle the failure cases of `RpcResult`.
+    ///
+    /// # Parameters
+    ///
+    /// - `failure`: An `RpcResult` of any type. The function processes the failure variant of this `RpcResult`.
+    ///
+    /// # Returns
+    ///
+    /// If the provided `RpcResult` is a failure variant, it returns `Ok` with an `RpcResult::Failure` containing the same status.
+    /// Otherwise, it returns an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provided `RpcResult` is not a failure variant. The error is a static string,
+    /// `"Expected a Failure variant!"`, indicating that the function expected a failure variant but found a success variant instead.
+    ///
+    /// This is typically used in contexts where only the failure cases of an `RpcResult` are relevant,
+    /// and the presence of a success variant indicates a logical error or unexpected state.
+    ///
     pub fn from_failure<U>(failure: RpcResult<U>) -> Result<Self, &'static str> {
         match failure {
             RpcResult::Failure(status) => Ok(RpcResult::Failure(status)),
-            _ => Err("Expected a Failure variant!"),
+            RpcResult::Success(_) => Err("Expected a Failure variant!"),
         }
     }
 
@@ -137,8 +150,8 @@ impl<T> RpcResult<T> {
     ///
     /// * `message`: A descriptive message for the failure.
     /// * `_e`: Additional details or context about the error.
-    pub fn failure_with_message(message: &str, _e: &str) -> Self {
-        let error_message = format!("{}: {}", message, _e);
+    pub fn failure_with_message(message: &str, e: &str) -> Self {
+        let error_message = format!("{message}: {e}");
         let error = Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             error_message,
@@ -182,7 +195,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RpcResult::Success(value) => write!(f, "Success({})", value),
+            RpcResult::Success(value) => write!(f, "Success({value})"),
             RpcResult::Failure(status) => write!(
                 f,
                 "Failure(code: {}\nmessage: \"{}\"\n)",

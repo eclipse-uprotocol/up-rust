@@ -119,7 +119,7 @@ impl UuidUtils {
         Uuid::from(uuid.clone()).get_variant() == Variant::RFC4122
     }
 
-    /// Verifies if the version is a formal UUIDv8 uProtocol ID
+    /// Verifies if the version is a formal `UUIDv8` uProtocol ID
     ///
     /// # Arguments
     ///
@@ -127,7 +127,7 @@ impl UuidUtils {
     ///
     /// # Returns
     ///
-    /// * `bool` - True if the UUID is a formal UUIDv8 uProtocol ID
+    /// * `bool` - True if the UUID is a formal `UUIDv8` uProtocol ID
     pub fn is_uprotocol(uuid: &uproto_Uuid) -> bool {
         matches!(UuidUtils::get_version(uuid), Some(o) if o == Version::Uprotocol)
     }
@@ -157,20 +157,20 @@ impl UuidUtils {
     pub fn get_time(uuid: &uproto_Uuid) -> Option<u64> {
         if let Some(version) = UuidUtils::get_version(uuid) {
             match version {
-                Version::TimeOrdered => {
-                    let time = Uuid::from(uuid.clone())
-                        .get_timestamp()
-                        .unwrap()
-                        .to_rfc4122();
-                    Some(time.0)
-                }
+                Version::TimeOrdered => Uuid::from(uuid.clone())
+                    .get_timestamp()
+                    .map(|time| time.to_rfc4122().0),
                 Version::Uprotocol => {
                     let uuid = Uuid::from(uuid.clone());
-                    let uuid_bytes = uuid.as_bytes();
                     // Re-assemble the original msb (u64)
-                    let msb = u64::from_le_bytes(uuid_bytes[..8].try_into().unwrap());
-                    let time = msb >> 16;
-                    Some(time)
+                    let uuid_bytes: &[u8; 16] = uuid.as_bytes();
+                    if let Ok(arr) = uuid_bytes[..8].try_into() {
+                        let msb = u64::from_le_bytes(arr);
+                        let time = msb >> 16;
+                        Some(time)
+                    } else {
+                        None
+                    }
                 }
                 _ => None,
             }

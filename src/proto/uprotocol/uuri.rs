@@ -43,6 +43,6 @@ impl From<Vec<u8>> for uproto_Uuri {
 impl Display for uproto_Uuri {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let uri = LongUriSerializer::serialize(self);
-        write!(f, "{}", uri)
+        write!(f, "{uri}")
     }
 }

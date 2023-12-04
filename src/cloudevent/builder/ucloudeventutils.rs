@@ -22,7 +22,7 @@ use std::time::SystemTime;
 use crate::uprotocol::{UCode, Uuid};
 use crate::uuid::builder::UuidUtils;
 
-/// Code to extract information from a CloudEvent
+/// Code to extract information from a `CloudEvent`
 #[derive(Debug)]
 pub struct UCloudEventUtils;
 
@@ -41,8 +41,7 @@ impl std::error::Error for ConversionError {}
 impl UCloudEventUtils {
     /// Extracts the source from a cloud event.
     ///
-    /// The source is a mandatory attribute. The CloudEvent constructor does not
-    /// allow creating a cloud event without a source.
+    /// The source is a mandatory attribute. The `CloudEvent` constructor does not allow creating a cloud event without a source.
     ///
     /// # Arguments
     ///
@@ -270,7 +269,7 @@ impl UCloudEventUtils {
                 if let Some(cloud_event_creation_time) = event.time() {
                     let now = Utc::now();
                     let creation_time_plus_ttl =
-                        *cloud_event_creation_time + Duration::milliseconds(ttl as i64);
+                        *cloud_event_creation_time + Duration::milliseconds(i64::from(ttl));
                     return now > creation_time_plus_ttl;
                 }
             }
@@ -279,7 +278,7 @@ impl UCloudEventUtils {
         false
     }
 
-    /// Calculates if an `Event` configured with a UUIDv8 id and a `ttl` attribute is expired.
+    /// Calculates if an `Event` configured with a `UUIDv8` id and a `ttl` attribute is expired.
     ///
     /// The `ttl` attribute configures how long this event should live for after it was generated (in milliseconds).
     ///
@@ -289,7 +288,7 @@ impl UCloudEventUtils {
     ///
     /// # Returns
     ///
-    /// Returns `true` if the `Event` was configured with a `ttl` greater than 0 and a UUIDv8 id to compare for expiration.
+    /// Returns `true` if the `Event` was configured with a `ttl` greater than 0 and a `UUIDv8` id to compare for expiration.
     pub fn is_expired(event: &Event) -> bool {
         let maybe_ttl = UCloudEventUtils::get_ttl(event);
         match maybe_ttl {
@@ -301,7 +300,7 @@ impl UCloudEventUtils {
                         .expect("Time went backwards")
                         .as_millis();
                     let delta = now as u64 - event_time;
-                    delta >= ttl as u64
+                    delta >= u64::from(ttl)
                 } else {
                     false
                 }
@@ -310,7 +309,7 @@ impl UCloudEventUtils {
         }
     }
 
-    /// Checks if an `Event` has a UUIDv8 id.
+    /// Checks if an `Event` has a `UUIDv8` id.
     ///
     /// # Arguments
     ///
@@ -318,7 +317,7 @@ impl UCloudEventUtils {
     ///
     /// # Returns
     ///
-    /// Returns `true` if the `Event` has a valid UUIDv8 id.
+    /// Returns `true` if the `Event` has a valid `UUIDv8` id.
     pub fn is_cloud_event_id(event: &Event) -> bool {
         UuidUtils::is_uuid(&Uuid::from(event.id()))
     }
@@ -361,6 +360,12 @@ impl UCloudEventUtils {
     /// # Returns
     ///
     /// Returns a `Result` containing the unpacked message of type `T` or a decoding error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `prost::DecodeError` in the following case:
+    ///
+    /// - If the function fails to decode the payload of the `Event` into the specified type `T`. This can occur if the payload does not conform to the expected format required for `T`, or if there are issues during the decoding process (such as incorrect field types, missing required fields, etc.). The `prost::DecodeError` will contain details about the specific nature of the decoding failure.
     pub fn unpack<T: Message + Default>(event: &Event) -> Result<T, prost::DecodeError> {
         let any_payload = UCloudEventUtils::get_payload(event);
         let buffer = Bytes::from(any_payload.value);
@@ -435,7 +440,9 @@ impl UCloudEventUtils {
         extension_name: &str,
     ) -> Option<String> {
         if event.extension(extension_name).is_some() {
-            event.extension(extension_name).map(|ext| ext.to_string())
+            event
+                .extension(extension_name)
+                .map(std::string::ToString::to_string)
         } else {
             None
         }

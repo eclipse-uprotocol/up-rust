@@ -15,7 +15,7 @@ use cloudevents::Event as CloudEvent;
 
 use crate::cloudevent::serializer::{CloudEventSerializationError, CloudEventSerializer};
 
-///  Serialize and deserialize CloudEvents to/from JSON format.
+///  Serialize and deserialize `CloudEvents` to/from JSON format.
 pub struct CloudEventJsonSerializer;
 impl CloudEventSerializer for CloudEventJsonSerializer {
     fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, CloudEventSerializationError> {

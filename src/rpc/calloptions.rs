@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-/// This struct is used when making uRPC calls to pass additional options.
+/// This struct is used when making `uRPC` calls to pass additional options.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CallOptions {
     timeout: u32,
@@ -68,6 +68,7 @@ impl Default for CallOptionsBuilder {
 
 impl CallOptionsBuilder {
     /// Add a timeout.
+    #[must_use]
     pub fn with_timeout(mut self, timeout: u32) -> Self {
         self.timeout = if timeout == 0 {
             CallOptions::TIMEOUT_DEFAULT
@@ -78,6 +79,7 @@ impl CallOptionsBuilder {
     }
 
     /// Add an OAuth2 access token.
+    #[must_use]
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.token = token.into();
         self

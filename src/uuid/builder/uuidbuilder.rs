@@ -77,6 +77,7 @@ impl UUIDv6Builder {
         }
     }
 
+    #[must_use]
     pub fn with_mac_address(mut self, address: MacAddress) -> Self {
         self.address = address;
         self
@@ -92,12 +93,12 @@ impl UUIDv6Builder {
     }
 }
 
-/// uProtocol UUIDv8 data model
+/// uProtocol `UUIDv8` data model
 ///
-/// UUIDv8 can only be built using the static factory methods of the class,
-/// given that the UUIDv8 datamodel is based off the previous UUID generated.
+/// `UUIDv8` can only be built using the static factory methods of the class,
+/// given that the `UUIDv8` datamodel is based off the previous UUID generated.
 ///
-/// The UUID is based off the draft-ietf-uuidrev-rfc4122bis and UUIDv7 with
+/// The UUID is based off the draft-ietf-uuidrev-rfc4122bis and `UUIDv7` with
 /// some modifications that are discussed below. The diagram below shows the
 /// specification for the UUID:
 ///
@@ -137,20 +138,21 @@ impl Default for UUIDv8Builder {
 impl UUIDv8Builder {
     pub fn new() -> Self {
         let mut rng = rand::thread_rng();
-        let _lsb: u64 = (rng.gen::<u64>() & 0x3fffffffffffffff) | 0x8000000000000000;
+        let lsb: u64 = (rng.gen::<u64>() & 0x3fff_ffff_ffff_ffff) | 0x8000_0000_0000_0000;
 
         UUIDv8Builder {
             msb: AtomicU64::new(UUIDV8_VERSION << 12),
-            lsb: _lsb,
+            lsb,
         }
     }
 
     pub fn build(&self) -> uproto_Uuid {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-        self.build_with_instant(now)
+        if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
+            if let Ok(now) = u64::try_from(now.as_millis()) {
+                return self.build_with_instant(now);
+            }
+        }
+        uproto_Uuid::default()
     }
 
     pub fn build_with_instant(&self, instant: u64) -> uproto_Uuid {

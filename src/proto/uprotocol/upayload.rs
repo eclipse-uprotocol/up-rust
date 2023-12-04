@@ -13,7 +13,6 @@
 
 use prost::Message;
 use prost_types::Any;
-use std::slice;
 
 use crate::uprotocol::{Data, UPayload};
 
@@ -59,10 +58,11 @@ fn data_to_slice(payload: &UPayload) -> Option<&[u8]> {
 }
 
 // Please no one use this...
-unsafe fn read_memory(address: u64, length: i32) -> &'static [u8] {
+unsafe fn read_memory(_address: u64, _length: i32) -> &'static [u8] {
     // Convert the raw address to a pointer
-    let ptr = address as *const u8;
-
+    // let ptr = address as *const u8;
     // Create a slice from the pointer and the length
-    slice::from_raw_parts(ptr, length as usize)
+    // slice::from_raw_parts(ptr, length as usize)
+
+    todo!("This is not implemented yet")
 }

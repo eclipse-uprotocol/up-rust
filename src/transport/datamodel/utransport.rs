@@ -14,7 +14,7 @@
 use async_trait::async_trait;
 use std::sync::mpsc::Sender;
 
-use crate::uprotocol::{UAttributes, UEntity, UMessage, UPayload, UStatus, UUri, Uuid};
+use crate::uprotocol::{UAttributes, UEntity, UMessage, UPayload, UStatus, UUri};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
 ///
@@ -56,21 +56,21 @@ pub trait UTransport {
     /// * `listener` - The method to execute to process the data for the topic.
     ///
     /// # Returns
-    /// Returns a Uuid on success that can be used for unregistering later, otherwise an Err(UStatus) with the appropriate failure information.
+    /// Returns a String containing an identifier that can be used for unregistering later, otherwise an Err(UStatus) with the appropriate failure information.
     async fn register_listener(
         &self,
         topic: UUri,
         listener: Sender<UMessage>,
-    ) -> Result<Uuid, UStatus>;
+    ) -> Result<String, UStatus>;
 
     /// Unregister a listener for a given topic. Messages arriving on this topic will no longer be processed
     /// by this listener.
     ///
     /// # Arguments
     /// * `topic` - Resolved `UUri` for where the listener was registered to receive messages from.
-    /// * `listener` - A Uuid to identify the listener that should be unregistered.
+    /// * `listener` - Identifier of the listener that should be unregistered.
     ///
     /// # Returns
     /// Returns () on success, otherwise an Err(UStatus) with the appropriate failure information.
-    async fn unregister_listener(&self, topic: UUri, listener: Uuid) -> Result<(), UStatus>;
+    async fn unregister_listener(&self, topic: UUri, listener: &str) -> Result<(), UStatus>;
 }

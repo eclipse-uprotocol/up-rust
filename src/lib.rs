@@ -23,7 +23,7 @@
 //!
 //! ## This crate includes:
 //!
-//! - the [`cloudevent`] module that offers a common way to represent uProtocol messages using the CloudEvent data model
+//! - the [`cloudevent`] module that offers a common way to represent uProtocol messages using the `CloudEvent` data model
 //! - the [`rpc`] module which offers wrappers for dealing with uProtocol payload in the context of RPC method invokation
 //! - the [`transport`] module as a set of abstractions for various transport-level concerns like status representation and serialization
 //! - the [`uri`] module, providing convenience wrappers for creation and validation of uProtocol-style resource identifiers
@@ -160,6 +160,7 @@ pub mod uprotocol {
 #[allow(non_snake_case)]
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/io.cloudevents.v1.rs"));
+
     pub mod cloudevents {
         pub mod protocloudevent;
     }

@@ -31,14 +31,16 @@ impl From<&str> for UResource {
     fn from(value: &str) -> Self {
         let mut parts = value.split('#');
         let name_and_instance = parts.next().unwrap_or_default();
-        let resource_message = parts.next().map(|s| s.to_string());
+        let resource_message = parts.next().map(std::string::ToString::to_string);
 
         let mut name_and_instance_parts = name_and_instance.split('.');
         let resource_name = name_and_instance_parts
             .next()
             .unwrap_or_default()
             .to_string();
-        let resource_instance = name_and_instance_parts.next().map(|s| s.to_string());
+        let resource_instance = name_and_instance_parts
+            .next()
+            .map(std::string::ToString::to_string);
 
         UResource {
             name: resource_name,

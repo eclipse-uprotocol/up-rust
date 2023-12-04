@@ -34,6 +34,18 @@ pub trait UAttributesValidator {
     /// # Returns
     /// Returns a `UStatus` that indicates success or failure. If failed, it includes a message containing
     /// all validation errors for invalid configurations.
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` when one or more validations fail. The error will contain a concatenated message of all the validation errors separated by a semicolon (`;`). Each part of the message corresponds to a failure from one of the specific validation functions called within `validate`. These may include errors from:
+    ///
+    /// - `validate_type` if the message type in `UAttributes` fails validation.
+    /// - `validate_ttl` if the time-to-live value is invalid.
+    /// - `validate_sink` if the sink URI does not pass validation.
+    /// - `validate_commstatus` if the communication status is invalid.
+    /// - `validate_permission_level` if the permission level is below the required threshold.
+    /// - `validate_reqid` if the request ID is not a valid UUID.
+    ///
+    /// If all validations pass, the function returns `Ok(())`, indicating no errors were found.
     fn validate(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         let error_message = vec![
             self.validate_type(attributes),
@@ -56,6 +68,7 @@ pub trait UAttributesValidator {
         }
     }
 
+    /// Return the name of the specific Validator implementation.
     fn type_name(&self) -> &'static str;
 
     /// Indicates whether the payload with these [`UAttributes`] has expired.
@@ -67,6 +80,20 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - "Payload is expired": If the `ttl` (time-to-live) is present, valid, and greater than 0, but the payload has expired. This is determined by comparing the current time duration since the UNIX epoch against the timestamp extracted from the UUID and the `ttl` value.
+    ///
+    /// - "Invalid duration": If there is an error in converting the current time duration to a valid `u64` format, indicating an issue with the duration calculation.
+    ///
+    /// - "Invalid TTL": If the `ttl` value is present but cannot be converted to a valid `u64`, suggesting an invalid `ttl` value.
+    ///
+    /// - System error message: If there is an error in calculating the current time duration since the UNIX epoch, possibly due to a system time error.
+    ///
+    /// The function returns `Ok(())` (indicating no error) in cases where `ttl` is not present, is less than or equal to 0, or if no UUID is present, or if the UUID does not contain a valid time component.
     fn is_expired(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         let ttl = match attributes.ttl {
             Some(t) if t > 0 => t,
@@ -77,7 +104,13 @@ pub trait UAttributesValidator {
         if let Some(uuid) = &attributes.id {
             if let Some(time) = UuidUtils::get_time(uuid) {
                 let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                    Ok(duration) => duration.as_millis() as u64 - time,
+                    Ok(duration) => {
+                        if let Ok(duration) = u64::try_from(duration.as_millis()) {
+                            duration - time
+                        } else {
+                            return Err(ValidationError::new("Invalid duration"));
+                        }
+                    }
                     Err(e) => return Err(ValidationError::new(e.to_string())),
                 };
 
@@ -85,16 +118,20 @@ pub trait UAttributesValidator {
                     return Ok(());
                 }
 
-                if delta >= ttl as u64 {
-                    return Err(ValidationError::new("Payload is expired"));
+                if let Ok(ttl) = u64::try_from(ttl) {
+                    if delta >= ttl {
+                        return Err(ValidationError::new("Payload is expired"));
+                    }
+                } else {
+                    return Err(ValidationError::new("Invalid TTL"));
                 }
             }
         }
         Ok(())
     }
 
-    /// Validate the time to live configuration. If the UAttributes does not contain a time to live
-    /// then the UStatus is ok.
+    /// Validate the time to live configuration. If the `UAttributes` does not contain a time to live
+    /// then the `UStatus` is ok.
     ///
     /// # Arguments
     ///
@@ -103,17 +140,25 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the `UAttributes` object contains a `ttl` (time to live) and it is less than 1.
+    ///   The error message will specify the invalid TTL value, indicating that it does not meet the minimum threshold considered valid.
+    ///
+    /// The function does not return an error if the `UAttributes` object does not contain a `ttl`, considering it a valid case.
     fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(ttl) = attributes.ttl {
             if ttl < 1 {
-                return Err(ValidationError::new(format!("Invalid TTL [{}]", ttl)));
+                return Err(ValidationError::new(format!("Invalid TTL [{ttl}]")));
             }
         }
         Ok(())
     }
 
-    /// Validates the sink URI for the default case. If the UAttributes does not contain a sink
-    /// then the ValidationResult is ok.
+    /// Validates the sink URI for the default case. If the `UAttributes` does not contain a sink
+    /// then the `ValidationResult` is ok.
     ///
     /// # Arguments
     ///
@@ -121,7 +166,15 @@ pub trait UAttributesValidator {
     ///
     /// # Returns
     ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// Returns a `ValidationResult` that is success or failed with a failure message.    
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the `UAttributes` object contains a `sink` and the sink URI does not pass the validation criteria set by `UriValidator`.
+    ///   The error will provide details about why the sink URI is considered invalid, such as format issues or other validation failures.
+    ///
+    /// The function does not return an error if the `UAttributes` object does not contain a `sink`, considering it a valid case.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(sink) = &attributes.sink {
             return UriValidator::validate(sink);
@@ -129,8 +182,8 @@ pub trait UAttributesValidator {
         Ok(())
     }
 
-    /// Validates the permission level for the default case. If the UAttributes does not contain
-    /// a permission level then the ValidationResult is ok.
+    /// Validates the permission level for the default case. If the `UAttributes` does not contain
+    /// a permission level then the `ValidationResult` is ok.
     ///
     /// # Arguments
     ///
@@ -139,6 +192,14 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the `UAttributes` object contains a `permission_level` and it is less than 1.
+    ///   The error will indicate that the permission level is invalid, suggesting that it does not meet the minimum required level.
+    ///
+    /// The function does not return an error if the `UAttributes` object does not contain a `permission_level`, considering it a valid case.
     fn validate_permission_level(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(plevel) = &attributes.permission_level {
             if *plevel < 1 {
@@ -148,8 +209,8 @@ pub trait UAttributesValidator {
         Ok(())
     }
 
-    /// Validates the communication status (`commStatus`) for the default case. If the UAttributes
-    /// does not contain a request id then the UStatus is ok.
+    /// Validates the communication status (`commStatus`) for the default case. If the `UAttributes`
+    /// does not contain a request id then the `UStatus` is ok.
     ///
     /// # Arguments
     ///
@@ -158,20 +219,28 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the `UAttributes` object contains a `reqid` (request ID) and it is not a valid UUID.
+    ///   The error will indicate that the request ID format is invalid, helping to identify issues with the input `UAttributes`.
+    ///
+    /// The function does not return an error if the `UAttributes` object does not contain a `reqid`, considering it a valid case.
     fn validate_commstatus(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(cs) = attributes.commstatus {
             if UCode::try_from(cs).is_err() {
                 return Err(ValidationError::new(format!(
-                    "Invalid Communication Status Code [{}]",
-                    cs,
+                    "Invalid Communication Status Code [{cs}]"
                 )));
             }
         }
         Ok(())
     }
 
-    /// Validates the `correlationId` for the default case. If the UAttributes does not contain
-    /// a request id then the UStatus is ok.
+    /// Validates the `correlationId` for the default case. If the `UAttributes` does not contain
+    /// a request id then the `UStatus` is ok.
     ///
     /// # Arguments
     ///
@@ -180,6 +249,14 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// # Errors
+    ///
+    /// This function returns a `ValidationError` in the following scenario:
+    ///
+    /// - If `UAttributes` contains a request ID (`reqid`), but it is not a valid UUID.
+    ///   The `ValidationError` will contain a message such as "Invalid UUID" to indicate the nature of the validation failure.
+    ///
+    /// The function considers the absence of a request ID in `UAttributes` as a valid case and does not return an error in such a scenario.
     fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(reqid) = &attributes.reqid {
             if !UuidUtils::is_uuid(reqid) {
@@ -198,6 +275,13 @@ pub trait UAttributesValidator {
     /// # Returns
     ///
     /// Returns a `ValidationResult` that is success or failed with a failure message.
+    ///
+    /// # Errors
+    ///
+    /// This function returns a `ValidationError` in cases where:
+    ///
+    /// - The `MessageType` in `UAttributes` does not conform to the expected format or value.
+    /// - The `UAttributes` object contains inconsistent or invalid data that fails the validation criteria.
     fn validate_type(&self, attributes: &UAttributes) -> Result<(), ValidationError>;
 }
 
@@ -223,14 +307,14 @@ impl Validators {
                 UMessageType::UmessageTypePublish => return Box::new(PublishValidator),
                 UMessageType::UmessageTypeRequest => return Box::new(RequestValidator),
                 UMessageType::UmessageTypeResponse => return Box::new(ResponseValidator),
-                _ => {}
+                UMessageType::UmessageTypeUnspecified => {}
             }
         }
         Box::new(PublishValidator)
     }
 }
 
-/// Validate UAttributes with type UMessageType::Publish
+/// Validate `UAttributes` with type `UMessageType::Publish`
 pub struct PublishValidator;
 
 impl UAttributesValidator for PublishValidator {
@@ -266,7 +350,7 @@ impl UAttributesValidator for PublishValidator {
     }
 }
 
-/// Validate UAttributes with type UMessageType::Request
+/// Validate `UAttributes` with type `UMessageType::Request`
 pub struct RequestValidator;
 
 impl UAttributesValidator for RequestValidator {
@@ -334,7 +418,7 @@ impl UAttributesValidator for RequestValidator {
             if ttl > 0 {
                 Ok(())
             } else {
-                Err(ValidationError::new(format!("Invalid TTL [{}]", ttl)))
+                Err(ValidationError::new(format!("Invalid TTL [{ttl}]")))
             }
         } else {
             Err(ValidationError::new("Missing TTL"))
@@ -342,7 +426,7 @@ impl UAttributesValidator for RequestValidator {
     }
 }
 
-/// Validate UAttributes with type UMessageType::Response
+/// Validate `UAttributes` with type `UMessageType::Response`
 pub struct ResponseValidator;
 
 impl UAttributesValidator for ResponseValidator {

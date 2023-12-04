@@ -20,7 +20,7 @@ use crate::uprotocol::{UMessageType, UResource, UUri};
 use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 use crate::uri::validator::UriValidator;
 
-/// Validates a CloudEvent
+/// Validates a `CloudEvent`
 pub trait CloudEventValidator: std::fmt::Display {
     /// Validates the `CloudEvent`. A `CloudEventValidator` instance is obtained according to
     /// the `type` attribute on the `CloudEvent`.
@@ -33,6 +33,18 @@ pub trait CloudEventValidator: std::fmt::Display {
     ///
     /// Returns a `UStatus` with success, or a `UStatus` with failure containing all the
     /// errors that were found.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` when one or more validations fail. The error will contain a concatenated message of all the validation errors separated by a semicolon (`;`). Each part of the message corresponds to a failure from one of the specific validation functions called within `validate`. These may include errors from:
+    ///
+    /// - `validate_version` if the `CloudEvent`'s `specversion` attribute does not meet the expected version criteria.
+    /// - `validate_id` if the `CloudEvent`'s `id` attribute does not conform to the required format or type.
+    /// - `validate_source` if the `CloudEvent`'s `source` attribute is missing, empty, or fails to meet specific criteria.
+    /// - `validate_type` if the `CloudEvent`'s `type` attribute is missing, empty, or does not adhere to expected standards.
+    /// - `validate_sink` if the `CloudEvent`'s `sink` URI fails the validation checks.
+    ///
+    /// If all validations pass, the function returns `Ok(())`, indicating no errors were found.
     fn validate(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         let error_message = vec![
             self.validate_version(cloud_event),
@@ -63,6 +75,12 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing either a success or a failure with the accompanying error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the `specversion` attribute of the `cloud_event` is not `V10`.
     fn validate_version(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         let version = cloud_event.specversion();
 
@@ -70,8 +88,7 @@ pub trait CloudEventValidator: std::fmt::Display {
             Ok(())
         } else {
             Err(ValidationError::new(format!(
-                "Invalid CloudEvent version [{}], CloudEvent version must be 1.0",
-                version
+                "Invalid CloudEvent version [{version}], CloudEvent version must be 1.0"
             )))
         }
     }
@@ -85,6 +102,12 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing either a success or a failure with the accompanying error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the `id` attribute of the `cloud_event` does not meet the validation criteria set by `UCloudEventUtils::is_cloud_event_id`. Specifically, if the `id` is not of the required type, such as `UUIDv8`.
     fn validate_id(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if UCloudEventUtils::is_cloud_event_id(cloud_event) {
             Ok(())
@@ -105,6 +128,12 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing a success or a failure with the error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    /// - If the `source` attribute of the `cloud_event` is missing, empty, or does not meet specific validation criteria.
+    /// - If there are additional validation rules specific to the `source` attribute (such as format requirements, expected URI structure, etc.), and the `source` attribute of the `cloud_event` does not conform to these rules.
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError>;
 
     /// Validates the type attribute of a `CloudEvent`.
@@ -116,6 +145,13 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing either a success or a failure with the accompanying error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - If the `type` attribute of the `cloud_event` is missing or empty.
+    /// - If the `type` attribute of the `cloud_event` does not conform to specific validation rules or criteria set by the implementation.
     fn validate_type(&self, cloud_event: &Event) -> Result<(), ValidationError>;
 
     /// Validates the sink value of a `CloudEvent` in the default scenario where the sink attribute is optional.
@@ -127,14 +163,19 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing a success or a failure with the error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the sink URI extracted from the `cloud_event` fails the validation checks performed by `self.validate_entity_uri`.
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
             let uri = LongUriSerializer::deserialize(sink.clone());
 
             if let Err(e) = self.validate_entity_uri(&uri) {
                 return Err(ValidationError::new(format!(
-                    "Invalid CloudEvent sink [{}] - {}",
-                    sink, e,
+                    "Invalid CloudEvent sink [{sink}] - {e}"
                 )));
             }
         }
@@ -151,6 +192,12 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing a success or a failure with the error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following case:
+    ///
+    /// - If the `UUri` fails the validation checks performed by `UriValidator::validate`.
     fn validate_entity_uri(&self, uri: &UUri) -> Result<(), ValidationError> {
         UriValidator::validate(uri)
     }
@@ -165,6 +212,14 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing a success or a failure with the error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - If the `UUri` fails the validation checks performed by `self.validate_entity_uri`. This indicates that the `UUri` does not meet the necessary criteria for an entity URI, which is a prerequisite for a valid topic URI.
+    /// - If the `UUri`'s `resource` part is either missing or has an empty `name`.
+    /// - If the `UUri`'s `resource` part does not contain message information (`message` field is `None`).
     fn validate_topic_uri(&self, uri: &UUri) -> Result<(), ValidationError> {
         self.validate_entity_uri(uri)?;
 
@@ -193,11 +248,17 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing a success or a failure with the error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - If the `UUri` fails the validation checks performed by `self.validate_entity_uri`.
+    /// - If the `UUri` does not correctly represent an RPC topic URI. Specifically, the error is returned if the `UUri`'s `resource` part does not match the expected "rpc.response" structure.
     fn validate_rpc_topic_uri(&self, uri: &UUri) -> Result<(), ValidationError> {
         if let Err(e) = self.validate_entity_uri(uri) {
             return Err(ValidationError::new(format!(
-                "Invalid RPC uri application response topic [{}]",
-                e,
+                "Invalid RPC uri application response topic [{e}]"
             )));
         }
 
@@ -207,11 +268,10 @@ pub trait CloudEventValidator: std::fmt::Display {
                 && resource.instance.as_ref().unwrap() == "response"
             {
                 return Ok(());
-            } else {
-                return Err(ValidationError::new(
-                    "Invalid RPC uri application response topic, UriPart is missing rpc.response",
-                ));
             }
+            return Err(ValidationError::new(
+                "Invalid RPC uri application response topic, UriPart is missing rpc.response",
+            ));
         }
         Ok(())
     }
@@ -227,11 +287,17 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// # Returns
     ///
     /// Returns a `ValidationResult` containing either a success or a failure with the accompanying error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the following cases:
+    ///
+    /// - If the `UUri` fails the validation checks performed by `self.validate_entity_uri`.
+    /// - If the `UUri` is not recognized as a valid RPC method URI according to the `UriValidator::is_rpc_method` check.
     fn validate_rpc_method(&self, uri: &UUri) -> Result<(), ValidationError> {
         if let Err(e) = self.validate_entity_uri(uri) {
             return Err(ValidationError::new(format!(
-                "Invalid RPC method uri [{}]",
-                e,
+                "Invalid RPC method uri [{e}]"
             )));
         }
 
@@ -242,7 +308,7 @@ pub trait CloudEventValidator: std::fmt::Display {
     }
 }
 
-/// Enum that hold the implementations of CloudEventValidator according to type.
+/// Enum that hold the implementations of `CloudEventValidator` according to type.
 pub enum CloudEventValidators {
     Response,
     Request,
@@ -278,15 +344,14 @@ impl CloudEventValidators {
     }
 }
 
-/// Implements Validations for a CloudEvent of type Publish.
+/// Implements Validations for a `CloudEvent` of type Publish.
 struct PublishValidator;
 impl CloudEventValidator for PublishValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         let source = LongUriSerializer::deserialize(cloud_event.source().to_string());
         if let Err(e) = self.validate_topic_uri(&source) {
             return Err(ValidationError::new(format!(
-                "Invalid Publish type CloudEvent source [{}] - {}",
-                source, e
+                "Invalid Publish type CloudEvent source [{source}] - {e}"
             )));
         }
         Ok(())
@@ -309,7 +374,7 @@ impl std::fmt::Display for PublishValidator {
     }
 }
 
-/// Implements Validations for a CloudEvent of type Publish that behaves as a Notification, meaning it must have a sink.
+/// Implements Validations for a `CloudEvent` of type Publish that behaves as a Notification, meaning it must have a sink.
 struct NotificationValidator;
 impl CloudEventValidator for NotificationValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
@@ -325,8 +390,7 @@ impl CloudEventValidator for NotificationValidator {
             let uri = LongUriSerializer::deserialize(sink.clone());
             if let Err(e) = self.validate_entity_uri(&uri) {
                 return Err(ValidationError::new(format!(
-                    "Invalid Notification type CloudEvent sink [{}] - {}",
-                    sink, e
+                    "Invalid Notification type CloudEvent sink [{sink}] - {e}"
                 )));
             }
         } else {
@@ -344,7 +408,7 @@ impl std::fmt::Display for NotificationValidator {
     }
 }
 
-/// Implements Validations for a CloudEvent for RPC Request.
+/// Implements Validations for a `CloudEvent` for RPC Request.
 struct RequestValidator;
 impl CloudEventValidator for RequestValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
@@ -352,8 +416,7 @@ impl CloudEventValidator for RequestValidator {
         let uri = LongUriSerializer::deserialize(source.clone());
         if let Err(e) = self.validate_rpc_topic_uri(&uri) {
             return Err(ValidationError::new(format!(
-                "Invalid RPC Request CloudEvent source [{}] - {}",
-                source, e
+                "Invalid RPC Request CloudEvent source [{source}] - {e}"
             )));
         }
         Ok(())
@@ -364,8 +427,7 @@ impl CloudEventValidator for RequestValidator {
             let uri = LongUriSerializer::deserialize(sink.clone());
             if let Err(e) = self.validate_rpc_method(&uri) {
                 return Err(ValidationError::new(format!(
-                    "Invalid RPC Request CloudEvent sink [{}] - {}",
-                    sink, e
+                    "Invalid RPC Request CloudEvent sink [{sink}] - {e}"
                 )));
             }
         } else {
@@ -393,7 +455,7 @@ impl std::fmt::Display for RequestValidator {
     }
 }
 
-/// Implements Validations for a CloudEvent for RPC Response.
+/// Implements Validations for a `CloudEvent` for RPC Response.
 struct ResponseValidator;
 impl CloudEventValidator for ResponseValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
@@ -401,8 +463,7 @@ impl CloudEventValidator for ResponseValidator {
         let uri = LongUriSerializer::deserialize(source.clone());
         if let Err(e) = self.validate_rpc_method(&uri) {
             return Err(ValidationError::new(format!(
-                "Invalid RPC Response CloudEvent source [{}] - {}",
-                source, e
+                "Invalid RPC Response CloudEvent source [{source}] - {e}"
             )));
         }
         Ok(())
@@ -413,8 +474,7 @@ impl CloudEventValidator for ResponseValidator {
             let uri = LongUriSerializer::deserialize(sink.clone());
             if let Err(e) = self.validate_rpc_topic_uri(&uri) {
                 return Err(ValidationError::new(format!(
-                    "Invalid RPC Response CloudEvent sink [{}] - {}",
-                    sink, e
+                    "Invalid RPC Response CloudEvent sink [{sink}] - {e}"
                 )));
             }
         } else {

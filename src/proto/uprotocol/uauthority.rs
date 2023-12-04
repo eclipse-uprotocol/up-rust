@@ -13,7 +13,7 @@
 
 use crate::uprotocol::{Remote, UAuthority};
 
-/// Helper functions to deal with UAuthority::Remote structure
+/// Helper functions to deal with `UAuthority::Remote` structure
 impl UAuthority {
     pub fn has_name(&self) -> bool {
         matches!(self.remote, Some(Remote::Name(_)))
