@@ -13,7 +13,7 @@
 
 use std::time::SystemTime;
 
-use crate::types::ValidationError;
+use crate::transport::validator::ValidationError;
 use crate::uprotocol::{UAttributes, UCode, UMessageType, Uuid};
 use crate::uri::validator::UriValidator;
 use crate::uuid::builder::UuidUtils;

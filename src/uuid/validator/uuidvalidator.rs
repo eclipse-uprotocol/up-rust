@@ -11,11 +11,29 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::types::ValidationError;
 use crate::uprotocol::Uuid as uproto_Uuid;
 use crate::uuid::builder::UuidUtils;
+use crate::uuid::validator::ValidationError;
 
+/// UUID Validator trait
+///
+/// Provides methods for validating different aspects of a UUID.
 pub trait UuidValidator {
+    /// Validates the given UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID to validate.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if all validations pass. Otherwise, returns `Err(ValidationError)` with a concatenated message of all validation errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` if one or more of the following validations fail:
+    /// - Version validation fails as per `validate_version`.
+    /// - Time component validation fails as per `validate_time`.
+    /// - Variant validation fails as per `validate_variant`.
+    /// The error message will contain details of all failed validations, concatenated together.
     fn validate(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
         let error_message = vec![
             self.validate_version(uuid),
@@ -35,8 +53,30 @@ pub trait UuidValidator {
         }
     }
 
+    /// Validates the version of the UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID whose version is to be validated.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the version is valid. Otherwise, returns `Err(ValidationError)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` if the UUID's version does not meet the required criteria. The specific requirements are defined in the implementation of this method.
     fn validate_version(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError>;
 
+    /// Validates the time component of the UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID whose time component is to be validated.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the time component is valid. Otherwise, returns `Err(ValidationError)` with "Invalid UUID Time".
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` with "Invalid UUID Time" if the UUID's time component is invalid or not properly formatted.
     fn validate_time(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
         if let Some(time) = UuidUtils::get_time(uuid) {
             if time > 0 {
@@ -46,9 +86,21 @@ pub trait UuidValidator {
         Err(ValidationError::new("Invalid UUID Time"))
     }
 
+    /// Validates the variant of the UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID whose variant is to be validated.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the variant is valid. Otherwise, returns `Err(ValidationError)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` if the UUID's variant does not meet the required criteria. The specific criteria for validation are defined in the implementation of this method.
     fn validate_variant(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError>;
 }
 
+/// Enum representing different types of UUID validators.
 #[allow(dead_code)]
 pub enum UuidValidators {
     Invalid,
@@ -56,8 +108,14 @@ pub enum UuidValidators {
     UUIDv8,
 }
 
+/// Implementation of methods for `UuidValidators`.
 #[allow(dead_code)]
 impl UuidValidators {
+    /// Returns a `UuidValidator` based on the type of the validator.
+    ///
+    /// # Returns
+    ///
+    /// Returns a boxed `UuidValidator`.
     pub fn validator(&self) -> Box<dyn UuidValidator> {
         match self {
             UuidValidators::Invalid => Box::new(InvalidValidator),
@@ -66,6 +124,15 @@ impl UuidValidators {
         }
     }
 
+    /// Determines the appropriate `UuidValidator` for a given UUID.
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid` - The UUID for which to determine the validator.
+    ///
+    /// # Returns
+    ///
+    /// Returns a boxed `UuidValidator` appropriate for the given UUID.
     pub fn get_validator(uuid: &uproto_Uuid) -> Box<dyn UuidValidator> {
         if UuidUtils::is_v6(&(uuid.clone())) {
             return Box::new(UUIDv6Validator);
@@ -88,7 +155,10 @@ impl UuidValidator for InvalidValidator {
     }
 }
 
+/// Validator for UUID version 6.
 pub struct UUIDv6Validator;
+
+/// `UuidValidator` implementation for `UUIDv6Validator`.
 impl UuidValidator for UUIDv6Validator {
     fn validate_variant(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
         if UuidUtils::is_rf4122(uuid) {
@@ -107,7 +177,10 @@ impl UuidValidator for UUIDv6Validator {
     }
 }
 
+/// Validator for UUID version 8.
 pub struct UUIDv8Validator;
+
+/// `UuidValidator` implementation for `UUIDv8Validator`.
 impl UuidValidator for UUIDv8Validator {
     fn validate_variant(&self, _uuid: &uproto_Uuid) -> Result<(), ValidationError> {
         Ok(())

@@ -144,7 +144,9 @@ impl UCloudEventUtils {
     /// otherwise a `None` is returned.
     pub fn get_ttl(event: &Event) -> Option<u32> {
         if let Some(ExtensionValue::Integer(ttl)) = event.extension("ttl") {
-            return Some(*ttl as u32);
+            if let Ok(ttl) = u32::try_from(*ttl) {
+                return Some(ttl);
+            }
         }
         None
     }
@@ -212,6 +214,10 @@ impl UCloudEventUtils {
     /// # Returns
     ///
     /// A new `Event` from the supplied `Event`, with the platform communication added.
+    ///
+    /// # Panics
+    ///
+    /// - if the `CloudEventBuilder` fails to build the `CloudEvent`.
     pub fn add_communication_status(event: Event, communication_status: i64) -> Event {
         let ce = EventBuilderV10::from(event);
 
@@ -219,25 +225,6 @@ impl UCloudEventUtils {
             .build()
             .unwrap()
     }
-
-    /// Extracts the integer value of the communication status attribute from a cloud event.
-    ///
-    /// The communication status attribute is optional. If there was a platform communication error
-    /// that occurred while delivering this cloud event, it will be indicated in this attribute.
-    /// If the attribute does not exist, it is assumed that everything was `UCode::OK_VALUE`.
-    ///
-    /// # Arguments
-    ///
-    /// * `event` - The `CloudEvent` from which the communication status is to be extracted.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `Code` value that indicates a platform communication error while delivering this
-    /// `CloudEvent` or `UCode::OK_VALUE`.
-    // pub fn get_timestamp(event: &Event) -> Option<u64> {
-    //     let id = event.id().to_string();
-    //     UuidUtils::get_time(&Uuid::from(id))
-    // }
 
     /// Extracts the timestamp from the UUIDV8 `Event` Id, using Unix epoch as the reference.
     ///
@@ -289,6 +276,13 @@ impl UCloudEventUtils {
     /// # Returns
     ///
     /// Returns `true` if the `Event` was configured with a `ttl` greater than 0 and a `UUIDv8` id to compare for expiration.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the current system time is earlier than the UNIX epoch. This can occur when calling
+    /// `SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)` if the system time is set to a date before January 1, 1970.
+    /// The panic message will be "Time went backwards". This is an unusual scenario and typically indicates a significant
+    /// system clock error.
     pub fn is_expired(event: &Event) -> bool {
         let maybe_ttl = UCloudEventUtils::get_ttl(event);
         match maybe_ttl {
@@ -299,8 +293,9 @@ impl UCloudEventUtils {
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .expect("Time went backwards")
                         .as_millis();
-                    let delta = now as u64 - event_time;
-                    delta >= u64::from(ttl)
+
+                    let delta = now - u128::from(event_time);
+                    delta >= u128::from(ttl)
                 } else {
                     false
                 }

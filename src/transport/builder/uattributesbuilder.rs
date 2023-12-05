@@ -124,6 +124,7 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured ttl.
+    #[must_use]
     pub fn with_ttl(&mut self, ttl: u32) -> &mut UAttributesBuilder {
         self.ttl = Some(i32::try_from(ttl).unwrap_or(i32::MAX));
         self
@@ -136,6 +137,7 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured token.
+    #[must_use]
     pub fn with_token<T>(&mut self, token: T) -> &mut UAttributesBuilder
     where
         T: Into<String>,
@@ -151,6 +153,7 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured sink.
+    #[must_use]
     pub fn with_sink(&mut self, sink: UUri) -> &mut UAttributesBuilder {
         self.sink = Some(sink);
         self
@@ -163,6 +166,7 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured permission level.
+    #[must_use]
     pub fn with_permission_level(&mut self, plevel: u32) -> &mut UAttributesBuilder {
         self.plevel = Some(i32::try_from(plevel).unwrap_or(i32::MAX));
         self
@@ -175,6 +179,7 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured communication status.
+    #[must_use]
     pub fn with_commstatus(&mut self, commstatus: i32) -> &mut UAttributesBuilder {
         self.commstatus = Some(commstatus);
         self
@@ -187,6 +192,7 @@ impl UAttributesBuilder {
     ///
     /// # Returns
     /// Returns the `UAttributesBuilder` instance with the configured request ID.
+    #[must_use]
     pub fn with_reqid(&mut self, reqid: Uuid) -> &mut UAttributesBuilder {
         self.reqid = Some(reqid);
         self

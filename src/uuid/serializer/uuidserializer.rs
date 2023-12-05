@@ -13,8 +13,6 @@
 
 use crate::uprotocol::Uuid;
 
-pub type UuidSerializationError = ();
-
 /// A UUID serializer interface used to serialize/deserialize UUIDs.
 ///
 /// This interface handles the serialization and deserialization of UUIDs into/from different formats.

@@ -14,21 +14,21 @@
 use cloudevents::Event as CloudEvent;
 use prost::Message;
 
-use crate::cloudevent::serializer::{CloudEventSerializationError, CloudEventSerializer};
+use crate::cloudevent::serializer::{CloudEventSerializer, SerializationError};
 use crate::proto::CloudEvent as CloudEventProto;
 
 /// Serialize and deserialize `CloudEvents` to protobuf format.
 pub struct CloudEventProtobufSerializer;
 impl CloudEventSerializer for CloudEventProtobufSerializer {
-    fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, CloudEventSerializationError> {
+    fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, SerializationError> {
         let proto_event = CloudEventProto::from(cloud_event.clone());
         Ok(proto_event.encode_to_vec())
     }
 
-    fn deserialize(&self, bytes: &[u8]) -> Result<CloudEvent, CloudEventSerializationError> {
+    fn deserialize(&self, bytes: &[u8]) -> Result<CloudEvent, SerializationError> {
         match CloudEventProto::decode(bytes) {
             Ok(proto_event) => Ok(CloudEvent::from(proto_event)),
-            Err(error) => Err(CloudEventSerializationError(error.to_string())),
+            Err(error) => Err(SerializationError::new(error.to_string())),
         }
     }
 }

@@ -33,11 +33,8 @@
 //! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main)
 
 mod types {
+    pub mod serializationerror;
     pub mod validationerror;
-    // pub mod validationresult;
-
-    pub use validationerror::*;
-    // pub use validationresult::*;
 }
 
 pub mod cloudevent {
@@ -58,6 +55,7 @@ pub mod cloudevent {
         mod cloudeventprotobufserializer;
         mod cloudeventserializer;
 
+        pub use crate::types::serializationerror::*;
         pub use cloudeventjsonserializer::*;
         pub use cloudeventprotobufserializer::*;
         pub use cloudeventserializer::*;
@@ -65,7 +63,39 @@ pub mod cloudevent {
     pub mod validator {
         mod cloudeventvalidator;
 
+        pub use crate::types::validationerror::*;
         pub use cloudeventvalidator::*;
+    }
+}
+
+pub mod rpc {
+    mod calloptions;
+    mod rpcclient;
+    mod rpcmapper;
+    mod rpcresult;
+
+    pub use calloptions::*;
+    pub use rpcclient::*;
+    pub use rpcmapper::*;
+    pub use rpcresult::*;
+}
+
+pub mod transport {
+    pub mod builder {
+        mod uattributesbuilder;
+
+        pub use uattributesbuilder::*;
+    }
+    pub mod datamodel {
+        mod utransport;
+
+        pub use utransport::*;
+    }
+    pub mod validator {
+        mod uattributesvalidator;
+
+        pub use crate::types::validationerror::*;
+        pub use uattributesvalidator::*;
     }
 }
 
@@ -76,6 +106,7 @@ pub mod uri {
     pub mod validator {
         mod urivalidator;
 
+        pub use crate::types::validationerror::*;
         pub use urivalidator::*;
     }
     pub mod serializer {
@@ -108,40 +139,14 @@ pub mod uuid {
     }
     pub mod validator {
         mod uuidvalidator;
+
+        pub use crate::types::validationerror::*;
+        pub use uuidvalidator::*;
     }
-}
-
-pub mod transport {
-    pub mod builder {
-        mod uattributesbuilder;
-
-        pub use uattributesbuilder::*;
-    }
-    pub mod datamodel {
-        mod utransport;
-
-        pub use utransport::*;
-    }
-    pub mod validator {
-        mod uattributesvalidator;
-
-        pub use uattributesvalidator::*;
-    }
-}
-
-pub mod rpc {
-    mod calloptions;
-    mod rpcclient;
-    mod rpcmapper;
-    mod rpcresult;
-
-    pub use calloptions::*;
-    pub use rpcclient::*;
-    pub use rpcmapper::*;
-    pub use rpcresult::*;
 }
 
 pub mod uprotocol {
+    // protoc-generated stubs, see build.rs
     include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
 
     pub use crate::proto::uprotocol::uauthority;
@@ -159,6 +164,7 @@ pub mod uprotocol {
 
 #[allow(non_snake_case)]
 pub mod proto {
+    // protoc-generated stubs, see build.rs
     include!(concat!(env!("OUT_DIR"), "/io.cloudevents.v1.rs"));
 
     pub mod cloudevents {

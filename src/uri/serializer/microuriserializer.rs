@@ -73,6 +73,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     ///
     /// # Returns
     /// A `Vec<u8>` representing the serialized `UUri`.
+    #[allow(clippy::cast_possible_truncation)]
     fn serialize(uri: &UUri) -> Vec<u8> {
         if UriValidator::is_empty(uri) || !UriValidator::is_micro_form(uri) {
             return vec![];

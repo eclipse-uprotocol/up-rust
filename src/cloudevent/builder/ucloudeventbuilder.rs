@@ -52,6 +52,10 @@ impl UCloudEventBuilder {
     ///
     /// * `Event` - Returns a request `CloudEvent`.
     ///
+    /// # Panics
+    ///
+    /// - if the `CloudEventBuilder` fails to build the `CloudEvent`.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -108,6 +112,10 @@ impl UCloudEventBuilder {
     /// # Returns
     ///
     /// Returns a response `CloudEvent`.
+    ///
+    /// # Panics
+    ///
+    /// - if the `CloudEventBuilder` fails to build the `CloudEvent`.
     ///
     /// # Example
     ///
@@ -169,6 +177,10 @@ impl UCloudEventBuilder {
     ///
     /// Returns a response `CloudEvent` Response for the use case of RPC Response message that failed.
     ///
+    /// # Panics
+    ///
+    /// - if the `CloudEventBuilder` fails to build the `CloudEvent`.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -229,6 +241,10 @@ impl UCloudEventBuilder {
     ///
     /// Returns a publish `CloudEvent`.
     ///
+    /// # Panics
+    ///
+    /// - if the `CloudEventBuilder` fails to build the `CloudEvent`.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -274,6 +290,10 @@ impl UCloudEventBuilder {
     /// # Returns
     ///
     /// Returns a publish `CloudEvent`
+    ///
+    /// # Panics
+    ///
+    /// - if the `CloudEventBuilder` fails to build the `CloudEvent`.
     ///
     /// # Example
     ///

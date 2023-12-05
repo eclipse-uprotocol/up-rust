@@ -11,8 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::types::ValidationError;
 use crate::uprotocol::{UAuthority, UEntity, UResource, UUri};
+use crate::uri::validator::ValidationError;
 
 /// Struct to encapsulate Uri validation logic.
 pub struct UriValidator;
@@ -179,6 +179,7 @@ impl UriValidator {
     ///
     /// # Returns
     /// Returns `true` if the `UAuthority` is of type remote.
+    #[allow(clippy::missing_panics_doc)]
     pub fn is_remote(uri: &UUri) -> bool {
         uri.authority.is_some() && uri.authority.as_ref().unwrap().remote.is_some()
     }
@@ -190,6 +191,7 @@ impl UriValidator {
     ///
     /// # Returns
     /// Returns `true` if the URI contains numbers, allowing it to be serialized into micro format.
+    #[allow(clippy::missing_panics_doc)]
     pub fn is_micro_form(uri: &UUri) -> bool {
         !Self::is_empty(uri)
             && uri.entity.as_ref().map_or(false, UEntity::has_id)
@@ -211,24 +213,24 @@ impl UriValidator {
             return false;
         }
 
-        let mut aname = String::new();
+        let mut auth_name = String::new();
         if let Some(authority) = &uri.authority {
             if let Some(name) = UAuthority::get_name(authority) {
-                aname = name.to_string();
+                auth_name = name.to_string();
             }
         }
 
-        let mut ename = String::new();
+        let mut ent_name = String::new();
         if let Some(entity) = &uri.entity {
-            ename = entity.name.to_string();
+            ent_name = entity.name.to_string();
         }
 
-        let mut rname = String::new();
+        let mut res_name = String::new();
         if let Some(resource) = &uri.resource {
-            rname = resource.name.to_string();
+            res_name = resource.name.to_string();
         }
 
-        !aname.is_empty() && !ename.trim().is_empty() && !rname.trim().is_empty()
+        !auth_name.is_empty() && !ent_name.trim().is_empty() && !res_name.trim().is_empty()
     }
 }
 

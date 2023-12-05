@@ -15,7 +15,7 @@ use cloudevents::event::SpecVersion;
 use cloudevents::{AttributesReader, Event};
 
 use crate::cloudevent::builder::UCloudEventUtils;
-use crate::types::ValidationError;
+use crate::cloudevent::validator::ValidationError;
 use crate::uprotocol::{UMessageType, UResource, UUri};
 use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 use crate::uri::validator::UriValidator;

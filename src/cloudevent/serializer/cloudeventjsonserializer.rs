@@ -13,22 +13,22 @@
 
 use cloudevents::Event as CloudEvent;
 
-use crate::cloudevent::serializer::{CloudEventSerializationError, CloudEventSerializer};
+use crate::cloudevent::serializer::{CloudEventSerializer, SerializationError};
 
 ///  Serialize and deserialize `CloudEvents` to/from JSON format.
 pub struct CloudEventJsonSerializer;
 impl CloudEventSerializer for CloudEventJsonSerializer {
-    fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, CloudEventSerializationError> {
+    fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, SerializationError> {
         match serde_json::to_vec(cloud_event) {
             Ok(bytes) => Ok(bytes),
-            Err(error) => Err(CloudEventSerializationError(error.to_string())),
+            Err(error) => Err(SerializationError::new(error.to_string())),
         }
     }
 
-    fn deserialize(&self, bytes: &[u8]) -> Result<CloudEvent, CloudEventSerializationError> {
+    fn deserialize(&self, bytes: &[u8]) -> Result<CloudEvent, SerializationError> {
         match serde_json::from_slice::<CloudEvent>(bytes) {
             Ok(event) => Ok(event),
-            Err(error) => Err(CloudEventSerializationError(error.to_string())),
+            Err(error) => Err(SerializationError::new(error.to_string())),
         }
     }
 }

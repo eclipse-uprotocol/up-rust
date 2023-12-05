@@ -64,6 +64,7 @@ impl From<CloudEventProto> for cloudevents::Event {
                     // timestamp
                     // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
                     if key.eq("timestamp") {
+                        #[allow(clippy::cast_sign_loss)]
                         let naive =
                             NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32).unwrap();
                         dt = Some(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
