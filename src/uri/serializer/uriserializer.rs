@@ -14,6 +14,8 @@
 use crate::uprotocol::{Remote, UUri};
 use crate::uri::validator::UriValidator;
 
+use super::SerializationError;
+
 /// `UUri`s are used in transport layers and hence need to be serialized.
 ///
 /// Each transport supports different serialization formats. For more information,
@@ -30,7 +32,7 @@ pub trait UriSerializer<T> {
     ///
     /// # Returns
     /// Returns a `UUri` object from the serialized format from the wire.
-    fn deserialize(uri: T) -> UUri;
+    fn deserialize(uri: T) -> Result<UUri, SerializationError>;
 
     /// Serializes a `UUri` into a specific serialization format.
     ///
@@ -39,7 +41,7 @@ pub trait UriSerializer<T> {
     ///
     /// # Returns
     /// Returns the `UUri` in the transport serialized format.
-    fn serialize(uri: &UUri) -> T;
+    fn serialize(uri: &UUri) -> Result<T, SerializationError>;
 
     /// Builds a fully resolved `UUri` from the serialized long format and the serialized micro format.
     ///

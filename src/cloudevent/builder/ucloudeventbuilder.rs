@@ -790,7 +790,7 @@ mod tests {
             resource: Some(UResourceBuilder::for_rpc_response()),
             ..Default::default()
         };
-        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri).unwrap();
 
         // service Method Uri
         let method_uri = UUri {
@@ -805,7 +805,7 @@ mod tests {
             )),
             ..Default::default()
         };
-        let service_method_uri = LongUriSerializer::serialize(&method_uri);
+        let service_method_uri = LongUriSerializer::serialize(&method_uri).unwrap();
 
         // fake payload
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
@@ -885,7 +885,7 @@ mod tests {
             resource: Some(UResourceBuilder::for_rpc_response()),
             ..Default::default()
         };
-        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri);
+        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri).unwrap();
 
         // Service Method Uri
         let method_uri = UUri {
@@ -900,7 +900,7 @@ mod tests {
             )),
             ..Default::default()
         };
-        let service_method_uri = LongUriSerializer::serialize(&method_uri);
+        let service_method_uri = LongUriSerializer::serialize(&method_uri).unwrap();
 
         // Additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
@@ -1073,6 +1073,6 @@ mod tests {
             }),
             ..Default::default()
         };
-        LongUriSerializer::serialize(&uri)
+        LongUriSerializer::serialize(&uri).unwrap()
     }
 }

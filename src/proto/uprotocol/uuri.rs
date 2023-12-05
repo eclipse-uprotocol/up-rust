@@ -18,31 +18,47 @@ use crate::uri::serializer::{LongUriSerializer, MicroUriSerializer, UriSerialize
 
 impl From<uproto_Uuri> for String {
     fn from(value: uproto_Uuri) -> Self {
-        LongUriSerializer::serialize(&value)
+        if let Ok(uri) = LongUriSerializer::serialize(&value) {
+            uri
+        } else {
+            String::new()
+        }
     }
 }
 
 impl From<&str> for uproto_Uuri {
     fn from(value: &str) -> Self {
-        LongUriSerializer::deserialize(value.into())
+        if let Ok(uri) = LongUriSerializer::deserialize(value.to_string()) {
+            uri
+        } else {
+            uproto_Uuri::default()
+        }
     }
 }
 
 impl From<uproto_Uuri> for Vec<u8> {
     fn from(value: uproto_Uuri) -> Self {
-        MicroUriSerializer::serialize(&value)
+        if let Ok(uri) = MicroUriSerializer::serialize(&value) {
+            uri
+        } else {
+            vec![]
+        }
     }
 }
 
 impl From<Vec<u8>> for uproto_Uuri {
     fn from(value: Vec<u8>) -> Self {
-        MicroUriSerializer::deserialize(value)
+        if let Ok(uri) = MicroUriSerializer::deserialize(value) {
+            uri
+        } else {
+            uproto_Uuri::default()
+        }
     }
 }
 
 impl Display for uproto_Uuri {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let uri = LongUriSerializer::serialize(self);
+        let uri = LongUriSerializer::serialize(self).unwrap_or_default();
         write!(f, "{uri}")
     }
 }

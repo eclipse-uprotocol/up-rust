@@ -14,7 +14,7 @@
 use regex::Regex;
 
 use crate::uprotocol::{Remote, UAuthority, UEntity, UResource, UUri};
-use crate::uri::serializer::uriserializer::UriSerializer;
+use crate::uri::serializer::{SerializationError, UriSerializer};
 use crate::uri::validator::UriValidator;
 
 /// `UriSerializer` that serializes a `UUri` to a string (long format) per
@@ -22,9 +22,9 @@ use crate::uri::validator::UriValidator;
 pub struct LongUriSerializer;
 
 impl UriSerializer<String> for LongUriSerializer {
-    fn serialize(uri: &UUri) -> String {
+    fn serialize(uri: &UUri) -> Result<String, SerializationError> {
         if UriValidator::is_empty(uri) {
-            return String::default();
+            return Err(SerializationError::new("URI is empty"));
         }
 
         let mut output = String::default();
@@ -37,10 +37,10 @@ impl UriSerializer<String> for LongUriSerializer {
         }
         output.push_str(&Self::build_resource_part_of_uri(uri));
 
-        Regex::new(r"/+$")
+        Ok(Regex::new(r"/+$")
             .unwrap()
             .replace_all(&output, "")
-            .into_owned()
+            .into_owned())
     }
 
     /// Create an  URI data object from a uProtocol string (long or short).
@@ -53,9 +53,9 @@ impl UriSerializer<String> for LongUriSerializer {
     /// # Returns
     ///
     /// Returns an `UUri` data object created from the given uProtocol URI string.
-    fn deserialize(uprotocol_uri: String) -> UUri {
+    fn deserialize(uprotocol_uri: String) -> Result<UUri, SerializationError> {
         if uprotocol_uri.is_empty() {
-            return UUri::default();
+            return Err(SerializationError::new("URI is empty"));
         }
 
         let uri = if let Some(index) = uprotocol_uri.find(':') {
@@ -67,7 +67,7 @@ impl UriSerializer<String> for LongUriSerializer {
         let uri_parts = Self::java_split(&uri, "/");
 
         if uri_parts.len() < 2 {
-            return UUri::default();
+            return Err(SerializationError::new("URI is invalid"));
         }
 
         #[allow(unused_assignments)]
@@ -87,7 +87,7 @@ impl UriSerializer<String> for LongUriSerializer {
         } else {
             if uri_parts.len() > 2 {
                 if uri_parts[2].trim().is_empty() {
-                    return UUri::default();
+                    return Err(SerializationError::new("URI is invalid"));
                 }
                 authority = Some(UAuthority {
                     remote: Some(Remote::Name(uri_parts[2].to_string())),
@@ -102,10 +102,10 @@ impl UriSerializer<String> for LongUriSerializer {
                     resource = Some(UResource::from(uri_parts[5].as_str()));
                 }
             } else {
-                return UUri {
+                return Ok(UUri {
                     authority,
                     ..Default::default()
-                };
+                });
             }
         }
 
@@ -117,7 +117,7 @@ impl UriSerializer<String> for LongUriSerializer {
             if let Ok(version) = version.parse::<u32>() {
                 ve = Some(version);
             } else {
-                return UUri::default();
+                return Err(SerializationError::new("URI is invalid"));
             }
         }
 
@@ -127,11 +127,11 @@ impl UriSerializer<String> for LongUriSerializer {
             ..Default::default()
         };
 
-        UUri {
+        Ok(UUri {
             entity: Some(entity),
             authority,
             resource,
-        }
+        })
     }
 }
 
@@ -240,82 +240,69 @@ mod tests {
             authority: None,
         };
         let uristr = LongUriSerializer::serialize(&uri);
-        assert_eq!("/hartley//rpc.raise", uristr);
-        let uri2 = LongUriSerializer::deserialize(uristr);
-        assert_eq!(uri, uri2);
+        assert_eq!("/hartley//rpc.raise", uristr.as_ref().unwrap());
+        let uri2 = LongUriSerializer::deserialize(uristr.unwrap());
+        assert_eq!(uri, uri2.unwrap());
     }
 
     #[test]
     fn test_parse_protocol_uri_when_is_empty_string() {
-        let uri = LongUriSerializer::deserialize(String::default());
-        assert!(UriValidator::is_empty(&uri));
+        let uri_result = LongUriSerializer::deserialize(String::default());
+        assert!(uri_result.is_err());
+        assert_eq!(uri_result.unwrap_err().to_string(), "URI is empty");
 
         let uristr = LongUriSerializer::serialize(&UUri::default());
-        assert!(uristr.is_empty());
+        assert!(uristr.is_err());
+        assert_eq!(uristr.unwrap_err().to_string(), "URI is empty");
     }
 
     #[test]
     fn test_parse_protocol_uri_with_schema_and_slash() {
-        let uri = LongUriSerializer::deserialize("/".into());
-        assert!(!UriValidator::is_remote(&uri));
-        assert!(uri.entity.is_none());
-        assert!(uri.resource.is_none());
-        assert!(UriValidator::is_empty(&uri));
+        let uri_result = LongUriSerializer::deserialize("/".into());
+        assert!(uri_result.is_err());
+        assert_eq!(uri_result.unwrap_err().to_string(), "URI is invalid");
     }
 
     #[test]
     fn test_parse_protocol_uri_with_schema_and_double_slash() {
-        let uri = LongUriSerializer::deserialize("//".to_string());
-        assert!(!UriValidator::is_remote(&uri));
-        assert!(uri.entity.is_none());
-        assert!(uri.resource.is_none());
-        assert!(UriValidator::is_empty(&uri));
+        let uri_result = LongUriSerializer::deserialize("//".to_string());
+        assert!(uri_result.is_err());
+        assert_eq!(uri_result.unwrap_err().to_string(), "URI is invalid");
     }
 
     #[test]
     fn test_parse_protocol_uri_with_schema_and_3_slash_and_something() {
-        let uri = "///body.access".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
-        assert!(!UriValidator::is_remote(&uri));
-        assert!(uri.entity.is_none());
-        assert!(uri.resource.is_none());
-        assert!(UriValidator::is_empty(&uri));
+        let uri_result = LongUriSerializer::deserialize("///body.access".to_string());
+        assert!(uri_result.is_err());
+        assert_eq!(uri_result.unwrap_err().to_string(), "URI is invalid");
     }
 
     #[test]
     fn test_parse_protocol_uri_with_schema_and_4_slash_and_something() {
-        let uri = "////body.access".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
-        assert!(!UriValidator::is_remote(&uri));
-        assert!(uri.entity.is_none());
-        assert!(uri.resource.is_none());
-        assert!(UriValidator::is_empty(&uri));
+        let uri_result = LongUriSerializer::deserialize("////body.access".to_string());
+        assert!(uri_result.is_err());
+        assert_eq!(uri_result.unwrap_err().to_string(), "URI is invalid");
     }
 
     #[test]
     fn test_parse_protocol_uri_with_schema_and_5_slash_and_something() {
-        let uri = "/////body.access".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
-        assert!(uri.entity.is_none());
-        assert!(uri.resource.is_none());
-        assert!(!UriValidator::is_remote(&uri));
-        assert!(UriValidator::is_empty(&uri));
+        let uri_result = LongUriSerializer::deserialize("/////body.access".to_string());
+        assert!(uri_result.is_err());
+        assert_eq!(uri_result.unwrap_err().to_string(), "URI is invalid");
     }
 
     #[test]
     fn test_parse_protocol_uri_with_schema_and_6_slash_and_something() {
-        let uri = "//////body.access".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
-        assert!(uri.entity.is_none());
-        assert!(uri.resource.is_none());
-        assert!(!UriValidator::is_remote(&uri));
-        assert!(UriValidator::is_empty(&uri));
+        let uri_result = LongUriSerializer::deserialize("//////body.access".to_string());
+        assert!(uri_result.is_err());
+        assert_eq!(uri_result.unwrap_err().to_string(), "URI is invalid");
     }
 
     #[test]
     fn test_parse_protocol_uri_with_local_service_no_version() {
-        let uri = "/body.access".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("/body.access".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert!(uri.resource.is_none());
@@ -323,8 +310,9 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_local_service_with_version() {
-        let uri = "/body.access/1".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("/body.access/1".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert_eq!(1, uri.entity.as_ref().unwrap().version_major.unwrap());
@@ -333,8 +321,9 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_local_service_no_version_with_resource_name_only() {
-        let uri = "/body.access//door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("/body.access//door".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert_eq!("door", uri.resource.as_ref().unwrap().name);
@@ -344,8 +333,9 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_local_service_with_version_with_resource_name_only() {
-        let uri = "/body.access/1/door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("/body.access/1/door".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert_eq!(1, uri.entity.as_ref().unwrap().version_major.unwrap());
@@ -356,8 +346,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_local_service_no_version_with_resource_with_instance() {
-        let uri = "/body.access//door.front_left".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("/body.access//door.front_left".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert_eq!("door", uri.resource.as_ref().unwrap().name);
@@ -371,8 +363,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_local_service_with_version_with_resource_with_message() {
-        let uri = "/body.access/1/door.front_left".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("/body.access/1/door.front_left".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert_eq!(1, uri.entity.as_ref().unwrap().version_major.unwrap());
@@ -388,8 +382,10 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_local_service_no_version_with_resource_with_instance_and_message(
     ) {
-        let uri = "/body.access//door.front_left#Door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("/body.access//door.front_left#Door".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert_eq!("door", uri.resource.as_ref().unwrap().name);
@@ -408,8 +404,10 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_local_service_with_version_with_resource_with_instance_and_message(
     ) {
-        let uri = "/body.access/1/door.front_left#Door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
         assert_eq!(1, uri.entity.as_ref().unwrap().version_major.unwrap());
@@ -428,8 +426,9 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_rpc_uri_with_local_service_no_version() {
-        let uri = "/petapp//rpc.response".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("/petapp//rpc.response".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("petapp", uri.entity.as_ref().unwrap().name);
         assert_eq!("rpc", uri.resource.as_ref().unwrap().name);
@@ -443,8 +442,9 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_rpc_uri_with_local_service_with_version() {
-        let uri = "/petapp/1/rpc.response".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("/petapp/1/rpc.response".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert_eq!("petapp", uri.entity.as_ref().unwrap().name);
         assert_eq!(1, uri.entity.as_ref().unwrap().version_major.unwrap());
@@ -459,8 +459,9 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_service_only_device_and_domain() {
-        let uri = "//VCU.MY_CAR_VIN".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("//VCU.MY_CAR_VIN".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
@@ -469,8 +470,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_service_only_device_and_cloud_domain() {
-        let uri = "//cloud.uprotocol.example.com".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("//cloud.uprotocol.example.com".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("cloud.uprotocol.example.com", name);
@@ -481,8 +484,9 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_service_no_version() {
-        let uri = "//VCU.MY_CAR_VIN/body.access".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize("//VCU.MY_CAR_VIN/body.access".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
@@ -494,8 +498,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_cloud_service_no_version() {
-        let uri = "//cloud.uprotocol.example.com/body.access".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("//cloud.uprotocol.example.com/body.access".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("cloud.uprotocol.example.com", name);
@@ -507,8 +513,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_service_with_version() {
-        let uri = "//VCU.MY_CAR_VIN/body.access/1".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("//VCU.MY_CAR_VIN/body.access/1".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
@@ -521,8 +529,11 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_cloud_service_with_version() {
-        let uri = "//cloud.uprotocol.example.com/body.access/1".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//cloud.uprotocol.example.com/body.access/1".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("cloud.uprotocol.example.com", name);
@@ -535,8 +546,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_service_no_version_with_resource_name_only() {
-        let uri = "//VCU.MY_CAR_VIN/body.access//door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("//VCU.MY_CAR_VIN/body.access//door".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
@@ -551,48 +564,17 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_uri_with_remote_cloud_service_no_version_with_resource_name_only() {
-        let uri = "//cloud.uprotocol.example.com/body.access//door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//cloud.uprotocol.example.com/body.access//door".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("cloud.uprotocol.example.com", name);
         }
         assert!(uri.entity.is_some());
         assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
-        assert!(uri.resource.is_some());
-        assert_eq!("door", uri.resource.as_ref().unwrap().name);
-        assert!(uri.resource.as_ref().unwrap().instance.is_none());
-        assert!(uri.resource.as_ref().unwrap().message.is_none());
-    }
-
-    #[test]
-    fn test_parse_protocol_uri_with_remote_service_with_version_with_resource_name_only() {
-        let uri = "//VCU.MY_CAR_VIN/body.access/1/door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
-        assert!(UriValidator::is_remote(&uri));
-        if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
-            assert_eq!("VCU.MY_CAR_VIN", name);
-        }
-        assert!(uri.entity.is_some());
-        assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
-        assert_eq!(1, uri.entity.as_ref().unwrap().version_major.unwrap());
-        assert!(uri.resource.is_some());
-        assert_eq!("door", uri.resource.as_ref().unwrap().name);
-        assert!(uri.resource.as_ref().unwrap().instance.is_none());
-        assert!(uri.resource.as_ref().unwrap().message.is_none());
-    }
-
-    #[test]
-    fn test_parse_protocol_uri_with_remote_service_cloud_with_version_with_resource_name_only() {
-        let uri = "//cloud.uprotocol.example.com/body.access/1/door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
-        assert!(UriValidator::is_remote(&uri));
-        if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
-            assert_eq!("cloud.uprotocol.example.com", name);
-        }
-        assert!(uri.entity.is_some());
-        assert_eq!("body.access", uri.entity.as_ref().unwrap().name);
-        assert_eq!(1, uri.entity.as_ref().unwrap().version_major.unwrap());
         assert!(uri.resource.is_some());
         assert_eq!("door", uri.resource.as_ref().unwrap().name);
         assert!(uri.resource.as_ref().unwrap().instance.is_none());
@@ -602,8 +584,11 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_remote_service_no_version_with_resource_and_instance_no_message(
     ) {
-        let uri = "//VCU.MY_CAR_VIN/body.access//door.front_left".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//VCU.MY_CAR_VIN/body.access//door.front_left".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
@@ -623,8 +608,11 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_remote_service_with_version_with_resource_and_instance_no_message(
     ) {
-        let uri = "//VCU.MY_CAR_VIN/body.access/1/door.front_left".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//VCU.MY_CAR_VIN/body.access/1/door.front_left".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
@@ -645,15 +633,13 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_remote_service_no_version_with_resource_and_instance_and_message(
     ) {
-        let uri = "//VCU.MY_CAR_VIN/body.access//door.front_left#Door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//VCU.MY_CAR_VIN/body.access//door.front_left#Door".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
-        if let Some(Remote::Name(name)) = uri
-            .authority
-            .as_ref()
-            .as_ref()
-            .and_then(|a| a.remote.as_ref())
-        {
+        if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
         }
         assert!(uri.entity.is_some());
@@ -675,8 +661,11 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_remote_cloud_service_no_version_with_resource_and_instance_and_message(
     ) {
-        let uri = "//cloud.uprotocol.example.com/body.access//door.front_left#Door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//cloud.uprotocol.example.com/body.access//door.front_left#Door".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("cloud.uprotocol.example.com", name);
@@ -700,8 +689,11 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_remote_service_with_version_with_resource_and_instance_and_message(
     ) {
-        let uri = "//VCU.MY_CAR_VIN/body.access/1/door.front_left#Door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//VCU.MY_CAR_VIN/body.access/1/door.front_left#Door".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU.MY_CAR_VIN", name);
@@ -726,8 +718,11 @@ mod tests {
     #[test]
     fn test_parse_protocol_uri_with_remote_cloud_service_with_version_with_resource_and_instance_and_message(
     ) {
-        let uri = "//cloud.uprotocol.example.com/body.access/1/door.front_left#Door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(
+            "//cloud.uprotocol.example.com/body.access/1/door.front_left#Door".to_string(),
+        );
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("cloud.uprotocol.example.com", name);
@@ -743,14 +738,19 @@ mod tests {
             uri.resource.as_ref().unwrap().instance.as_ref().unwrap()
         );
         assert!(uri.resource.as_ref().unwrap().message.is_some());
-        assert_eq!("Door", uri.resource.unwrap().message.unwrap());
+        assert_eq!(
+            "Door",
+            uri.resource.as_ref().unwrap().message.as_ref().unwrap()
+        );
     }
 
     #[test]
     fn test_parse_protocol_uri_with_remote_service_no_domain_with_version_with_resource_and_instance_no_message(
     ) {
-        let uri = "//VCU/body.access/1/door.front_left".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("//VCU/body.access/1/door.front_left".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("VCU", name);
@@ -765,13 +765,15 @@ mod tests {
             "front_left",
             uri.resource.as_ref().unwrap().instance.as_ref().unwrap()
         );
-        assert!(uri.resource.unwrap().message.is_none());
+        assert!(uri.resource.as_ref().unwrap().message.is_none());
     }
 
     #[test]
     fn test_parse_protocol_rpc_uri_with_remote_service_no_version() {
-        let uri = "//bo.cloud/petapp//rpc.response".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("bo.cloud", name);
@@ -790,8 +792,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocol_rpc_uri_with_remote_service_with_version() {
-        let uri = "//bo.cloud/petapp/1/rpc.response".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("//bo.cloud/petapp/1/rpc.response".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         if let Some(Remote::Name(name)) = uri.authority.as_ref().and_then(|a| a.remote.as_ref()) {
             assert_eq!("bo.cloud", name);
@@ -806,13 +810,14 @@ mod tests {
             "response",
             uri.resource.as_ref().unwrap().instance.as_ref().unwrap()
         );
-        assert!(uri.resource.unwrap().message.is_none());
+        assert!(uri.resource.as_ref().unwrap().message.is_none());
     }
 
     #[test]
     fn test_build_protocol_uri_from_uri_when_uri_is_empty() {
         let uprotocol_uri = LongUriSerializer::serialize(&UUri::default());
-        assert_eq!("", &uprotocol_uri);
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(uprotocol_uri.unwrap_err().to_string(), "URI is empty");
     }
 
     #[test]
@@ -828,7 +833,8 @@ mod tests {
             authority: Some(UAuthority::default()),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/////door", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/////door", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -843,7 +849,8 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/body.access", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -860,7 +867,8 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access/1", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/body.access/1", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -880,7 +888,8 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access//door", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/body.access//door", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -901,7 +910,8 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access/1/door", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/body.access/1/door", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -922,7 +932,8 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access//door.front_left", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/body.access//door.front_left", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -944,7 +955,8 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access/1/door.front_left", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/body.access/1/door.front_left", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -966,7 +978,11 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access//door.front_left#Door", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!(
+            "/body.access//door.front_left#Door",
+            &uprotocol_uri.unwrap()
+        );
     }
 
     #[test]
@@ -989,7 +1005,11 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/body.access/1/door.front_left#Door", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!(
+            "/body.access/1/door.front_left#Door",
+            &uprotocol_uri.unwrap()
+        );
     }
 
     #[test]
@@ -1007,7 +1027,8 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("//vcu.my_car_vin/body.access", &uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("//vcu.my_car_vin/body.access", &uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -1026,7 +1047,8 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("//vcu.my_car_vin/body.access/1", uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("//vcu.my_car_vin/body.access/1", uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -1045,7 +1067,11 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("//cloud.uprotocol.example.com/body.access/1", uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!(
+            "//cloud.uprotocol.example.com/body.access/1",
+            uprotocol_uri.unwrap()
+        );
     }
 
     #[test]
@@ -1069,7 +1095,11 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("//vcu.my_car_vin/body.access/1/door", uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!(
+            "//vcu.my_car_vin/body.access/1/door",
+            uprotocol_uri.unwrap()
+        );
     }
 
     #[test]
@@ -1092,7 +1122,8 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("//vcu.my_car_vin/body.access//door", uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("//vcu.my_car_vin/body.access//door", uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -1117,9 +1148,10 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_ok());
         assert_eq!(
             "//vcu.my_car_vin/body.access/1/door.front_left",
-            uprotocol_uri
+            uprotocol_uri.unwrap()
         );
     }
 
@@ -1146,9 +1178,10 @@ mod tests {
         };
 
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_ok());
         assert_eq!(
             "//cloud.uprotocol.example.com/body.access/1/door.front_left",
-            uprotocol_uri
+            uprotocol_uri.unwrap()
         );
     }
 
@@ -1174,9 +1207,10 @@ mod tests {
         };
 
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_ok());
         assert_eq!(
             "//vcu.my_car_vin/body.access//door.front_left",
-            uprotocol_uri
+            uprotocol_uri.unwrap()
         );
     }
 
@@ -1203,9 +1237,10 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_ok());
         assert_eq!(
             "//vcu.my_car_vin/body.access/1/door.front_left#Door",
-            uprotocol_uri
+            uprotocol_uri.unwrap()
         );
     }
 
@@ -1231,9 +1266,10 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_ok());
         assert_eq!(
             "//vcu.my_car_vin/body.access//door.front_left#Door",
-            uprotocol_uri
+            uprotocol_uri.unwrap()
         );
     }
 
@@ -1255,7 +1291,8 @@ mod tests {
             authority: None,
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("/petapp/1/rpc.response", uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!("/petapp/1/rpc.response", uprotocol_uri.unwrap());
     }
 
     #[test]
@@ -1278,9 +1315,10 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_ok());
         assert_eq!(
             "//cloud.uprotocol.example.com/petapp//rpc.response",
-            uprotocol_uri
+            uprotocol_uri.unwrap()
         );
     }
 
@@ -1305,13 +1343,19 @@ mod tests {
             authority: Some(authority),
         };
         let uprotocol_uri = LongUriSerializer::serialize(&uri);
-        assert_eq!("//vcu.my_car_vin/body.access/1/door", uprotocol_uri);
+        assert!(uprotocol_uri.is_ok());
+        assert_eq!(
+            "//vcu.my_car_vin/body.access/1/door",
+            uprotocol_uri.unwrap()
+        );
     }
 
     #[test]
     fn test_parse_local_protocol_uri_with_custom_scheme() {
-        let uri = "custom:/body.access//door.front_left#Door".to_string();
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result =
+            LongUriSerializer::deserialize("custom:/body.access//door.front_left#Door".to_string());
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(!UriValidator::is_remote(&uri));
         assert!(uri.authority.as_ref().is_none());
         assert!(uri.entity.is_some());
@@ -1335,7 +1379,9 @@ mod tests {
         let uri = "custom://vcu.vin/body.access//door.front_left#Door".to_string();
         let uri2 = "//vcu.vin/body.access//door.front_left#Door".to_string();
 
-        let uri = LongUriSerializer::deserialize(uri);
+        let uri_result = LongUriSerializer::deserialize(uri);
+        assert!(uri_result.is_ok());
+        let uri = uri_result.unwrap();
         assert!(UriValidator::is_remote(&uri));
         assert!(uri.authority.as_ref().is_some());
         assert!(uri.authority.is_some());
@@ -1356,13 +1402,16 @@ mod tests {
             "Door",
             uri.resource.as_ref().unwrap().message.as_ref().unwrap()
         );
-        assert_eq!(uri2, LongUriSerializer::serialize(&uri));
+        let uri3 = LongUriSerializer::serialize(&uri);
+        assert_eq!(uri2, uri3.unwrap());
     }
 
     #[test]
     fn test_deserialize_long_and_micro_passing_empty_long_uri_empty_byte_array() {
         let uri = LongUriSerializer::build_resolved("", &[]);
         assert!(uri.is_some());
-        assert_eq!("", LongUriSerializer::serialize(&uri.unwrap()));
+        let uri2 = LongUriSerializer::serialize(&uri.unwrap());
+        assert!(uri2.is_err());
+        assert_eq!(uri2.unwrap_err().to_string(), "URI is empty");
     }
 }

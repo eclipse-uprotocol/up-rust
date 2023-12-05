@@ -114,6 +114,7 @@ pub mod uri {
         mod microuriserializer;
         mod uriserializer;
 
+        pub use crate::types::serializationerror::*;
         pub use longuriserializer::*;
         pub use microuriserializer::*;
         pub use uriserializer::*;

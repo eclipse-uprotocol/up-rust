@@ -171,13 +171,17 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// - If the sink URI extracted from the `cloud_event` fails the validation checks performed by `self.validate_entity_uri`.
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            let uri = LongUriSerializer::deserialize(sink.clone());
-
-            if let Err(e) = self.validate_entity_uri(&uri) {
-                return Err(ValidationError::new(format!(
-                    "Invalid CloudEvent sink [{sink}] - {e}"
-                )));
+            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+                if let Err(e) = self.validate_entity_uri(&uri) {
+                    return Err(ValidationError::new(format!(
+                        "Invalid CloudEvent sink [{sink}] - {e}"
+                    )));
+                }
             }
+        } else {
+            return Err(ValidationError::new(
+                "Invalid CloudEvent sink, sink must be an uri",
+            ));
         }
         Ok(())
     }
@@ -348,11 +352,16 @@ impl CloudEventValidators {
 struct PublishValidator;
 impl CloudEventValidator for PublishValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
-        let source = LongUriSerializer::deserialize(cloud_event.source().to_string());
-        if let Err(e) = self.validate_topic_uri(&source) {
-            return Err(ValidationError::new(format!(
-                "Invalid Publish type CloudEvent source [{source}] - {e}"
-            )));
+        if let Ok(source) = LongUriSerializer::deserialize(cloud_event.source().to_string()) {
+            if let Err(e) = self.validate_topic_uri(&source) {
+                return Err(ValidationError::new(format!(
+                    "Invalid Publish type CloudEvent source [{source}] - {e}"
+                )));
+            }
+        } else {
+            return Err(ValidationError::new(
+                "Invalid CloudEvent source, Publish CloudEvent source must be an uri",
+            ));
         }
         Ok(())
     }
@@ -387,11 +396,16 @@ impl CloudEventValidator for NotificationValidator {
 
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            let uri = LongUriSerializer::deserialize(sink.clone());
-            if let Err(e) = self.validate_entity_uri(&uri) {
-                return Err(ValidationError::new(format!(
-                    "Invalid Notification type CloudEvent sink [{sink}] - {e}"
-                )));
+            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+                if let Err(e) = self.validate_entity_uri(&uri) {
+                    return Err(ValidationError::new(format!(
+                        "Invalid Notification type CloudEvent sink [{sink}] - {e}"
+                    )));
+                }
+            } else {
+                return Err(ValidationError::new(
+                    "Invalid CloudEvent sink, Notification CloudEvent sink must be an uri",
+                ));
             }
         } else {
             return Err(ValidationError::new(
@@ -413,22 +427,32 @@ struct RequestValidator;
 impl CloudEventValidator for RequestValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         let source = cloud_event.source();
-        let uri = LongUriSerializer::deserialize(source.clone());
-        if let Err(e) = self.validate_rpc_topic_uri(&uri) {
-            return Err(ValidationError::new(format!(
-                "Invalid RPC Request CloudEvent source [{source}] - {e}"
-            )));
+        if let Ok(uri) = LongUriSerializer::deserialize(source.clone()) {
+            if let Err(e) = self.validate_rpc_topic_uri(&uri) {
+                return Err(ValidationError::new(format!(
+                    "Invalid RPC Request CloudEvent source [{source}] - {e}"
+                )));
+            }
+        } else {
+            return Err(ValidationError::new(
+                "Invalid RPC Request CloudEvent source, Request CloudEvent source must be uri for the method to be called",
+            ));
         }
         Ok(())
     }
 
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            let uri = LongUriSerializer::deserialize(sink.clone());
-            if let Err(e) = self.validate_rpc_method(&uri) {
-                return Err(ValidationError::new(format!(
-                    "Invalid RPC Request CloudEvent sink [{sink}] - {e}"
-                )));
+            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+                if let Err(e) = self.validate_rpc_method(&uri) {
+                    return Err(ValidationError::new(format!(
+                        "Invalid RPC Request CloudEvent sink [{sink}] - {e}"
+                    )));
+                }
+            } else {
+                return Err(ValidationError::new(
+                    "Invalid RPC Request CloudEvent sink, Request CloudEvent sink must be uri for the method to be called",
+                ));
             }
         } else {
             return Err(ValidationError::new(
@@ -460,22 +484,32 @@ struct ResponseValidator;
 impl CloudEventValidator for ResponseValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         let source = cloud_event.source();
-        let uri = LongUriSerializer::deserialize(source.clone());
-        if let Err(e) = self.validate_rpc_method(&uri) {
-            return Err(ValidationError::new(format!(
-                "Invalid RPC Response CloudEvent source [{source}] - {e}"
-            )));
+        if let Ok(uri) = LongUriSerializer::deserialize(source.clone()) {
+            if let Err(e) = self.validate_rpc_method(&uri) {
+                return Err(ValidationError::new(format!(
+                    "Invalid RPC Response CloudEvent source [{source}] - {e}"
+                )));
+            }
+        } else {
+            return Err(ValidationError::new(
+                "Invalid RPC Response CloudEvent source, Response CloudEvent source must be uri for the method to be called",
+            ));
         }
         Ok(())
     }
 
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            let uri = LongUriSerializer::deserialize(sink.clone());
-            if let Err(e) = self.validate_rpc_topic_uri(&uri) {
-                return Err(ValidationError::new(format!(
-                    "Invalid RPC Response CloudEvent sink [{sink}] - {e}"
-                )));
+            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+                if let Err(e) = self.validate_rpc_topic_uri(&uri) {
+                    return Err(ValidationError::new(format!(
+                        "Invalid RPC Response CloudEvent sink [{sink}] - {e}"
+                    )));
+                }
+            } else {
+                return Err(ValidationError::new(
+                    "Invalid RPC Response CloudEvent sink, Response CloudEvent sink must be uri for the method to be called",
+                ));
             }
         } else {
             return Err(ValidationError::new(
@@ -722,7 +756,6 @@ mod tests {
     fn validate_cloud_event_id_when_not_valid() {
         let event = build_base_cloud_event_for_test();
         let status = CloudEventValidators::get_validator(&event).validate_id(&event);
-
         assert!(status.is_err());
         assert_eq!(
             status.unwrap_err().to_string(),
@@ -742,7 +775,11 @@ mod tests {
 
         let validator = CloudEventValidators::Publish.validator();
         let status = validator.validate(&event);
-        assert!(status.is_ok());
+        assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid CloudEvent sink, sink must be an uri",
+        );
     }
 
     #[test]
@@ -750,7 +787,8 @@ mod tests {
         let uuid = UUIDv8Builder::new().build();
         let uri = LongUriSerializer::deserialize(
             "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
-        );
+        )
+        .unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(uri.to_string())
@@ -760,7 +798,11 @@ mod tests {
 
         let validator = CloudEventValidators::get_validator(&event);
         let status = validator.validate(&event);
-        assert!(status.is_ok());
+        assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid CloudEvent sink, sink must be an uri"
+        );
     }
 
     #[test]
@@ -768,8 +810,9 @@ mod tests {
         let uuid = UUIDv8Builder::new().build();
         let uri = LongUriSerializer::deserialize(
             "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
-        );
-        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string());
+        )
+        .unwrap();
+        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string()).unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(uri.to_string())
@@ -788,8 +831,9 @@ mod tests {
         let uuid = UUIDv8Builder::new().build();
         let uri = LongUriSerializer::deserialize(
             "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
-        );
-        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string());
+        )
+        .unwrap();
+        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string()).unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(uri.to_string())
@@ -824,13 +868,13 @@ mod tests {
         assert!(status.is_err());
         assert_eq!(
             status.unwrap_err().to_string(),
-            "Invalid Publish type CloudEvent source [] - Uri is empty",
+            "Invalid CloudEvent source, Publish CloudEvent source must be an uri; Invalid CloudEvent sink, sink must be an uri",
         );
     }
 
     #[test]
     fn test_publish_type_cloudevent_is_not_valid_when_source_is_missing_authority() {
-        let uri = LongUriSerializer::deserialize("/body.access".to_string());
+        let uri = LongUriSerializer::deserialize("/body.access".to_string()).unwrap();
 
         let event = build_base_cloud_event_builder_for_test()
             .id("testme".to_string())
@@ -857,7 +901,8 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_not_valid_when_source_is_missing_message_info() {
-        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left".to_string());
+        let uri =
+            LongUriSerializer::deserialize("/body.access/1/door.front_left".to_string()).unwrap();
 
         let event = build_base_cloud_event_builder_for_test()
             .id("testme".to_string())
@@ -885,8 +930,9 @@ mod tests {
     #[test]
     fn test_notification_type_cloudevent_is_valid_when_everything_is_valid() {
         let uuid = UUIDv8Builder::new().build();
-        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
-        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string());
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
+            .unwrap();
+        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string()).unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(uri.to_string())
@@ -903,7 +949,8 @@ mod tests {
     #[test]
     fn test_notification_type_cloudevent_is_not_valid_missing_sink() {
         let uuid = UUIDv8Builder::new().build();
-        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
+            .unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(uri.to_string())
@@ -924,8 +971,9 @@ mod tests {
     #[test]
     fn test_notification_type_cloudevent_is_not_valid_invalid_sink() {
         let uuid = UUIDv8Builder::new().build();
-        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string());
-        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string());
+        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
+            .unwrap();
+        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string()).unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(uri.to_string())
@@ -947,9 +995,11 @@ mod tests {
     #[test]
     fn test_request_type_cloudevent_is_valid_when_everything_is_valid() {
         let uuid = UUIDv8Builder::new().build();
-        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let source =
+            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
         let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string());
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string())
+                .unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -967,9 +1017,10 @@ mod tests {
     #[test]
     fn test_request_type_cloudevent_is_not_valid_invalid_source() {
         let uuid = UUIDv8Builder::new().build();
-        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//dog".to_string());
+        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//dog".to_string()).unwrap();
         let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string());
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string())
+                .unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -991,7 +1042,8 @@ mod tests {
     #[test]
     fn test_request_type_cloudevent_is_not_valid_missing_sink() {
         let uuid = UUIDv8Builder::new().build();
-        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let source =
+            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -1012,9 +1064,11 @@ mod tests {
     #[test]
     fn test_request_type_cloudevent_is_not_valid_invalid_sink_not_rpc_command() {
         let uuid = UUIDv8Builder::new().build();
-        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+        let source =
+            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
         let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
+                .unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -1037,8 +1091,10 @@ mod tests {
     fn test_response_type_cloudevent_is_valid_when_everything_is_valid() {
         let uuid = UUIDv8Builder::new().build();
         let source =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string());
-        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string())
+                .unwrap();
+        let sink =
+            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -1057,8 +1113,10 @@ mod tests {
     fn test_response_type_cloudevent_is_not_valid_invalid_source() {
         let uuid = UUIDv8Builder::new().build();
         let source =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
-        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string());
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
+                .unwrap();
+        let sink =
+            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -1081,7 +1139,8 @@ mod tests {
     fn test_response_type_cloudevent_is_not_valid_missing_sink_and_invalid_source() {
         let uuid = UUIDv8Builder::new().build();
         let source =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
+                .unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -1102,9 +1161,10 @@ mod tests {
     #[test]
     fn test_response_type_cloudevent_is_not_valid_invalid_source_not_rpc_command() {
         let uuid = UUIDv8Builder::new().build();
-        let source = LongUriSerializer::deserialize("//bo.cloud/petapp/1/dog".to_string());
+        let source = LongUriSerializer::deserialize("//bo.cloud/petapp/1/dog".to_string()).unwrap();
         let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string());
+            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
+                .unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid.to_string())
             .source(source.to_string())
@@ -1137,7 +1197,7 @@ mod tests {
                 ..Default::default()
             }),
         };
-        let source = LongUriSerializer::serialize(&uri);
+        let source = LongUriSerializer::serialize(&uri).unwrap();
         let payload = build_proto_payload_for_test();
         let attributes = UCloudEventAttributesBuilder::new()
             .with_hash("somehash".to_string())

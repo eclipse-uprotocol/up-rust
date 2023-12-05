@@ -64,7 +64,7 @@ mod tests {
             }),
         };
 
-        let source = LongUriSerializer::serialize(&uri);
+        let source = LongUriSerializer::serialize(&uri).unwrap();
 
         // Fake payload
         let proto_payload = build_proto_payload_for_test();
@@ -182,7 +182,7 @@ mod tests {
                 ..Default::default()
             }),
         };
-        let source = LongUriSerializer::serialize(&uri);
+        let source = LongUriSerializer::serialize(&uri).unwrap();
 
         // Fake payload
         let proto_payload = build_other_proto_payload_for_test();

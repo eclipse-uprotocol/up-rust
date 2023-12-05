@@ -818,7 +818,7 @@ mod tests {
     }
 
     fn build_topic() -> UUri {
-        LongUriSerializer::deserialize("//vcu.vin/hartley/1/rpc.Raise".to_string())
+        LongUriSerializer::deserialize("//vcu.vin/hartley/1/rpc.Raise".to_string()).unwrap()
     }
 
     fn build_attributes() -> UAttributes {

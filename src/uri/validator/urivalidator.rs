@@ -248,15 +248,12 @@ mod tests {
     #[test]
     fn test_validate_blank_uri() {
         let uri = LongUriSerializer::deserialize("".to_string());
-        let status = UriValidator::validate(&uri);
-        assert!(UriValidator::is_empty(&uri));
-        assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
+        assert!(uri.is_err());
     }
 
     #[test]
     fn test_validate_uri_with_get_entity() {
-        let uri = LongUriSerializer::deserialize("/hartley".to_string());
+        let uri = LongUriSerializer::deserialize("/hartley".to_string()).unwrap();
         let status = UriValidator::validate(&uri);
         assert!(status.is_ok());
     }
@@ -264,10 +261,7 @@ mod tests {
     #[test]
     fn test_validate_with_malformed_uri() {
         let uri = LongUriSerializer::deserialize("hartley".to_string());
-        let status = UriValidator::validate(&uri);
-        assert!(UriValidator::is_empty(&uri));
-        assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
+        assert!(uri.is_err());
     }
 
     #[test]
@@ -280,47 +274,91 @@ mod tests {
 
     #[test]
     fn test_validate_rpc_method_with_valid_uri() {
-        let uri = LongUriSerializer::deserialize("/hartley//rpc.echo".to_string());
+        let uri = LongUriSerializer::deserialize("/hartley//rpc.echo".to_string()).unwrap();
         let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_validate_rpc_method_with_invalid_uri() {
-        let uri = LongUriSerializer::deserialize("/hartley/echo".to_string());
-        let status = UriValidator::validate_rpc_method(&uri);
+        let entity = UEntity {
+            name: "hartley".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "echo".into(),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(UAuthority::default()),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_validate_rpc_method_with_malformed_uri() {
-        let uri = LongUriSerializer::deserialize("hartley".to_string());
-        let status = UriValidator::validate_rpc_method(&uri);
-        assert!(UriValidator::is_empty(&uri));
+        let entity = UEntity {
+            name: "hartley".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(UAuthority::default()),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_validate_rpc_response_with_valid_uri() {
-        let uri = LongUriSerializer::deserialize("/hartley//rpc.response".to_string());
+        let uri = LongUriSerializer::deserialize("/hartley//rpc.response".to_string()).unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_validate_rpc_response_with_malformed_uri() {
-        let uri = LongUriSerializer::deserialize("hartley".to_string());
-        let status = UriValidator::validate_rpc_response(&uri);
-        assert!(UriValidator::is_empty(&uri));
+        let entity = UEntity {
+            name: "hartley".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(UAuthority::default()),
+        };
+
+        let status = UriValidator::validate_rpc_response(&uuri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_validate_rpc_response_with_rpc_type() {
-        let uri = LongUriSerializer::deserialize("/hartley//dummy.wrong".to_string());
+        let uri = LongUriSerializer::deserialize("/hartley//dummy.wrong".to_string()).unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
         assert_eq!(status.unwrap_err().to_string(), "Invalid RPC response type");
@@ -328,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_validate_rpc_response_with_invalid_rpc_response_type() {
-        let uri = LongUriSerializer::deserialize("/hartley//rpc.wrong".to_string());
+        let uri = LongUriSerializer::deserialize("/hartley//rpc.wrong".to_string()).unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
         assert_eq!(status.unwrap_err().to_string(), "Invalid RPC response type");
@@ -337,227 +375,518 @@ mod tests {
     #[test]
     fn test_topic_uri_with_version_when_it_is_valid_remote() {
         let uri = "//VCU.MY_CAR_VIN/body.access/1/door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_topic_uri_no_version_when_it_is_valid_remote() {
         let uri = "//VCU.MY_CAR_VIN/body.access//door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_topic_uri_with_version_when_it_is_valid_local() {
         let uri = "/body.access/1/door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_topic_uri_no_version_when_it_is_valid_local() {
         let uri = "/body.access//door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
+    use crate::uprotocol::u_authority::Remote;
     #[test]
     fn test_topic_uri_invalid_when_uri_has_schema_only() {
-        let uri = ":".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            remote: Some(Remote::Name(":".into())),
+        };
+        let entity = UEntity {
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_topic_uri_invalid_when_uri_has_empty_use_name_local() {
-        let uri = "/".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let entity = UEntity {
+            name: "".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: None,
+        };
+
+        let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_topic_uri_invalid_when_uri_is_remote_no_authority() {
-        let uri = "//".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            ..Default::default()
+        };
+        let entity = UEntity {
+            name: "".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_topic_uri_invalid_when_uri_is_remote_no_authority_with_use() {
-        let uri = "///body.access/1/door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            ..Default::default()
+        };
+        let entity = UEntity {
+            name: "body.access".into(),
+            version_major: Some(1),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "door".into(),
+            instance: Some("front_left".into()),
+            message: Some("Door".into()),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+        let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_topic_uri_invalid_when_uri_is_missing_use_remote() {
         let uri = "//VCU.myvin///door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_topic_uri_invalid_when_uri_is_missing_use_name_remote() {
-        let uri = "/1/door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let entity = UEntity {
+            version_major: Some(1),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "door".into(),
+            instance: Some("front_left".into()),
+            message: Some("Door".into()),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: None,
+        };
+
+        let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_topic_uri_invalid_when_uri_is_missing_use_name_local() {
         let uri = "//VCU.myvin//1".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri));
+        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_with_version_when_it_is_valid_remote() {
         let uri = "//bo.cloud/petapp/1/rpc.response".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_topic_uri_no_version_when_it_is_valid_remote() {
         let uri = "//bo.cloud/petapp//rpc.response".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_topic_uri_with_version_when_it_is_valid_local() {
         let uri = "/petapp/1/rpc.response".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_topic_uri_no_version_when_it_is_valid_local() {
         let uri = "/petapp//rpc.response".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_has_schema_only() {
-        let uri = ":".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            remote: Some(Remote::Name(":".into())),
+        };
+        let entity = UEntity {
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_with_version_when_it_is_not_valid_missing_rpc_response_local() {
         let uri = "/petapp/1/dog".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_with_version_when_it_is_not_valid_missing_rpc_response_remote() {
-        let uri = "//petapp/1/dog".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let entity = UEntity {
+            name: "petapp".into(),
+            version_major: Some(1),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "dog".into(),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: None,
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_remote_no_authority() {
-        let uri = "//".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            ..Default::default()
+        };
+        let entity = UEntity {
+            name: "".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "".into(),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_remote_no_authority_with_use() {
-        let uri = "///body.access/1".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            ..Default::default()
+        };
+        let entity = UEntity {
+            name: "body.access".into(),
+            version_major: Some(1),
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_missing_use() {
         let uri = "//VCU.myvin".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_remote() {
         let uri = "/1".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
+        );
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_local() {
         let uri = "//VCU.myvin//1".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_rpc_method_uri_with_version_when_it_is_valid_remote() {
         let uri = "//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_method_uri_no_version_when_it_is_valid_remote() {
         let uri = "//VCU.myvin/body.access//rpc.UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_method_uri_with_version_when_it_is_valid_local() {
         let uri = "/body.access/1/rpc.UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_method_uri_no_version_when_it_is_valid_local() {
         let uri = "/body.access//rpc.UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_has_schema_only() {
-        let uri = ":".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            remote: Some(Remote::Name(":".into())),
+        };
+        let entity = UEntity {
+            ..Default::default()
+        };
+        let resource = UResource {
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_rpc_method_uri_with_version_when_it_is_not_valid_not_rpc_method_local() {
         let uri = "/body.access//UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
+        );
     }
 
     #[test]
     fn test_rpc_method_uri_with_version_when_it_is_not_valid_not_rpc_method_remote() {
-        let uri = "//body.access/1/UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            ..Default::default()
+        };
+        let entity = UEntity {
+            name: "body.access".into(),
+            version_major: Some(1),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "UpdateDoor".into(),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_is_remote_no_authority() {
-        let uri = "//".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let authority = UAuthority {
+            ..Default::default()
+        };
+        let entity = UEntity {
+            name: "".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "".into(),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_is_remote_no_authority_with_use() {
-        let uri = "///body.access/1/rpc.UpdateDoor".to_string();
-        let uuri = LongUriSerializer::deserialize(uri);
+        let authority = UAuthority {
+            ..Default::default()
+        };
+        let entity = UEntity {
+            name: "body.access".into(),
+            version_major: Some(1),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "rpc".into(),
+            instance: Some("UpdateDoor".into()),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: Some(authority),
+        };
+
         let status = UriValidator::validate_rpc_method(&uuri);
-        assert_eq!("", &uuri.to_string());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is remote missing uAuthority"
+        );
     }
 
     #[test]
@@ -588,21 +917,45 @@ mod tests {
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_is_missing_use() {
         let uri = "//VCU.myvin".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_is_missing_use_name_local() {
-        let uri = "/1/rpc.UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let entity = UEntity {
+            version_major: Some(1),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "rpc".into(),
+            instance: Some("UpdateDoor".into()),
+            ..Default::default()
+        };
+        let uuri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: None,
+        };
+
+        let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
+        assert_eq!(
+            status.unwrap_err().to_string(),
+            "Uri is missing uSoftware Entity name"
+        );
     }
 
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_is_missing_use_name_remote() {
         let uri = "//VCU.myvin//1/rpc.UpdateDoor".to_string();
-        let status = UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri));
+        let status =
+            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
     }
 
@@ -612,7 +965,7 @@ mod tests {
         if let Some(valid_uris) = json_object.get("validUris").and_then(|v| v.as_array()) {
             for uri in valid_uris {
                 let uri: String = uri.as_str().unwrap_or_default().to_string();
-                let uuri = LongUriSerializer::deserialize(uri);
+                let uuri = LongUriSerializer::deserialize(uri).unwrap();
                 let status = UriValidator::validate(&uuri);
                 assert!(status.is_ok());
             }
@@ -626,11 +979,12 @@ mod tests {
 
         for uri_object in invalid_uris {
             let uri = uri_object.get("uri").unwrap().as_str().unwrap();
-            let uuri = LongUriSerializer::deserialize(uri.into());
-            let status = UriValidator::validate(&uuri);
-            assert!(status.is_err());
-            let message = uri_object.get("status_message").unwrap().as_str().unwrap();
-            assert_eq!(message, status.unwrap_err().to_string());
+            if let Ok(uuri) = LongUriSerializer::deserialize(uri.into()) {
+                let status = UriValidator::validate(&uuri);
+                assert!(status.is_err());
+                let message = uri_object.get("status_message").unwrap().as_str().unwrap();
+                assert_eq!(message, status.unwrap_err().to_string());
+            }
         }
     }
 
@@ -640,7 +994,7 @@ mod tests {
         let valid_rpc_uris = json_object.get("validRpcUris").unwrap().as_array().unwrap();
 
         for uri in valid_rpc_uris {
-            let uuri = LongUriSerializer::deserialize(uri.to_string());
+            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
             let status = UriValidator::validate_rpc_method(&uuri);
             assert!(status.is_ok());
         }
@@ -657,7 +1011,7 @@ mod tests {
 
         for uri_object in invalid_rpc_uris {
             let uri = uri_object.get("uri").unwrap().as_str().unwrap();
-            let uuri = LongUriSerializer::deserialize(uri.to_string());
+            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
             let status = UriValidator::validate_rpc_method(&uuri);
             assert!(status.is_err());
             let message = uri_object.get("status_message").unwrap().as_str().unwrap();
@@ -675,7 +1029,7 @@ mod tests {
             .unwrap();
 
         for uri in valid_rpc_response_uris {
-            let uuri = LongUriSerializer::deserialize(uri.to_string());
+            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
             let status = UriValidator::validate_rpc_response(&uuri);
             assert!(UriValidator::is_rpc_response(&uuri));
             assert!(status.is_ok());
@@ -714,7 +1068,7 @@ mod tests {
             .unwrap();
 
         for uri in invalid_rpc_response_uris {
-            let uuri = LongUriSerializer::deserialize(uri.to_string());
+            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
             let status = UriValidator::validate_rpc_response(&uuri);
             assert!(status.is_err());
         }

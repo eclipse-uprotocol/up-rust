@@ -17,7 +17,7 @@ use std::io::Write;
 
 use crate::uprotocol::{Remote, UAuthority, UEntity, UUri};
 use crate::uri::builder::resourcebuilder::UResourceBuilder;
-use crate::uri::serializer::uriserializer::UriSerializer;
+use crate::uri::serializer::{SerializationError, UriSerializer};
 use crate::uri::validator::UriValidator;
 
 const LOCAL_MICRO_URI_LENGTH: usize = 8; // local micro URI length
@@ -74,9 +74,9 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     /// # Returns
     /// A `Vec<u8>` representing the serialized `UUri`.
     #[allow(clippy::cast_possible_truncation)]
-    fn serialize(uri: &UUri) -> Vec<u8> {
+    fn serialize(uri: &UUri) -> Result<Vec<u8>, SerializationError> {
         if UriValidator::is_empty(uri) || !UriValidator::is_micro_form(uri) {
-            return vec![];
+            return Err(SerializationError::new("URI is empty or not in micro form"));
         }
 
         let mut cursor = Cursor::new(Vec::new());
@@ -98,7 +98,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                 match ip.len() {
                     4 => address_type = AddressType::IPv4,
                     16 => address_type = AddressType::IPv6,
-                    _ => return vec![],
+                    _ => return Err(SerializationError::new("Invalid IP address")),
                 }
                 remote_ip = Some(ip.to_vec());
             }
@@ -143,7 +143,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
             }
         }
 
-        cursor.into_inner()
+        Ok(cursor.into_inner())
     }
 
     /// Creates a `UUri` data object from a uProtocol micro URI.
@@ -155,14 +155,14 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     /// # Returns
     ///
     /// Returns a `UUri` data object.
-    fn deserialize(micro_uri: Vec<u8>) -> UUri {
+    fn deserialize(micro_uri: Vec<u8>) -> Result<UUri, SerializationError> {
         if micro_uri.len() < LOCAL_MICRO_URI_LENGTH {
-            return UUri::default();
+            return Err(SerializationError::new("URI is empty or not in micro form"));
         }
 
         // Need to be version 1
         if micro_uri[0] != 0x1 {
-            return UUri::default();
+            return Err(SerializationError::new("URI is not version 1"));
         }
 
         // RESOURCE_ID
@@ -170,23 +170,23 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
 
         let address_type = AddressType::from(micro_uri[1]);
         if address_type.is_none() {
-            return UUri::default();
+            return Err(SerializationError::new("Invalid address type"));
         }
 
         match address_type.unwrap() {
             AddressType::Local => {
                 if micro_uri.len() != LOCAL_MICRO_URI_LENGTH {
-                    return UUri::default();
+                    return Err(SerializationError::new("Invalid micro URI length"));
                 }
             }
             AddressType::IPv4 => {
                 if micro_uri.len() != IPV4_MICRO_URI_LENGTH {
-                    return UUri::default();
+                    return Err(SerializationError::new("Invalid micro URI length"));
                 }
             }
             AddressType::IPv6 => {
                 if micro_uri.len() != IPV6_MICRO_URI_LENGTH {
-                    return UUri::default();
+                    return Err(SerializationError::new("Invalid micro URI length"));
                 }
             }
             AddressType::ID => {}
@@ -221,7 +221,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
             AddressType::Local => {}
         }
 
-        UUri {
+        Ok(UUri {
             authority,
             entity: Some(UEntity {
                 id: Some(ue_id.into()),
@@ -229,7 +229,7 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
                 ..Default::default()
             }),
             resource: Some(UResourceBuilder::from_id(u32::from(uresource_id))),
-        }
+        })
     }
 }
 
@@ -245,9 +245,11 @@ mod tests {
     fn test_empty() {
         let uri = UUri::default();
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert_eq!(0, uprotocol_uri.len());
-        let uri2: UUri = MicroUriSerializer::deserialize(uprotocol_uri);
-        assert!(UriValidator::is_empty(&uri2))
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is empty or not in micro form"
+        );
     }
 
     #[test]
@@ -265,8 +267,10 @@ mod tests {
             ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
-        assert_eq!(uri, uri2)
+        assert!(uprotocol_uri.is_ok());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri.unwrap());
+        assert!(uri2.is_ok());
+        assert_eq!(uri, uri2.unwrap())
     }
 
     #[test]
@@ -286,70 +290,105 @@ mod tests {
             }),
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert!(uprotocol_uri.is_empty())
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is empty or not in micro form"
+        );
     }
 
     #[test]
     fn test_serialize_uri_missing_ids() {
         let uri = UUri {
             entity: Some(UEntity {
-                name: "hartley".to_string(),
+                name: "kaputt".to_string(),
                 ..Default::default()
             }),
             resource: Some(UResourceBuilder::for_rpc_response()),
             ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert!(uprotocol_uri.is_empty())
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is empty or not in micro form"
+        );
     }
 
     #[test]
     fn test_serialize_uri_missing_resource_ids() {
         let uri = UUri {
             entity: Some(UEntity {
-                name: "hartley".to_string(),
+                name: "kaputt".to_string(),
                 ..Default::default()
             }),
             ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert!(uprotocol_uri.is_empty())
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is empty or not in micro form"
+        );
     }
 
     #[test]
     fn test_deserialize_bad_microuri_length() {
         let bad_uri: Vec<u8> = vec![0x1, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
-        assert!(UriValidator::is_empty(&uprotocol_uri));
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is empty or not in micro form"
+        );
     }
 
     #[test]
     fn test_deserialize_bad_microuri_not_version_1() {
         let bad_uri: Vec<u8> = vec![0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
-        assert!(UriValidator::is_empty(&uprotocol_uri));
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is not version 1"
+        );
     }
 
     #[test]
     fn test_deserialize_bad_microuri_not_valid_address_type() {
         let bad_uri: Vec<u8> = vec![0x1, 0x5, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
-        assert!(UriValidator::is_empty(&uprotocol_uri));
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "Invalid address type"
+        );
     }
 
     #[test]
     fn test_deserialize_bad_microuri_valid_address_type_invalid_length() {
         let bad_uri: Vec<u8> = vec![0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
-        assert!(UriValidator::is_empty(&uprotocol_uri));
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "Invalid micro URI length"
+        );
 
         let bad_uri: Vec<u8> = vec![0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
-        assert!(UriValidator::is_empty(&uprotocol_uri));
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "Invalid micro URI length"
+        );
 
         let bad_uri: Vec<u8> = vec![0x1, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
-        assert!(UriValidator::is_empty(&uprotocol_uri));
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "Invalid micro URI length"
+        );
     }
 
     #[test]
@@ -368,12 +407,13 @@ mod tests {
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert!(!uprotocol_uri.is_empty());
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert!(!uprotocol_uri.as_ref().unwrap().is_empty());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri.unwrap());
+        assert!(uri2.as_ref().is_ok());
         assert!(UriValidator::is_micro_form(&uri));
-        assert!(UriValidator::is_micro_form(&uri2));
-        assert_eq!(uri.to_string(), uri2.to_string());
-        assert_eq!(uri, uri2);
+        assert!(UriValidator::is_micro_form(uri2.as_ref().unwrap()));
+        assert_eq!(uri.to_string(), uri2.as_ref().unwrap().to_string());
+        assert_eq!(uri, uri2.unwrap());
     }
 
     #[test]
@@ -395,12 +435,14 @@ mod tests {
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert!(!uprotocol_uri.is_empty());
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert!(uprotocol_uri.as_ref().is_ok());
+        assert!(!uprotocol_uri.as_ref().unwrap().is_empty());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri.unwrap());
+        assert!(uri2.as_ref().is_ok());
         assert!(UriValidator::is_micro_form(&uri));
-        assert!(UriValidator::is_micro_form(&uri2));
-        assert_eq!(uri.to_string(), uri2.to_string());
-        assert_eq!(uri, uri2);
+        assert!(UriValidator::is_micro_form(uri2.as_ref().unwrap()));
+        assert_eq!(uri.to_string(), uri2.as_ref().unwrap().to_string());
+        assert_eq!(uri, uri2.unwrap());
     }
 
     #[test]
@@ -424,12 +466,14 @@ mod tests {
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert!(!uprotocol_uri.is_empty());
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert!(uprotocol_uri.as_ref().is_ok());
+        assert!(!uprotocol_uri.as_ref().unwrap().is_empty());
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri.unwrap());
+        assert!(uri2.is_ok());
         assert!(UriValidator::is_micro_form(&uri));
-        assert!(UriValidator::is_micro_form(&uri2));
-        assert_eq!(uri.to_string(), uri2.to_string());
-        assert_eq!(uri, uri2);
+        assert!(UriValidator::is_micro_form(uri2.as_ref().unwrap()));
+        assert_eq!(uri.to_string(), uri2.as_ref().unwrap().to_string());
+        assert_eq!(uri, uri2.unwrap());
     }
 
     #[test]
@@ -447,7 +491,8 @@ mod tests {
             resource: Some(UResourceBuilder::for_rpc_request(None, Some(99))),
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert!(uprotocol_uri.is_empty());
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(uprotocol_uri.unwrap_err().to_string(), "Invalid IP address");
     }
 
     #[test]
@@ -471,10 +516,12 @@ mod tests {
         };
 
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
-        assert_eq!(uprotocol_uri.len(), 9 + size);
-        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri);
+        assert!(uprotocol_uri.as_ref().is_ok());
+        assert_eq!(uprotocol_uri.as_ref().unwrap().len(), 9 + size);
+        let uri2 = MicroUriSerializer::deserialize(uprotocol_uri.unwrap());
+        assert!(uri2.is_ok());
         assert!(UriValidator::is_micro_form(&uri));
-        assert!(UriValidator::is_micro_form(&uri2));
-        assert_eq!(uri, uri2);
+        assert!(UriValidator::is_micro_form(uri2.as_ref().unwrap()));
+        assert_eq!(uri, uri2.unwrap());
     }
 }
