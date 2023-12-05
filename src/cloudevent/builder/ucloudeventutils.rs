@@ -144,9 +144,7 @@ impl UCloudEventUtils {
     /// otherwise a `None` is returned.
     pub fn get_ttl(event: &Event) -> Option<u32> {
         if let Some(ExtensionValue::Integer(ttl)) = event.extension("ttl") {
-            if let Ok(ttl) = u32::try_from(*ttl) {
-                return Some(ttl);
-            }
+            return u32::try_from(*ttl).ok();
         }
         None
     }
