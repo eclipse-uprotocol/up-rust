@@ -14,18 +14,17 @@
 use uuid::Uuid;
 
 use crate::uprotocol::Uuid as uproto_Uuid;
-use crate::uuid::serializer::uuidserializer::UuidSerializer;
+use crate::uuid::serializer::{SerializationError, UuidSerializer};
 
 /// UUID Serializer interface used to serialize/deserialize UUIDs to/from a byte array
-
 pub struct MicroUuidSerializer;
 
 impl UuidSerializer<[u8; 16]> for MicroUuidSerializer {
-    fn serialize(uuid: &uproto_Uuid) -> [u8; 16] {
-        *Uuid::from(uuid.clone()).as_bytes()
+    fn serialize(uuid: &uproto_Uuid) -> Result<[u8; 16], SerializationError> {
+        Ok(*Uuid::from(uuid.clone()).as_bytes())
     }
 
-    fn deserialize(uuid: [u8; 16]) -> uproto_Uuid {
-        Uuid::from_bytes(uuid).into()
+    fn deserialize(uuid: [u8; 16]) -> Result<uproto_Uuid, SerializationError> {
+        Ok(Uuid::from_bytes(uuid).into())
     }
 }

@@ -12,9 +12,8 @@
  ********************************************************************************/
 
 use crate::uprotocol::{Remote, UUri};
+use crate::uri::serializer::SerializationError;
 use crate::uri::validator::UriValidator;
-
-use super::SerializationError;
 
 /// `UUri`s are used in transport layers and hence need to be serialized.
 ///
@@ -28,10 +27,15 @@ pub trait UriSerializer<T> {
     /// Deserialize from the format to a `UUri`.
     ///
     /// # Arguments
-    /// * `uri` - The serialized `UUri`.
+    /// * `uri` - The serialized `UUri` in format `T`.
     ///
     /// # Returns
-    /// Returns a `UUri` object from the serialized format from the wire.
+    /// Returns a `Result<UUri, SerializationError>` representing the deserialized `UUri` object from the serialized format.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `SerializationError` if the deserialization process fails. This can occur if the serialized input
+    /// is not in a valid format, is corrupt, or if other issues arise during the deserialization process.
     fn deserialize(uri: T) -> Result<UUri, SerializationError>;
 
     /// Serializes a `UUri` into a specific serialization format.
@@ -40,7 +44,12 @@ pub trait UriSerializer<T> {
     /// * `uri` - The `UUri` object to be serialized into the format `T`.
     ///
     /// # Returns
-    /// Returns the `UUri` in the transport serialized format.
+    /// Returns a `Result<T, SerializationError>` representing the serialized `UUri` in the specified format.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `SerializationError` if the serialization process fails. This may be due to reasons such as incompatible data
+    /// in the `UUri` that cannot be represented in the desired format, or errors that occur during the serialization process.
     fn serialize(uri: &UUri) -> Result<T, SerializationError>;
 
     /// Builds a fully resolved `UUri` from the serialized long format and the serialized micro format.

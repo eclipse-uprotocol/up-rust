@@ -12,6 +12,7 @@
  ********************************************************************************/
 
 use crate::uprotocol::Uuid;
+use crate::uuid::serializer::SerializationError;
 
 /// A UUID serializer interface used to serialize/deserialize UUIDs.
 ///
@@ -27,12 +28,17 @@ pub trait UuidSerializer<T> {
     ///
     /// # Arguments
     ///
-    /// * `uuid`: The serialized Uuid.
+    /// * `uuid`: The serialized Uuid in format `T`.
     ///
     /// # Returns
     ///
-    /// The deserialized Uuid object.
-    fn deserialize(uuid: T) -> Uuid;
+    /// The deserialized Uuid object as `Result<Uuid, SerializationError>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `SerializationError` if the deserialization process fails. This can happen if the provided serialized data
+    /// is not in the correct format, is corrupted, or if any other issues occur during the deserialization process.
+    fn deserialize(uuid: T) -> Result<Uuid, SerializationError>;
 
     /// Serialize from a Uuid to the given format.
     ///
@@ -42,6 +48,11 @@ pub trait UuidSerializer<T> {
     ///
     /// # Returns
     ///
-    /// The serialized Uuid.
-    fn serialize(uuid: &Uuid) -> T;
+    /// The serialized Uuid in format `T` as `Result<T, SerializationError>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `SerializationError` if the serialization process fails. This may occur if the Uuid object contains data
+    /// that cannot be serialized into the desired format or if an error occurs during the serialization process.
+    fn serialize(uuid: &Uuid) -> Result<T, SerializationError>;
 }

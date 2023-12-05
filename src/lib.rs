@@ -134,6 +134,7 @@ pub mod uuid {
         mod microuuidserializer;
         mod uuidserializer;
 
+        pub use crate::types::serializationerror::*;
         pub use longuuidserializer::*;
         pub use microuuidserializer::*;
         pub use uuidserializer::*;
