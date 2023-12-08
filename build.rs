@@ -32,6 +32,13 @@ fn main() -> std::io::Result<()> {
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/upayload.proto",
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/umessage.proto",
             "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/ustatus.proto",
+
+            // not used in the SDK yet, but for completeness sake
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/file.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uprotocol_options.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/udiscovery/v3/udiscovery.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/usubscription/v3/usubscription.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/utwin/v1/utwin.proto",
         ]
     ) {
         let error_message = format!("Failed to fetch and build protobuf file: {err:?}");
