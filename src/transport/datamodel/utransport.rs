@@ -12,7 +12,6 @@
  ********************************************************************************/
 
 use async_trait::async_trait;
-use std::sync::mpsc::Sender;
 
 use crate::uprotocol::{UAttributes, UEntity, UMessage, UPayload, UStatus, UUri};
 
@@ -49,18 +48,18 @@ pub trait UTransport {
         attributes: UAttributes,
     ) -> Result<(), UStatus>;
 
-    /// Registers a listener to be called when `UPayload` is received for the specific topic.
+    /// Registers a listener to be called asynchronously when `UMessage` is received for the specified topic.
     ///
     /// # Arguments
-    /// * `topic` - Resolved `UUri` for where the message arrived via the underlying transport technology.
-    /// * `listener` - The method to execute to process the data for the topic.
+    /// * `topic` - Resolved `UUri` indicating the topic for which the listener is registered.
+    /// * `listener` - A boxed closure (or function pointer) that takes `UMessage` as an argument and returns nothing. The closure is executed to process the data for the topic. It must be `Send` and `'static` to allow transfer across threads and a stable lifetime.
     ///
     /// # Returns
-    /// Returns a String containing an identifier that can be used for unregistering later, otherwise an Err(UStatus) with the appropriate failure information.
+    /// Asynchronously returns a `Result<String, UStatus>`. On success, returns a `String` containing an identifier that can be used for unregistering the listener later. On failure, returns `Err(UStatus)` with the appropriate failure information.
     async fn register_listener(
         &self,
         topic: UUri,
-        listener: Sender<UMessage>,
+        listener: Box<dyn Fn(UMessage) + Send + 'static>,
     ) -> Result<String, UStatus>;
 
     /// Unregister a listener for a given topic. Messages arriving on this topic will no longer be processed
