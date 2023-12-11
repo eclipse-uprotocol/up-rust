@@ -169,7 +169,7 @@ pub mod uprotocol {
         // this re-export is necessary to accomodate the package/reference structure of the uprotocol uproto files (included below)
         pub(crate) use crate::uprotocol::{UCode, UMessage, UStatus, UUri, UUriBatch};
     }
-    mod core {
+    pub mod core {
         pub mod udiscovery {
             pub mod v3 {
                 include!(concat!(env!("OUT_DIR"), "/uprotocol.core.udiscovery.v3.rs"));
@@ -188,16 +188,6 @@ pub mod uprotocol {
                 include!(concat!(env!("OUT_DIR"), "/uprotocol.core.utwin.v1.rs"));
             }
         }
-    }
-    // Re-export types with slightly less cumbersome crate names
-    pub mod udiscovery {
-        pub use crate::uprotocol::core::udiscovery::v3::*;
-    }
-    pub mod usubscription {
-        pub use crate::uprotocol::core::usubscription::v3::*;
-    }
-    pub mod utwin {
-        pub use crate::uprotocol::core::utwin::v1::*;
     }
 }
 
