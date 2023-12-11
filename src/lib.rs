@@ -162,6 +162,43 @@ pub mod uprotocol {
 
     pub use u_authority::Remote;
     pub use u_payload::Data;
+
+    // This is to make the more specialized uprotocol types available within the SDK scope;
+    // not required by the code, so not sure whether it'll stay in.
+    mod v1 {
+        // this re-export is necessary to accomodate the package/reference structure of the uprotocol uproto files (included below)
+        pub(crate) use crate::uprotocol::{UCode, UMessage, UStatus, UUri, UUriBatch};
+    }
+    mod core {
+        pub mod udiscovery {
+            pub mod v3 {
+                include!(concat!(env!("OUT_DIR"), "/uprotocol.core.udiscovery.v3.rs"));
+            }
+        }
+        pub mod usubscription {
+            pub mod v3 {
+                include!(concat!(
+                    env!("OUT_DIR"),
+                    "/uprotocol.core.usubscription.v3.rs"
+                ));
+            }
+        }
+        pub mod utwin {
+            pub mod v1 {
+                include!(concat!(env!("OUT_DIR"), "/uprotocol.core.utwin.v1.rs"));
+            }
+        }
+    }
+    // Re-export types with slightly less cumbersome crate names
+    pub mod udiscovery {
+        pub use crate::uprotocol::core::udiscovery::v3::*;
+    }
+    pub mod usubscription {
+        pub use crate::uprotocol::core::usubscription::v3::*;
+    }
+    pub mod utwin {
+        pub use crate::uprotocol::core::utwin::v1::*;
+    }
 }
 
 #[allow(non_snake_case)]
