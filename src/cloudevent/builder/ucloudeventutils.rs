@@ -18,21 +18,13 @@ use cloudevents::{AttributesReader, Data, Event, EventBuilder, EventBuilderV10};
 use prost::Message;
 use prost_types::Any;
 use std::time::SystemTime;
-use uuid::Uuid;
 
-use crate::transport::datamodel::UCode;
+use crate::uprotocol::{UCode, Uuid};
 use crate::uuid::builder::UuidUtils;
 
-/// Code to extract information from a CloudEvent
+/// Code to extract information from a `CloudEvent`
 #[derive(Debug)]
-pub struct UCloudEvent;
-
-pub trait EventConversionExt {
-    // Convert cloudevents::Event to prost_types::Any
-    fn to_any(&self) -> prost_types::Any;
-    // Convert prost_types::Any to cloudevents::Event
-    fn from_any(any: prost_types::Any) -> Result<cloudevents::Event, ConversionError>;
-}
+pub struct UCloudEventUtils;
 
 // Define a custom error for the conversion
 #[derive(Debug)]
@@ -46,41 +38,10 @@ impl std::fmt::Display for ConversionError {
 
 impl std::error::Error for ConversionError {}
 
-impl UCloudEvent {
-    /// Pretty prints a `CloudEvent` showing only its id, source, type, and possibly a sink.
-    ///
-    /// This function is primarily intended for logging purposes.
-    ///
-    /// # Arguments
-    ///
-    /// * `cloudEvent` - The `CloudEvent` instance that we wish to format as a pretty string.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `String` representation of the `CloudEvent` highlighting only its id, source, type, and potentially a sink.
-    pub fn to_string(event: &Event) -> String {
-        if let Some(sink) = UCloudEvent::get_sink(event) {
-            format!(
-                "CloudEvent{{id='{}', source='{}', sink='{}', type='{}'}}",
-                event.id(),
-                event.source(),
-                sink,
-                event.ty()
-            )
-        } else {
-            format!(
-                "CloudEvent{{id='{}', source='{}', type='{}'}}",
-                event.id(),
-                event.source(),
-                event.ty()
-            )
-        }
-    }
-
+impl UCloudEventUtils {
     /// Extracts the source from a cloud event.
     ///
-    /// The source is a mandatory attribute. The CloudEvent constructor does not
-    /// allow creating a cloud event without a source.
+    /// The source is a mandatory attribute. The `CloudEvent` constructor does not allow creating a cloud event without a source.
     ///
     /// # Arguments
     ///
@@ -183,7 +144,7 @@ impl UCloudEvent {
     /// otherwise a `None` is returned.
     pub fn get_ttl(event: &Event) -> Option<u32> {
         if let Some(ExtensionValue::Integer(ttl)) = event.extension("ttl") {
-            return Some(*ttl as u32);
+            return u32::try_from(*ttl).ok();
         }
         None
     }
@@ -205,28 +166,6 @@ impl UCloudEvent {
             return Some(token.to_string());
         }
         None
-    }
-
-    /// Extracts the integer value of the communication status attribute from a cloud event.
-    ///
-    /// The communication status attribute is optional. If there was a platform communication error
-    /// that occurred while delivering this cloud event, it will be indicated in this attribute.
-    /// If the attribute does not exist, it is assumed that everything was `UCode::OK_VALUE`.
-    ///
-    /// # Arguments
-    ///
-    /// * `event` - The `CloudEvent` from which the communication status is to be extracted.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `Code` value that indicates a platform communication error while delivering this
-    /// `CloudEvent` or `UCode::OK_VALUE`.
-    pub fn get_timestamp(event: &Event) -> Option<u64> {
-        let id = event.id();
-        match Uuid::parse_str(id) {
-            Ok(uuid) => UuidUtils::get_time(&uuid),
-            Err(_) => None,
-        }
     }
 
     /// Extracts the communication status attribute from the provided `Event`.
@@ -260,7 +199,7 @@ impl UCloudEvent {
     ///
     /// Returns `true` if the provided `CloudEvent` is marked with having a platform delivery problem.
     pub fn has_communication_problem(event: &Event) -> bool {
-        UCloudEvent::get_communication_status(event).is_some_and(|c: i64| c != UCode::Ok as i64)
+        matches!(UCloudEventUtils::get_communication_status(event), Some(c) if c != UCode::Ok as i64)
     }
 
     /// Returns a new `Event` from the supplied `Event`, with the platform communication added.
@@ -273,6 +212,10 @@ impl UCloudEvent {
     /// # Returns
     ///
     /// A new `Event` from the supplied `Event`, with the platform communication added.
+    ///
+    /// # Panics
+    ///
+    /// - if the `CloudEventBuilder` fails to build the `CloudEvent`.
     pub fn add_communication_status(event: Event, communication_status: i64) -> Event {
         let ce = EventBuilderV10::from(event);
 
@@ -291,11 +234,7 @@ impl UCloudEvent {
     ///
     /// An `Option<u64>` containing the timestamp from the UUIDV8 `Event` Id or `None` if the timestamp can't be extracted.
     pub fn get_creation_timestamp(event: &Event) -> Option<u64> {
-        let cloud_event_id = event.id();
-        match Uuid::parse_str(cloud_event_id) {
-            Ok(uuid) => Some(UuidUtils::get_time(&uuid).expect("Failed to get time from UUID")),
-            Err(_) => None,
-        }
+        UuidUtils::get_time(&Uuid::from(event.id()))
     }
 
     /// Calculates if an `Event` configured with a creation time and a `ttl` attribute is expired.
@@ -310,12 +249,12 @@ impl UCloudEvent {
     ///
     /// Returns `true` if the `Event` was configured with a `ttl` greater than 0 and a creation time to compare for expiration.
     pub fn is_expired_by_cloud_event_creation_date(event: &Event) -> bool {
-        match UCloudEvent::get_ttl(event) {
+        match UCloudEventUtils::get_ttl(event) {
             Some(ttl) if ttl > 0 => {
                 if let Some(cloud_event_creation_time) = event.time() {
                     let now = Utc::now();
                     let creation_time_plus_ttl =
-                        *cloud_event_creation_time + Duration::milliseconds(ttl as i64);
+                        *cloud_event_creation_time + Duration::milliseconds(i64::from(ttl));
                     return now > creation_time_plus_ttl;
                 }
             }
@@ -324,7 +263,7 @@ impl UCloudEvent {
         false
     }
 
-    /// Calculates if an `Event` configured with a UUIDv8 id and a `ttl` attribute is expired.
+    /// Calculates if an `Event` configured with a `UUIDv8` id and a `ttl` attribute is expired.
     ///
     /// The `ttl` attribute configures how long this event should live for after it was generated (in milliseconds).
     ///
@@ -334,31 +273,36 @@ impl UCloudEvent {
     ///
     /// # Returns
     ///
-    /// Returns `true` if the `Event` was configured with a `ttl` greater than 0 and a UUIDv8 id to compare for expiration.
+    /// Returns `true` if the `Event` was configured with a `ttl` greater than 0 and a `UUIDv8` id to compare for expiration.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the current system time is earlier than the UNIX epoch. This can occur when calling
+    /// `SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)` if the system time is set to a date before January 1, 1970.
+    /// The panic message will be "Time went backwards". This is an unusual scenario and typically indicates a significant
+    /// system clock error.
     pub fn is_expired(event: &Event) -> bool {
-        let maybe_ttl = UCloudEvent::get_ttl(event);
+        let maybe_ttl = UCloudEventUtils::get_ttl(event);
         match maybe_ttl {
             Some(ttl) if ttl > 0 => {
-                let cloud_event_id = event.id();
-                match Uuid::parse_str(cloud_event_id) {
-                    Ok(uuid) => {
-                        let event_time =
-                            UuidUtils::get_time(&uuid).expect("Failed to get time from UUID");
-                        let now = SystemTime::now()
-                            .duration_since(SystemTime::UNIX_EPOCH)
-                            .expect("Time went backwards")
-                            .as_millis();
-                        let delta = now as u64 - event_time;
-                        delta >= ttl as u64
-                    }
-                    Err(_) => false,
+                let uuid = Uuid::from(event.id());
+                if let Some(event_time) = UuidUtils::get_time(&uuid) {
+                    let now = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .expect("Time went backwards")
+                        .as_millis();
+
+                    let delta = now - u128::from(event_time);
+                    delta >= u128::from(ttl)
+                } else {
+                    false
                 }
             }
             _ => false,
         }
     }
 
-    /// Checks if an `Event` has a UUIDv8 id.
+    /// Checks if an `Event` has a `UUIDv8` id.
     ///
     /// # Arguments
     ///
@@ -366,13 +310,9 @@ impl UCloudEvent {
     ///
     /// # Returns
     ///
-    /// Returns `true` if the `Event` has a valid UUIDv8 id.
+    /// Returns `true` if the `Event` has a valid `UUIDv8` id.
     pub fn is_cloud_event_id(event: &Event) -> bool {
-        let cloud_event_id = event.id();
-        match Uuid::parse_str(cloud_event_id) {
-            Ok(uuid) => UuidUtils::is_valid_uuid(&uuid),
-            Err(_) => false,
-        }
+        UuidUtils::is_uuid(&Uuid::from(event.id()))
     }
 
     /// Extracts the payload from the `Event` as a protobuf `Any` object.
@@ -388,7 +328,7 @@ impl UCloudEvent {
     ///
     /// Returns the payload from the `Event` as a Protobuf `Any` object.
     pub fn get_payload(event: &Event) -> Any {
-        if let Some(buffer) = UCloudEvent::serialize_event_data_into_bytes(event) {
+        if let Some(buffer) = UCloudEventUtils::serialize_event_data_into_bytes(event) {
             if let Ok(any) = prost_types::Any::decode(buffer.as_slice()) {
                 return any;
             }
@@ -413,8 +353,14 @@ impl UCloudEvent {
     /// # Returns
     ///
     /// Returns a `Result` containing the unpacked message of type `T` or a decoding error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `prost::DecodeError` in the following case:
+    ///
+    /// - If the function fails to decode the payload of the `Event` into the specified type `T`. This can occur if the payload does not conform to the expected format required for `T`, or if there are issues during the decoding process (such as incorrect field types, missing required fields, etc.). The `prost::DecodeError` will contain details about the specific nature of the decoding failure.
     pub fn unpack<T: Message + Default>(event: &Event) -> Result<T, prost::DecodeError> {
-        let any_payload = UCloudEvent::get_payload(event);
+        let any_payload = UCloudEventUtils::get_payload(event);
         let buffer = Bytes::from(any_payload.value);
 
         T::decode(buffer)
@@ -442,6 +388,36 @@ impl UCloudEvent {
         }
     }
 
+    /// Pretty prints a `CloudEvent` showing only its id, source, type, and possibly a sink.
+    ///
+    /// This function is primarily intended for logging purposes.
+    ///
+    /// # Arguments
+    ///
+    /// * `cloudEvent` - The `CloudEvent` instance that we wish to format as a pretty string.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `String` representation of the `CloudEvent` highlighting only its id, source, type, and potentially a sink.
+    pub fn to_string(event: &Event) -> String {
+        if let Some(sink) = UCloudEventUtils::get_sink(event) {
+            format!(
+                "CloudEvent{{id='{}', source='{}', sink='{}', type='{}'}}",
+                event.id(),
+                event.source(),
+                sink,
+                event.ty()
+            )
+        } else {
+            format!(
+                "CloudEvent{{id='{}', source='{}', type='{}'}}",
+                event.id(),
+                event.source(),
+                event.ty()
+            )
+        }
+    }
+
     /// Extracts the `String` value of a specified extension from a `CloudEvent`.
     ///
     /// # Arguments
@@ -457,7 +433,9 @@ impl UCloudEvent {
         extension_name: &str,
     ) -> Option<String> {
         if event.extension(extension_name).is_some() {
-            event.extension(extension_name).map(|ext| ext.to_string())
+            event
+                .extension(extension_name)
+                .map(std::string::ToString::to_string)
         } else {
             None
         }
@@ -478,7 +456,7 @@ impl UCloudEvent {
         event: &Event,
         extension_name: &str,
     ) -> Option<i32> {
-        UCloudEvent::extract_string_value_from_extension(event, extension_name)
+        UCloudEventUtils::extract_string_value_from_extension(event, extension_name)
             .and_then(|s| s.parse::<i32>().ok())
     }
 }
@@ -487,12 +465,11 @@ impl UCloudEvent {
 mod tests {
     use super::*;
     use crate::cloudevent::builder::UCloudEventBuilder;
-    use crate::cloudevent::datamodel::ucloudeventattributes::{Priority, UCloudEventAttributes};
-    use crate::cloudevent::datamodel::ucloudeventtype::UCloudEventType;
+    use crate::cloudevent::datamodel::UCloudEventAttributes;
     use crate::proto::CloudEvent;
-    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::uprotocol::{UEntity, UMessageType, UPriority, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::{UUIDFactory, UUIDv8Factory};
+    use crate::uuid::builder::UUIDv8Builder;
 
     use chrono::{offset, TimeZone, Utc};
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
@@ -504,7 +481,7 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let source = UCloudEvent::get_source(&cloud_event);
+        let source = UCloudEventUtils::get_source(&cloud_event);
 
         assert_eq!(
             Some("/body.access//door.front_left#Door".to_string()),
@@ -522,7 +499,7 @@ mod tests {
             .build()
             .expect("Failed to build the cloud event");
 
-        let sink = UCloudEvent::get_sink(&cloud_event);
+        let sink = UCloudEventUtils::get_sink(&cloud_event);
         assert_eq!(Some(sink_for_test.to_string()), sink);
     }
 
@@ -531,7 +508,7 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let sink = UCloudEvent::get_sink(&cloud_event);
+        let sink = UCloudEventUtils::get_sink(&cloud_event);
 
         assert!(sink.is_none());
     }
@@ -543,7 +520,7 @@ mod tests {
 
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let request_id = UCloudEvent::get_request_id(&cloud_event);
+        let request_id = UCloudEventUtils::get_request_id(&cloud_event);
 
         assert_eq!(Some("someRequestId".to_string()), request_id);
     }
@@ -554,7 +531,7 @@ mod tests {
 
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let request_id = UCloudEvent::get_request_id(&cloud_event);
+        let request_id = UCloudEventUtils::get_request_id(&cloud_event);
 
         assert_eq!(None, request_id);
     }
@@ -572,7 +549,7 @@ mod tests {
 
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let request_id = UCloudEvent::get_request_id(&cloud_event);
+        let request_id = UCloudEventUtils::get_request_id(&cloud_event);
 
         assert_eq!(None, request_id);
     }
@@ -582,7 +559,7 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let hash_value = UCloudEvent::get_hash(&cloud_event);
+        let hash_value = UCloudEventUtils::get_hash(&cloud_event);
 
         assert_eq!(Some("somehash".to_string()), hash_value);
     }
@@ -593,7 +570,7 @@ mod tests {
         let mut cloud_event: Event = builder.build().expect("Failed to build the cloud event");
         cloud_event.remove_extension("hash");
 
-        let hash_value = UCloudEvent::get_hash(&cloud_event);
+        let hash_value = UCloudEventUtils::get_hash(&cloud_event);
 
         assert!(hash_value.is_none());
     }
@@ -603,9 +580,9 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let priority = UCloudEvent::get_priority(&cloud_event);
+        let priority = UCloudEventUtils::get_priority(&cloud_event);
 
-        assert_eq!(Some(Priority::Standard.to_string()), priority);
+        assert_eq!(UPriority::UpriorityCs0.as_str_name(), priority.unwrap());
     }
 
     #[test]
@@ -614,7 +591,7 @@ mod tests {
         let mut cloud_event: Event = builder.build().expect("Failed to build the cloud event");
         cloud_event.remove_extension("priority");
 
-        let priority = UCloudEvent::get_priority(&cloud_event);
+        let priority = UCloudEventUtils::get_priority(&cloud_event);
 
         assert!(priority.is_none());
     }
@@ -624,7 +601,7 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let ttl = UCloudEvent::get_ttl(&cloud_event);
+        let ttl = UCloudEventUtils::get_ttl(&cloud_event);
 
         assert_eq!(Some(3), ttl);
     }
@@ -635,7 +612,7 @@ mod tests {
         let mut cloud_event: Event = builder.build().expect("Failed to build the cloud event");
         cloud_event.remove_extension("ttl");
 
-        let ttl = UCloudEvent::get_ttl(&cloud_event);
+        let ttl = UCloudEventUtils::get_ttl(&cloud_event);
 
         assert!(ttl.is_none());
     }
@@ -645,7 +622,7 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let token = UCloudEvent::get_token(&cloud_event);
+        let token = UCloudEventUtils::get_token(&cloud_event);
 
         assert_eq!(Some("someOAuthToken".to_string()), token);
     }
@@ -656,7 +633,7 @@ mod tests {
         let mut cloud_event: Event = builder.build().expect("Failed to build the cloud event");
         cloud_event.remove_extension("token");
 
-        let token = UCloudEvent::get_token(&cloud_event);
+        let token = UCloudEventUtils::get_token(&cloud_event);
 
         assert!(token.is_none());
     }
@@ -667,8 +644,8 @@ mod tests {
         let mut cloud_event: Event = builder.build().expect("Failed to build the cloud event");
         cloud_event.set_extension("commstatus", UCode::Aborted as i64);
 
-        let has_communication_problem = UCloudEvent::has_communication_problem(&cloud_event);
-        let communication_status = UCloudEvent::get_communication_status(&cloud_event);
+        let has_communication_problem = UCloudEventUtils::has_communication_problem(&cloud_event);
+        let communication_status = UCloudEventUtils::get_communication_status(&cloud_event);
 
         assert!(has_communication_problem);
         assert_eq!(Some(UCode::Aborted as i64), communication_status);
@@ -679,8 +656,8 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let has_communication_problem = UCloudEvent::has_communication_problem(&cloud_event);
-        let communication_status = UCloudEvent::get_communication_status(&cloud_event);
+        let has_communication_problem = UCloudEventUtils::has_communication_problem(&cloud_event);
+        let communication_status = UCloudEventUtils::get_communication_status(&cloud_event);
 
         assert!(!has_communication_problem);
         assert_eq!(Some(UCode::Ok as i64), communication_status);
@@ -692,8 +669,8 @@ mod tests {
         builder = builder.extension("commstatus", "boom");
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let has_communication_problem = UCloudEvent::has_communication_problem(&cloud_event);
-        let communication_status = UCloudEvent::get_communication_status(&cloud_event);
+        let has_communication_problem = UCloudEventUtils::has_communication_problem(&cloud_event);
+        let communication_status = UCloudEventUtils::get_communication_status(&cloud_event);
 
         assert!(!has_communication_problem);
         assert_eq!(Some(UCode::Ok as i64), communication_status);
@@ -705,7 +682,7 @@ mod tests {
         builder = builder.extension("commstatus", UCode::InvalidArgument as i64);
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let communication_status = UCloudEvent::get_communication_status(&cloud_event);
+        let communication_status = UCloudEventUtils::get_communication_status(&cloud_event);
 
         assert_eq!(Some(UCode::InvalidArgument as i64), communication_status);
     }
@@ -715,7 +692,7 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let communication_status = UCloudEvent::get_communication_status(&cloud_event);
+        let communication_status = UCloudEventUtils::get_communication_status(&cloud_event);
 
         assert_eq!(Some(UCode::Ok as i64), communication_status);
     }
@@ -727,21 +704,21 @@ mod tests {
 
         assert_eq!(
             Some(UCode::Ok as i64),
-            UCloudEvent::get_communication_status(&cloud_event)
+            UCloudEventUtils::get_communication_status(&cloud_event)
         );
 
-        let updated_cloud_event = UCloudEvent::add_communication_status(
+        let updated_cloud_event = UCloudEventUtils::add_communication_status(
             cloud_event.clone(),
             UCode::DeadlineExceeded as i64,
         );
 
         assert_eq!(
             Some(UCode::DeadlineExceeded as i64),
-            UCloudEvent::get_communication_status(&updated_cloud_event)
+            UCloudEventUtils::get_communication_status(&updated_cloud_event)
         );
         assert_eq!(
             Some(UCode::Ok as i64),
-            UCloudEvent::get_communication_status(&cloud_event)
+            UCloudEventUtils::get_communication_status(&cloud_event)
         );
     }
 
@@ -750,18 +727,18 @@ mod tests {
         let builder = build_base_cloud_event_for_test();
         let cloud_event: Event = builder.build().expect("Failed to build the cloud event");
 
-        let creation_timestamp = UCloudEvent::get_timestamp(&cloud_event);
+        let creation_timestamp = UCloudEventUtils::get_creation_timestamp(&cloud_event);
 
         assert!(creation_timestamp.is_none());
     }
 
     #[test]
     fn test_extract_creation_timestamp_from_cloud_event_uuidv8_id_when_uuidv8_id_is_valid() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test();
         let cloud_event = builder.id(uuid.to_string()).build().unwrap();
 
-        let maybe_creation_timestamp = UCloudEvent::get_timestamp(&cloud_event);
+        let maybe_creation_timestamp = UCloudEventUtils::get_creation_timestamp(&cloud_event);
         assert!(maybe_creation_timestamp.is_some());
 
         let creation_timestamp = maybe_creation_timestamp.unwrap();
@@ -781,7 +758,7 @@ mod tests {
         let mut cloud_event: Event = builder.build().expect("Failed to build the cloud event");
         cloud_event.remove_extension("ttl");
 
-        assert!(!UCloudEvent::is_expired_by_cloud_event_creation_date(
+        assert!(!UCloudEventUtils::is_expired_by_cloud_event_creation_date(
             &cloud_event
         ));
     }
@@ -792,7 +769,7 @@ mod tests {
         builder = builder.extension("ttl", 0);
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired_by_cloud_event_creation_date(
+        assert!(!UCloudEventUtils::is_expired_by_cloud_event_creation_date(
             &cloud_event
         ));
     }
@@ -803,7 +780,7 @@ mod tests {
         builder = builder.extension("ttl", -1);
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired_by_cloud_event_creation_date(
+        assert!(!UCloudEventUtils::is_expired_by_cloud_event_creation_date(
             &cloud_event
         ));
     }
@@ -814,7 +791,7 @@ mod tests {
 
         let builder = cloudevents::EventBuilderV10::new()
             .id("id")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source("/body.accss//door.front_left#Door")
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -824,7 +801,7 @@ mod tests {
             .extension("ttl", 3);
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired_by_cloud_event_creation_date(
+        assert!(!UCloudEventUtils::is_expired_by_cloud_event_creation_date(
             &cloud_event
         ));
     }
@@ -836,7 +813,7 @@ mod tests {
             .extension("ttl", 500);
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired_by_cloud_event_creation_date(
+        assert!(!UCloudEventUtils::is_expired_by_cloud_event_creation_date(
             &cloud_event
         ));
     }
@@ -849,7 +826,7 @@ mod tests {
             .extension("ttl", 500);
         let cloud_event = builder.build().unwrap();
 
-        assert!(UCloudEvent::is_expired_by_cloud_event_creation_date(
+        assert!(UCloudEventUtils::is_expired_by_cloud_event_creation_date(
             &cloud_event
         ));
     }
@@ -862,7 +839,7 @@ mod tests {
             .extension("ttl", 500);
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired_by_cloud_event_creation_date(
+        assert!(!UCloudEventUtils::is_expired_by_cloud_event_creation_date(
             &cloud_event
         ));
     }
@@ -874,7 +851,7 @@ mod tests {
         let mut cloud_event = builder.build().unwrap();
         cloud_event.remove_extension("ttl");
 
-        assert!(!UCloudEvent::is_expired(&cloud_event));
+        assert!(!UCloudEventUtils::is_expired(&cloud_event));
     }
 
     #[test]
@@ -885,29 +862,29 @@ mod tests {
             .id(uuid.to_string());
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired(&cloud_event));
+        assert!(!UCloudEventUtils::is_expired(&cloud_event));
     }
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_minus_one() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", -1)
             .id(uuid.to_string());
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired(&cloud_event));
+        assert!(!UCloudEventUtils::is_expired(&cloud_event));
     }
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_large_number_mili() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", i64::MAX)
             .id(uuid.to_string());
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_expired(&cloud_event));
+        assert!(!UCloudEventUtils::is_expired(&cloud_event));
     }
 
     #[test]
@@ -915,7 +892,7 @@ mod tests {
         use std::thread;
         use std::time::Duration;
 
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 1)
             .id(uuid.to_string());
@@ -923,27 +900,27 @@ mod tests {
 
         thread::sleep(Duration::from_millis(800));
 
-        assert!(UCloudEvent::is_expired(&cloud_event));
+        assert!(UCloudEventUtils::is_expired(&cloud_event));
     }
 
     #[test]
     fn test_cloudevent_has_a_v8_uuid() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test().id(uuid.to_string());
         let cloud_event = builder.build().unwrap();
 
-        assert!(UCloudEvent::is_cloud_event_id(&cloud_event));
+        assert!(UCloudEventUtils::is_cloud_event_id(&cloud_event));
     }
 
     #[test]
     fn test_cloudevent_does_not_have_a_v8_uuid() {
-        let uuid = Uuid::new_v4();
+        let uuid = uuid::Uuid::new_v4();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 3)
             .id(uuid.to_string());
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_cloud_event_id(&cloud_event));
+        assert!(!UCloudEventUtils::is_cloud_event_id(&cloud_event));
     }
 
     #[test]
@@ -951,7 +928,7 @@ mod tests {
         let builder = build_base_cloud_event_for_test().extension("ttl", 3);
         let cloud_event = builder.build().unwrap();
 
-        assert!(!UCloudEvent::is_cloud_event_id(&cloud_event));
+        assert!(!UCloudEventUtils::is_cloud_event_id(&cloud_event));
     }
 
     #[test]
@@ -962,17 +939,17 @@ mod tests {
 
         let builder = cloudevents::EventBuilderV10::new()
             .id("someid")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source("/body.accss//door.front_left#Door")
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
-                format!("proto://{}", any_payload.type_url.clone()),
+                format!("proto://{}", any_payload.type_url),
                 any_bytes,
             )
             .extension("ttl", 3);
         let cloud_event = builder.build().unwrap();
 
-        let extracted = UCloudEvent::get_payload(&cloud_event);
+        let extracted = UCloudEventUtils::get_payload(&cloud_event);
 
         assert_eq!(any_payload, extracted);
     }
@@ -985,7 +962,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             // The url crate does not accept URLs without a base
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
@@ -996,10 +973,10 @@ mod tests {
             .build()
             .unwrap();
 
-        let buffer = UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap();
+        let buffer = UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap();
         let parsed_any = prost_types::Any::decode(buffer.as_slice()).ok().unwrap();
 
-        let payload_any = UCloudEvent::get_payload(&cloud_event);
+        let payload_any = UCloudEventUtils::get_payload(&cloud_event);
 
         assert_eq!(parsed_any, payload_any);
     }
@@ -1008,7 +985,7 @@ mod tests {
     fn test_extract_payload_from_cloud_event_when_payload_is_bad_proto_object() {
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             // The url crate does not accept URLs without a base
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
@@ -1023,7 +1000,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let extracted = UCloudEvent::get_payload(&cloud_event);
+        let extracted = UCloudEventUtils::get_payload(&cloud_event);
 
         assert_eq!(Any::default(), extracted);
     }
@@ -1032,11 +1009,11 @@ mod tests {
     fn test_extract_payload_from_cloud_event_as_any_proto_object_when_no_schema() {
         let payload_for_cloud_event = build_proto_payload_for_test();
         let cloud_event_data =
-            UCloudEvent::serialize_event_data_into_bytes(&payload_for_cloud_event).unwrap();
+            UCloudEventUtils::serialize_event_data_into_bytes(&payload_for_cloud_event).unwrap();
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1045,7 +1022,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let extracted = UCloudEvent::get_payload(&cloud_event);
+        let extracted = UCloudEventUtils::get_payload(&cloud_event);
 
         assert_eq!(cloud_event_data, extracted.encode_to_vec());
     }
@@ -1056,7 +1033,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1066,7 +1043,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let extracted = UCloudEvent::get_payload(&cloud_event);
+        let extracted = UCloudEventUtils::get_payload(&cloud_event);
 
         assert_eq!(Any::default(), extracted);
     }
@@ -1076,7 +1053,7 @@ mod tests {
         // Creating a protobuf CloudEvent message
         let source_event = cloudevents::EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source(Url::parse("up://VCU.MY_CAR_VIN/someService").unwrap())
             .ty("example.demo")
             .data(
@@ -1086,13 +1063,13 @@ mod tests {
             .build()
             .unwrap();
 
-        let proto_event = CloudEvent::from(source_event.clone());
+        let proto_event = CloudEvent::from(source_event);
         let bytes = proto_event.encode_to_vec();
 
         // Creating the CloudEvent
         let cloud_event = EventBuilderV10::new()
             .id("someId")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1102,7 +1079,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let nb = UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap();
+        let nb = UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap();
         let extracted: Result<CloudEvent, prost::DecodeError> = CloudEvent::decode(nb.as_slice());
 
         assert!(extracted.is_ok());
@@ -1133,7 +1110,7 @@ mod tests {
             .unwrap();
 
         // Try to unpack the event data into a proto::CloudEventProto
-        let nb = UCloudEvent::serialize_event_data_into_bytes(&cloud_event).unwrap();
+        let nb = UCloudEventUtils::serialize_event_data_into_bytes(&cloud_event).unwrap();
         let extracted: Result<CloudEvent, prost::DecodeError> = CloudEvent::decode(nb.as_slice());
 
         // Assert that the extraction was unsuccessful (since we used non-protobuf data)
@@ -1149,7 +1126,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let pretty_print = UCloudEvent::to_string(&cloud_event);
+        let pretty_print = UCloudEventUtils::to_string(&cloud_event);
 
         let expected = "CloudEvent{id='testme', source='/body.access//door.front_left#Door', \
                     sink='//bo.cloud/petapp/1/rpc.response', type='pub.v1'}";
@@ -1161,7 +1138,7 @@ mod tests {
     fn test_pretty_printing_a_cloudevent_without_a_sink() {
         let cloud_event = build_base_cloud_event_for_test().build().unwrap();
 
-        let pretty_print = UCloudEvent::to_string(&cloud_event);
+        let pretty_print = UCloudEventUtils::to_string(&cloud_event);
 
         let expected =
             "CloudEvent{id='testme', source='/body.access//door.front_left#Door', type='pub.v1'}";
@@ -1170,19 +1147,23 @@ mod tests {
     }
 
     fn build_base_cloud_event_for_test() -> EventBuilderV10 {
-        let ue = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(ue),
-            Some(UResource::new(
-                "door".to_string(),
-                Some(String::from("front_left")),
-                Some(String::from("Door")),
-                None,
-                false,
-            )),
-        );
-        let source = LongUriSerializer::serialize(&uri);
+        let entity = UEntity {
+            name: "body.access".into(),
+            ..Default::default()
+        };
+        let resource = UResource {
+            name: "door".into(),
+            instance: Some("front_left".into()),
+            message: Some("Door".into()),
+            ..Default::default()
+        };
+        let uri = UUri {
+            entity: Some(entity),
+            resource: Some(resource),
+            authority: None,
+        };
+
+        let source = LongUriSerializer::serialize(&uri).unwrap();
 
         // fake payload
         let payload = pack_event_into_any(&build_proto_payload_for_test());
@@ -1190,7 +1171,7 @@ mod tests {
         // additional attributes
         let attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -1202,7 +1183,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UCloudEventType::PUBLISH)
+        event.ty(UMessageType::UmessageTypePublish)
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -1234,7 +1215,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

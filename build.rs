@@ -11,6 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use prost_build::Config;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -20,10 +21,27 @@ fn main() -> std::io::Result<()> {
     std::env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path().unwrap());
 
     if let Err(err) = get_and_build_protos(
-        &["https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
-        "https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/status.proto"]
+        &[
+            // cloudevent proto definitions
+            "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
+
+            // uProtocol-project proto definitions
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uuid.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uri.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uattributes.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/upayload.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/umessage.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/ustatus.proto",
+
+            // not used in the SDK yet, but for completeness sake
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/file.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uprotocol_options.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/udiscovery/v3/udiscovery.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/usubscription/v3/usubscription.proto",
+            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/utwin/v1/utwin.proto",
+        ]
     ) {
-        let error_message = format!("Failed to fetch and build protobuf file: {:?}", err);
+        let error_message = format!("Failed to fetch and build protobuf file: {err:?}");
         return Err(std::io::Error::new(std::io::ErrorKind::Other, error_message));
     }
 
@@ -32,20 +50,29 @@ fn main() -> std::io::Result<()> {
 
 // Fetch protobuf definitions from `url`, and build them with prost_build
 fn get_and_build_protos(urls: &[&str]) -> core::result::Result<(), Box<dyn std::error::Error>> {
-    for url in urls.iter() {
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let mut proto_files = Vec::new();
+
+    for url in urls {
         // Extract filename from the URL
         let filename = url.rsplit('/').next().unwrap_or_default();
-        let out_dir = env::var_os("OUT_DIR").unwrap();
         let dest_path = Path::new(&out_dir).join(filename);
 
-        // fetch cloudevents protobuf
+        // Download the .proto file
         if let Err(err) = download_and_write_file(url, filename) {
-            panic!("Failed to download and write file: {:?}", err);
+            panic!("Failed to download and write file: {err:?}");
         }
-
-        // build cloudevents protobuf
-        prost_build::compile_protos(&[dest_path], &[out_dir.to_str().unwrap()])?;
+        proto_files.push(dest_path);
     }
+
+    // Compile all .proto files together
+    let mut config = Config::new();
+
+    // Some proto files contain comments that will be interpreted as rustdoc comments (and fail to compile)
+    config.disable_comments(["."]);
+
+    config.compile_protos(&proto_files, &[&out_dir])?;
+
     Ok(())
 }
 
@@ -66,11 +93,7 @@ fn download_and_write_file(
         Ok(response) => {
             let out_dir = env::var_os("OUT_DIR").unwrap();
             let dest_path = Path::new(&out_dir).join(destination);
-
-            println!("file dest: {:?}", dest_path.to_str());
-
-            // let dest_path = Path::new(destination);
-            let mut out_file = fs::File::create(&dest_path)?;
+            let mut out_file = fs::File::create(dest_path)?;
 
             // Write the response body directly to the file
             let _ = std::io::copy(&mut response.into_reader(), &mut out_file);

@@ -1,7 +1,7 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/rust
 {
-    "name": "uProtocol-SDK-Rust dev",
+    "name": "uProtocol-Rust SDK",
     "build": {
         "dockerfile": "Dockerfile"
     },
@@ -52,7 +52,7 @@
             ]
         }
     },
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/uprotocol-sdk-rust/,type=bind",
-    "workspaceFolder": "/workspace/uprotocol-sdk-rust/",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/uprotocol-rust/,type=bind",
+    "workspaceFolder": "/workspace/uprotocol-rust/",
     "remoteUser": "vscode"
 }

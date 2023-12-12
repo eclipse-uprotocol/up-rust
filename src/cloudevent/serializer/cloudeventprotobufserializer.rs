@@ -11,26 +11,24 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::cloudevent::serializer::cloudeventserializer::{
-    CloudEventSerializationError, CloudEventSerializer,
-};
-use crate::proto::CloudEvent as CloudEventProto;
-
 use cloudevents::Event as CloudEvent;
 use prost::Message;
 
-/// Serialize and deserialize CloudEvents to protobuf format.
+use crate::cloudevent::serializer::{CloudEventSerializer, SerializationError};
+use crate::proto::CloudEvent as CloudEventProto;
+
+/// Serialize and deserialize `CloudEvents` to protobuf format.
 pub struct CloudEventProtobufSerializer;
 impl CloudEventSerializer for CloudEventProtobufSerializer {
-    fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, CloudEventSerializationError> {
+    fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, SerializationError> {
         let proto_event = CloudEventProto::from(cloud_event.clone());
         Ok(proto_event.encode_to_vec())
     }
 
-    fn deserialize(&self, bytes: &[u8]) -> Result<CloudEvent, CloudEventSerializationError> {
+    fn deserialize(&self, bytes: &[u8]) -> Result<CloudEvent, SerializationError> {
         match CloudEventProto::decode(bytes) {
             Ok(proto_event) => Ok(CloudEvent::from(proto_event)),
-            Err(error) => Err(CloudEventSerializationError(error.to_string())),
+            Err(error) => Err(SerializationError::new(error.to_string())),
         }
     }
 }
@@ -38,33 +36,35 @@ impl CloudEventSerializer for CloudEventProtobufSerializer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloudevent::builder::UCloudEventBuilder;
-    use crate::cloudevent::datamodel::{
-        Priority, UCloudEvent, UCloudEventAttributesBuilder, UCloudEventType,
-    };
-    use crate::cloudevent::serializer::cloudeventjsonserializer::CloudEventJsonSerializer;
-    use crate::rpc::RpcMapper;
-    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
-    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::event::ExtensionValue;
     use cloudevents::{AttributesReader, Event, EventBuilder, EventBuilderV10};
     use prost_types::Any;
 
+    use crate::cloudevent::builder::{UCloudEventBuilder, UCloudEventUtils};
+    use crate::cloudevent::datamodel::UCloudEventAttributesBuilder;
+    use crate::cloudevent::serializer::cloudeventjsonserializer::CloudEventJsonSerializer;
+    use crate::rpc::RpcMapper;
+    use crate::uprotocol::{UAuthority, UEntity, UMessageType, UPriority, UResource, UUri};
+    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
+
     #[test]
     fn serialize_and_deserialize_cloud_event_to_protobuf() {
         // Build the source
-        let use_entity = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(use_entity),
-            Some(UResource::long_format_with_instance(
-                "Door".to_string(),
-                "front_left".to_string(),
-                None,
-            )),
-        );
-        let source = LongUriSerializer::serialize(&uri);
+        let uri = UUri {
+            authority: Some(UAuthority::default()),
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "Door".to_string(),
+                instance: Some("front_left".to_string()),
+                ..Default::default()
+            }),
+        };
+
+        let source = LongUriSerializer::serialize(&uri).unwrap();
 
         // Fake payload
         let proto_payload = build_proto_payload_for_test();
@@ -72,7 +72,7 @@ mod tests {
         // Configure cloud event
         let u_cloud_event_attributes = UCloudEventAttributesBuilder::new()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Low)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .build();
 
@@ -83,7 +83,7 @@ mod tests {
             &proto_payload.type_url,
             &u_cloud_event_attributes,
         );
-        cloud_event_builder = cloud_event_builder.ty(UCloudEventType::PUBLISH);
+        cloud_event_builder = cloud_event_builder.ty(UMessageType::UmessageTypePublish);
 
         let cloud_event = cloud_event_builder.build().unwrap();
 
@@ -102,7 +102,7 @@ mod tests {
         // Cloud event
         let cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
@@ -115,7 +115,7 @@ mod tests {
         // Another cloud event
         let another_cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::FILE)
+            .ty(UMessageType::UmessageTypeRequest)
             .source("/body.access/1/door.front_left".to_string())
             .build()
             .unwrap();
@@ -134,7 +134,7 @@ mod tests {
         // Cloud event
         let cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
@@ -147,7 +147,7 @@ mod tests {
         // Another cloud event
         let another_cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
@@ -170,17 +170,19 @@ mod tests {
         let serializer = CloudEventProtobufSerializer;
 
         // Source
-        let use_entity = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(use_entity),
-            Some(UResource::long_format_with_instance(
-                "Door".to_string(),
-                "front_left".to_string(),
-                None,
-            )),
-        );
-        let source = LongUriSerializer::serialize(&uri);
+        let uri = UUri {
+            authority: Some(UAuthority::default()),
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "Door".to_string(),
+                instance: Some("front_left".to_string()),
+                ..Default::default()
+            }),
+        };
+        let source = LongUriSerializer::serialize(&uri).unwrap();
 
         // Fake payload
         let proto_payload = build_other_proto_payload_for_test();
@@ -188,7 +190,7 @@ mod tests {
         // Additional attributes
         let u_cloud_event_attributes = UCloudEventAttributesBuilder::new()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs1)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -201,7 +203,7 @@ mod tests {
             &proto_payload.type_url,
             &u_cloud_event_attributes,
         );
-        cloud_event_builder = cloud_event_builder.ty(UCloudEventType::PUBLISH);
+        cloud_event_builder = cloud_event_builder.ty(UMessageType::UmessageTypePublish);
 
         let cloud_event1 = cloud_event_builder.build().unwrap();
         let bytes1 = serializer.serialize(&cloud_event1).unwrap();
@@ -214,11 +216,11 @@ mod tests {
         compare_bytevec_sums(&bytes1, &bytes2);
 
         let cloud_event3 = serializer.deserialize(&bytes2).unwrap();
-        let cloud_event3_payload = UCloudEvent::get_payload(&cloud_event3);
+        let cloud_event3_payload = UCloudEventUtils::get_payload(&cloud_event3);
 
-        let pay1 = Event::from(RpcMapper::unpack_any::<CloudEventProto>(proto_payload).unwrap());
+        let pay1 = Event::from(RpcMapper::unpack_any::<CloudEventProto>(&proto_payload).unwrap());
         let pay2 =
-            Event::from(RpcMapper::unpack_any::<CloudEventProto>(cloud_event3_payload).unwrap());
+            Event::from(RpcMapper::unpack_any::<CloudEventProto>(&cloud_event3_payload).unwrap());
 
         assert_cloud_events_are_the_same(&pay1, &pay2);
 
@@ -249,12 +251,12 @@ mod tests {
         compare_bytevec_sums(&bytes1, &bytes2);
 
         let cloud_event3 = serializer.deserialize(&bytes2).unwrap();
-        let cloud_event3_payload = UCloudEvent::get_payload(&cloud_event3);
+        let cloud_event3_payload = UCloudEventUtils::get_payload(&cloud_event3);
 
         let pay1 =
-            Event::from(RpcMapper::unpack_any::<CloudEventProto>(cloud_event_proto).unwrap());
+            Event::from(RpcMapper::unpack_any::<CloudEventProto>(&cloud_event_proto).unwrap());
         let pay2 =
-            Event::from(RpcMapper::unpack_any::<CloudEventProto>(cloud_event3_payload).unwrap());
+            Event::from(RpcMapper::unpack_any::<CloudEventProto>(&cloud_event3_payload).unwrap());
 
         assert_eq!(pay1, pay2);
 
@@ -361,7 +363,7 @@ mod tests {
     fn build_cloud_event_for_test() -> EventBuilderV10 {
         EventBuilderV10::new()
             .id("hello")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .source("//VCU.VIN/body.access")
     }
 
@@ -386,7 +388,7 @@ mod tests {
         let event = EventBuilderV10::new()
             .id("hello")
             .source("//VCU.VIN/body.access")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
                 format!("proto://{}", Any::default().type_url),
@@ -402,6 +404,6 @@ mod tests {
 
     fn pack_event_into_any(event: &Event) -> Any {
         let proto_event = CloudEventProto::from(event.clone());
-        RpcMapper::pack_any(proto_event).unwrap()
+        RpcMapper::pack_any(&proto_event).unwrap()
     }
 }

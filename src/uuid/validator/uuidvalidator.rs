@@ -11,55 +11,111 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-#![allow(dead_code)]
-
-use crate::transport::datamodel::UStatus;
+use crate::uprotocol::Uuid as uproto_Uuid;
 use crate::uuid::builder::UuidUtils;
-use crate::uuid::validator::{UCode, ValidationResult};
+use crate::uuid::validator::ValidationError;
 
-use uuid::{Uuid, Variant};
-
+/// UUID Validator trait
+///
+/// Provides methods for validating different aspects of a UUID.
 pub trait UuidValidator {
-    fn validate(&self, uuid: &Uuid) -> UStatus {
-        let error_messages: Vec<String> = vec![
+    /// Validates the given UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID to validate.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if all validations pass. Otherwise, returns `Err(ValidationError)` with a concatenated message of all validation errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` if one or more of the following validations fail:
+    /// - Version validation fails as per `validate_version`.
+    /// - Time component validation fails as per `validate_time`.
+    /// - Variant validation fails as per `validate_variant`.
+    /// The error message will contain details of all failed validations, concatenated together.
+    fn validate(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
+        let error_message = vec![
             self.validate_version(uuid),
             self.validate_time(uuid),
             self.validate_variant(uuid),
         ]
         .into_iter()
-        .filter(|status| status.is_failure())
-        .map(|status| status.get_message())
-        .collect();
+        .filter_map(Result::err)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("; ");
 
-        let error_message = error_messages.join(", ");
         if error_message.is_empty() {
-            UStatus::ok()
+            Ok(())
         } else {
-            UStatus::fail_with_msg_and_reason(&error_message, UCode::InvalidArgument)
+            Err(ValidationError::new(error_message))
         }
     }
 
-    fn validate_version(&self, uuid: &Uuid) -> ValidationResult;
+    /// Validates the version of the UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID whose version is to be validated.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the version is valid. Otherwise, returns `Err(ValidationError)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` if the UUID's version does not meet the required criteria. The specific requirements are defined in the implementation of this method.
+    fn validate_version(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError>;
 
-    fn validate_time(&self, uuid: &Uuid) -> ValidationResult {
+    /// Validates the time component of the UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID whose time component is to be validated.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the time component is valid. Otherwise, returns `Err(ValidationError)` with "Invalid UUID Time".
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` with "Invalid UUID Time" if the UUID's time component is invalid or not properly formatted.
+    fn validate_time(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
         if let Some(time) = UuidUtils::get_time(uuid) {
             if time > 0 {
-                return ValidationResult::Success;
+                return Ok(());
             }
         }
-        ValidationResult::Failure("Invalid UUID Time".to_string())
+        Err(ValidationError::new("Invalid UUID Time"))
     }
 
-    fn validate_variant(&self, uuid: &Uuid) -> ValidationResult;
+    /// Validates the variant of the UUID.
+    ///
+    /// # Arguments
+    /// * `uuid` - The UUID whose variant is to be validated.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the variant is valid. Otherwise, returns `Err(ValidationError)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` if the UUID's variant does not meet the required criteria. The specific criteria for validation are defined in the implementation of this method.
+    fn validate_variant(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError>;
 }
 
+/// Enum representing different types of UUID validators.
+#[allow(dead_code)]
 pub enum UuidValidators {
     Invalid,
     UUIDv6,
     UUIDv8,
 }
 
+/// Implementation of methods for `UuidValidators`.
+#[allow(dead_code)]
 impl UuidValidators {
+    /// Returns a `UuidValidator` based on the type of the validator.
+    ///
+    /// # Returns
+    ///
+    /// Returns a boxed `UuidValidator`.
     pub fn validator(&self) -> Box<dyn UuidValidator> {
         match self {
             UuidValidators::Invalid => Box::new(InvalidValidator),
@@ -68,11 +124,20 @@ impl UuidValidators {
         }
     }
 
-    pub fn get_validator(uuid: &Uuid) -> Box<dyn UuidValidator> {
-        if UuidUtils::is_v6(uuid) {
+    /// Determines the appropriate `UuidValidator` for a given UUID.
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid` - The UUID for which to determine the validator.
+    ///
+    /// # Returns
+    ///
+    /// Returns a boxed `UuidValidator` appropriate for the given UUID.
+    pub fn get_validator(uuid: &uproto_Uuid) -> Box<dyn UuidValidator> {
+        if UuidUtils::is_v6(&(uuid.clone())) {
             return Box::new(UUIDv6Validator);
         }
-        if UuidUtils::is_uprotocol(uuid) {
+        if UuidUtils::is_uprotocol(&(uuid.clone())) {
             return Box::new(UUIDv8Validator);
         }
         Box::new(InvalidValidator)
@@ -81,45 +146,51 @@ impl UuidValidators {
 
 pub struct InvalidValidator;
 impl UuidValidator for InvalidValidator {
-    fn validate_variant(&self, _uuid: &Uuid) -> ValidationResult {
-        ValidationResult::Failure("Invalid UUID Variant".to_string())
+    fn validate_variant(&self, _uuid: &uproto_Uuid) -> Result<(), ValidationError> {
+        Err(ValidationError::new("Invalid UUID Variant"))
     }
 
-    fn validate_version(&self, _uuid: &Uuid) -> ValidationResult {
-        ValidationResult::Failure("Invalid UUID Version".to_string())
+    fn validate_version(&self, _uuid: &uproto_Uuid) -> Result<(), ValidationError> {
+        Err(ValidationError::new("Invalid UUID Version"))
     }
 }
 
+/// Validator for UUID version 6.
 pub struct UUIDv6Validator;
+
+/// `UuidValidator` implementation for `UUIDv6Validator`.
 impl UuidValidator for UUIDv6Validator {
-    fn validate_variant(&self, uuid: &Uuid) -> ValidationResult {
-        if UuidUtils::get_variant(uuid) == Variant::RFC4122 {
-            ValidationResult::Success
+    fn validate_variant(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
+        if UuidUtils::is_rf4122(uuid) {
+            Ok(())
         } else {
-            ValidationResult::Failure("Invalid UUIDv6 variant".to_string())
+            Err(ValidationError::new("Invalid UUIDv6 variant"))
         }
     }
 
-    fn validate_version(&self, uuid: &Uuid) -> ValidationResult {
+    fn validate_version(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
         if UuidUtils::is_v6(uuid) {
-            ValidationResult::Success
+            Ok(())
         } else {
-            ValidationResult::Failure("Not a UUIDv6 uuid".to_string())
+            Err(ValidationError::new("Not a UUIDv6 uuid"))
         }
     }
 }
 
+/// Validator for UUID version 8.
 pub struct UUIDv8Validator;
+
+/// `UuidValidator` implementation for `UUIDv8Validator`.
 impl UuidValidator for UUIDv8Validator {
-    fn validate_variant(&self, _uuid: &Uuid) -> ValidationResult {
-        ValidationResult::Success
+    fn validate_variant(&self, _uuid: &uproto_Uuid) -> Result<(), ValidationError> {
+        Ok(())
     }
 
-    fn validate_version(&self, uuid: &Uuid) -> ValidationResult {
+    fn validate_version(&self, uuid: &uproto_Uuid) -> Result<(), ValidationError> {
         if UuidUtils::is_uprotocol(uuid) {
-            ValidationResult::Success
+            Ok(())
         } else {
-            ValidationResult::Failure("Not a UUIDv8 uuid".to_string())
+            Err(ValidationError::new("Not a UUIDv8 uuid"))
         }
     }
 }
@@ -127,114 +198,170 @@ impl UuidValidator for UUIDv8Validator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::uuid::builder::{UUIDFactory, UUIDv6Factory, UUIDv8Factory};
+    use crate::uuid::builder::{UUIDv6Builder, UUIDv8Builder};
 
     #[test]
     fn test_validator_with_good_uuid() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let status = UuidValidators::get_validator(&uuid).validate(&uuid);
-        assert_eq!(UStatus::ok(), status);
+        assert!(status.is_ok());
     }
 
     #[test]
     fn test_good_uuid_string() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let status = UuidValidators::UUIDv8.validator().validate(&uuid);
-        assert_eq!(UStatus::ok(), status);
+        assert!(status.is_ok());
     }
 
     #[test]
     fn test_invalid_uuid() {
-        let uuid = Uuid::nil();
+        let uuid: uproto_Uuid = uproto_Uuid { msb: 0, lsb: 0 };
         let status = UuidValidators::get_validator(&uuid).validate(&uuid);
-        assert_eq!(UCode::InvalidArgument, status.code());
-        assert_eq!(
-            "Invalid UUID Version, Invalid UUID Time, Invalid UUID Variant",
-            status.message()
-        );
+        assert!(status.is_err());
+        assert!(status
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid UUID Version"));
+        assert!(status
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid UUID Time"));
+        assert!(status
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid UUID Variant"));
     }
 
     #[test]
     fn test_invalid_time_uuid() {
-        let uuid = UUIDv8Factory::new().build_with_instant(0);
+        let uuid = UUIDv8Builder::new().build_with_instant(0);
         let status = UuidValidators::UUIDv8.validator().validate(&uuid);
-        assert_eq!(UCode::Ok, status.code());
-        // assert_eq!("Not a UUIDv8 uuid, Invalid UUID Time", status.message());
+        assert!(status.is_ok());
     }
-
-    // Invalid (null) input is not an option in Rust
-    // #[test]
-    // fn test_uuidv8_with_invalid_uuids() {}
 
     #[test]
     fn test_uuidv8_with_invalid_types() {
-        let uuidv6 = UUIDv6Factory::new().build();
-        let uuid = Uuid::nil();
-        let uuidv4 = Uuid::new_v4();
+        let uuidv6 = UUIDv6Builder::new().build();
+        let uuid = uproto_Uuid { msb: 0, lsb: 0 };
+        let uuidv4 = uproto_Uuid::from(uuid::Uuid::new_v4());
 
         let validator = UuidValidators::UUIDv8.validator();
 
         let status = validator.validate(&uuidv6);
-        assert_eq!(UCode::InvalidArgument, status.code());
-        assert_eq!("Not a UUIDv8 uuid", status.message());
+        assert!(status.is_err());
+        assert_eq!(
+            status.as_ref().unwrap_err().to_string(),
+            "Not a UUIDv8 uuid"
+        );
 
         let status1 = validator.validate(&uuid);
-        assert_eq!(UCode::InvalidArgument, status1.code());
-        assert_eq!("Not a UUIDv8 uuid, Invalid UUID Time", status1.message());
+        assert!(status.is_err());
+        assert!(status1
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Not a UUIDv8 uuid"));
+        assert!(status1
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid UUID Time"));
 
         let status2 = validator.validate(&uuidv4);
-        assert_eq!(UCode::InvalidArgument, status2.code());
-        assert_eq!("Not a UUIDv8 uuid, Invalid UUID Time", status2.message());
+        assert!(status.is_err());
+        assert!(status2
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Not a UUIDv8 uuid"));
+        assert!(status2
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid UUID Time"));
     }
 
     #[test]
     fn test_good_uuidv6() {
-        let uuid = UUIDv6Factory::new().build();
+        let uuid = UUIDv6Builder::new().build();
         let validator = UuidValidators::get_validator(&uuid);
         assert!(UuidUtils::is_v6(&uuid));
-        assert_eq!(UCode::Ok, validator.validate(&uuid).code());
+        let status = validator.validate(&uuid);
+        assert!(status.is_ok());
     }
 
     #[test]
     fn test_uuidv6_with_bad_variant() {
-        if let Ok(uuid) = UuidUtils::from_string("1ee57e66-d33a-65e0-4a77-3c3f061c1e9e") {
+        if let Ok(uuid) = uproto_Uuid::try_from("1ee57e66-d33a-65e0-4a77-3c3f061c1e9e") {
             let validator = UuidValidators::get_validator(&uuid);
             let status = validator.validate(&uuid);
-            assert_eq!("Invalid UUIDv6 variant", status.message());
-            assert_eq!(UCode::InvalidArgument, status.code());
+            assert!(status.is_err());
+            assert_eq!(status.unwrap_err().to_string(), "Invalid UUIDv6 variant");
         }
     }
 
     #[test]
     fn test_uuidv6_with_invalid_uuid() {
-        let uuid = Uuid::from_fields(9 << 12, 0, 0, &[0; 8]);
+        let uuid = uproto_Uuid::from(uuid::Uuid::from_fields(9 << 12, 0, 0, &[0; 8]));
         let validator = UuidValidators::UUIDv6.validator();
         let status = validator.validate(&uuid);
-        assert_eq!(
-            "Not a UUIDv6 uuid, Invalid UUID Time, Invalid UUIDv6 variant",
-            status.message()
-        );
-        assert_eq!(UCode::InvalidArgument, status.code());
+        assert!(status.is_err());
+        assert!(status
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Not a UUIDv6 uuid"));
+        assert!(status
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid UUID Time"));
+        assert!(status
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid UUIDv6 variant"));
     }
 
     #[test]
     fn test_uuidv6_with_null_uuid() {
-        let uuid = Uuid::nil();
+        let uuid = uproto_Uuid { msb: 0, lsb: 0 };
         let validator = UuidValidators::UUIDv6.validator();
         let status = validator.validate(&uuid);
-        assert_eq!(
-            "Not a UUIDv6 uuid, Invalid UUID Time, Invalid UUIDv6 variant",
-            status.message()
-        );
-        assert_eq!(UCode::InvalidArgument, status.code());
+        assert!(status.is_err());
+        {
+            let uuid = uproto_Uuid::from(uuid::Uuid::from_fields(9 << 12, 0, 0, &[0; 8]));
+            let validator = UuidValidators::UUIDv6.validator();
+            let status = validator.validate(&uuid);
+            assert!(status.is_err());
+            assert!(status
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("Not a UUIDv6 uuid"));
+            assert!(status
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid UUID Time"));
+            assert!(status
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid UUIDv6 variant"));
+        }
     }
 
     #[test]
     fn test_uuidv6_with_uuidv8() {
-        let uuid = UUIDv8Factory::new().build();
+        let uuid = UUIDv8Builder::new().build();
         let validator = UuidValidators::UUIDv6.validator();
         let status = validator.validate(&uuid);
-        assert_eq!("Not a UUIDv6 uuid", status.message());
-        assert_eq!(UCode::InvalidArgument, status.code());
+        assert!(status.is_err());
+        assert_eq!(status.unwrap_err().to_string(), "Not a UUIDv6 uuid");
     }
 }

@@ -49,7 +49,6 @@ There exists a helper script in ./tools to generate test results and test code c
 
 All of these prerequisites are made available as a VSCode devcontainer, configured at the usual place (`.devcontainer`).
 
-
 ## Contact
 
 Contact the project developers via the project's "dev" list.

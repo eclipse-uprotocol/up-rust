@@ -23,7 +23,7 @@
 //!
 //! ## This crate includes:
 //!
-//! - the [`cloudevent`] module that offers a common way to represent uProtocol messages using the CloudEvent data model
+//! - the [`cloudevent`] module that offers a common way to represent uProtocol messages using the `CloudEvent` data model
 //! - the [`rpc`] module which offers wrappers for dealing with uProtocol payload in the context of RPC method invokation
 //! - the [`transport`] module as a set of abstractions for various transport-level concerns like status representation and serialization
 //! - the [`uri`] module, providing convenience wrappers for creation and validation of uProtocol-style resource identifiers
@@ -33,30 +33,29 @@
 //! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main)
 
 mod types {
-    pub mod ustatus;
-    pub mod validationresult;
+    pub mod serializationerror;
+    pub mod validationerror;
 }
 
 pub mod cloudevent {
     pub mod builder {
         mod ucloudeventbuilder;
+        mod ucloudeventutils;
 
         pub use ucloudeventbuilder::*;
+        pub use ucloudeventutils::*;
     }
     pub mod datamodel {
-        mod ucloudevent;
         mod ucloudeventattributes;
-        mod ucloudeventtype;
 
-        pub use ucloudevent::*;
         pub use ucloudeventattributes::*;
-        pub use ucloudeventtype::*;
     }
     pub mod serializer {
         mod cloudeventjsonserializer;
         mod cloudeventprotobufserializer;
         mod cloudeventserializer;
 
+        pub use crate::types::serializationerror::*;
         pub use cloudeventjsonserializer::*;
         pub use cloudeventprotobufserializer::*;
         pub use cloudeventserializer::*;
@@ -64,81 +63,8 @@ pub mod cloudevent {
     pub mod validator {
         mod cloudeventvalidator;
 
-        pub use crate::types::validationresult::*;
+        pub use crate::types::validationerror::*;
         pub use cloudeventvalidator::*;
-    }
-}
-
-pub mod uri {
-    pub mod datamodel {
-        mod uauthority;
-        mod uentity;
-        mod uresource;
-        mod uuri;
-
-        pub use uauthority::*;
-        pub use uentity::*;
-        pub use uresource::*;
-        pub use uuri::*;
-    }
-    pub mod validator {
-        mod urivalidator;
-
-        pub use urivalidator::*;
-    }
-    pub mod serializer {
-        mod longuriserializer;
-        mod microuriserializer;
-        mod shorturiserializer;
-        mod uriserializer;
-
-        pub use longuriserializer::*;
-        pub use microuriserializer::*;
-        pub use shorturiserializer::*;
-        pub use uriserializer::*;
-    }
-}
-
-pub mod uuid {
-    pub mod builder {
-        mod uuidbuilder;
-        mod uuidutils;
-
-        pub use uuidbuilder::*;
-        pub use uuidutils::*;
-    }
-    pub mod validator {
-        mod uuidvalidator;
-
-        pub use crate::types::ustatus::*;
-        pub use crate::types::validationresult::*;
-    }
-}
-
-pub mod transport {
-    pub mod datamodel {
-        mod uattributes;
-        mod ulistener;
-        mod umessagetype;
-        mod upayload;
-        mod upriority;
-        mod userializationhint;
-        mod utransport;
-
-        pub use uattributes::*;
-        pub use ulistener::*;
-        pub use umessagetype::*;
-        pub use upayload::*;
-        pub use upriority::*;
-        pub use userializationhint::*;
-        pub use utransport::*;
-
-        pub use crate::types::ustatus::*;
-    }
-    pub mod validator {
-        mod uattributesvalidator;
-
-        pub use uattributesvalidator::*;
     }
 }
 
@@ -154,15 +80,134 @@ pub mod rpc {
     pub use rpcresult::*;
 }
 
+pub mod transport {
+    pub mod builder {
+        mod uattributesbuilder;
+
+        pub use uattributesbuilder::*;
+    }
+    pub mod datamodel {
+        mod utransport;
+
+        pub use utransport::*;
+    }
+    pub mod validator {
+        mod uattributesvalidator;
+
+        pub use crate::types::validationerror::*;
+        pub use uattributesvalidator::*;
+    }
+}
+
+pub mod uri {
+    pub mod builder {
+        pub mod resourcebuilder;
+    }
+    pub mod validator {
+        mod urivalidator;
+
+        pub use crate::types::validationerror::*;
+        pub use urivalidator::*;
+    }
+    pub mod serializer {
+        mod longuriserializer;
+        mod microuriserializer;
+        mod uriserializer;
+
+        pub use crate::types::serializationerror::*;
+        pub use longuriserializer::*;
+        pub use microuriserializer::*;
+        pub use uriserializer::*;
+    }
+}
+
+pub mod uuid {
+    pub mod builder {
+        mod uuidbuilder;
+        mod uuidutils;
+
+        pub use uuidbuilder::*;
+        pub use uuidutils::*;
+    }
+    pub mod serializer {
+        mod longuuidserializer;
+        mod microuuidserializer;
+        mod uuidserializer;
+
+        pub use crate::types::serializationerror::*;
+        pub use longuuidserializer::*;
+        pub use microuuidserializer::*;
+        pub use uuidserializer::*;
+    }
+    pub mod validator {
+        mod uuidvalidator;
+
+        pub use crate::types::validationerror::*;
+        pub use uuidvalidator::*;
+    }
+}
+
+pub mod uprotocol {
+    // protoc-generated stubs, see build.rs
+    include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
+
+    pub use crate::proto::uprotocol::uauthority;
+    pub use crate::proto::uprotocol::uentity;
+    pub use crate::proto::uprotocol::umessagetype;
+    pub use crate::proto::uprotocol::upayload;
+    pub use crate::proto::uprotocol::uresource;
+    pub use crate::proto::uprotocol::ustatus;
+    pub use crate::proto::uprotocol::uuid;
+    pub use crate::proto::uprotocol::uuri;
+
+    pub use u_authority::Remote;
+    pub use u_payload::Data;
+
+    // This is to make the more specialized uprotocol types available within the SDK scope;
+    // not required by the code, so not sure whether it'll stay in.
+    mod v1 {
+        // this re-export is necessary to accomodate the package/reference structure of the uprotocol uproto files (included below)
+        pub(crate) use crate::uprotocol::{UCode, UMessage, UStatus, UUri, UUriBatch};
+    }
+    pub mod core {
+        pub mod udiscovery {
+            pub mod v3 {
+                include!(concat!(env!("OUT_DIR"), "/uprotocol.core.udiscovery.v3.rs"));
+            }
+        }
+        pub mod usubscription {
+            pub mod v3 {
+                include!(concat!(
+                    env!("OUT_DIR"),
+                    "/uprotocol.core.usubscription.v3.rs"
+                ));
+            }
+        }
+        pub mod utwin {
+            pub mod v1 {
+                include!(concat!(env!("OUT_DIR"), "/uprotocol.core.utwin.v1.rs"));
+            }
+        }
+    }
+}
+
 #[allow(non_snake_case)]
 pub mod proto {
+    // protoc-generated stubs, see build.rs
     include!(concat!(env!("OUT_DIR"), "/io.cloudevents.v1.rs"));
+
     pub mod cloudevents {
         pub mod protocloudevent;
     }
 
-    include!(concat!(env!("OUT_DIR"), "/google.rpc.rs"));
-    pub mod google {
-        pub mod protostatus;
+    pub mod uprotocol {
+        pub mod uauthority;
+        pub mod uentity;
+        pub mod umessagetype;
+        pub mod upayload;
+        pub mod uresource;
+        pub mod ustatus;
+        pub mod uuid;
+        pub mod uuri;
     }
 }

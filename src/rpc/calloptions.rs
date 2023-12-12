@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-/// This struct is used when making uRPC calls to pass additional options.
+/// This struct is used when making `uRPC` calls to pass additional options.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CallOptions {
     timeout: u32,
@@ -38,7 +38,7 @@ impl CallOptions {
         self.timeout
     }
 
-    /// Get an OAuth2 access token.
+    /// Get an `OAuth2` access token.
     pub fn token(&self) -> Option<&str> {
         // I don't agree with the trim() here - a space is a valid character, so if I don't want to have them
         // here, I should fail noisily on creation. But, to be compliant with the Java SDK...
@@ -68,6 +68,7 @@ impl Default for CallOptionsBuilder {
 
 impl CallOptionsBuilder {
     /// Add a timeout.
+    #[must_use]
     pub fn with_timeout(mut self, timeout: u32) -> Self {
         self.timeout = if timeout == 0 {
             CallOptions::TIMEOUT_DEFAULT
@@ -77,7 +78,8 @@ impl CallOptionsBuilder {
         self
     }
 
-    /// Add an OAuth2 access token.
+    /// Add an `OAuth2` access token.
+    #[must_use]
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
         self.token = token.into();
         self

@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::transport::datamodel::{UCode, UStatus};
+use crate::uprotocol::{UCode, UStatus};
 
 /// A wrapper for RPC stub calls.
 ///
@@ -37,7 +37,6 @@ impl<T> RpcResult<T> {
     }
 
     /// Unwraps the value if the `RpcResult` is a `Success` variant, otherwise invokes the provided closure `op` and returns its result.
-    /// (was 'getOrElse()' in the Java SDK)
     pub fn unwrap_or_else<F: FnOnce() -> T>(self, op: F) -> T {
         match self {
             RpcResult::Success(val) => val,
@@ -54,7 +53,7 @@ impl<T> RpcResult<T> {
         match self {
             RpcResult::Success(value) => match func(value) {
                 Ok(val) => RpcResult::Success(val),
-                Err(e) => RpcResult::Failure(UStatus::fail_with_msg_and_reason(&e, UCode::Unknown)),
+                Err(e) => RpcResult::Failure(UStatus::fail_with_code(UCode::Unknown, &e)),
             },
             RpcResult::Failure(status) => RpcResult::Failure(status),
         }
@@ -79,15 +78,16 @@ impl<T> RpcResult<T> {
     /// If it returns `false`, or if the `RpcResult` is a `Failure`,
     /// a `Failure` variant with a `FailedPrecondition` status is returned.
     /// (was 'filter()' in the Java SDK)
+    #[must_use]
     pub fn validate<F>(self, predicate: F) -> Self
     where
         F: FnOnce(&T) -> bool,
     {
         match self {
             RpcResult::Success(value) if predicate(&value) => RpcResult::Success(value),
-            RpcResult::Success(_) => RpcResult::Failure(UStatus::fail_with_msg_and_reason(
-                "Validation failed",
+            RpcResult::Success(_) => RpcResult::Failure(UStatus::fail_with_code(
                 UCode::FailedPrecondition,
+                "Validation failed",
             )),
             failure @ RpcResult::Failure(_) => failure,
         }
@@ -96,8 +96,10 @@ impl<T> RpcResult<T> {
     /// Returns the `Code` of the `Failure` variant if present, or `None` if the `RpcResult` is a `Success`.
     pub fn failure_value(&self) -> Option<UCode> {
         match self {
-            RpcResult::Failure(status) => Some(UCode::from(status.code_as_int())),
-            _ => None,
+            RpcResult::Failure(status) => {
+                Some(UCode::try_from(status.code).unwrap_or(UCode::Unknown))
+            }
+            RpcResult::Success(_) => None,
         }
     }
 
@@ -105,7 +107,7 @@ impl<T> RpcResult<T> {
     pub fn success_value(&self) -> Option<&T> {
         match self {
             RpcResult::Success(value) => Some(value),
-            _ => None,
+            RpcResult::Failure(_) => None,
         }
     }
 
@@ -114,17 +116,30 @@ impl<T> RpcResult<T> {
         RpcResult::Success(value)
     }
 
-    // pub fn failure(status: Code) -> Self {
-    //     RpcResult::Failure(Status::new(status, ""))
-    // }
-
     /// Attempts to create an `RpcResult` from another `RpcResult` with a different inner type.
-    /// Returns the original failure status if the provided `RpcResult` is a failure variant,
-    /// otherwise returns an error.
+    /// This function is specifically designed to handle the failure cases of `RpcResult`.
+    ///
+    /// # Parameters
+    ///
+    /// - `failure`: An `RpcResult` of any type. The function processes the failure variant of this `RpcResult`.
+    ///
+    /// # Returns
+    ///
+    /// If the provided `RpcResult` is a failure variant, it returns `Ok` with an `RpcResult::Failure` containing the same status.
+    /// Otherwise, it returns an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provided `RpcResult` is not a failure variant. The error is a static string,
+    /// `"Expected a Failure variant!"`, indicating that the function expected a failure variant but found a success variant instead.
+    ///
+    /// This is typically used in contexts where only the failure cases of an `RpcResult` are relevant,
+    /// and the presence of a success variant indicates a logical error or unexpected state.
+    ///
     pub fn from_failure<U>(failure: RpcResult<U>) -> Result<Self, &'static str> {
         match failure {
             RpcResult::Failure(status) => Ok(RpcResult::Failure(status)),
-            _ => Err("Expected a Failure variant!"),
+            RpcResult::Success(_) => Err("Expected a Failure variant!"),
         }
     }
 
@@ -135,14 +150,14 @@ impl<T> RpcResult<T> {
     ///
     /// * `message`: A descriptive message for the failure.
     /// * `_e`: Additional details or context about the error.
-    pub fn failure_with_message(message: &str, _e: &str) -> Self {
-        let error_message = format!("{}: {}", message, _e);
+    pub fn failure_with_message(message: &str, e: &str) -> Self {
+        let error_message = format!("{message}: {e}");
         let error = Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             error_message,
         ));
 
-        let status = UStatus::fail_with_msg(&error.to_string());
+        let status = UStatus::fail(&error.to_string());
         RpcResult::Failure(status)
     }
 
@@ -153,7 +168,7 @@ impl<T> RpcResult<T> {
     /// * `code`: The status code indicating the nature of the failure.
     /// * `message`: A descriptive message providing details about the failure.
     pub fn failure(code: UCode, message: &str) -> Self {
-        let status = UStatus::fail_with_msg_and_reason(message, code);
+        let status = UStatus::fail_with_code(code, message);
         RpcResult::Failure(status)
     }
 
@@ -180,11 +195,11 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RpcResult::Success(value) => write!(f, "Success({})", value),
+            RpcResult::Success(value) => write!(f, "Success({value})"),
             RpcResult::Failure(status) => write!(
                 f,
                 "Failure(code: {}\nmessage: \"{}\"\n)",
-                status.code_as_int(),
+                status.code,
                 status.message()
             ),
         }
@@ -204,7 +219,7 @@ mod tests {
     }
 
     fn fun_that_returns_a_failure_for_and_then(x: i32) -> RpcResult<i32> {
-        RpcResult::Failure(UStatus::fail_with_msg(&format!("{} went boom", x)))
+        RpcResult::Failure(UStatus::fail(&format!("{} went boom", x)))
     }
 
     fn multiply_by_2(x: i32) -> Result<RpcResult<i32>, String> {
@@ -299,7 +314,7 @@ mod tests {
         match mapped {
             RpcResult::Success(_) => panic!("Expected failure, but got success."),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code_as_int());
+                assert_eq!(UCode::Unknown as i32, status.code);
                 assert_eq!("2 went boom", status.message());
             }
         }
@@ -307,16 +322,14 @@ mod tests {
 
     #[test]
     fn test_map_on_failure() {
-        let result: RpcResult<i32> = RpcResult::Failure(UStatus::fail_with_msg_and_reason(
-            "boom",
-            UCode::InvalidArgument,
-        ));
+        let result: RpcResult<i32> =
+            RpcResult::Failure(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
         let mapped: RpcResult<i32> = result.map(|x| Ok(x * 2));
 
         match mapped {
             RpcResult::Success(_) => panic!("Expected failure, but got success."),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
+                assert_eq!(UCode::InvalidArgument as i32, status.code);
                 assert_eq!("boom", status.message());
             }
         }
@@ -330,7 +343,7 @@ mod tests {
         match flat_mapped {
             RpcResult::Success(_) => panic!("Expected a failure, but got a success!"),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code_as_int());
+                assert_eq!(UCode::Unknown as i32, status.code);
             }
         }
     }
@@ -348,13 +361,13 @@ mod tests {
 
     #[test]
     fn test_and_then_on_failure() {
-        let result = RpcResult::Failure(UStatus::fail_with_msg(""));
+        let result = RpcResult::Failure(UStatus::fail(""));
         let and_then_mapped = result.and_then(|x: i32| RpcResult::Success(x * 2));
 
         match and_then_mapped {
             RpcResult::Success(_) => panic!("Expected a failure, but got a success!"),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code_as_int());
+                assert_eq!(UCode::Unknown as i32, status.code);
             }
         }
     }
@@ -367,7 +380,7 @@ mod tests {
         match filter_result {
             RpcResult::Success(_) => panic!("Expected a failure, but got a success!"),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::FailedPrecondition as i32, status.code_as_int());
+                assert_eq!(UCode::FailedPrecondition as i32, status.code);
             }
         }
     }
@@ -395,7 +408,7 @@ mod tests {
 
         match validated_result {
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
+                assert_eq!(UCode::InvalidArgument as i32, status.code);
                 assert_eq!("boom", status.message());
             }
             _ => panic!("Expected Failure but found Success"),
@@ -421,7 +434,7 @@ mod tests {
 
         match mapped {
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code_as_int());
+                assert_eq!(UCode::Unknown as i32, status.code);
                 assert_eq!("2 went boom", status.message());
             }
             _ => panic!("Expected Failure but found Success"),
@@ -430,16 +443,14 @@ mod tests {
 
     #[test]
     fn test_flatten_on_failure() {
-        let result: RpcResult<i32> = RpcResult::Failure(UStatus::fail_with_msg_and_reason(
-            "boom",
-            UCode::InvalidArgument,
-        ));
+        let result: RpcResult<i32> =
+            RpcResult::Failure(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
         let mapped: RpcResult<RpcResult<i32>> = result.map(multiply_by_2);
         let flattened = RpcResult::<RpcResult<i32>>::flatten(mapped);
 
         match flattened {
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::InvalidArgument as i32, status.code_as_int());
+                assert_eq!(UCode::InvalidArgument as i32, status.code);
                 assert_eq!("boom", status.message());
             }
             _ => panic!("Expected Failure but found Success"),
@@ -454,10 +465,8 @@ mod tests {
 
     #[test]
     fn test_to_string_failure() {
-        let result: RpcResult<i32> = RpcResult::Failure(UStatus::fail_with_msg_and_reason(
-            "boom",
-            UCode::InvalidArgument,
-        ));
+        let result: RpcResult<i32> =
+            RpcResult::Failure(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
         let expected_output = format!(
             "Failure(code: {}\nmessage: \"{}\"\n)",
             UCode::InvalidArgument as i32,

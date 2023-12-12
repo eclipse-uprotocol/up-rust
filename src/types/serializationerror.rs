@@ -11,11 +11,26 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use prost::Name;
-
-use crate::proto::Status as ProtoStatus;
-
-impl Name for ProtoStatus {
-    const NAME: &'static str = "Status";
-    const PACKAGE: &'static str = "google.rpc";
+#[derive(Debug)]
+pub struct SerializationError {
+    message: String,
 }
+
+impl SerializationError {
+    pub fn new<T>(message: T) -> SerializationError
+    where
+        T: Into<String>,
+    {
+        SerializationError {
+            message: message.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for SerializationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for SerializationError {}

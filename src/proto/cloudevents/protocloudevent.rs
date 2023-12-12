@@ -38,7 +38,7 @@ impl From<CloudEventProto> for cloudevents::Event {
 
         // extensions
         let mut extensions = HashMap::<String, ExtensionValue>::new();
-        for (key, value) in source_event.attributes.iter() {
+        for (key, value) in &source_event.attributes {
             match value.attr.as_ref().unwrap() {
                 Attr::CeBoolean(b) => {
                     extensions.insert(key.to_string(), ExtensionValue::Boolean(*b));
@@ -47,7 +47,7 @@ impl From<CloudEventProto> for cloudevents::Event {
                     // TODO not quite sure whether/how to map this to ExtensionValue::String
                 }
                 Attr::CeInteger(i) => {
-                    extensions.insert(key.to_string(), ExtensionValue::Integer(*i as i64));
+                    extensions.insert(key.to_string(), ExtensionValue::Integer(i64::from(*i)));
                 }
                 Attr::CeString(s) => {
                     // contenttype
@@ -64,6 +64,7 @@ impl From<CloudEventProto> for cloudevents::Event {
                     // timestamp
                     // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
                     if key.eq("timestamp") {
+                        #[allow(clippy::cast_sign_loss)]
                         let naive =
                             NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32).unwrap();
                         dt = Some(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
@@ -75,7 +76,7 @@ impl From<CloudEventProto> for cloudevents::Event {
                     // dataschema
                     // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
                     if key.eq("dataschema") {
-                        if let Ok(url) = Url::parse(uri) {
+                        if let Ok(url) = Url::parse(uri.as_str()) {
                             dataschema = Some(url);
                         }
                         // if Url::parse() doesn't work, this attribute is lost
@@ -105,7 +106,7 @@ impl From<CloudEventProto> for cloudevents::Event {
         let mut cloud_event = event_builder.build().unwrap();
 
         // Extract data - the proto serialization knows a protobuf.Any type!... something there?
-        let event_data: Option<Data> = match source_event.data.clone() {
+        let event_data: Option<Data> = match source_event.data {
             Some(CloudEventData::BinaryData(data)) => Some(Data::Binary(data)),
             Some(CloudEventData::TextData(text)) => Some(Data::String(text)),
             _ => None,
@@ -116,7 +117,7 @@ impl From<CloudEventProto> for cloudevents::Event {
         cloud_event.set_datacontenttype(contenttype);
         cloud_event.set_dataschema(dataschema);
 
-        for (key, value) in extensions.iter() {
+        for (key, value) in &extensions {
             cloud_event.set_extension(key, value.clone());
         }
 
@@ -184,6 +185,7 @@ impl From<cloudevents::Event> for CloudEventProto {
                     };
                     ext_list.insert(key.to_string(), ext);
                 }
+                #[allow(clippy::cast_possible_truncation)]
                 ExtensionValue::Integer(i) => {
                     let ext = CloudEventAttributeValue {
                         attr: Some(Attr::CeInteger(*i as i32)),
@@ -215,8 +217,8 @@ impl From<cloudevents::Event> for CloudEventProto {
 mod tests {
     use super::*;
     use crate::cloudevent::builder::UCloudEventBuilder;
-    use crate::cloudevent::datamodel::{Priority, UCloudEventAttributes, UCloudEventType};
-    use crate::uri::datamodel::{UAuthority, UEntity, UResource, UUri};
+    use crate::cloudevent::datamodel::UCloudEventAttributes;
+    use crate::uprotocol::{UEntity, UMessageType, UPriority, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
@@ -232,19 +234,18 @@ mod tests {
     }
 
     fn build_base_cloud_event_for_test() -> EventBuilderV10 {
-        let ue = UEntity::long_format("body.access".to_string(), None);
-        let uri = UUri::new(
-            Some(UAuthority::LOCAL),
-            Some(ue),
-            Some(UResource::new(
-                "door".to_string(),
-                Some(String::from("front_left")),
-                Some(String::from("Door")),
-                None,
-                false,
-            )),
-        );
-        let source = LongUriSerializer::serialize(&uri);
+        let uri = UUri {
+            entity: Some(UEntity {
+                name: "body.access".to_string(),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let source = LongUriSerializer::serialize(&uri).unwrap();
 
         // fake payload
         let payload = pack_event_into_any(&build_proto_payload_for_test());
@@ -252,7 +253,7 @@ mod tests {
         // additional attributes
         let attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(Priority::Standard)
+            .with_priority(UPriority::UpriorityCs0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -264,7 +265,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UCloudEventType::PUBLISH)
+        event.ty(UMessageType::UmessageTypePublish)
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -296,7 +297,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UCloudEventType::PUBLISH)
+            .ty(UMessageType::UmessageTypePublish)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",
