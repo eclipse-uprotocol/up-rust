@@ -28,13 +28,15 @@ pub struct UAttributesBuilder {
 }
 
 impl UAttributesBuilder {
-    /// Constructs a `UAttributesBuilder` for a publish message.
+    /// Gets a builder for creating a publish message.
     ///
     /// # Arguments
+    ///
     /// * `priority` - The priority of the message.
     ///
     /// # Returns
-    /// Returns a `UAttributesBuilder` instance with the configured priority.
+    ///
+    /// The builder initialized with the given values.
     pub fn publish(priority: UPriority) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
@@ -49,14 +51,16 @@ impl UAttributesBuilder {
         }
     }
 
-    /// Constructs a `UAttributesBuilder` for a notification message.
+    /// Gets a builder for creating a notification message.
     ///
     /// # Arguments
+    ///
     /// * `priority` - The priority of the message.
     /// * `sink` - The destination URI.
     ///
     /// # Returns
-    /// Returns a `UAttributesBuilder` instance with the configured priority and sink.
+    ///
+    /// The builder initialized with the given values.
     pub fn notification(priority: UPriority, sink: UUri) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
@@ -71,21 +75,23 @@ impl UAttributesBuilder {
         }
     }
 
-    /// Constructs a `UAttributesBuilder` for a request message.
+    /// Gets a builder for creating a request message.
     ///
     /// # Arguments
+    ///
     /// * `priority` - The priority of the message.
     /// * `sink` - The destination URI.
-    /// * `ttl` - The time to live in milliseconds.
+    /// * `ttl` - The time to live in milliseconds. The value is capped at [`i32::MAX`].
     ///
     /// # Returns
-    /// Returns a `UAttributesBuilder` instance with the configured priority, sink, and ttl.
-    pub fn request(priority: UPriority, sink: UUri, ttl: i32) -> UAttributesBuilder {
+    ///
+    /// The builder initialized with the given values.
+    pub fn request(priority: UPriority, sink: UUri, ttl: u32) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
             message_type: UMessageType::UmessageTypeRequest,
             priority,
-            ttl: Some(ttl),
+            ttl: Some(i32::try_from(ttl).unwrap_or(i32::MAX)),
             token: None,
             sink: Some(sink),
             plevel: None,
@@ -94,15 +100,17 @@ impl UAttributesBuilder {
         }
     }
 
-    /// Constructs a `UAttributesBuilder` for a response message.
+    /// Gets a builder for creating a repsonse message.
     ///
     /// # Arguments
+    ///
     /// * `priority` - The priority of the message.
     /// * `sink` - The destination URI.
     /// * `reqid` - The original request UUID used to correlate the response to the request.
     ///
     /// # Returns
-    /// Returns a `UAttributesBuilder` instance with the configured priority, sink, and reqid.
+    ///
+    /// The builder initialized with the given values.
     pub fn response(priority: UPriority, sink: UUri, reqid: Uuid) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
@@ -117,26 +125,30 @@ impl UAttributesBuilder {
         }
     }
 
-    /// Adds the time to live in milliseconds.
+    /// Sets the message's time-to-live.
     ///
     /// # Arguments
-    /// * `ttl` - The time to live in milliseconds.
+    ///
+    /// * `ttl` - The time-to-live in milliseconds. The value is capped at [`i32::MAX`].
     ///
     /// # Returns
-    /// Returns the `UAttributesBuilder` instance with the configured ttl.
+    ///
+    /// The builder.
     #[must_use]
     pub fn with_ttl(&mut self, ttl: u32) -> &mut UAttributesBuilder {
         self.ttl = Some(i32::try_from(ttl).unwrap_or(i32::MAX));
         self
     }
 
-    /// Adds the authorization token used for TAP.
+    /// Sets the message's authorization token used for TAP.
     ///
     /// # Arguments
-    /// * `token` - The authorization token used for TAP.
+    ///
+    /// * `token` - The token.
     ///
     /// # Returns
-    /// Returns the `UAttributesBuilder` instance with the configured token.
+    ///
+    /// The builder.
     #[must_use]
     pub fn with_token<T>(&mut self, token: T) -> &mut UAttributesBuilder
     where
@@ -146,62 +158,71 @@ impl UAttributesBuilder {
         self
     }
 
-    /// Adds the explicit destination URI.
+    /// Sets the message's destination URI.
     ///
     /// # Arguments
-    /// * `sink` - The explicit destination URI.
+    ///
+    /// * `sink` - The URI.
     ///
     /// # Returns
-    /// Returns the `UAttributesBuilder` instance with the configured sink.
+    ///
+    /// The builder.
     #[must_use]
     pub fn with_sink(&mut self, sink: UUri) -> &mut UAttributesBuilder {
         self.sink = Some(sink);
         self
     }
 
-    /// Adds the permission level of the message.
+    /// Sets the message's permission level.
     ///
     /// # Arguments
-    /// * `plevel` - The permission level of the message.
+    ///
+    /// * `plevel` - The level.
     ///
     /// # Returns
-    /// Returns the `UAttributesBuilder` instance with the configured permission level.
+    ///
+    /// The builder.
     #[must_use]
     pub fn with_permission_level(&mut self, plevel: u32) -> &mut UAttributesBuilder {
         self.plevel = Some(i32::try_from(plevel).unwrap_or(i32::MAX));
         self
     }
 
-    /// Adds the communication status of the message.
+    /// Sets the message's communication status.
     ///
     /// # Arguments
-    /// * `commstatus` - The communication status of the message.
+    ///
+    /// * `commstatus` - The status.
     ///
     /// # Returns
-    /// Returns the `UAttributesBuilder` instance with the configured communication status.
+    ///
+    /// The builder.
     #[must_use]
     pub fn with_commstatus(&mut self, commstatus: i32) -> &mut UAttributesBuilder {
         self.commstatus = Some(commstatus);
         self
     }
 
-    /// Adds the request ID.
+    /// Sets the messgae's request ID.
     ///
     /// # Arguments
-    /// * `reqid` - The request ID.
+    ///
+    /// * `reqid` - The ID.
     ///
     /// # Returns
-    /// Returns the `UAttributesBuilder` instance with the configured request ID.
+    ///
+    /// The builder.
     #[must_use]
     pub fn with_reqid(&mut self, reqid: Uuid) -> &mut UAttributesBuilder {
         self.reqid = Some(reqid);
         self
     }
 
-    /// Constructs the `UAttributes` from the builder.
+    /// Creates the attributes based on the builder's state.
     ///
     /// # Returns
-    /// Returns a constructed `UAttributes` instance based on the builder's configuration.
+    ///
+    /// The attributes.
     pub fn build(&self) -> UAttributes {
         UAttributes {
             id: Some(self.id.clone()),
