@@ -59,7 +59,7 @@ pub trait UTransport {
     async fn register_listener(
         &self,
         topic: UUri,
-        listener: Box<dyn Fn(UMessage) + Send + 'static>,
+        listener: Box<dyn Fn(UMessage) + Send + Sync + 'static>,
     ) -> Result<String, UStatus>;
 
     /// Unregister a listener for a given topic. Messages arriving on this topic will no longer be processed
