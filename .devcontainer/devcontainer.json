@@ -1,0 +1,58 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/rust
+{
+    "name": "uProtocol-Rust SDK",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+        "--privileged"
+    ],
+    // This is a workaround which is again necessary on MacOS 14.0, it looks like this bug is back:
+    // https://github.com/microsoft/vscode-dev-containers/issues/1487#issuecomment-1143907307
+    "mounts": [
+        "source=rust-volume,target=/rust-volume,type=volume"
+    ],
+    "postCreateCommand": "sudo .devcontainer/post-create.sh",
+    "customizations": {
+        "vscode": {
+            // Set *default* container specific settings.json values on container create.
+            "settings": {
+                "lldb.executable": "/usr/bin/lldb",
+                // VS Code don't watch files under ./target
+                "files.watcherExclude": {
+                    "**/target/**": true
+                },
+                "rust-analyzer.checkOnSave.command": "clippy",
+                "coverage-gutters.coverageBaseDir": "**",
+                "coverage-gutters.coverageFileNames": [
+                    "target/tarpaulin/lcov.info"
+                ]
+            },
+            // Add the IDs of extensions you want installed when the container is created.
+            "extensions": [
+                "asciidoctor.asciidoctor-vscode",
+                "bianxianyang.htmlplay",
+                "bierner.markdown-mermaid",
+                "bierner.markdown-preview-github-styles",
+                "davidanson.vscode-markdownlint",
+                "hediet.vscode-drawio",
+                "linusu.auto-dark-mode",
+                "mhutchie.git-graph",
+                "redhat.vscode-yaml",
+                "ryanluker.vscode-coverage-gutters",
+                "rust-lang.rust-analyzer",
+                "serayuzgur.crates",
+                "streetsidesoftware.code-spell-checker",
+                "tamasfe.even-better-toml",
+                "timonwong.shellcheck",
+                "vadimcn.vscode-lldb",
+                "yzhang.markdown-all-in-one",
+                "zxh404.vscode-proto3"
+            ]
+        }
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/uprotocol-rust/,type=bind",
+    "workspaceFolder": "/workspace/uprotocol-rust/",
+    "remoteUser": "vscode"
+}
