@@ -259,7 +259,7 @@ pub trait UAttributesValidator {
     /// The function considers the absence of a request ID in `UAttributes` as a valid case and does not return an error in such a scenario.
     fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(reqid) = &attributes.reqid {
-            if !UuidUtils::is_uuid(reqid) {
+            if !UuidUtils::is_uprotocol(reqid) {
                 return Err(ValidationError::new("Invalid UUID"));
             }
         }
@@ -493,7 +493,7 @@ impl UAttributesValidator for ResponseValidator {
             if *reqid == Uuid::default() {
                 return Err(ValidationError::new("Missing correlation Id"));
             }
-            if UuidUtils::is_uuid(reqid) {
+            if UuidUtils::is_uprotocol(reqid) {
                 return Ok(());
             }
         }

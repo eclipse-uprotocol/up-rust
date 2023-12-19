@@ -19,7 +19,7 @@ use prost::Message;
 use prost_types::Any;
 use std::time::SystemTime;
 
-use crate::uprotocol::{UCode, Uuid};
+use crate::uprotocol::UCode;
 use crate::uuid::builder::UuidUtils;
 
 /// Code to extract information from a `CloudEvent`
@@ -234,7 +234,10 @@ impl UCloudEventUtils {
     ///
     /// An `Option<u64>` containing the timestamp from the UUIDV8 `Event` Id or `None` if the timestamp can't be extracted.
     pub fn get_creation_timestamp(event: &Event) -> Option<u64> {
-        UuidUtils::get_time(&Uuid::from(event.id()))
+        match event.id().parse() {
+            Ok(uuid) => UuidUtils::get_time(&uuid),
+            Err(_e) => None,
+        }
     }
 
     /// Calculates if an `Event` configured with a creation time and a `ttl` attribute is expired.
@@ -285,8 +288,12 @@ impl UCloudEventUtils {
         let maybe_ttl = UCloudEventUtils::get_ttl(event);
         match maybe_ttl {
             Some(ttl) if ttl > 0 => {
-                let uuid = Uuid::from(event.id());
-                if let Some(event_time) = UuidUtils::get_time(&uuid) {
+                if let Some(event_time) = event
+                    .id()
+                    .parse()
+                    .ok()
+                    .and_then(|uuid| UuidUtils::get_time(&uuid))
+                {
                     let now = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .expect("Time went backwards")
@@ -312,7 +319,10 @@ impl UCloudEventUtils {
     ///
     /// Returns `true` if the `Event` has a valid `UUIDv8` id.
     pub fn is_cloud_event_id(event: &Event) -> bool {
-        UuidUtils::is_uuid(&Uuid::from(event.id()))
+        event
+            .id()
+            .parse()
+            .map_or(false, |uuid| UuidUtils::is_uprotocol(&uuid))
     }
 
     /// Extracts the payload from the `Event` as a protobuf `Any` object.
@@ -736,7 +746,7 @@ mod tests {
     fn test_extract_creation_timestamp_from_cloud_event_uuidv8_id_when_uuidv8_id_is_valid() {
         let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test();
-        let cloud_event = builder.id(uuid.to_string()).build().unwrap();
+        let cloud_event = builder.id(uuid).build().unwrap();
 
         let maybe_creation_timestamp = UCloudEventUtils::get_creation_timestamp(&cloud_event);
         assert!(maybe_creation_timestamp.is_some());
@@ -847,7 +857,7 @@ mod tests {
     #[test]
     fn test_cloudevent_is_not_expired_when_no_ttl_configured() {
         let uuid = uuid::Uuid::new_v4();
-        let builder = build_base_cloud_event_for_test().id(uuid.to_string());
+        let builder = build_base_cloud_event_for_test().id(uuid);
         let mut cloud_event = builder.build().unwrap();
         cloud_event.remove_extension("ttl");
 
@@ -859,7 +869,7 @@ mod tests {
         let uuid = uuid::Uuid::new_v4();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 0)
-            .id(uuid.to_string());
+            .id(uuid);
         let cloud_event = builder.build().unwrap();
 
         assert!(!UCloudEventUtils::is_expired(&cloud_event));
@@ -870,7 +880,7 @@ mod tests {
         let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", -1)
-            .id(uuid.to_string());
+            .id(uuid);
         let cloud_event = builder.build().unwrap();
 
         assert!(!UCloudEventUtils::is_expired(&cloud_event));
@@ -881,7 +891,7 @@ mod tests {
         let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", i64::MAX)
-            .id(uuid.to_string());
+            .id(uuid);
         let cloud_event = builder.build().unwrap();
 
         assert!(!UCloudEventUtils::is_expired(&cloud_event));
@@ -895,7 +905,7 @@ mod tests {
         let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 1)
-            .id(uuid.to_string());
+            .id(uuid);
         let cloud_event = builder.build().unwrap();
 
         thread::sleep(Duration::from_millis(800));
@@ -906,7 +916,7 @@ mod tests {
     #[test]
     fn test_cloudevent_has_a_v8_uuid() {
         let uuid = UUIDv8Builder::new().build();
-        let builder = build_base_cloud_event_for_test().id(uuid.to_string());
+        let builder = build_base_cloud_event_for_test().id(uuid);
         let cloud_event = builder.build().unwrap();
 
         assert!(UCloudEventUtils::is_cloud_event_id(&cloud_event));
@@ -917,7 +927,7 @@ mod tests {
         let uuid = uuid::Uuid::new_v4();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 3)
-            .id(uuid.to_string());
+            .id(uuid);
         let cloud_event = builder.build().unwrap();
 
         assert!(!UCloudEventUtils::is_cloud_event_id(&cloud_event));
