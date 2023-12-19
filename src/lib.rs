@@ -129,16 +129,6 @@ pub mod uuid {
         pub use uuidbuilder::*;
         pub use uuidutils::*;
     }
-    pub mod serializer {
-        mod longuuidserializer;
-        mod microuuidserializer;
-        mod uuidserializer;
-
-        pub use crate::types::serializationerror::*;
-        pub use longuuidserializer::*;
-        pub use microuuidserializer::*;
-        pub use uuidserializer::*;
-    }
     pub mod validator {
         mod uuidvalidator;
 

@@ -11,8 +11,6 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use prost::Message;
-use std::str::FromStr;
 use uuid::{Uuid, Variant};
 
 use crate::uprotocol::Uuid as uproto_Uuid;
@@ -23,9 +21,9 @@ pub struct UuidConversionError {
 }
 
 impl UuidConversionError {
-    pub fn new(message: &str) -> UuidConversionError {
+    pub fn new<T: Into<String>>(message: T) -> UuidConversionError {
         UuidConversionError {
-            message: message.to_string(),
+            message: message.into(),
         }
     }
 }
@@ -40,46 +38,7 @@ impl std::error::Error for UuidConversionError {}
 
 pub struct UuidUtils;
 
-impl TryFrom<&[u8; 16]> for uproto_Uuid {
-    type Error = UuidConversionError;
-
-    fn try_from(bytes: &[u8; 16]) -> Result<Self, Self::Error> {
-        Ok(Uuid::from_bytes(*bytes).into())
-    }
-}
-
-impl TryFrom<String> for uproto_Uuid {
-    type Error = UuidConversionError;
-
-    fn try_from(uuid_str: String) -> Result<Self, Self::Error> {
-        match Uuid::from_str(&uuid_str) {
-            Ok(uuid) => Ok(uuid.into()),
-            Err(err) => Err(UuidConversionError::new(&err.to_string())),
-        }
-    }
-}
-
 impl UuidUtils {
-    /// Converts the UUID to a String
-    ///
-    /// # Returns
-    ///
-    /// * `String` - The String representation of the UUID
-    pub fn to_string(uuid: &uproto_Uuid) -> String {
-        uuid.to_string()
-    }
-
-    /// Converts the UUID to a byte array
-    ///
-    /// # Returns
-    ///
-    /// * `Vec<u8>` - The byte array representation of the UUID
-    pub fn to_bytes(uuid: &uproto_Uuid) -> Vec<u8> {
-        let mut v = uuid.msb.encode_to_vec();
-        v.extend(uuid.lsb.encode_to_vec());
-        v
-    }
-
     /// Fetches the UUID version
     ///
     /// # Arguments
@@ -90,20 +49,7 @@ impl UuidUtils {
     ///
     /// * `uuid::Version` - The version of the UUID
     pub fn get_version(uuid: &uproto_Uuid) -> Option<Version> {
-        Version::from_value(Uuid::from(uuid.clone()).get_version_num())
-    }
-
-    /// Verify uuid is either v6 or v8
-    ///
-    /// # Arguments
-    ///
-    /// * `uuid` - A reference to the UUID object
-    ///
-    /// # Returns
-    ///
-    /// * `bool` - True if is UUID version 6 or 8
-    pub fn is_uuid(uuid: &uproto_Uuid) -> bool {
-        UuidUtils::is_uprotocol(uuid) || UuidUtils::is_v6(uuid)
+        Version::from_value(Uuid::from(uuid).get_version_num())
     }
 
     /// Verify if uuid is of variant RFC4122
@@ -116,7 +62,7 @@ impl UuidUtils {
     ///
     /// * `bool` - True if UUID has variant RFC4122
     pub fn is_rf4122(uuid: &uproto_Uuid) -> bool {
-        Uuid::from(uuid.clone()).get_variant() == Variant::RFC4122
+        Uuid::from(uuid).get_variant() == Variant::RFC4122
     }
 
     /// Verifies if the version is a formal `UUIDv8` uProtocol ID
@@ -132,50 +78,24 @@ impl UuidUtils {
         matches!(UuidUtils::get_version(uuid), Some(o) if o == Version::Uprotocol)
     }
 
-    /// Verifies if the version is UUID version 6
+    /// Returns the point in time that a UUID has been created at.
     ///
     /// # Arguments
     ///
-    /// * `uuid` - A reference to the UUID object
+    /// * `uuid` - The UUID.
     ///
     /// # Returns
     ///
-    /// * `bool` - True if the UUID is version 6
-    pub fn is_v6(uuid: &uproto_Uuid) -> bool {
-        matches!(UuidUtils::get_version(uuid), Some(o) if o == Version::TimeOrdered)
-    }
-
-    /// Returns the number of milliseconds since Unix epoch for the provided UUID
-    ///
-    /// # Arguments
-    ///
-    /// * `uuid` - A reference to the UUID object
-    ///
-    /// # Returns
-    ///
-    /// * `Option<u64>` - The number of milliseconds since Unix epoch if the UUID version is supported, otherwise None.
-    pub fn get_time(uuid: &uproto_Uuid) -> Option<u64> {
-        if let Some(version) = UuidUtils::get_version(uuid) {
-            match version {
-                Version::TimeOrdered => Uuid::from(uuid.clone())
-                    .get_timestamp()
-                    .map(|time| time.to_rfc4122().0),
-                Version::Uprotocol => {
-                    let uuid = Uuid::from(uuid.clone());
-                    // Re-assemble the original msb (u64)
-                    let uuid_bytes: &[u8; 16] = uuid.as_bytes();
-                    if let Ok(arr) = uuid_bytes[..8].try_into() {
-                        let msb = u64::from_le_bytes(arr);
-                        let time = msb >> 16;
-                        Some(time)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
+    /// The number of milliseconds since UNIX EPOCH if the given UUID is a uProtocol UUID, `None` otherwise.
+    pub fn get_time(uprotocol_uuid: &uproto_Uuid) -> Option<u64> {
+        let uuid = uuid::Uuid::from(uprotocol_uuid);
+        match Version::from_value(uuid.get_version_num()) {
+            Some(Version::Uprotocol) => {
+                // the timstamp is contained in the 48 most significant bits
+                let msb = uuid.as_u64_pair().0;
+                Some(msb >> 16)
             }
-        } else {
-            None
+            _ => None,
         }
     }
 }
@@ -209,5 +129,34 @@ impl Version {
     /// Returns the integer representation of the version.
     pub fn value(self) -> usize {
         self as usize
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::uuid::builder::UUIDv8Builder;
+
+    #[test]
+    fn test_get_time() {
+        let instant = 0x18C684468F8u64; // Thu, 14 Dec 2023 12:19:23 GMT
+        let uprotocol_uuid = UUIDv8Builder::new().build_with_instant(instant);
+        assert_eq!(UuidUtils::get_time(&uprotocol_uuid).unwrap(), instant);
+    }
+
+    #[test]
+    fn test_is_uprotocol() {
+        let uprotocol_uuid = UUIDv8Builder::new().build();
+        assert!(UuidUtils::is_uprotocol(&uprotocol_uuid));
+        assert!(UuidUtils::is_rf4122(&uprotocol_uuid));
+    }
+
+    #[test]
+    fn test_get_version() {
+        let uprotocol_uuid = UUIDv8Builder::new().build();
+        assert_eq!(
+            UuidUtils::get_version(&uprotocol_uuid).unwrap(),
+            Version::Uprotocol
+        );
     }
 }
