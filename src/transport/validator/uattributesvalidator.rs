@@ -16,7 +16,6 @@ use std::time::SystemTime;
 use crate::transport::validator::ValidationError;
 use crate::uprotocol::{UAttributes, UCode, UMessageType, Uuid};
 use crate::uri::validator::UriValidator;
-use crate::uuid::builder::UuidUtils;
 
 /// `UAttributes` is the struct that defines the Payload. It serves as the configuration for various aspects
 /// like time to live, priority, security tokens, and more. Each variant of `UAttributes` defines a different
@@ -101,30 +100,28 @@ pub trait UAttributesValidator {
             None => 0,
         };
 
-        if let Some(uuid) = &attributes.id {
-            if let Some(time) = UuidUtils::get_time(uuid) {
-                let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                    Ok(duration) => {
-                        if let Ok(duration) = u64::try_from(duration.as_millis()) {
-                            duration - time
-                        } else {
-                            return Err(ValidationError::new("Invalid duration"));
-                        }
+        if let Some(time) = attributes.id.as_ref().and_then(|uuid| uuid.get_time()) {
+            let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(duration) => {
+                    if let Ok(duration) = u64::try_from(duration.as_millis()) {
+                        duration - time
+                    } else {
+                        return Err(ValidationError::new("Invalid duration"));
                     }
-                    Err(e) => return Err(ValidationError::new(e.to_string())),
-                };
-
-                if ttl <= 0 {
-                    return Ok(());
                 }
+                Err(e) => return Err(ValidationError::new(e.to_string())),
+            };
 
-                if let Ok(ttl) = u64::try_from(ttl) {
-                    if delta >= ttl {
-                        return Err(ValidationError::new("Payload is expired"));
-                    }
-                } else {
-                    return Err(ValidationError::new("Invalid TTL"));
+            if ttl <= 0 {
+                return Ok(());
+            }
+
+            if let Ok(ttl) = u64::try_from(ttl) {
+                if delta >= ttl {
+                    return Err(ValidationError::new("Payload is expired"));
                 }
+            } else {
+                return Err(ValidationError::new("Invalid TTL"));
             }
         }
         Ok(())
@@ -259,7 +256,7 @@ pub trait UAttributesValidator {
     /// The function considers the absence of a request ID in `UAttributes` as a valid case and does not return an error in such a scenario.
     fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(reqid) = &attributes.reqid {
-            if !UuidUtils::is_uprotocol(reqid) {
+            if !reqid.is_uprotocol_uuid() {
                 return Err(ValidationError::new("Invalid UUID"));
             }
         }
@@ -493,7 +490,7 @@ impl UAttributesValidator for ResponseValidator {
             if *reqid == Uuid::default() {
                 return Err(ValidationError::new("Missing correlation Id"));
             }
-            if UuidUtils::is_uprotocol(reqid) {
+            if reqid.is_uprotocol_uuid() {
                 return Ok(());
             }
         }

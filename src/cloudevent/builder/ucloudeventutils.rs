@@ -19,8 +19,7 @@ use prost::Message;
 use prost_types::Any;
 use std::time::SystemTime;
 
-use crate::uprotocol::UCode;
-use crate::uuid::builder::UuidUtils;
+use crate::uprotocol::{UCode, Uuid};
 
 /// Code to extract information from a `CloudEvent`
 #[derive(Debug)]
@@ -234,8 +233,8 @@ impl UCloudEventUtils {
     ///
     /// An `Option<u64>` containing the timestamp from the UUIDV8 `Event` Id or `None` if the timestamp can't be extracted.
     pub fn get_creation_timestamp(event: &Event) -> Option<u64> {
-        match event.id().parse() {
-            Ok(uuid) => UuidUtils::get_time(&uuid),
+        match event.id().parse::<Uuid>() {
+            Ok(uuid) => uuid.get_time(),
             Err(_e) => None,
         }
     }
@@ -290,9 +289,9 @@ impl UCloudEventUtils {
             Some(ttl) if ttl > 0 => {
                 if let Some(event_time) = event
                     .id()
-                    .parse()
+                    .parse::<Uuid>()
                     .ok()
-                    .and_then(|uuid| UuidUtils::get_time(&uuid))
+                    .and_then(|uuid| uuid.get_time())
                 {
                     let now = SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -321,8 +320,8 @@ impl UCloudEventUtils {
     pub fn is_cloud_event_id(event: &Event) -> bool {
         event
             .id()
-            .parse()
-            .map_or(false, |uuid| UuidUtils::is_uprotocol(&uuid))
+            .parse::<Uuid>()
+            .map_or(false, |uuid| uuid.is_uprotocol_uuid())
     }
 
     /// Extracts the payload from the `Event` as a protobuf `Any` object.

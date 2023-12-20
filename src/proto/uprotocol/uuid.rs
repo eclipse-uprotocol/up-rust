@@ -12,16 +12,77 @@
  ********************************************************************************/
 
 use std::str::FromStr;
-use uuid::Uuid;
+use uuid::{Uuid, Variant, Version};
 
 use crate::uprotocol::Uuid as uproto_Uuid;
-use crate::uuid::builder::UuidConversionError;
+
+#[derive(Debug)]
+pub struct UuidConversionError {
+    message: String,
+}
+
+impl UuidConversionError {
+    pub fn new<T: Into<String>>(message: T) -> UuidConversionError {
+        UuidConversionError {
+            message: message.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for UuidConversionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error converting Uuid: {}", self.message)
+    }
+}
+
+impl std::error::Error for UuidConversionError {}
 
 impl uproto_Uuid {
     /// Returns a string representation of this UUID as defined by
     /// [RFC 4122, Section 3](https://www.rfc-editor.org/rfc/rfc4122.html#section-3).
     pub fn to_hyphenated_string(&self) -> String {
         Uuid::from(self).as_hyphenated().to_string()
+    }
+
+    fn try_get_time(uuid: &uuid::Uuid) -> Result<u64, String> {
+        match uuid.get_version() {
+            Some(Version::Custom) => {
+                // the timstamp is contained in the 48 most significant bits
+                let msb = uuid.as_u64_pair().0;
+                Ok(msb >> 16)
+            }
+            _ => Err("not a uProtocol UUID".to_string()),
+        }
+    }
+
+    /// Returns the point in time that this UUID has been created at.
+    ///
+    /// # Returns
+    ///
+    /// The number of milliseconds since UNIX EPOCH if this UUID is a uProtocol UUID, `None` otherwise.
+    pub fn get_time(&self) -> Option<u64> {
+        let uuid = uuid::Uuid::from(self);
+        uproto_Uuid::try_get_time(&uuid).ok()
+    }
+
+    /// Checks if this is a valid uProtocol UUID.
+    ///
+    /// # Returns
+    ///
+    /// `true` if this UUID meets the formal requirements defined by the
+    /// [uProtocol spec](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/v1.5.0/basics/uuid.adoc#2-specification).
+    pub fn is_uprotocol_uuid(&self) -> bool {
+        let uuid = uuid::Uuid::from(self);
+
+        if !matches!(uuid.get_version(), Some(Version::Custom)) {
+            return false;
+        }
+
+        if uuid.get_variant() != Variant::RFC4122 {
+            return false;
+        }
+
+        true
     }
 }
 
@@ -193,5 +254,35 @@ mod tests {
 
         let uuid_as_bytes: [u8; 16] = uuid.into();
         assert_eq!(uuid_as_bytes, bytes);
+    }
+
+    #[test]
+    fn test_is_uprotocol_uuid_succeeds() {
+        // timestamp = 1, ver = 0b1000
+        let msb = 0x0000000000018000u64;
+        // variant = 0b10
+        let lsb = 0x8000000000000000u64;
+        let uuid = uproto_Uuid { msb, lsb };
+        assert!(uuid.is_uprotocol_uuid());
+    }
+
+    #[test]
+    fn test_is_uprotocol_uuid_fails_for_invalid_version() {
+        // timestamp = 1, ver = 0b1100
+        let msb = 0x000000000001C000u64;
+        // variant = 0b10
+        let lsb = 0x8000000000000000u64;
+        let uuid = uproto_Uuid { msb, lsb };
+        assert!(!uuid.is_uprotocol_uuid());
+    }
+
+    #[test]
+    fn test_is_uprotocol_uuid_fails_for_invalid_variant() {
+        // timestamp = 1, ver = 0b1000
+        let msb = 0x0000000000018000u64;
+        // variant = 0b01
+        let lsb = 0x4000000000000000u64;
+        let uuid = uproto_Uuid { msb, lsb };
+        assert!(!uuid.is_uprotocol_uuid());
     }
 }

@@ -124,16 +124,8 @@ pub mod uri {
 pub mod uuid {
     pub mod builder {
         mod uuidbuilder;
-        mod uuidutils;
 
         pub use uuidbuilder::*;
-        pub use uuidutils::*;
-    }
-    pub mod validator {
-        mod uuidvalidator;
-
-        pub use crate::types::validationerror::*;
-        pub use uuidvalidator::*;
     }
 }
 
