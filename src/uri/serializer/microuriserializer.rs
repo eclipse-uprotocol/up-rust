@@ -11,7 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use bytes::{Buf, BufMut};
+use byteorder::WriteBytesExt;
+use std::io::Cursor;
 use std::io::Write;
 
 use crate::uprotocol::{UAuthority, UEntity, UUri};

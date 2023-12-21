@@ -13,6 +13,9 @@
 
 use crate::uprotocol::uri::UResource;
 
+const URESOURCE_ID_LENGTH: usize = 16;
+const URESOURCE_ID_VALID_BITMASK: u32 = 0xffff << URESOURCE_ID_LENGTH;
+
 impl UResource {
     pub fn has_id(&self) -> bool {
         self.id.is_some()
@@ -24,6 +27,22 @@ impl UResource {
 
     pub fn get_instance(&self) -> Option<&str> {
         self.instance.as_deref()
+    }
+
+    /// Returns whether a `UResource`'s `id` can fit within the 16 bits allotted for the micro URI format
+    ///
+    /// # Returns
+    /// Returns a `Result<bool, bool>` where the error means id is empty and happy path tells us whether it fits (true)
+    /// or not (false)
+    ///
+    /// # Errors
+    ///
+    /// Returns a simple `bool` in the failure case
+    pub fn id_fits_micro_uri(&self) -> Result<bool, bool> {
+        if let Some(id) = self.id {
+            if id & URESOURCE_ID_VALID_BITMASK == 0 { Ok(true) }
+            else { Ok(false) }
+        } else { Err(false) }
     }
 }
 
