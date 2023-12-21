@@ -14,16 +14,16 @@
 use crate::uprotocol::UResource;
 
 impl UResource {
-    pub fn has_id(resource: &UResource) -> bool {
-        resource.id.is_some()
+    pub fn has_id(&self) -> bool {
+        self.id.is_some()
     }
 
-    pub fn get_message(resource: &UResource) -> Option<&str> {
-        resource.message.as_deref()
+    pub fn get_message(&self) -> Option<&str> {
+        self.message.as_deref()
     }
 
-    pub fn get_instance(resource: &UResource) -> Option<&str> {
-        resource.instance.as_deref()
+    pub fn get_instance(&self) -> Option<&str> {
+        self.instance.as_deref()
     }
 }
 
@@ -48,5 +48,11 @@ impl From<&str> for UResource {
             instance: resource_instance,
             message: resource_message,
         }
+    }
+}
+
+impl From<String> for UResource {
+    fn from(value: String) -> Self {
+        Self::from(value.as_str())
     }
 }

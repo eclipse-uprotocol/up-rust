@@ -15,11 +15,9 @@ use rand::Rng;
 use std::convert::Into;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use uuid::Builder;
 
 use crate::uprotocol::Uuid as uproto_Uuid;
 
-const UUIDV8_VERSION: u64 = 8;
 const MAX_COUNT: u64 = 0xfff;
 const MAX_TIMESTAMP_BITS: u8 = 48;
 const MAX_TIMESTAMP_MASK: u64 = 0xffff << MAX_TIMESTAMP_BITS;
@@ -70,22 +68,36 @@ impl Default for UUIDv8Builder {
 impl UUIDv8Builder {
     pub fn new() -> Self {
         UUIDv8Builder {
-            msb: AtomicU64::new(UUIDV8_VERSION << 12),
-            // we do not need to explicitly set the variant bits
+            // we do not need to explicitly set the version and variant bits
             // because this will be done implicitly by the
             // call to uuid::builder::Builder::from_custom_bytes
             // when creating a UUID using one of the build functions
+            msb: AtomicU64::new(0),
             lsb: rand::thread_rng().gen::<u64>().to_be_bytes(),
         }
     }
 
+    /// Creates a new UUID for the current system time.
+    ///
+    /// # Arguments
+    ///
+    /// * `timestamp` - The timestamp (in milliseconds since UNIX EPOCH) to use.
+    ///
+    /// # Panics
+    ///
+    /// if the system time
+    /// * is set to a point in time before UNIX Epoch, or
+    /// * is set to a point in time later than UNIX Epoch + 0xFFFFFFFFFFFF seconds
     pub fn build(&self) -> uproto_Uuid {
         if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
             if let Ok(now) = u64::try_from(now.as_millis()) {
-                return self.build_with_instant(now);
+                self.build_with_instant(now)
+            } else {
+                panic!("current system time is set to a point in time too far in the future");
             }
+        } else {
+            panic!("current system time is set to a point in time before UNIX Epoch");
         }
-        uproto_Uuid::default()
     }
 
     /// Creates a new UUID for a given timestamp.
@@ -97,7 +109,7 @@ impl UUIDv8Builder {
     /// # Panics
     ///
     /// * if the given timestamp is greater than 2^48 - 1.
-    pub fn build_with_instant(&self, timestamp: u64) -> uproto_Uuid {
+    fn build_with_instant(&self, timestamp: u64) -> uproto_Uuid {
         if timestamp & MAX_TIMESTAMP_MASK != 0 {
             panic!("Timestamp of UUID must not exceed 48 bits")
         }
@@ -109,7 +121,10 @@ impl UUIDv8Builder {
                 if (current_msb & MAX_COUNT) < MAX_COUNT {
                     self.msb.fetch_add(1, Ordering::SeqCst);
                 } else {
-                    // TODO we should either panic or return an Err here
+                    // this should never happen in practice because we
+                    // do not expect any uEntity to emit more than
+                    // 4095 messages/ms
+                    // so we simply keep the current counter at MAX_COUNT
                 }
             } else {
                 self.msb.store(timestamp << 16, Ordering::SeqCst);
@@ -121,7 +136,7 @@ impl UUIDv8Builder {
         let mut bytes = [0u8; 16];
         bytes[..8].copy_from_slice(&new_msb.to_be_bytes());
         bytes[8..].copy_from_slice(&self.lsb);
-        Builder::from_custom_bytes(bytes).into_uuid().into()
+        uuid::Builder::from_custom_bytes(bytes).into_uuid().into()
     }
 }
 
@@ -130,31 +145,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_build_uuid8_with_instant() {
+    fn test_build_creates_valid_uprotocol_uuid() {
+        let uuid = UUIDv8Builder::new().build();
+        assert!(uuid.is_uprotocol_uuid());
+    }
+
+    #[test]
+    fn test_build_with_instant_creates_uprotocol_uuid() {
         let instant = 0x18C684468F8u64; // Thu, 14 Dec 2023 12:19:23 GMT
-        let uprotocol_uuid = UUIDv8Builder::new().build_with_instant(instant);
+        let uuid = UUIDv8Builder::new().build_with_instant(instant);
+        assert!(uuid.is_uprotocol_uuid());
+        assert_eq!(uuid.get_time().unwrap(), instant);
 
         // instant, version (8) and counter (000) should show up in UUID
-        assert!(uprotocol_uuid
+        assert!(uuid
             .to_hyphenated_string()
             .starts_with("018c6844-68f8-8000-"));
-        // variant is 0b10
-        assert_eq!(uprotocol_uuid.lsb >> 62, 0b10);
     }
 
     #[test]
     fn test_uuid_for_subsequent_generation() {
         let instant = 0x18C684468F8u64; // Thu, 14 Dec 2023 12:19:23 GMT
         let builder = UUIDv8Builder::new();
-        let _uprotocol_uuid_for_instant = builder.build_with_instant(instant);
-        let uprotocol_uuid_for_same_instant = builder.build_with_instant(instant);
+        let _uuid_for_instant = builder.build_with_instant(instant);
+        let uuid_for_same_instant = builder.build_with_instant(instant);
+        assert!(uuid_for_same_instant.is_uprotocol_uuid());
 
         // same instant, version (8) and _incremented_ counter (001) should show up in UUID
-        assert!(uprotocol_uuid_for_same_instant
+        assert!(uuid_for_same_instant
             .to_hyphenated_string()
             .starts_with("018c6844-68f8-8001-"));
-        // variant is 0b10
-        assert_eq!(uprotocol_uuid_for_same_instant.lsb >> 62, 0b10);
     }
 
     #[test]

@@ -48,12 +48,12 @@ impl UAuthority {
         }
     }
 
-    pub fn set_name<T>(authority: &mut UAuthority, name: T) -> &mut Self
+    pub fn set_name<T>(&mut self, name: T) -> &mut Self
     where
         T: Into<String>,
     {
-        authority.remote = Some(Remote::Name(name.into()));
-        authority
+        self.remote = Some(Remote::Name(name.into()));
+        self
     }
 
     pub fn set_ip(&mut self, ip: Vec<u8>) -> &mut Self {
