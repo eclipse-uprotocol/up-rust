@@ -120,8 +120,7 @@ impl UriValidator {
     /// Returns `true` if the URI contains both names and numeric representations of the names,
     /// meaning that this `UUri` can be serialized to long or micro formats.
     pub fn is_resolved(uri: &UUri) -> bool {
-        !Self::is_empty(uri)
-        // TODO finish this
+        UriValidator::is_micro_form(uri) && UriValidator::is_long_form(uri)
     }
 
     /// Checks if the URI is of type RPC.
@@ -1095,7 +1094,6 @@ mod tests {
             assert!(status.is_err());
         }
     }
-
 
     #[test]
     fn test_is_micro_form_uri_overflow_resource_id() {
