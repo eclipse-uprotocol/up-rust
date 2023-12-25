@@ -13,6 +13,8 @@
 
 use crate::uprotocol::uri::UResource;
 
+use crate::uri::validator::ValidationError;
+
 const URESOURCE_ID_LENGTH: usize = 16;
 const URESOURCE_ID_VALID_BITMASK: u32 = 0xffff << URESOURCE_ID_LENGTH;
 
@@ -32,17 +34,22 @@ impl UResource {
     /// Returns whether a `UResource`'s `id` can fit within the 16 bits allotted for the micro URI format
     ///
     /// # Returns
-    /// Returns a `Result<bool, bool>` where the error means id is empty and happy path tells us whether it fits (true)
+    /// Returns a `Result<bool, ValidationError>` where the error means id is empty and happy path tells us whether it fits (true)
     /// or not (false)
     ///
     /// # Errors
     ///
-    /// Returns a simple `bool` in the failure case
-    pub fn id_fits_micro_uri(&self) -> Result<bool, bool> {
+    /// Returns a `ValidationError` in the failure case, indicating no id present
+    pub fn id_fits_micro_uri(&self) -> Result<bool, ValidationError> {
         if let Some(id) = self.id {
-            if id & URESOURCE_ID_VALID_BITMASK == 0 { Ok(true) }
-            else { Ok(false) }
-        } else { Err(false) }
+            if id & URESOURCE_ID_VALID_BITMASK == 0 {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            Err(ValidationError::new("Missing id"))
+        }
     }
 }
 

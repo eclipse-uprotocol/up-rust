@@ -578,4 +578,42 @@ mod tests {
         assert!(UriValidator::is_micro_form(uri2.as_ref().unwrap()));
         assert_eq!(uri, uri2.unwrap());
     }
+
+    #[test]
+    fn test_serialize_uri_overflow_resource_id() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(0x10000),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(uprotocol_uri.unwrap_err().to_string(), "UResource id larger than allotted 16 bits");
+    }
+
+    #[test]
+    fn test_serialize_uri_overflow_entity_id() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                id: Some(0x10000),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(29999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(uprotocol_uri.unwrap_err().to_string(), "UEntity id larger than allotted 16 bits");
+    }
 }
