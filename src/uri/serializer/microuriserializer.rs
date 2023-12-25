@@ -595,7 +595,10 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(uprotocol_uri.unwrap_err().to_string(), "UResource id larger than allotted 16 bits");
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "UResource id larger than allotted 16 bits"
+        );
     }
 
     #[test]
@@ -614,6 +617,9 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(uprotocol_uri.unwrap_err().to_string(), "UEntity id larger than allotted 16 bits");
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "UEntity id larger than allotted 16 bits"
+        );
     }
 }
