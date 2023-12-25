@@ -1096,6 +1096,43 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn test_is_micro_form_uri_overflow_resource_id() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(0x10000),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let is_micro_form = UriValidator::is_micro_form(&uri);
+        assert_eq!(is_micro_form, false);
+    }
+
+    #[test]
+    fn test_is_micro_form_uri_overflow_entity_id() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                id: Some(0x10000),
+                version_major: Some(254),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(29999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let is_micro_form = UriValidator::is_micro_form(&uri);
+        assert_eq!(is_micro_form, false);
+    }
+
     fn get_json_object() -> Result<Value, Error> {
         let current_directory = std::env::current_dir().expect("Failed to get current directory");
         let json_path = current_directory.join("tests").join("uris.json");
