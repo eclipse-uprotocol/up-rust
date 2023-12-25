@@ -192,7 +192,8 @@ impl UriValidator {
     /// * `uri` - The `UUri` to check.
     ///
     /// # Returns
-    /// Returns `true` if the URI contains numbers, allowing it to be serialized into micro format.
+    /// Returns `true` if the URI contains numbers which will fit in the allotted space (16 bits for
+    /// id), allowing it to be serialized into micro format.
     #[allow(clippy::missing_panics_doc)]
     pub fn is_micro_form(uri: &UUri) -> bool {
         !Self::is_empty(uri)
