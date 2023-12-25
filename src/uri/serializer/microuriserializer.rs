@@ -539,7 +539,10 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(uprotocol_uri.unwrap_err().to_string(), "Invalid IP address");
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is empty or not in micro form"
+        );
     }
 
     #[test]
