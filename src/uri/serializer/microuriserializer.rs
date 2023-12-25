@@ -622,4 +622,26 @@ mod tests {
             "URI is empty or not in micro form"
         );
     }
+
+    #[test]
+    fn test_serialize_version_overflow_entity_version() {
+        let uri = UUri {
+            entity: Some(UEntity {
+                id: Some(29999),
+                version_major: Some(0x100),
+                ..Default::default()
+            }),
+            resource: Some(UResource {
+                id: Some(29999),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+        assert!(uprotocol_uri.is_err());
+        assert_eq!(
+            uprotocol_uri.unwrap_err().to_string(),
+            "URI is empty or not in micro form"
+        );
+    }
 }

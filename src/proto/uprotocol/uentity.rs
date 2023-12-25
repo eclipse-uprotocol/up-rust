@@ -17,6 +17,8 @@ use crate::uri::validator::ValidationError;
 
 const UENTITY_ID_LENGTH: usize = 16;
 const UENTITY_ID_VALID_BITMASK: u32 = 0xffff << UENTITY_ID_LENGTH;
+const UENTITY_MAJOR_VERSION_LENGTH: usize = 8;
+const UENTITY_MAJOR_VERSION_VALID_BITMASK: u32 = 0xffffff << UENTITY_MAJOR_VERSION_LENGTH;
 
 impl UEntity {
     pub fn has_id(&self) -> bool {
@@ -41,6 +43,18 @@ impl UEntity {
             }
         } else {
             Err(ValidationError::new("Missing id"))
+        }
+    }
+
+    pub fn version_fits_micro_uri(&self) -> Result<bool, ValidationError> {
+        if let Some(id) = self.version_major {
+            if id & UENTITY_MAJOR_VERSION_VALID_BITMASK == 0 {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            Err(ValidationError::new("Major version must be present"))
         }
     }
 }
