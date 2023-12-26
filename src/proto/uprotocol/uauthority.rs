@@ -48,6 +48,15 @@ impl UAuthority {
         self.id.is_some()
     }
 
+    /// Returns whether the `Remote` `Ip` meets conformance with IPv4 or IPv6 spec
+    ///
+    /// # Returns
+    /// Returns a `Result<IpConformance, ValidationError>` where the error means remote is not IP or there is no remote
+    /// and happy path tells us whether the IP conforms with spec or not
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the failure case, indicating no remote or remote is not IP
     pub fn remote_ip_conforms(&self) -> Result<IpConformance, ValidationError> {
         if let Some(_remote) = self.remote.as_ref() {
             match &self.remote {
@@ -63,6 +72,15 @@ impl UAuthority {
         }
     }
 
+    /// Returns whether the `Remote` `Id` meets conformance allowable range of bytes
+    ///
+    /// # Returns
+    /// Returns a `Result<bool, ValidationError>` where the error means remote is not ID or there is no remote
+    /// and happy path tells us whether the ID conforms with allowable range of bytes or not
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the failure case, indicating no remote or remote is not IP
     pub fn remote_id_conforms(&self) -> Result<bool, ValidationError> {
         if let Some(_remote) = self.remote.as_ref() {
             match &self.remote {

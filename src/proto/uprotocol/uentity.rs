@@ -46,6 +46,15 @@ impl UEntity {
         }
     }
 
+    /// Returns whether a `UEntity`'s `version_major` can fit within the 16 bits allotted for the micro URI format
+    ///
+    /// # Returns
+    /// Returns a `Result<bool, ValidationError>` where the error means id is empty and happy path tells us whether it fits (true)
+    /// or not (false)
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the failure case, indicating no version_major present
     pub fn version_fits_micro_uri(&self) -> Result<bool, ValidationError> {
         if let Some(id) = self.version_major {
             if id & UENTITY_MAJOR_VERSION_VALID_BITMASK == 0 {
