@@ -17,8 +17,8 @@ use crate::uri::validator::ValidationError;
 
 pub enum IpConformance {
     NonConformal,
-    Ipv4,
-    Ipv6,
+    IPv4,
+    IPv6,
 }
 
 const REMOTE_IPV4_BYTES: usize = 4;
@@ -52,8 +52,8 @@ impl UAuthority {
         if let Some(_remote) = self.remote.as_ref() {
             match &self.remote {
                 Some(Remote::Ip(ip)) => Ok(match ip.len() {
-                    REMOTE_IPV4_BYTES => IpConformance::Ipv4,
-                    REMOTE_IPV6_BYTES => IpConformance::Ipv6,
+                    REMOTE_IPV4_BYTES => IpConformance::IPv4,
+                    REMOTE_IPV6_BYTES => IpConformance::IPv6,
                     _ => IpConformance::NonConformal,
                 }),
                 _ => Err(ValidationError::new("Remote is not IP")),

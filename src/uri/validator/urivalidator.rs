@@ -238,7 +238,7 @@ impl UriValidator {
                 Some(Remote::Ip(_)) => {
                     if !matches!(
                         authority.remote_ip_conforms(),
-                        Ok(IpConformance::Ipv4) | Ok(IpConformance::Ipv6)
+                        Ok(IpConformance::IPv4) | Ok(IpConformance::IPv6)
                     ) {
                         Err(ValidationError::new(
                             "Authority: Remote IP does not conform to IPv4 (4 bytes) nor IPv6 standards (16 bytes)",
