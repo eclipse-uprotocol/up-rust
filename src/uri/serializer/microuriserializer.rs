@@ -85,8 +85,10 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     /// A `Vec<u8>` representing the serialized `UUri`.
     #[allow(clippy::cast_possible_truncation)]
     fn serialize(uri: &UUri) -> Result<Vec<u8>, SerializationError> {
-        if UriValidator::is_empty(uri) || !UriValidator::is_micro_form(uri) {
-            return Err(SerializationError::new("URI is empty or not in micro form"));
+        if let Err(validation_error) = UriValidator::validate_micro_form(uri) {
+            let error_message =
+                format!("Failed to validate micro URI format: {}", validation_error);
+            return Err(SerializationError::new(error_message));
         }
 
         let mut buf = vec![];
@@ -269,7 +271,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: URI is empty"
         );
     }
 
@@ -321,7 +323,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: Authority: Remote types supported are IP or ID only"
         );
     }
 
@@ -340,15 +342,17 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: Entity: Missing id"
         );
     }
 
     #[test]
-    fn test_serialize_uri_missing_resource_ids() {
+    fn test_serialize_uri_missing_resource() {
         let uri = UUri {
             entity: Some(UEntity {
                 name: "kaputt".to_string(),
+                id: Some(2999),
+                version_major: Some(1),
                 ..Default::default()
             })
             .into(),
@@ -358,7 +362,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: Resource: Is missing"
         );
     }
 
@@ -541,7 +545,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: Authority: Remote IP does not conform to IPv4 (4 bytes) nor IPv6 standards (16 bytes)"
         );
     }
 
@@ -600,7 +604,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: Resource: ID does not fit within the 16 bits allotted"
         );
     }
 
@@ -622,7 +626,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: Entity: ID does not fit within the 16 bits allotted"
         );
     }
 
@@ -644,7 +648,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
+            "Failed to validate micro URI format: Entity: Major version does not fit within the 8 bits allotted"
         );
     }
 }
