@@ -100,7 +100,7 @@ pub trait UAttributesValidator {
             None => 0,
         };
 
-        if let Some(time) = attributes.id.as_ref().and_then(|uuid| uuid.get_time()) {
+        if let Some(time) = attributes.id.as_ref().and_then(Uuid::get_time) {
             let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(duration) => {
                     if let Ok(duration) = u64::try_from(duration.as_millis()) {
