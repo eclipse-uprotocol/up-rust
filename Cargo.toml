@@ -56,4 +56,4 @@ ureq = "2.7"
 
 [dev-dependencies]
 base64 = "0.21"
-futures = "0.3"
+test-case = "3.3"
