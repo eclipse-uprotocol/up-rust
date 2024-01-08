@@ -41,6 +41,7 @@ pub trait RpcClient {
     ///
     /// Returns a Future with the result or error.
     async fn invoke_method(
+        &self,
         topic: UUri,
         payload: UPayload,
         attributes: UAttributes,
