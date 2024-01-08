@@ -110,9 +110,10 @@ impl UUIDv8Builder {
     ///
     /// * if the given timestamp is greater than 2^48 - 1.
     fn build_with_instant(&self, timestamp: u64) -> uproto_Uuid {
-        if timestamp & MAX_TIMESTAMP_MASK != 0 {
-            panic!("Timestamp of UUID must not exceed 48 bits")
-        }
+        assert!(
+            timestamp & MAX_TIMESTAMP_MASK == 0,
+            "Timestamp of UUID must not exceed 48 bits"
+        );
 
         let new_msb = {
             let current_msb = self.msb.load(Ordering::SeqCst);

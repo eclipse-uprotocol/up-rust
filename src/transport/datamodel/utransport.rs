@@ -52,14 +52,18 @@ pub trait UTransport {
     ///
     /// # Arguments
     /// * `topic` - Resolved `UUri` indicating the topic for which the listener is registered.
-    /// * `listener` - A boxed closure (or function pointer) that takes `UMessage` as an argument and returns nothing. The closure is executed to process the data for the topic. It must be `Send` and `'static` to allow transfer across threads and a stable lifetime.
+    /// * `listener` - A boxed closure (or function pointer) that takes `Result<UMessage, UStatus>` as an argument and returns nothing.
+    ///                The closure is executed to process the data or handle the error for the topic.
+    ///                It must be `Send`, `Sync` and `'static` to allow transfer across threads and a stable lifetime.
     ///
     /// # Returns
-    /// Asynchronously returns a `Result<String, UStatus>`. On success, returns a `String` containing an identifier that can be used for unregistering the listener later. On failure, returns `Err(UStatus)` with the appropriate failure information.
+    /// Asynchronously returns a `Result<String, UStatus>`.
+    /// On success, returns a `String` containing an identifier that can be used for unregistering the listener later.
+    /// On failure, returns `Err(UStatus)` with the appropriate failure information.
     async fn register_listener(
         &self,
         topic: UUri,
-        listener: Box<dyn Fn(UMessage) + Send + 'static>,
+        listener: Box<dyn Fn(Result<UMessage, UStatus>) + Send + Sync + 'static>,
     ) -> Result<String, UStatus>;
 
     /// Unregister a listener for a given topic. Messages arriving on this topic will no longer be processed

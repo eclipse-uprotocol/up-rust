@@ -34,8 +34,8 @@ impl UCloudEventBuilder {
     ///
     /// This module provides the functionality to generate `CloudEvents` of the 4 core types: `Request`, `Response`, `Publish`, and `Notify`.
 
-    /// Creates the string representation of a UUIDv8 as defined by
-    /// https://www.rfc-editor.org/rfc/rfc4122.html#section-3
+    /// Creates the string representation of a `UUIDv8` as defined by
+    /// [RFC 4122](https://www.rfc-editor.org/rfc/rfc4122.html#section-3)
     fn create_cloudevent_id() -> String {
         UUIDv8Builder::new().build().to_hyphenated_string()
     }
