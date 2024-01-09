@@ -84,10 +84,10 @@ impl UAuthority {
     pub fn remote_id_conforms(&self) -> Result<bool, ValidationError> {
         if let Some(_remote) = self.remote.as_ref() {
             match &self.remote {
-                Some(Remote::Id(id)) => Ok(match id.len() {
-                    REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES => true,
-                    _ => false,
-                }),
+                Some(Remote::Id(id)) => Ok(matches!(
+                    id.len(),
+                    REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES
+                )),
                 _ => Err(ValidationError::new("Remote is not ID")),
             }
         } else {
