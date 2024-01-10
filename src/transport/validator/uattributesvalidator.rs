@@ -394,7 +394,7 @@ impl UAttributesValidator for RequestValidator {
     /// Returns a `ValidationResult` that is success or failed with a failure message.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(sink) = &attributes.sink {
-            UriValidator::validate_rpc_response(sink)
+            UriValidator::validate_rpc_method(sink)
         } else {
             Err(ValidationError::new("Missing Sink"))
         }
@@ -470,7 +470,7 @@ impl UAttributesValidator for ResponseValidator {
     /// Returns a `ValidationResult` that is success or failed with a failure message.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), ValidationError> {
         if let Some(sink) = &attributes.sink {
-            UriValidator::validate_rpc_method(sink)
+            UriValidator::validate_rpc_response(sink)
         } else {
             Err(ValidationError::new("Missing Sink"))
         }
