@@ -17,7 +17,9 @@ use crate::uprotocol::{UMessage, UStatus, UUri};
 
 /// `RpcServer` is an interface called by uServices to register method listeners for
 /// incoming RPC requests from clients.
-/// TODO: Add uProtocol spec in the future
+///
+/// For more details, please refer to the
+/// [RpcServer Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l2/README.adoc).
 #[async_trait]
 pub trait RpcServer {
     /// Register a listener for a particular method URI to be notified when requests
