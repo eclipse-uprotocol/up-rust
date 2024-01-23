@@ -39,7 +39,9 @@ impl UEntity {
 
         if let Some(id) = self.id {
             if id & UENTITY_ID_VALID_BITMASK != 0 {
-                validation_errors.push(ValidationError::new("ID does not fit within allotted 16 bits in micro form"));
+                validation_errors.push(ValidationError::new(
+                    "ID does not fit within allotted 16 bits in micro form",
+                ));
             }
         } else {
             validation_errors.push(ValidationError::new("ID must be present"));
@@ -47,7 +49,9 @@ impl UEntity {
 
         if let Some(major_version) = self.version_major {
             if major_version & UENTITY_MAJOR_VERSION_VALID_BITMASK != 0 {
-                validation_errors.push(ValidationError::new("Major version does not fit within 16 allotted bits in micro form"));
+                validation_errors.push(ValidationError::new(
+                    "Major version does not fit within 16 allotted bits in micro form",
+                ));
             }
         } else {
             validation_errors.push(ValidationError::new("Major version must be present"));

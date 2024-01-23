@@ -45,7 +45,9 @@ impl UResource {
 
         if let Some(id) = self.id {
             if id & URESOURCE_ID_VALID_BITMASK != 0 {
-                validation_errors.push(ValidationError::new("ID does not fit within allotted 16 bits in micro form"));
+                validation_errors.push(ValidationError::new(
+                    "ID does not fit within allotted 16 bits in micro form",
+                ));
             }
         } else {
             validation_errors.push(ValidationError::new("ID must be present"));
