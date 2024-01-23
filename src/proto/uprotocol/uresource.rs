@@ -13,7 +13,7 @@
 
 use crate::uprotocol::uri::UResource;
 
-use crate::uri::validator::ValidationError;
+pub use crate::uri::validator::ValidationError;
 
 const URESOURCE_ID_LENGTH: usize = 16;
 const URESOURCE_ID_VALID_BITMASK: u32 = 0xffff << URESOURCE_ID_LENGTH;
@@ -31,24 +31,36 @@ impl UResource {
         self.instance.as_deref()
     }
 
-    /// Returns whether a `UResource`'s `id` can fit within the 16 bits allotted for the micro URI format
+    /// Returns whether a `UResource` satisfies the requirements of a micro form URI
     ///
     /// # Returns
-    /// Returns a `Result<bool, ValidationError>` where the error means id is empty and happy path tells us whether it fits (true)
-    /// or not (false)
+    /// Returns a `Result<(), ValidationError>` where the ValidationError will contain the reasons it failed or OK(())
+    /// otherwise
     ///
     /// # Errors
     ///
-    /// Returns a `ValidationError` in the failure case, indicating no id present
-    pub fn id_fits_micro_uri(&self) -> Result<bool, ValidationError> {
+    /// Returns a `ValidationError` in the failure case
+    pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
+        let mut validation_errors = Vec::new();
+
         if let Some(id) = self.id {
-            if id & URESOURCE_ID_VALID_BITMASK == 0 {
-                Ok(true)
-            } else {
-                Ok(false)
+            if id & URESOURCE_ID_VALID_BITMASK != 0 {
+                validation_errors.push(ValidationError::new("ID does not fit within allotted 16 bits in micro form"));
             }
         } else {
-            Err(ValidationError::new("Missing id"))
+            validation_errors.push(ValidationError::new("ID must be present"));
+        }
+
+        if !validation_errors.is_empty() {
+            let combined_message = validation_errors
+                .into_iter()
+                .map(|err| err.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            Err(ValidationError::new(combined_message))
+        } else {
+            Ok(())
         }
     }
 }

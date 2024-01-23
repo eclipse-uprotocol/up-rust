@@ -323,7 +323,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Authority: Remote types supported are IP or ID only"
+            "Failed to validate micro URI format: Authority: Must use IP address or ID as UAuthority for micro form."
         );
     }
 
@@ -342,7 +342,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: Missing id"
+            "Failed to validate micro URI format: Entity: ID must be present, Major version must be present"
         );
     }
 
@@ -545,7 +545,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Authority: Remote IP does not conform to IPv4 (4 bytes) nor IPv6 standards (16 bytes)"
+            "Failed to validate micro URI format: Authority: IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)"
         );
     }
 
@@ -604,7 +604,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Resource: ID does not fit within the 16 bits allotted"
+            "Failed to validate micro URI format: Resource: ID does not fit within allotted 16 bits in micro form"
         );
     }
 
@@ -626,7 +626,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: ID does not fit within the 16 bits allotted"
+            "Failed to validate micro URI format: Entity: ID does not fit within allotted 16 bits in micro form"
         );
     }
 
@@ -648,7 +648,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: Major version does not fit within the 8 bits allotted"
+            "Failed to validate micro URI format: Entity: Major version does not fit within 16 allotted bits in micro form"
         );
     }
 }

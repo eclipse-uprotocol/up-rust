@@ -13,13 +13,7 @@
 
 use crate::uprotocol::uri::UAuthority;
 
-use crate::uri::validator::ValidationError;
-
-pub enum IpConformance {
-    NonConformal,
-    IPv4,
-    IPv6,
-}
+pub use crate::uri::validator::ValidationError;
 
 const REMOTE_IPV4_BYTES: usize = 4;
 const REMOTE_IPV6_BYTES: usize = 16;
@@ -48,50 +42,50 @@ impl UAuthority {
         self.id.is_some()
     }
 
-    /// Returns whether the `Remote` `Ip` meets conformance with IPv4 or IPv6 spec
+    /// Returns whether a `UAuthority` satisfies the requirements of a micro form URI
     ///
     /// # Returns
-    /// Returns a `Result<IpConformance, ValidationError>` where the error means remote is not IP or there is no remote
-    /// and happy path tells us whether the IP conforms with spec or not
+    /// Returns a `Result<(), ValidationError>` where the ValidationError will contain the reasons it failed or OK(())
+    /// otherwise
     ///
     /// # Errors
     ///
-    /// Returns a `ValidationError` in the failure case, indicating no remote or remote is not IP
-    pub fn remote_ip_conforms(&self) -> Result<IpConformance, ValidationError> {
-        if let Some(_remote) = self.remote.as_ref() {
-            match &self.remote {
-                Some(Remote::Ip(ip)) => Ok(match ip.len() {
-                    REMOTE_IPV4_BYTES => IpConformance::IPv4,
-                    REMOTE_IPV6_BYTES => IpConformance::IPv6,
-                    _ => IpConformance::NonConformal,
-                }),
-                _ => Err(ValidationError::new("Remote is not IP")),
-            }
-        } else {
-            Err(ValidationError::new("No remote"))
-        }
-    }
+    /// Returns a `ValidationError` in the failure case
+    pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
+        let mut validation_errors = Vec::new();
 
-    /// Returns whether the `Remote` `Id` meets conformance allowable range of bytes
-    ///
-    /// # Returns
-    /// Returns a `Result<bool, ValidationError>` where the error means remote is not ID or there is no remote
-    /// and happy path tells us whether the ID conforms with allowable range of bytes or not
-    ///
-    /// # Errors
-    ///
-    /// Returns a `ValidationError` in the failure case, indicating no remote or remote is not IP
-    pub fn remote_id_conforms(&self) -> Result<bool, ValidationError> {
-        if let Some(_remote) = self.remote.as_ref() {
-            match &self.remote {
-                Some(Remote::Id(id)) => Ok(matches!(
+        match &self.remote {
+            None => {
+                validation_errors.push(ValidationError::new("Has Authority, but no remote"));
+            }
+            Some(Remote::Ip(ip)) => {
+                if !(ip.len() == REMOTE_IPV4_BYTES || ip.len() == REMOTE_IPV6_BYTES) {
+                    validation_errors.push(ValidationError::new("IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)"));
+                }
+            }
+            Some(Remote::Id(id)) => {
+                if !matches!(
                     id.len(),
                     REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES
-                )),
-                _ => Err(ValidationError::new("Remote is not ID")),
+                ) {
+                    validation_errors.push(ValidationError::new("ID doesn't fit in bytes allocated"));
+                }
             }
+            Some(Remote::Name(_)) => {
+                validation_errors.push(ValidationError::new("Must use IP address or ID as UAuthority for micro form."));
+            }
+        }
+
+        if !validation_errors.is_empty() {
+            let combined_message = validation_errors
+                .into_iter()
+                .map(|err| err.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            Err(ValidationError::new(combined_message))
         } else {
-            Err(ValidationError::new("No remote"))
+            Ok(())
         }
     }
 }

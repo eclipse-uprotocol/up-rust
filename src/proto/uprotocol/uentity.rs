@@ -13,7 +13,7 @@
 
 use crate::uprotocol::uri::UEntity;
 
-use crate::uri::validator::ValidationError;
+pub use crate::uri::validator::ValidationError;
 
 const UENTITY_ID_LENGTH: usize = 16;
 const UENTITY_ID_VALID_BITMASK: u32 = 0xffff << UENTITY_ID_LENGTH;
@@ -25,45 +25,44 @@ impl UEntity {
         self.id.is_some()
     }
 
-    /// Returns whether a `UEntity`'s `id` can fit within the 16 bits allotted for the micro URI format
+    /// Returns whether a `UEntity` satisfies the requirements of a micro form URI
     ///
     /// # Returns
-    /// Returns a `Result<bool, ValidationError>` where the error means id is empty and happy path tells us whether it fits (true)
-    /// or not (false)
+    /// Returns a `Result<(), ValidationError>` where the ValidationError will contain the reasons it failed or OK(())
+    /// otherwise
     ///
     /// # Errors
     ///
-    /// Returns a `ValidationError` in the failure case, indicating no id present
-    pub fn id_fits_micro_uri(&self) -> Result<bool, ValidationError> {
-        if let Some(id) = self.id {
-            if id & UENTITY_ID_VALID_BITMASK == 0 {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
-        } else {
-            Err(ValidationError::new("Missing id"))
-        }
-    }
+    /// Returns a `ValidationError` in the failure case
+    pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
+        let mut validation_errors = Vec::new();
 
-    /// Returns whether a `UEntity`'s `version_major` can fit within the 16 bits allotted for the micro URI format
-    ///
-    /// # Returns
-    /// Returns a `Result<bool, ValidationError>` where the error means id is empty and happy path tells us whether it fits (true)
-    /// or not (false)
-    ///
-    /// # Errors
-    ///
-    /// Returns a `ValidationError` in the failure case, indicating no version_major present
-    pub fn version_fits_micro_uri(&self) -> Result<bool, ValidationError> {
-        if let Some(id) = self.version_major {
-            if id & UENTITY_MAJOR_VERSION_VALID_BITMASK == 0 {
-                Ok(true)
-            } else {
-                Ok(false)
+        if let Some(id) = self.id {
+            if id & UENTITY_ID_VALID_BITMASK != 0 {
+                validation_errors.push(ValidationError::new("ID does not fit within allotted 16 bits in micro form"));
             }
         } else {
-            Err(ValidationError::new("Major version must be present"))
+            validation_errors.push(ValidationError::new("ID must be present"));
+        }
+
+        if let Some(major_version) = self.version_major {
+            if major_version & UENTITY_MAJOR_VERSION_VALID_BITMASK != 0 {
+                validation_errors.push(ValidationError::new("Major version does not fit within 16 allotted bits in micro form"));
+            }
+        } else {
+            validation_errors.push(ValidationError::new("Major version must be present"));
+        }
+
+        if !validation_errors.is_empty() {
+            let combined_message = validation_errors
+                .into_iter()
+                .map(|err| err.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            Err(ValidationError::new(combined_message))
+        } else {
+            Ok(())
         }
     }
 }

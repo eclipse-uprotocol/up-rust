@@ -201,76 +201,27 @@ impl UriValidator {
             Err(ValidationError::new("URI is empty"))?;
         }
 
-        // TODO: Move this validation logic over into the appropriate impls for the structs
-
         let mut validation_errors = Vec::new();
         if let Some(entity) = uri.entity.as_ref() {
-            // TODO: Move this functionality over into UEntity's impl
-            //entity.validate_micro_form();
-
-            // match entity.id_fits_micro_uri() {
-            //     Ok(true) => (),
-            //     Ok(false) => Err(ValidationError::new(
-            //         "Entity: ID does not fit within the 16 bits allotted",
-            //     ))?,
-            //     Err(e) => Err(ValidationError::new(format!("Entity: {}", e)))?,
-            // }
-            //
-            // match entity.version_fits_micro_uri() {
-            //     Ok(true) => (),
-            //     Ok(false) => Err(ValidationError::new(
-            //         "Entity: Major version does not fit within the 8 bits allotted",
-            //     ))?,
-            //     Err(e) => Err(ValidationError::new(format!("Entity: {}", e)))?,
-            // }
+            if let Err(e) = entity.validate_micro_form() {
+                validation_errors.push(ValidationError::new(format!("Entity: {}", e)));
+            }
         } else {
             validation_errors.push(ValidationError::new("Entity: Is missing"));
         }
 
         if let Some(resource) = uri.resource.as_ref() {
-            // TODO: Move this functionality over into UResource's impl
-            // resource.validate_micro_form();
-
-            // match resource.id_fits_micro_uri() {
-            //     Ok(true) => (),
-            //     Ok(false) => Err(ValidationError::new(
-            //         "Resource: ID does not fit within the 16 bits allotted",
-            //     ))?,
-            //     Err(e) => Err(ValidationError::new(format!("Resource: {}", e)))?,
-            // }
+            if let Err(e) = resource.validate_micro_form() {
+                validation_errors.push(ValidationError::new(format!("Resource: {}", e)));
+            }
         } else {
             validation_errors.push(ValidationError::new("Resource: Is missing"));
         }
 
         if let Some(authority) = uri.authority.as_ref() {
-            // TODO: Move this functionality over into UAuthority's impl
-            // authority.validate_micro_form();
-
-            // match authority.remote {
-            //     Some(Remote::Ip(_)) => {
-            //         if !matches!(
-            //             authority.remote_ip_conforms(),
-            //             Ok(IpConformance::IPv4) | Ok(IpConformance::IPv6)
-            //         ) {
-            //             Err(ValidationError::new(
-            //                 "Authority: Remote IP does not conform to IPv4 (4 bytes) nor IPv6 standards (16 bytes)",
-            //             ))?;
-            //         }
-            //     }
-            //     Some(Remote::Id(_)) => {
-            //         if !authority
-            //             .remote_id_conforms()
-            //             .map_or(false, |conforms| conforms)
-            //         {
-            //             Err(ValidationError::new(
-            //                 "Authority: Remote ID does not conform to expected length: 1-255 bytes",
-            //             ))?;
-            //         }
-            //     }
-            //     _ => Err(ValidationError::new(
-            //         "Authority: Remote types supported are IP or ID only",
-            //     ))?,
-            // }
+            if let Err(e) = authority.validate_micro_form() {
+                validation_errors.push(ValidationError::new(format!("Authority: {}", e)));
+            }
         }
 
         if !validation_errors.is_empty() {
