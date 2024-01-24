@@ -73,11 +73,13 @@ pub mod rpc {
     mod rpcclient;
     mod rpcmapper;
     mod rpcresult;
+    mod rpcserver;
 
     pub use calloptions::*;
     pub use rpcclient::*;
     pub use rpcmapper::*;
     pub use rpcresult::*;
+    pub use rpcserver::*;
 }
 
 pub mod transport {
