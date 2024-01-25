@@ -28,6 +28,7 @@ impl UResourceBuilder {
             instance: Some(String::from("response")),
             id: Some(0),
             message: None,
+            ..Default::default()
         }
     }
 
@@ -45,6 +46,7 @@ impl UResourceBuilder {
             instance: method,
             id,
             message: None,
+            ..Default::default()
         }
     }
 
@@ -70,6 +72,7 @@ impl UResourceBuilder {
             instance: None,
             id: Some(id),
             message: None,
+            ..Default::default()
         }
     }
 }

@@ -11,58 +11,27 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::{Remote, UAuthority};
+use crate::uprotocol::uri::UAuthority;
 
 /// Helper functions to deal with `UAuthority::Remote` structure
 impl UAuthority {
-    pub fn has_name(&self) -> bool {
-        matches!(self.remote, Some(Remote::Name(_)))
-    }
-
-    pub fn has_ip(&self) -> bool {
-        matches!(self.remote, Some(Remote::Ip(_)))
-    }
-
-    pub fn has_id(&self) -> bool {
-        matches!(self.remote, Some(Remote::Id(_)))
-    }
-
     pub fn get_name(&self) -> Option<&str> {
-        match &self.remote {
-            Some(Remote::Name(name)) => Some(name),
-            _ => None,
-        }
+        self.name.as_deref()
     }
 
     pub fn get_ip(&self) -> Option<&[u8]> {
-        match &self.remote {
-            Some(Remote::Ip(ip)) => Some(ip),
-            _ => None,
-        }
+        self.ip.as_deref()
+    }
+
+    pub fn has_ip(&self) -> bool {
+        self.ip.is_some()
     }
 
     pub fn get_id(&self) -> Option<&[u8]> {
-        match &self.remote {
-            Some(Remote::Id(id)) => Some(id),
-            _ => None,
-        }
+        self.id.as_deref()
     }
 
-    pub fn set_name<T>(&mut self, name: T) -> &mut Self
-    where
-        T: Into<String>,
-    {
-        self.remote = Some(Remote::Name(name.into()));
-        self
-    }
-
-    pub fn set_ip(&mut self, ip: Vec<u8>) -> &mut Self {
-        self.remote = Some(Remote::Ip(ip));
-        self
-    }
-
-    pub fn set_id(&mut self, id: Vec<u8>) -> &mut Self {
-        self.remote = Some(Remote::Id(id));
-        self
+    pub fn has_id(&self) -> bool {
+        self.id.is_some()
     }
 }

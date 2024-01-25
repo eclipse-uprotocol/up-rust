@@ -34,24 +34,22 @@ rust-version = "1.66"
 version = "0.1.5"
 
 [dependencies]
-async-trait = "0.1"
-byteorder = "1.4"
-bytes = "1.4"
-chrono = "0.4"
+async-trait = { version = "0.1" }
+bytes = { version = "1.5" }
+chrono = { version = "0.4" }
 cloudevents-sdk = { version = "0.7" }
-prost = "0.12"
-prost-types = "0.12"
-rand = "0.8"
-regex = "1"
+protobuf = { version = "3.3" }
+rand = { version = "0.8" }
+regex = { version = "1.10" }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-url = "2"
-uuid = { version = "1.6", features = ["v8"] }
+serde_json = { version = "1.0" }
+url = { version = "2.5" }
+uuid = { version = "1.7", features = ["v8"] }
 
 [build-dependencies]
-prost-build = { version = "0.12" }
-protoc-bin-vendored = { version = "3" }
-ureq = "2.7"
+protobuf-codegen = { version = "3.3" }
+protoc-bin-vendored = { version = "3.0" }
+ureq = { version = "2.7" }
 
 [dev-dependencies]
-test-case = "3.3"
+test-case = { version = "3.3" }

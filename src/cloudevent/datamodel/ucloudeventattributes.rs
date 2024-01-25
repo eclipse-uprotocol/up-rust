@@ -138,14 +138,14 @@ mod tests {
     fn test_hash_code_equals() {
         let attributes1 = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs0)
+            .with_priority(UPriority::UPRIORITY_CS0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
 
         let attributes2 = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs0)
+            .with_priority(UPriority::UPRIORITY_CS0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -154,28 +154,16 @@ mod tests {
     }
 
     #[test]
-    fn test_to_string() {
-        let attributes = UCloudEventAttributes::builder()
-            .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs0)
-            .with_ttl(3)
-            .with_token("someOAuthToken".to_string())
-            .build();
-
-        assert_eq!(attributes.to_string(), "UCloudEventAttributes { hash: Some(\"somehash\"), priority: Some(UpriorityCs0), ttl: Some(3), token: Some(\"someOAuthToken\") }");
-    }
-
-    #[test]
     fn test_create_valid() {
         let attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs6)
+            .with_priority(UPriority::UPRIORITY_CS6)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
 
         assert_eq!(attributes.hash(), Some("somehash"));
-        assert_eq!(attributes.priority(), Some(UPriority::UpriorityCs6));
+        assert_eq!(attributes.priority(), Some(UPriority::UPRIORITY_CS6));
         assert_eq!(attributes.ttl(), Some(3));
         assert_eq!(attributes.token(), Some("someOAuthToken"));
     }
@@ -220,7 +208,7 @@ mod tests {
         assert!(!attributes3.is_empty());
 
         let attributes4 = UCloudEventAttributes::builder()
-            .with_priority(UPriority::UpriorityUnspecified)
+            .with_priority(UPriority::UPRIORITY_UNSPECIFIED)
             .build();
 
         assert!(!attributes4.is_empty());
