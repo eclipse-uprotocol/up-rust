@@ -16,6 +16,7 @@ use protobuf::{well_known_types::any::Any, Message};
 
 pub use crate::types::serializationerror::SerializationError;
 
+pub use crate::types::parsingerror::ParsingError;
 pub use crate::types::serializationerror::SerializationError;
 use crate::uprotocol::{Data, UPayload, UPayloadFormat};
 
@@ -38,34 +39,45 @@ impl UPayloadFormat {
     ///
     /// # Returns
     ///
-    /// The corresponding payload format or None if the MIME type is unsupported.
-    pub fn from_mime_type(mime_type: &str) -> Option<Self> {
-        if let Ok(mime) = MediaType::parse(mime_type) {
-            if mime.ty == APPLICATION {
-                if mime.subty == JSON {
-                    return Some(UPayloadFormat::UpayloadFormatJson);
+    /// The payload format that corresponds to the MIME type.
+    ///
+    /// Errors
+    ///
+    /// Returns a parsing error if the given string is not a valid MIME type string or
+    /// represents an unsupported MIME type.
+    pub fn from_mime_type(mime_type: &str) -> Result<Self, ParsingError> {
+        match MediaType::parse(mime_type) {
+            Ok(mime) => {
+                if mime.ty == APPLICATION {
+                    if mime.subty == JSON {
+                        return Ok(UPayloadFormat::UpayloadFormatJson);
+                    }
+                    if mime.subty == OCTET_STREAM {
+                        return Ok(UPayloadFormat::UpayloadFormatRaw);
+                    }
+                    if mime.subty == SUBTYPE_PROTOBUF {
+                        return Ok(UPayloadFormat::UpayloadFormatProtobuf);
+                    }
+                    if mime.subty == SUBTYPE_PROTOBUF_WRAPPED {
+                        return Ok(UPayloadFormat::UpayloadFormatProtobufWrappedInAny);
+                    }
+                    if mime.subty == SUBTYPE_SOMEIP {
+                        return Ok(UPayloadFormat::UpayloadFormatSomeip);
+                    }
+                    if mime.subty == SUBTYPE_SOMEIP_TLV {
+                        return Ok(UPayloadFormat::UpayloadFormatSomeipTlv);
+                    }
                 }
-                if mime.subty == OCTET_STREAM {
-                    return Some(UPayloadFormat::UpayloadFormatRaw);
+                if mime.ty == TEXT && mime.subty == PLAIN {
+                    return Ok(UPayloadFormat::UpayloadFormatText);
                 }
-                if mime.subty == SUBTYPE_PROTOBUF {
-                    return Some(UPayloadFormat::UpayloadFormatProtobuf);
-                }
-                if mime.subty == SUBTYPE_PROTOBUF_WRAPPED {
-                    return Some(UPayloadFormat::UpayloadFormatProtobufWrappedInAny);
-                }
-                if mime.subty == SUBTYPE_SOMEIP {
-                    return Some(UPayloadFormat::UpayloadFormatSomeip);
-                }
-                if mime.subty == SUBTYPE_SOMEIP_TLV {
-                    return Some(UPayloadFormat::UpayloadFormatSomeipTlv);
-                }
+                Err(ParsingError::new(format!(
+                    "unsupported MIME type: {}",
+                    mime
+                )))
             }
-            if mime.ty == TEXT && mime.subty == PLAIN {
-                return Some(UPayloadFormat::UpayloadFormatText);
-            }
+            Err(e) => Err(ParsingError::new(e.to_string())),
         }
-        None
     }
 
     /// Gets the MIME type corresponding to this payload format.
@@ -197,7 +209,11 @@ mod tests {
     #[test_case("text/plain", Some(UPayloadFormat::UpayloadFormatText))]
     #[test_case("application/unsupported; foo=bar", None)]
     fn test_from_mime_time(media_type: &str, expected_format: Option<UPayloadFormat>) {
-        assert_eq!(UPayloadFormat::from_mime_type(media_type), expected_format);
+        let parsing_result = UPayloadFormat::from_mime_type(media_type);
+        assert!(parsing_result.is_ok() == expected_format.is_some());
+        if let Some(format) = expected_format {
+            assert_eq!(format, parsing_result.unwrap());
+        }
     }
 
     #[test_case(0, true; "unspecified succeeds")]
