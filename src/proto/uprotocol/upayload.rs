@@ -11,11 +11,89 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use mediatype::{names::*, MediaType, Name};
 use protobuf::{well_known_types::any::Any, Message};
 
 pub use crate::types::serializationerror::SerializationError;
 
-use crate::uprotocol::upayload::{upayload::Data, UPayload, UPayloadFormat};
+pub use crate::types::serializationerror::SerializationError;
+use crate::uprotocol::{Data, UPayload, UPayloadFormat};
+
+const SUBTYPE_PROTOBUF: Name = Name::new_unchecked("protobuf");
+const SUBTYPE_PROTOBUF_WRAPPED: Name = Name::new_unchecked("x-protobuf");
+const SUBTYPE_SOMEIP: Name = Name::new_unchecked("x-someip");
+const SUBTYPE_SOMEIP_TLV: Name = Name::new_unchecked("x-someip_tlv");
+
+const MEDIA_TYPE_APPLICATION_JSON: MediaType = MediaType::new(APPLICATION, JSON);
+const MEDIA_TYPE_APPLICATION_OCTET_STREAM: MediaType = MediaType::new(APPLICATION, OCTET_STREAM);
+const MEDIA_TYPE_APPLICATION_PROTOBUF: MediaType = MediaType::new(APPLICATION, SUBTYPE_PROTOBUF);
+const MEDIA_TYPE_APPLICATION_PROTOBUF_WRAPPED: MediaType =
+    MediaType::new(APPLICATION, SUBTYPE_PROTOBUF_WRAPPED);
+const MEDIA_TYPE_APPLICATION_SOMEIP: MediaType = MediaType::new(APPLICATION, SUBTYPE_SOMEIP);
+const MEDIA_TYPE_APPLICATION_SOMEIPTLV: MediaType = MediaType::new(APPLICATION, SUBTYPE_SOMEIP_TLV);
+const MEDIA_TYPE_TEXT_PLAIN: MediaType = MediaType::new(TEXT, PLAIN);
+
+impl UPayloadFormat {
+    /// Gets the payload format that corresponds to a given MIME type.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding payload format or None if the MIME type is unsupported.
+    pub fn from_mime_type(mime_type: &str) -> Option<Self> {
+        if let Ok(mime) = MediaType::parse(mime_type) {
+            if mime.ty == APPLICATION {
+                if mime.subty == JSON {
+                    return Some(UPayloadFormat::UpayloadFormatJson);
+                }
+                if mime.subty == OCTET_STREAM {
+                    return Some(UPayloadFormat::UpayloadFormatRaw);
+                }
+                if mime.subty == SUBTYPE_PROTOBUF {
+                    return Some(UPayloadFormat::UpayloadFormatProtobuf);
+                }
+                if mime.subty == SUBTYPE_PROTOBUF_WRAPPED {
+                    return Some(UPayloadFormat::UpayloadFormatProtobufWrappedInAny);
+                }
+                if mime.subty == SUBTYPE_SOMEIP {
+                    return Some(UPayloadFormat::UpayloadFormatSomeip);
+                }
+                if mime.subty == SUBTYPE_SOMEIP_TLV {
+                    return Some(UPayloadFormat::UpayloadFormatSomeipTlv);
+                }
+            }
+            if mime.ty == TEXT && mime.subty == PLAIN {
+                return Some(UPayloadFormat::UpayloadFormatText);
+            }
+        }
+        None
+    }
+
+    /// Gets the MIME type corresponding to this payload format.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding MIME type or None if the payload format is [`UPayloadFormat::UpayloadFormatUnspecified`].
+    pub fn to_mime_type(&self) -> Option<String> {
+        match self {
+            UPayloadFormat::UpayloadFormatJson => Some(MEDIA_TYPE_APPLICATION_JSON.to_string()),
+            UPayloadFormat::UpayloadFormatProtobuf => {
+                Some(MEDIA_TYPE_APPLICATION_PROTOBUF.to_string())
+            }
+            UPayloadFormat::UpayloadFormatProtobufWrappedInAny => {
+                Some(MEDIA_TYPE_APPLICATION_PROTOBUF_WRAPPED.to_string())
+            }
+            UPayloadFormat::UpayloadFormatRaw => {
+                Some(MEDIA_TYPE_APPLICATION_OCTET_STREAM.to_string())
+            }
+            UPayloadFormat::UpayloadFormatSomeip => Some(MEDIA_TYPE_APPLICATION_SOMEIP.to_string()),
+            UPayloadFormat::UpayloadFormatSomeipTlv => {
+                Some(MEDIA_TYPE_APPLICATION_SOMEIPTLV.to_string())
+            }
+            UPayloadFormat::UpayloadFormatText => Some(MEDIA_TYPE_TEXT_PLAIN.to_string()),
+            _ => None,
+        }
+    }
+}
 
 impl TryFrom<Any> for UPayload {
     type Error = SerializationError;
@@ -100,13 +178,36 @@ mod tests {
 
     use super::*;
 
+    #[test_case("application/json", Some(UPayloadFormat::UpayloadFormatJson))]
+    #[test_case(
+        "application/json; charset=utf-8",
+        Some(UPayloadFormat::UpayloadFormatJson)
+    )]
+    #[test_case("application/protobuf", Some(UPayloadFormat::UpayloadFormatProtobuf))]
+    #[test_case(
+        "application/x-protobuf",
+        Some(UPayloadFormat::UpayloadFormatProtobufWrappedInAny)
+    )]
+    #[test_case("application/octet-stream", Some(UPayloadFormat::UpayloadFormatRaw))]
+    #[test_case("application/x-someip", Some(UPayloadFormat::UpayloadFormatSomeip))]
+    #[test_case(
+        "application/x-someip_tlv",
+        Some(UPayloadFormat::UpayloadFormatSomeipTlv)
+    )]
+    #[test_case("text/plain", Some(UPayloadFormat::UpayloadFormatText))]
+    #[test_case("application/unsupported; foo=bar", None)]
+    fn test_from_mime_time(media_type: &str, expected_format: Option<UPayloadFormat>) {
+        assert_eq!(UPayloadFormat::from_mime_type(media_type), expected_format);
+    }
+
     #[test_case(0, true; "unspecified succeeds")]
-    #[test_case(1, true; "protobuf succeeds")]
-    #[test_case(2, false; "json fails")]
-    #[test_case(3, false; "SOME/IP fails")]
-    #[test_case(4, false; "SOME/IP TLV fails")]
-    #[test_case(5, false; "raw fails")]
-    #[test_case(6, false; "text fails")]
+    #[test_case(1, true; "wrapped protobuf succeeds")]
+    #[test_case(2, false; "protobuf fails")]
+    #[test_case(3, false; "json fails")]
+    #[test_case(4, false; "SOME/IP fails")]
+    #[test_case(5, false; "SOME/IP TLV fails")]
+    #[test_case(6, false; "raw fails")]
+    #[test_case(7, false; "text fails")]
     fn test_into_any_with_payload_format(format: i32, should_succeed: bool) {
         let timestamp = Timestamp::default();
         let data = Any::pack(&timestamp).unwrap().write_to_bytes().unwrap();

@@ -38,6 +38,7 @@ async-trait = { version = "0.1" }
 bytes = { version = "1.5" }
 chrono = { version = "0.4" }
 cloudevents-sdk = { version = "0.7" }
+mediatype = "0.19"
 protobuf = { version = "3.3" }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
