@@ -33,6 +33,7 @@
 //! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main)
 
 mod types {
+    pub mod parsingerror;
     pub mod serializationerror;
     pub mod validationerror;
 }
