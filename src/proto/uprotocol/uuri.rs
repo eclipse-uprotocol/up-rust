@@ -11,9 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::fmt::Display;
-
-use crate::uprotocol::UUri as uproto_Uuri;
+use crate::uprotocol::uri::UUri as uproto_Uuri;
 use crate::uri::serializer::{LongUriSerializer, MicroUriSerializer, UriSerializer};
 
 impl From<uproto_Uuri> for String {
@@ -53,12 +51,5 @@ impl From<Vec<u8>> for uproto_Uuri {
         } else {
             uproto_Uuri::default()
         }
-    }
-}
-
-impl Display for uproto_Uuri {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let uri = LongUriSerializer::serialize(self).unwrap_or_default();
-        write!(f, "{uri}")
     }
 }

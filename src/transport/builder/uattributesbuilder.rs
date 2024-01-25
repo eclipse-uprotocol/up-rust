@@ -11,12 +11,14 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::{UAttributes, UMessageType, UPriority, UUri, Uuid};
+use crate::uprotocol::uattributes::{UAttributes, UMessageType, UPriority};
+use crate::uprotocol::uri::UUri;
+use crate::uprotocol::uuid::UUID;
 use crate::uuid::builder::UUIDv8Builder;
 
 /// Builder for easy construction of the `UAttributes` object.
 pub struct UAttributesBuilder {
-    id: Uuid,
+    id: UUID,
     message_type: UMessageType,
     priority: UPriority,
     ttl: Option<i32>,
@@ -24,7 +26,7 @@ pub struct UAttributesBuilder {
     sink: Option<UUri>,
     plevel: Option<i32>,
     commstatus: Option<i32>,
-    reqid: Option<Uuid>,
+    reqid: Option<UUID>,
 }
 
 impl UAttributesBuilder {
@@ -40,7 +42,7 @@ impl UAttributesBuilder {
     pub fn publish(priority: UPriority) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
-            message_type: UMessageType::UmessageTypePublish,
+            message_type: UMessageType::UMESSAGE_TYPE_PUBLISH,
             priority,
             ttl: None,
             token: None,
@@ -64,7 +66,7 @@ impl UAttributesBuilder {
     pub fn notification(priority: UPriority, sink: UUri) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
-            message_type: UMessageType::UmessageTypePublish,
+            message_type: UMessageType::UMESSAGE_TYPE_PUBLISH,
             priority,
             ttl: None,
             token: None,
@@ -89,7 +91,7 @@ impl UAttributesBuilder {
     pub fn request(priority: UPriority, sink: UUri, ttl: u32) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
-            message_type: UMessageType::UmessageTypeRequest,
+            message_type: UMessageType::UMESSAGE_TYPE_REQUEST,
             priority,
             ttl: Some(i32::try_from(ttl).unwrap_or(i32::MAX)),
             token: None,
@@ -111,10 +113,10 @@ impl UAttributesBuilder {
     /// # Returns
     ///
     /// The builder initialized with the given values.
-    pub fn response(priority: UPriority, sink: UUri, reqid: Uuid) -> UAttributesBuilder {
+    pub fn response(priority: UPriority, sink: UUri, reqid: UUID) -> UAttributesBuilder {
         UAttributesBuilder {
             id: UUIDv8Builder::new().build(),
-            message_type: UMessageType::UmessageTypeResponse,
+            message_type: UMessageType::UMESSAGE_TYPE_RESPONSE,
             priority,
             ttl: None,
             token: None,
@@ -213,7 +215,7 @@ impl UAttributesBuilder {
     ///
     /// The builder.
     #[must_use]
-    pub fn with_reqid(&mut self, reqid: Uuid) -> &mut UAttributesBuilder {
+    pub fn with_reqid(&mut self, reqid: UUID) -> &mut UAttributesBuilder {
         self.reqid = Some(reqid);
         self
     }
@@ -225,15 +227,16 @@ impl UAttributesBuilder {
     /// The attributes.
     pub fn build(&self) -> UAttributes {
         UAttributes {
-            id: Some(self.id.clone()),
-            r#type: self.message_type.into(),
+            id: Some(self.id.clone()).into(),
+            type_: self.message_type.into(),
             priority: self.priority.into(),
             ttl: self.ttl,
             token: self.token.clone(),
-            sink: self.sink.clone(),
+            sink: self.sink.clone().into(),
             permission_level: self.plevel,
             commstatus: self.commstatus,
-            reqid: self.reqid.clone(),
+            reqid: self.reqid.clone().into(),
+            ..Default::default()
         }
     }
 }

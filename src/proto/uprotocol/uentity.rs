@@ -11,10 +11,10 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::UEntity;
+use crate::uprotocol::uri::UEntity;
 
 impl UEntity {
-    pub fn has_id(entity: &UEntity) -> bool {
-        entity.id.is_some()
+    pub fn has_id(&self) -> bool {
+        self.id.is_some()
     }
 }

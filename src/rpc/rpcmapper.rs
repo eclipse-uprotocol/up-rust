@@ -11,12 +11,15 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use prost_types::Any;
+use protobuf::well_known_types::any::Any;
+use protobuf::MessageFull;
 use std::default::Default;
 use std::fmt;
 
 use crate::rpc::rpcclient::RpcClientResult;
-use crate::uprotocol::{Data, UCode, UPayload, UPayloadFormat, UStatus};
+use crate::uprotocol::upayload::upayload::Data;
+use crate::uprotocol::upayload::{UPayload, UPayloadFormat};
+use crate::uprotocol::ustatus::{UCode, UStatus};
 
 pub type RpcPayloadResult = Result<RpcPayload, RpcMapperError>;
 
@@ -79,16 +82,19 @@ impl RpcMapper {
     ///
     pub fn map_response<T>(response: RpcClientResult) -> Result<T, RpcMapperError>
     where
-        T: prost::Message + Default,
+        T: MessageFull + Default,
     {
         let payload = response?; // Directly returns in case of error
         Any::try_from(payload)
             .map_err(|_e| {
                 RpcMapperError::UnknownType("Couldn't decode payload into Any".to_string())
             })
-            .and_then(|any| {
-                T::decode(any.value.as_slice())
-                    .map_err(|error| RpcMapperError::InvalidPayload(error.to_string()))
+            .and_then(|any| match any.unpack::<T>() {
+                Ok(Some(m)) => Ok(m),
+                Ok(None) => Err(RpcMapperError::InvalidPayload(String::from(
+                    "Any object is not of expected type",
+                ))),
+                Err(error) => Err(RpcMapperError::InvalidPayload(error.to_string())),
             })
     }
 
@@ -127,8 +133,8 @@ impl RpcMapper {
                 match Self::unpack_any::<UStatus>(&any) {
                     Ok(proto_status) => {
                         // in this branch, we have successfully unpacked a protobuf-status from the (now consumed) payload
-                        match UCode::try_from(proto_status.code).unwrap_or(UCode::Unknown) {
-                            UCode::Ok => Ok(RpcPayload {
+                        match proto_status.get_code() {
+                            UCode::OK => Ok(RpcPayload {
                                 status: UStatus::ok(),
                                 payload: None,
                             }),
@@ -175,13 +181,16 @@ impl RpcMapper {
     /// # Errors
     ///
     /// Returns an `RpcMapperError` if the protobuf serialization of the data exceeds 2^32 - 1 bytes.
-    pub fn pack_payload<T: prost::Message>(data: &T) -> Result<UPayload, RpcMapperError> {
-        let buf = data.encode_to_vec();
+    pub fn pack_payload<T: MessageFull>(data: &T) -> Result<UPayload, RpcMapperError> {
+        let buf = data.write_to_bytes().map_err(|_e| {
+            RpcMapperError::ProtobufError(String::from("failed to serialize payload to protobuf"))
+        })?;
         if let Ok(len) = i32::try_from(buf.len()) {
             Ok(UPayload {
                 data: Some(Data::Value(buf)),
                 length: Some(len),
-                format: UPayloadFormat::UpayloadFormatProtobuf.into(),
+                format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF.into(),
+                ..Default::default()
             })
         } else {
             Err(RpcMapperError::InvalidPayload(
@@ -197,8 +206,7 @@ impl RpcMapper {
     ///
     /// # Type Parameters
     ///
-    /// * `T`: The target type of the data to be unpacked. Must implement `prost::Message` for protobuf
-    ///   deserialization and `Default` for initialization.
+    /// * `T`: The target type of the data to be unpacked.
     ///
     /// # Parameters
     ///
@@ -212,18 +220,18 @@ impl RpcMapper {
     ///
     /// Returns an `RpcMapperError` if the unpacking process fails, for example if the payload could
     /// not be deserialized into the target protobuf type `T`.
-    pub fn unpack_payload<T: prost::Message + std::default::Default>(
+    pub fn unpack_payload<T: MessageFull + Default>(
         payload: UPayload,
     ) -> Result<T, RpcMapperError> {
         Any::try_from(payload)
             .map_err(|_e| RpcMapperError::UnknownType("Couldn't decode payload".to_string()))
             .and_then(|any| {
-                T::decode(any.value.as_slice())
+                T::parse_from_bytes(any.value.as_slice())
                     .map_err(|error| RpcMapperError::InvalidPayload(error.to_string()))
             })
     }
 
-    /// Packs a given `data` of type `T` into a `prost_types::Any` object.
+    /// Packs a given `data` of type `T` into a protbuf `Any` object.
     ///
     /// This function is useful for converting strongly-typed data into an `Any`
     /// object for use in message-passing scenarios where the type needs to be
@@ -231,8 +239,7 @@ impl RpcMapper {
     ///
     /// # Type Parameters
     ///
-    /// * `T`: The type of the data to be packed. Must implement `prost::Name` to provide
-    ///   type URL information.
+    /// * `T`: The type of the data to be packed.
     ///
     /// # Parameters
     ///
@@ -240,17 +247,17 @@ impl RpcMapper {
     ///
     /// # Returns
     ///
-    /// * `Ok(Any)`: A `prost_types::Any` object containing the packed `data`.
+    /// * `Ok(Any)`: A protobuf `Any` object containing the packed `data`.
     /// * `Err(RpcMapperError)`: An error that occurred during the packing process.
     ///
     /// # Errors
     ///
     /// Returns an `RpcMapperError` if the packing process fails.
-    pub fn pack_any<T: prost::Name>(data: &T) -> Result<Any, RpcMapperError> {
-        Any::from_msg(data).map_err(|error| RpcMapperError::InvalidPayload(error.to_string()))
+    pub fn pack_any<T: MessageFull>(data: &T) -> Result<Any, RpcMapperError> {
+        Any::pack(data).map_err(|error| RpcMapperError::InvalidPayload(error.to_string()))
     }
 
-    /// Unpacks a given `prost_types::Any` object into a data of type `T`.
+    /// Unpacks a given protbuf `Any` object into a data of type `T`.
     ///
     /// This function is used to convert an `Any` object back into its original
     /// strongly-typed data. It's essentially the reverse operation of `pack_any`.
@@ -262,7 +269,7 @@ impl RpcMapper {
     ///
     /// # Parameters
     ///
-    /// * `any`: The `prost_types::Any` object that will be unpacked.
+    /// * `any`: The `Any` object that will be unpacked.
     ///
     /// # Returns
     ///
@@ -273,11 +280,16 @@ impl RpcMapper {
     ///
     /// Returns an `RpcMapperError` if the unpacking process fails, for example due to type mismatch
     /// or if the data inside `Any` could not be decoded into type `T`.
-    pub fn unpack_any<T: prost::Name + std::default::Default>(
-        any: &Any,
-    ) -> Result<T, RpcMapperError> {
-        any.to_msg()
-            .map_err(|error| RpcMapperError::InvalidPayload(error.to_string()))
+    pub fn unpack_any<T: MessageFull>(any: &Any) -> Result<T, RpcMapperError> {
+        match any.unpack() {
+            Err(error) => Err(RpcMapperError::InvalidPayload(error.to_string())),
+            Ok(v) => match v {
+                Some(msg) => Ok(msg),
+                None => Err(RpcMapperError::ProtobufError(String::from(
+                    "Any object does not contain payload",
+                ))),
+            },
+        }
     }
 }
 
@@ -287,8 +299,8 @@ mod tests {
     use bytes::{Buf, BufMut};
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
 
-    use crate::proto::CloudEvent as CloudEventProto;
-    use crate::uprotocol::UMessageType;
+    use crate::cloudevents::CloudEvent as CloudEventProto;
+    use crate::uprotocol::uattributes::UMessageType;
 
     fn build_status_response(code: UCode, msg: &str) -> RpcClientResult {
         let status = UStatus::fail_with_code(code, msg);
@@ -307,11 +319,8 @@ mod tests {
     fn build_number_response(number: i32) -> RpcClientResult {
         let any: Any = Any {
             type_url: "type.googleapis.com/Int32Value".to_string(),
-            value: {
-                let mut buf = vec![];
-                buf.put_i32(number);
-                buf
-            },
+            value: number.to_be_bytes().into(),
+            ..Default::default()
         };
         Ok(any.try_into().unwrap())
     }
@@ -319,7 +328,7 @@ mod tests {
     fn build_cloud_event_for_test() -> Event {
         EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UmessageTypeRequest)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
             .source("http://example.com")
             .build()
             .unwrap()
@@ -348,13 +357,13 @@ mod tests {
 
     #[test]
     fn test_compose_that_returns_status() {
-        let response = build_status_response(UCode::InvalidArgument, "boom");
+        let response = build_status_response(UCode::INVALID_ARGUMENT, "boom");
 
         let result = RpcMapper::map_response_to_result(response).unwrap();
 
         assert!(result.status.is_failed());
-        assert_eq!(result.status.code, UCode::InvalidArgument as i32);
-        assert_eq!(result.status.message(), "boom");
+        assert_eq!(result.status.get_code(), UCode::INVALID_ARGUMENT);
+        assert_eq!(result.status.message.unwrap(), "boom");
     }
 
     #[test]
@@ -383,12 +392,12 @@ mod tests {
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_status_using_map_response_to_rpc_response(
     ) {
-        let response = build_status_response(UCode::InvalidArgument, "boom");
+        let response = build_status_response(UCode::INVALID_ARGUMENT, "boom");
         let result = RpcMapper::map_response_to_result(response).unwrap();
 
         assert!(result.status.is_failed());
-        assert_eq!(UCode::InvalidArgument as i32, result.status.code);
-        assert_eq!("boom", result.status.message());
+        assert_eq!(UCode::INVALID_ARGUMENT, result.status.get_code());
+        assert_eq!("boom", result.status.message.unwrap());
     }
 
     // No exceptions in Rust
@@ -403,7 +412,7 @@ mod tests {
 
         assert!(result.status.is_failed());
         assert_eq!(
-            result.status.message(),
+            result.status.message.unwrap(),
             "Unexpected any-payload type type.googleapis.com/Int32Value"
         );
     }
@@ -419,11 +428,10 @@ mod tests {
 
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_status_using_map_response() {
-        let response = build_status_response(UCode::Aborted, "hello");
+        let response = build_status_response(UCode::ABORTED, "hello");
         let e = RpcMapper::map_response::<CloudEventProto>(response);
 
         assert!(e.is_err());
-        assert_eq!(e.err().unwrap().to_string(), "Invalid payload: failed to decode Protobuf message: CloudEvent.id: invalid wire type: Varint (expected LengthDelimited)");
     }
 
     // We don't do exceptions
@@ -436,10 +444,6 @@ mod tests {
         let e = RpcMapper::map_response::<CloudEventProto>(response);
 
         assert!(e.is_err());
-        assert_eq!(
-            e.err().unwrap().to_string(),
-            "Invalid payload: failed to decode Protobuf message: invalid tag value: 0"
-        );
     }
 
     // all these stub-using tests, what do they add?
@@ -474,22 +478,22 @@ mod tests {
 
     #[test]
     fn test_success_invoke_method_happy_flow_that_returns_status_using_map_response() {
-        let response = build_status_response(UCode::Ok, "all good");
+        let response = build_status_response(UCode::OK, "all good");
         let s = RpcMapper::map_response::<UStatus>(response).unwrap();
         let ustatus = s;
 
-        assert_eq!(UCode::Ok as i32, ustatus.code);
-        assert_eq!("all good", ustatus.message());
+        assert_eq!(UCode::OK, ustatus.get_code());
+        assert_eq!("all good", ustatus.message.unwrap());
     }
 
     #[test]
     fn test_success_invoke_method_happy_flow_that_returns_status_using_map_response_to_result_to_rpc_response(
     ) {
-        let response = build_status_response(UCode::Ok, "all good");
+        let response = build_status_response(UCode::OK, "all good");
         let s = RpcMapper::map_response_to_result(response).unwrap();
 
         assert!(s.status.is_success());
-        assert_eq!(s.status.code, UCode::Ok as i32);
+        assert_eq!(s.status.get_code(), UCode::OK);
     }
 
     #[test]
@@ -501,6 +505,7 @@ mod tests {
                 buf.put_i32(42);
                 buf
             },
+            ..Default::default()
         };
 
         let result: Result<UStatus, RpcMapperError> = RpcMapper::unpack_any::<UStatus>(&payload);

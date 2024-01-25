@@ -68,6 +68,9 @@ pub mod cloudevent {
     }
 }
 
+// protoc-generated stubs, see build.rs
+include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
+
 pub mod rpc {
     mod calloptions;
     mod rpcclient;
@@ -133,65 +136,27 @@ pub mod uuid {
 
 pub mod uprotocol {
     // protoc-generated stubs, see build.rs
-    include!(concat!(env!("OUT_DIR"), "/uprotocol.v1.rs"));
+    include!(concat!(env!("OUT_DIR"), "/uprotocol/mod.rs"));
 
-    pub use crate::proto::uprotocol::uauthority;
-    pub use crate::proto::uprotocol::uentity;
-    pub use crate::proto::uprotocol::umessagetype;
-    pub use crate::proto::uprotocol::upayload;
-    pub use crate::proto::uprotocol::uresource;
-    pub use crate::proto::uprotocol::ustatus;
-    pub use crate::proto::uprotocol::uuid;
-    pub use crate::proto::uprotocol::uuri;
-
-    pub use u_authority::Remote;
-    pub use u_payload::Data;
-
-    // This is to make the more specialized uprotocol types available within the SDK scope;
-    // not required by the code, so not sure whether it'll stay in.
-    mod v1 {
-        // this re-export is necessary to accomodate the package/reference structure of the uprotocol uproto files (included below)
-        pub(crate) use crate::uprotocol::{UCode, UMessage, UStatus, UUri, UUriBatch};
-    }
-    pub mod core {
-        pub mod udiscovery {
-            pub mod v3 {
-                include!(concat!(env!("OUT_DIR"), "/uprotocol.core.udiscovery.v3.rs"));
-            }
-        }
-        pub mod usubscription {
-            pub mod v3 {
-                include!(concat!(
-                    env!("OUT_DIR"),
-                    "/uprotocol.core.usubscription.v3.rs"
-                ));
-            }
-        }
-        pub mod utwin {
-            pub mod v1 {
-                include!(concat!(env!("OUT_DIR"), "/uprotocol.core.utwin.v1.rs"));
-            }
-        }
-    }
+    pub use crate::proto::uprotocol::upayload::*;
+    pub use crate::proto::uprotocol::uuid::*;
 }
 
 #[allow(non_snake_case)]
-pub mod proto {
-    // protoc-generated stubs, see build.rs
-    include!(concat!(env!("OUT_DIR"), "/io.cloudevents.v1.rs"));
+pub(crate) mod proto {
 
-    pub mod cloudevents {
-        pub mod protocloudevent;
+    pub(crate) mod cloudevents {
+        pub(crate) mod protocloudevent;
     }
 
-    pub mod uprotocol {
-        pub mod uauthority;
-        pub mod uentity;
-        pub mod umessagetype;
-        pub mod upayload;
-        pub mod uresource;
-        pub mod ustatus;
-        pub mod uuid;
-        pub mod uuri;
+    pub(crate) mod uprotocol {
+        pub(crate) mod uauthority;
+        pub(crate) mod uentity;
+        pub(crate) mod umessagetype;
+        pub(crate) mod upayload;
+        pub(crate) mod uresource;
+        pub(crate) mod ustatus;
+        pub(crate) mod uuid;
+        pub(crate) mod uuri;
     }
 }

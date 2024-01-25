@@ -14,20 +14,14 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use cloudevents::event::ExtensionValue;
 use cloudevents::{AttributesReader, AttributesWriter, Data, EventBuilder};
-use prost::Name;
 
 use std::collections::HashMap;
 use url::Url;
 
-use crate::proto::cloud_event::cloud_event_attribute_value::Attr;
-use crate::proto::cloud_event::CloudEventAttributeValue;
-use crate::proto::cloud_event::Data as CloudEventData;
-use crate::proto::CloudEvent as CloudEventProto;
-
-impl Name for CloudEventProto {
-    const NAME: &'static str = "CloudEvent";
-    const PACKAGE: &'static str = "io.cloudevents.v1";
-}
+use crate::cloudevents::cloud_event::cloud_event_attribute_value::Attr;
+use crate::cloudevents::cloud_event::CloudEventAttributeValue;
+use crate::cloudevents::cloud_event::Data as CloudEventData;
+use crate::cloudevents::CloudEvent as CloudEventProto;
 
 impl From<CloudEventProto> for cloudevents::Event {
     fn from(source_event: CloudEventProto) -> Self {
@@ -94,7 +88,7 @@ impl From<CloudEventProto> for cloudevents::Event {
         let mut event_builder = cloudevents::EventBuilderV10::new()
             .id(source_event.id)
             .source(source_event.source)
-            .ty(source_event.r#type);
+            .ty(source_event.type_);
 
         if let Some(s) = subject {
             event_builder = event_builder.subject(s);
@@ -134,6 +128,7 @@ impl From<cloudevents::Event> for CloudEventProto {
         if let Some(subject) = source_event.subject() {
             let s = CloudEventAttributeValue {
                 attr: Some(Attr::CeString(subject.to_string())),
+                ..Default::default()
             };
             ext_list.insert("subject".to_string(), s);
         }
@@ -145,7 +140,10 @@ impl From<cloudevents::Event> for CloudEventProto {
             let sys_time: std::time::SystemTime = time.into();
 
             let timesstamp = CloudEventAttributeValue {
-                attr: Some(Attr::CeTimestamp(prost_types::Timestamp::from(sys_time))),
+                attr: Some(Attr::CeTimestamp(
+                    protobuf::well_known_types::timestamp::Timestamp::from(sys_time),
+                )),
+                ..Default::default()
             };
             ext_list.insert("timestamp".to_string(), timesstamp);
         }
@@ -155,6 +153,7 @@ impl From<cloudevents::Event> for CloudEventProto {
         if let Some(schema) = source_event.dataschema() {
             let ds = CloudEventAttributeValue {
                 attr: Some(Attr::CeUri(schema.to_string())),
+                ..Default::default()
             };
             ext_list.insert("dataschema".to_string(), ds);
         }
@@ -164,6 +163,7 @@ impl From<cloudevents::Event> for CloudEventProto {
         if let Some(contenttype) = source_event.datacontenttype() {
             let ct = CloudEventAttributeValue {
                 attr: Some(Attr::CeString(contenttype.to_string())),
+                ..Default::default()
             };
             ext_list.insert("contenttype".to_string(), ct);
         }
@@ -182,6 +182,7 @@ impl From<cloudevents::Event> for CloudEventProto {
                 ExtensionValue::Boolean(b) => {
                     let ext = CloudEventAttributeValue {
                         attr: Some(Attr::CeBoolean(*b)),
+                        ..Default::default()
                     };
                     ext_list.insert(key.to_string(), ext);
                 }
@@ -189,12 +190,14 @@ impl From<cloudevents::Event> for CloudEventProto {
                 ExtensionValue::Integer(i) => {
                     let ext = CloudEventAttributeValue {
                         attr: Some(Attr::CeInteger(*i as i32)),
+                        ..Default::default()
                     };
                     ext_list.insert(key.to_string(), ext);
                 }
                 ExtensionValue::String(s) => {
                     let ext = CloudEventAttributeValue {
                         attr: Some(Attr::CeString(s.to_string())),
+                        ..Default::default()
                     };
                     ext_list.insert(key.to_string(), ext);
                 }
@@ -206,9 +209,10 @@ impl From<cloudevents::Event> for CloudEventProto {
             spec_version: cloudevents::event::SpecVersion::V10.to_string(),
             id: source_event.id().to_string(),
             source: source_event.source().to_string(),
-            r#type: source_event.ty().to_string(),
+            type_: source_event.ty().to_string(),
             data: event_data,
             attributes: ext_list,
+            ..Default::default()
         }
     }
 }
@@ -218,11 +222,12 @@ mod tests {
     use super::*;
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::UCloudEventAttributes;
-    use crate::uprotocol::{UEntity, UMessageType, UPriority, UResource, UUri};
+    use crate::uprotocol::uattributes::{UMessageType, UPriority};
+    use crate::uprotocol::uri::{UEntity, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
-    use prost_types::Any;
+    use protobuf::well_known_types::any::Any;
 
     #[test]
     fn test_cloudevent_to_proto() {
@@ -238,11 +243,13 @@ mod tests {
             entity: Some(UEntity {
                 name: "body.access".to_string(),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 name: "door".to_string(),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let source = LongUriSerializer::serialize(&uri).unwrap();
@@ -253,7 +260,7 @@ mod tests {
         // additional attributes
         let attributes = UCloudEventAttributes::builder()
             .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs0)
+            .with_priority(UPriority::UPRIORITY_CS0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -265,7 +272,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UMessageType::UmessageTypePublish)
+        event.ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -287,9 +294,10 @@ mod tests {
                 .to_string()
         };
 
-        prost_types::Any {
+        Any {
             type_url: schema,
             value: data_bytes,
+            ..Default::default()
         }
     }
 
@@ -297,7 +305,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

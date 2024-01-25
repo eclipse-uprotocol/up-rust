@@ -11,26 +11,19 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use prost::Name;
-
-use crate::uprotocol::{UCode, UStatus};
-
-impl Name for UStatus {
-    const NAME: &'static str = "UStatus";
-    const PACKAGE: &'static str = "uprotocol.v1";
-}
+use crate::uprotocol::ustatus::{UCode, UStatus};
 
 impl UStatus {
     pub fn ok() -> Self {
         UStatus {
-            code: UCode::Ok.into(),
+            code: UCode::OK.into(),
             ..Default::default()
         }
     }
 
     pub fn fail(msg: &str) -> Self {
         UStatus {
-            code: UCode::Unknown.into(),
+            code: UCode::UNKNOWN.into(),
             message: Some(msg.to_string()),
             ..Default::default()
         }
@@ -45,18 +38,14 @@ impl UStatus {
     }
 
     pub fn is_failed(&self) -> bool {
-        self.code != UCode::Ok as i32
+        self.get_code() != UCode::OK
     }
 
     pub fn is_success(&self) -> bool {
-        self.code == UCode::Ok as i32
+        self.get_code() == UCode::OK
     }
 
     pub fn get_code(&self) -> UCode {
-        if let Ok(code) = UCode::try_from(self.code) {
-            code
-        } else {
-            UCode::Unknown
-        }
+        self.code.enum_value_or_default()
     }
 }

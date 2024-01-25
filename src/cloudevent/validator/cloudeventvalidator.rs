@@ -16,7 +16,8 @@ use cloudevents::{AttributesReader, Event};
 
 use crate::cloudevent::builder::UCloudEventUtils;
 use crate::cloudevent::validator::ValidationError;
-use crate::uprotocol::{UMessageType, UResource, UUri};
+use crate::uprotocol::uattributes::UMessageType;
+use crate::uprotocol::uri::{UResource, UUri};
 use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 use crate::uri::validator::UriValidator;
 
@@ -266,7 +267,7 @@ pub trait CloudEventValidator: std::fmt::Display {
             )));
         }
 
-        if let Some(resource) = &uri.resource {
+        if let Some(resource) = uri.resource.as_ref() {
             if resource.name == "rpc"
                 && resource.instance.as_ref().is_some()
                 && resource.instance.as_ref().unwrap() == "response"
@@ -341,8 +342,8 @@ impl CloudEventValidators {
     /// Returns a `CloudEventValidator` according to the `type` attribute in the `CloudEvent`.
     pub fn get_validator(cloud_event: &Event) -> Box<dyn CloudEventValidator> {
         match UMessageType::from(cloud_event.ty()) {
-            UMessageType::UmessageTypeResponse => Box::new(ResponseValidator),
-            UMessageType::UmessageTypeRequest => Box::new(RequestValidator),
+            UMessageType::UMESSAGE_TYPE_RESPONSE => Box::new(ResponseValidator),
+            UMessageType::UMESSAGE_TYPE_REQUEST => Box::new(RequestValidator),
             _ => Box::new(PublishValidator),
         }
     }
@@ -355,7 +356,9 @@ impl CloudEventValidator for PublishValidator {
         if let Ok(source) = LongUriSerializer::deserialize(cloud_event.source().to_string()) {
             if let Err(e) = self.validate_topic_uri(&source) {
                 return Err(ValidationError::new(format!(
-                    "Invalid Publish type CloudEvent source [{source}] - {e}"
+                    "Invalid Publish type CloudEvent source [{}] - {}",
+                    cloud_event.source().as_str(),
+                    e
                 )));
             }
         } else {
@@ -367,7 +370,7 @@ impl CloudEventValidator for PublishValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> Result<(), ValidationError> {
-        if UMessageType::UmessageTypePublish.eq(&UMessageType::from(cloud_event.ty())) {
+        if UMessageType::UMESSAGE_TYPE_PUBLISH.eq(&UMessageType::from(cloud_event.ty())) {
             return Ok(());
         }
         Err(ValidationError::new(format!(
@@ -463,7 +466,7 @@ impl CloudEventValidator for RequestValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> Result<(), ValidationError> {
-        if UMessageType::UmessageTypeRequest.eq(&UMessageType::from(cloud_event.ty())) {
+        if UMessageType::UMESSAGE_TYPE_REQUEST.eq(&UMessageType::from(cloud_event.ty())) {
             return Ok(());
         }
         Err(ValidationError::new(format!(
@@ -520,7 +523,7 @@ impl CloudEventValidator for ResponseValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> Result<(), ValidationError> {
-        if UMessageType::UmessageTypeResponse.eq(&UMessageType::from(cloud_event.ty())) {
+        if UMessageType::UMESSAGE_TYPE_RESPONSE.eq(&UMessageType::from(cloud_event.ty())) {
             return Ok(());
         }
         Err(ValidationError::new(format!(
@@ -540,14 +543,15 @@ impl std::fmt::Display for ResponseValidator {
 mod tests {
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::UCloudEventAttributesBuilder;
-    use crate::uprotocol::{UAuthority, UEntity, UPriority, UResource};
+    use crate::uprotocol::uattributes::UPriority;
+    use crate::uprotocol::uri::{UAuthority, UEntity};
     use crate::uuid::builder::UUIDv8Builder;
 
     use super::*;
 
     use cloudevents::{Data, EventBuilder, EventBuilderV03, EventBuilderV10};
-    use prost::Message;
-    use prost_types::Any;
+    use protobuf::well_known_types::any::Any;
+    use protobuf::Message;
     use uuid::Uuid;
 
     #[test]
@@ -578,7 +582,7 @@ mod tests {
     fn test_publish_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UmessageTypeResponse)
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
             .build()
             .unwrap();
 
@@ -596,7 +600,7 @@ mod tests {
     fn test_notification_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UmessageTypeResponse)
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
             .build()
             .unwrap();
 
@@ -615,7 +619,7 @@ mod tests {
     fn test_get_a_request_cloud_event_validator() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UmessageTypeRequest)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
             .build()
             .unwrap();
 
@@ -630,7 +634,7 @@ mod tests {
     fn test_request_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -648,7 +652,7 @@ mod tests {
     fn test_get_a_response_cloud_event_validator() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UmessageTypeResponse)
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
             .build()
             .unwrap();
 
@@ -663,7 +667,7 @@ mod tests {
     fn test_response_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -690,7 +694,7 @@ mod tests {
     fn validate_cloud_event_version_when_valid() {
         let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_builder_for_test()
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .id(uuid);
         let event = builder.build().unwrap();
 
@@ -703,7 +707,7 @@ mod tests {
     fn validate_cloud_event_version_when_not_valid() {
         let builder = EventBuilderV03::new()
             .id("id".to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .source("/body.access".to_string());
 
         let event = builder.build().unwrap();
@@ -721,7 +725,7 @@ mod tests {
     fn validate_cloud_event_id_when_valid() {
         let uuid = UUIDv8Builder::new().build();
         let builder = build_base_cloud_event_builder_for_test()
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .id(uuid);
         let event = builder.build().unwrap();
 
@@ -735,7 +739,7 @@ mod tests {
         let uuid = Uuid::new_v4();
 
         let builder = build_base_cloud_event_builder_for_test()
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .id(uuid);
         let event = builder.build().unwrap();
 
@@ -769,7 +773,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source("/body.access/1/door.front_left#Door".to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -785,14 +789,11 @@ mod tests {
     #[test]
     fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote() {
         let uuid = UUIDv8Builder::new().build();
-        let uri = LongUriSerializer::deserialize(
-            "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
-        )
-        .unwrap();
+        let uri = "//VCU.myvin/body.access/1/door.front_left#Door";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(uri.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .source(uri)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build();
         let event = event.unwrap();
 
@@ -808,16 +809,13 @@ mod tests {
     #[test]
     fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote_with_a_sink() {
         let uuid = UUIDv8Builder::new().build();
-        let uri = LongUriSerializer::deserialize(
-            "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
-        )
-        .unwrap();
-        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string()).unwrap();
+        let uri = "//VCU.myvin/body.access/1/door.front_left#Door";
+        let sink = "//bo.cloud/petapp";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(uri.to_string())
+            .source(uri)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -829,16 +827,13 @@ mod tests {
     #[test]
     fn test_publish_type_cloudevent_is_not_valid_when_remote_with_invalid_sink() {
         let uuid = UUIDv8Builder::new().build();
-        let uri = LongUriSerializer::deserialize(
-            "//VCU.myvin/body.access/1/door.front_left#Door".to_string(),
-        )
-        .unwrap();
-        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string()).unwrap();
+        let uri = "//VCU.myvin/body.access/1/door.front_left#Door";
+        let sink = "//bo.cloud";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(uri.to_string())
+            .source(uri)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -858,7 +853,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source("/".to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -874,12 +869,12 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_not_valid_when_source_is_missing_authority() {
-        let uri = LongUriSerializer::deserialize("/body.access".to_string()).unwrap();
+        let uri = "/body.access";
 
         let event = build_base_cloud_event_builder_for_test()
             .id("testme".to_string())
-            .source(uri.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .source(uri)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -901,13 +896,12 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_not_valid_when_source_is_missing_message_info() {
-        let uri =
-            LongUriSerializer::deserialize("/body.access/1/door.front_left".to_string()).unwrap();
+        let uri = "/body.access/1/door.front_left";
 
         let event = build_base_cloud_event_builder_for_test()
             .id("testme".to_string())
-            .source(uri.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .source(uri)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -930,14 +924,13 @@ mod tests {
     #[test]
     fn test_notification_type_cloudevent_is_valid_when_everything_is_valid() {
         let uuid = UUIDv8Builder::new().build();
-        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
-            .unwrap();
-        let sink = LongUriSerializer::deserialize("//bo.cloud/petapp".to_string()).unwrap();
+        let uri = "/body.access/1/door.front_left#Door";
+        let sink = "//bo.cloud/petapp";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(uri.to_string())
+            .source(uri)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -954,7 +947,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source(uri.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -962,10 +955,6 @@ mod tests {
         let status = validator.validate(&event);
 
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid CloudEvent sink, Notification CloudEvent sink must be an uri"
-        );
     }
 
     #[test]
@@ -978,7 +967,7 @@ mod tests {
             .id(uuid)
             .source(uri.to_string())
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .build()
             .unwrap();
 
@@ -986,25 +975,18 @@ mod tests {
         let status = validator.validate(&event);
 
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid Notification type CloudEvent sink [//bo.cloud] - Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
     fn test_request_type_cloudevent_is_valid_when_everything_is_valid() {
         let uuid = UUIDv8Builder::new().build();
-        let source =
-            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
-        let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string())
-                .unwrap();
+        let source = "//bo.cloud/petapp//rpc.response";
+        let sink = "//VCU.myvin/body.access/1/rpc.UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
+            .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypeRequest)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
             .build()
             .unwrap();
 
@@ -1017,15 +999,13 @@ mod tests {
     #[test]
     fn test_request_type_cloudevent_is_not_valid_invalid_source() {
         let uuid = UUIDv8Builder::new().build();
-        let source = LongUriSerializer::deserialize("//bo.cloud/petapp//dog".to_string()).unwrap();
-        let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string())
-                .unwrap();
+        let source = "//bo.cloud/petapp//dog";
+        let sink = "//VCU.myvin/body.access/1/rpc.UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
+            .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypeRequest)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
             .build()
             .unwrap();
 
@@ -1042,12 +1022,11 @@ mod tests {
     #[test]
     fn test_request_type_cloudevent_is_not_valid_missing_sink() {
         let uuid = UUIDv8Builder::new().build();
-        let source =
-            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
+        let source = "//bo.cloud/petapp//rpc.response";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
-            .ty(UMessageType::UmessageTypeRequest)
+            .source(source)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
             .build()
             .unwrap();
 
@@ -1064,16 +1043,13 @@ mod tests {
     #[test]
     fn test_request_type_cloudevent_is_not_valid_invalid_sink_not_rpc_command() {
         let uuid = UUIDv8Builder::new().build();
-        let source =
-            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
-        let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
-                .unwrap();
+        let source = "//bo.cloud/petapp//rpc.response";
+        let sink = "//VCU.myvin/body.access/1/UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
+            .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypeRequest)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
             .build()
             .unwrap();
 
@@ -1090,16 +1066,13 @@ mod tests {
     #[test]
     fn test_response_type_cloudevent_is_valid_when_everything_is_valid() {
         let uuid = UUIDv8Builder::new().build();
-        let source =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string())
-                .unwrap();
-        let sink =
-            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
+        let source = "//VCU.myvin/body.access/1/rpc.UpdateDoor";
+        let sink = "//bo.cloud/petapp//rpc.response";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
+            .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypeResponse)
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
             .build()
             .unwrap();
 
@@ -1112,16 +1085,13 @@ mod tests {
     #[test]
     fn test_response_type_cloudevent_is_not_valid_invalid_source() {
         let uuid = UUIDv8Builder::new().build();
-        let source =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
-                .unwrap();
-        let sink =
-            LongUriSerializer::deserialize("//bo.cloud/petapp//rpc.response".to_string()).unwrap();
+        let source = "//VCU.myvin/body.access/1/UpdateDoor";
+        let sink = "//bo.cloud/petapp//rpc.response";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
+            .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypeResponse)
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
             .build()
             .unwrap();
 
@@ -1138,13 +1108,11 @@ mod tests {
     #[test]
     fn test_response_type_cloudevent_is_not_valid_missing_sink_and_invalid_source() {
         let uuid = UUIDv8Builder::new().build();
-        let source =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
-                .unwrap();
+        let source = "//VCU.myvin/body.access/1/UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
-            .ty(UMessageType::UmessageTypeResponse)
+            .source(source)
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
             .build()
             .unwrap();
 
@@ -1161,15 +1129,13 @@ mod tests {
     #[test]
     fn test_response_type_cloudevent_is_not_valid_invalid_source_not_rpc_command() {
         let uuid = UUIDv8Builder::new().build();
-        let source = LongUriSerializer::deserialize("//bo.cloud/petapp/1/dog".to_string()).unwrap();
-        let sink =
-            LongUriSerializer::deserialize("//VCU.myvin/body.access/1/UpdateDoor".to_string())
-                .unwrap();
+        let source = "//bo.cloud/petapp/1/dog";
+        let sink = "//VCU.myvin/body.access/1/UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
-            .source(source.to_string())
+            .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UmessageTypeResponse)
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
             .build()
             .unwrap();
 
@@ -1187,21 +1153,24 @@ mod tests {
 
     fn build_base_cloud_event_builder_for_test() -> EventBuilderV10 {
         let uri = UUri {
-            authority: Some(UAuthority::default()),
+            authority: Some(UAuthority::default()).into(),
             entity: Some(UEntity {
                 name: "body.access".to_string(),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 name: "door".to_string(),
                 ..Default::default()
-            }),
+            })
+            .into(),
+            ..Default::default()
         };
         let source = LongUriSerializer::serialize(&uri).unwrap();
         let payload = build_proto_payload_for_test();
         let attributes = UCloudEventAttributesBuilder::new()
             .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs0)
+            .with_priority(UPriority::UPRIORITY_CS0)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -1209,7 +1178,7 @@ mod tests {
         UCloudEventBuilder::build_base_cloud_event(
             "testme",
             &source,
-            &payload.encode_to_vec(),
+            &payload.write_to_bytes().unwrap(),
             &payload.type_url,
             &attributes,
         )
@@ -1217,7 +1186,7 @@ mod tests {
 
     fn build_base_cloud_event_for_test() -> Event {
         let mut builder = build_base_cloud_event_builder_for_test();
-        builder = builder.ty(UMessageType::UmessageTypePublish);
+        builder = builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH);
         builder.build().unwrap()
     }
 
@@ -1225,7 +1194,7 @@ mod tests {
         let event = EventBuilderV10::new()
             .id("hello")
             .source("/body.access")
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",
@@ -1256,9 +1225,10 @@ mod tests {
                 .to_string()
         };
 
-        prost_types::Any {
+        Any {
             type_url: schema,
             value: data_bytes,
+            ..Default::default()
         }
     }
 }

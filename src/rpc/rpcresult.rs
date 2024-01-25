@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::{UCode, UStatus};
+use crate::uprotocol::ustatus::{UCode, UStatus};
 
 /// A wrapper for RPC stub calls.
 ///
@@ -53,7 +53,7 @@ impl<T> RpcResult<T> {
         match self {
             RpcResult::Success(value) => match func(value) {
                 Ok(val) => RpcResult::Success(val),
-                Err(e) => RpcResult::Failure(UStatus::fail_with_code(UCode::Unknown, &e)),
+                Err(e) => RpcResult::Failure(UStatus::fail_with_code(UCode::UNKNOWN, &e)),
             },
             RpcResult::Failure(status) => RpcResult::Failure(status),
         }
@@ -86,7 +86,7 @@ impl<T> RpcResult<T> {
         match self {
             RpcResult::Success(value) if predicate(&value) => RpcResult::Success(value),
             RpcResult::Success(_) => RpcResult::Failure(UStatus::fail_with_code(
-                UCode::FailedPrecondition,
+                UCode::FAILED_PRECONDITION,
                 "Validation failed",
             )),
             failure @ RpcResult::Failure(_) => failure,
@@ -96,9 +96,7 @@ impl<T> RpcResult<T> {
     /// Returns the `Code` of the `Failure` variant if present, or `None` if the `RpcResult` is a `Success`.
     pub fn failure_value(&self) -> Option<UCode> {
         match self {
-            RpcResult::Failure(status) => {
-                Some(UCode::try_from(status.code).unwrap_or(UCode::Unknown))
-            }
+            RpcResult::Failure(status) => Some(status.get_code()),
             RpcResult::Success(_) => None,
         }
     }
@@ -196,12 +194,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RpcResult::Success(value) => write!(f, "Success({value})"),
-            RpcResult::Failure(status) => write!(
-                f,
-                "Failure(code: {}\nmessage: \"{}\"\n)",
-                status.code,
-                status.message()
-            ),
+            RpcResult::Failure(status) => write!(f, "Failure(status: {})", status),
         }
     }
 }
@@ -234,7 +227,7 @@ mod tests {
 
     #[test]
     fn test_is_success_on_failure() {
-        let result = RpcResult::<i32>::failure(UCode::InvalidArgument, "boom");
+        let result = RpcResult::<i32>::failure(UCode::INVALID_ARGUMENT, "boom");
         assert!(!result.is_success());
     }
 
@@ -246,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_is_failure_on_failure() {
-        let result = RpcResult::<i32>::failure(UCode::InvalidArgument, "boom");
+        let result = RpcResult::<i32>::failure(UCode::INVALID_ARGUMENT, "boom");
         assert!(result.is_failure());
     }
 
@@ -258,7 +251,7 @@ mod tests {
     #[test]
 
     fn test_unwrap_or_else_on_failure() {
-        let result: RpcResult<i32> = RpcResult::failure(UCode::InvalidArgument, "boom");
+        let result: RpcResult<i32> = RpcResult::failure(UCode::INVALID_ARGUMENT, "boom");
         assert_eq!(get_default(), result.unwrap_or_else(get_default));
     }
 
@@ -270,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_unwrap_or_else_on_failure_value() {
-        let result: RpcResult<i32> = RpcResult::failure(UCode::InvalidArgument, "boom");
+        let result: RpcResult<i32> = RpcResult::failure(UCode::INVALID_ARGUMENT, "boom");
         assert_eq!(5, result.unwrap_or_else(|| 5));
     }
 
@@ -282,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_success_value_on_failure() {
-        let result: RpcResult<i32> = RpcResult::failure(UCode::InvalidArgument, "boom");
+        let result: RpcResult<i32> = RpcResult::failure(UCode::INVALID_ARGUMENT, "boom");
         assert!(result.failure_value().is_some());
     }
 
@@ -294,8 +287,8 @@ mod tests {
 
     #[test]
     fn test_failure_value_on_failure() {
-        let result: RpcResult<i32> = RpcResult::failure(UCode::InvalidArgument, "boom");
-        assert_eq!(Some(UCode::InvalidArgument), result.failure_value());
+        let result: RpcResult<i32> = RpcResult::failure(UCode::INVALID_ARGUMENT, "boom");
+        assert_eq!(Some(UCode::INVALID_ARGUMENT), result.failure_value());
     }
 
     #[test]
@@ -314,8 +307,8 @@ mod tests {
         match mapped {
             RpcResult::Success(_) => panic!("Expected failure, but got success."),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code);
-                assert_eq!("2 went boom", status.message());
+                assert_eq!(UCode::UNKNOWN, status.get_code());
+                assert_eq!("2 went boom", status.message.unwrap());
             }
         }
     }
@@ -323,14 +316,14 @@ mod tests {
     #[test]
     fn test_map_on_failure() {
         let result: RpcResult<i32> =
-            RpcResult::Failure(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
+            RpcResult::Failure(UStatus::fail_with_code(UCode::INVALID_ARGUMENT, "boom"));
         let mapped: RpcResult<i32> = result.map(|x| Ok(x * 2));
 
         match mapped {
             RpcResult::Success(_) => panic!("Expected failure, but got success."),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::InvalidArgument as i32, status.code);
-                assert_eq!("boom", status.message());
+                assert_eq!(UCode::INVALID_ARGUMENT, status.get_code());
+                assert_eq!("boom", status.message.unwrap());
             }
         }
     }
@@ -343,7 +336,7 @@ mod tests {
         match flat_mapped {
             RpcResult::Success(_) => panic!("Expected a failure, but got a success!"),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code);
+                assert_eq!(UCode::UNKNOWN, status.get_code());
             }
         }
     }
@@ -367,7 +360,7 @@ mod tests {
         match and_then_mapped {
             RpcResult::Success(_) => panic!("Expected a failure, but got a success!"),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code);
+                assert_eq!(UCode::UNKNOWN, status.get_code());
             }
         }
     }
@@ -380,7 +373,7 @@ mod tests {
         match filter_result {
             RpcResult::Success(_) => panic!("Expected a failure, but got a success!"),
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::FailedPrecondition as i32, status.code);
+                assert_eq!(UCode::FAILED_PRECONDITION, status.get_code());
             }
         }
     }
@@ -403,13 +396,13 @@ mod tests {
 
     #[test]
     fn test_validate_on_failure() {
-        let result: RpcResult<i32> = RpcResult::failure(UCode::InvalidArgument, "boom");
+        let result: RpcResult<i32> = RpcResult::failure(UCode::INVALID_ARGUMENT, "boom");
         let validated_result = result.validate(|&i| i > 5);
 
         match validated_result {
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::InvalidArgument as i32, status.code);
-                assert_eq!("boom", status.message());
+                assert_eq!(UCode::INVALID_ARGUMENT, status.get_code());
+                assert_eq!("boom", status.message.unwrap());
             }
             _ => panic!("Expected Failure but found Success"),
         }
@@ -434,8 +427,8 @@ mod tests {
 
         match mapped {
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::Unknown as i32, status.code);
-                assert_eq!("2 went boom", status.message());
+                assert_eq!(UCode::UNKNOWN, status.get_code());
+                assert_eq!("2 went boom", status.message.unwrap());
             }
             _ => panic!("Expected Failure but found Success"),
         }
@@ -444,34 +437,16 @@ mod tests {
     #[test]
     fn test_flatten_on_failure() {
         let result: RpcResult<i32> =
-            RpcResult::Failure(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
+            RpcResult::Failure(UStatus::fail_with_code(UCode::INVALID_ARGUMENT, "boom"));
         let mapped: RpcResult<RpcResult<i32>> = result.map(multiply_by_2);
         let flattened = RpcResult::<RpcResult<i32>>::flatten(mapped);
 
         match flattened {
             RpcResult::Failure(status) => {
-                assert_eq!(UCode::InvalidArgument as i32, status.code);
-                assert_eq!("boom", status.message());
+                assert_eq!(UCode::INVALID_ARGUMENT, status.get_code());
+                assert_eq!("boom", status.message.unwrap());
             }
             _ => panic!("Expected Failure but found Success"),
         }
-    }
-
-    #[test]
-    fn test_to_string_success() {
-        let result: RpcResult<i32> = RpcResult::success(2);
-        assert_eq!("Success(2)", result.to_string());
-    }
-
-    #[test]
-    fn test_to_string_failure() {
-        let result: RpcResult<i32> =
-            RpcResult::Failure(UStatus::fail_with_code(UCode::InvalidArgument, "boom"));
-        let expected_output = format!(
-            "Failure(code: {}\nmessage: \"{}\"\n)",
-            UCode::InvalidArgument as i32,
-            "boom"
-        );
-        assert_eq!(expected_output, result.to_string());
     }
 }

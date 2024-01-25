@@ -12,24 +12,24 @@
  ********************************************************************************/
 
 use cloudevents::Event as CloudEvent;
-use prost::Message;
+use protobuf::Message;
 
 use crate::cloudevent::serializer::{CloudEventSerializer, SerializationError};
-use crate::proto::CloudEvent as CloudEventProto;
+use crate::cloudevents::CloudEvent as CloudEventProto;
 
 /// Serialize and deserialize `CloudEvents` to protobuf format.
 pub struct CloudEventProtobufSerializer;
 impl CloudEventSerializer for CloudEventProtobufSerializer {
     fn serialize(&self, cloud_event: &CloudEvent) -> Result<Vec<u8>, SerializationError> {
-        let proto_event = CloudEventProto::from(cloud_event.clone());
-        Ok(proto_event.encode_to_vec())
+        CloudEventProto::from(cloud_event.to_owned())
+            .write_to_bytes()
+            .map_err(|e| SerializationError::new(e.to_string()))
     }
 
     fn deserialize(&self, bytes: &[u8]) -> Result<CloudEvent, SerializationError> {
-        match CloudEventProto::decode(bytes) {
-            Ok(proto_event) => Ok(CloudEvent::from(proto_event)),
-            Err(error) => Err(SerializationError::new(error.to_string())),
-        }
+        CloudEventProto::parse_from_bytes(bytes)
+            .map(CloudEvent::from)
+            .map_err(|error| SerializationError::new(error.to_string()))
     }
 }
 
@@ -39,29 +39,33 @@ mod tests {
 
     use cloudevents::event::ExtensionValue;
     use cloudevents::{AttributesReader, Event, EventBuilder, EventBuilderV10};
-    use prost_types::Any;
+    use protobuf::well_known_types::any::Any;
 
     use crate::cloudevent::builder::{UCloudEventBuilder, UCloudEventUtils};
     use crate::cloudevent::datamodel::UCloudEventAttributesBuilder;
     use crate::cloudevent::serializer::cloudeventjsonserializer::CloudEventJsonSerializer;
     use crate::rpc::RpcMapper;
-    use crate::uprotocol::{UAuthority, UEntity, UMessageType, UPriority, UResource, UUri};
+    use crate::uprotocol::uattributes::{UMessageType, UPriority};
+    use crate::uprotocol::uri::{UAuthority, UEntity, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     #[test]
     fn serialize_and_deserialize_cloud_event_to_protobuf() {
         // Build the source
         let uri = UUri {
-            authority: Some(UAuthority::default()),
+            authority: Some(UAuthority::default()).into(),
             entity: Some(UEntity {
                 name: "body.access".to_string(),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 name: "Door".to_string(),
                 instance: Some("front_left".to_string()),
                 ..Default::default()
-            }),
+            })
+            .into(),
+            ..Default::default()
         };
 
         let source = LongUriSerializer::serialize(&uri).unwrap();
@@ -72,18 +76,18 @@ mod tests {
         // Configure cloud event
         let u_cloud_event_attributes = UCloudEventAttributesBuilder::new()
             .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs0)
+            .with_priority(UPriority::UPRIORITY_CS0)
             .with_ttl(3)
             .build();
 
         let mut cloud_event_builder = UCloudEventBuilder::build_base_cloud_event(
             "hello",
             &source,
-            &proto_payload.encode_to_vec(),
+            &proto_payload.write_to_bytes().unwrap(),
             &proto_payload.type_url,
             &u_cloud_event_attributes,
         );
-        cloud_event_builder = cloud_event_builder.ty(UMessageType::UmessageTypePublish);
+        cloud_event_builder = cloud_event_builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH);
 
         let cloud_event = cloud_event_builder.build().unwrap();
 
@@ -102,12 +106,12 @@ mod tests {
         // Cloud event
         let cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
                 format!("proto://{}", Any::default().type_url),
-                proto_payload.encode_to_vec(),
+                proto_payload.write_to_bytes().unwrap(),
             )
             .build()
             .unwrap();
@@ -115,7 +119,7 @@ mod tests {
         // Another cloud event
         let another_cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UmessageTypeRequest)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
             .source("/body.access/1/door.front_left".to_string())
             .build()
             .unwrap();
@@ -134,12 +138,12 @@ mod tests {
         // Cloud event
         let cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
                 format!("proto://{}", Any::default().type_url),
-                proto_payload.encode_to_vec(),
+                proto_payload.write_to_bytes().unwrap(),
             )
             .build()
             .unwrap();
@@ -147,12 +151,12 @@ mod tests {
         // Another cloud event
         let another_cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
                 format!("proto://{}", Any::default().type_url),
-                proto_payload.encode_to_vec(),
+                proto_payload.write_to_bytes().unwrap(),
             )
             .build()
             .unwrap();
@@ -171,16 +175,19 @@ mod tests {
 
         // Source
         let uri = UUri {
-            authority: Some(UAuthority::default()),
+            authority: Some(UAuthority::default()).into(),
             entity: Some(UEntity {
                 name: "body.access".to_string(),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 name: "Door".to_string(),
                 instance: Some("front_left".to_string()),
                 ..Default::default()
-            }),
+            })
+            .into(),
+            ..Default::default()
         };
         let source = LongUriSerializer::serialize(&uri).unwrap();
 
@@ -190,7 +197,7 @@ mod tests {
         // Additional attributes
         let u_cloud_event_attributes = UCloudEventAttributesBuilder::new()
             .with_hash("somehash".to_string())
-            .with_priority(UPriority::UpriorityCs1)
+            .with_priority(UPriority::UPRIORITY_CS1)
             .with_ttl(3)
             .with_token("someOAuthToken".to_string())
             .build();
@@ -199,11 +206,11 @@ mod tests {
         let mut cloud_event_builder = UCloudEventBuilder::build_base_cloud_event(
             "testme",
             &source,
-            &proto_payload.encode_to_vec(),
+            &proto_payload.write_to_bytes().unwrap(),
             &proto_payload.type_url,
             &u_cloud_event_attributes,
         );
-        cloud_event_builder = cloud_event_builder.ty(UMessageType::UmessageTypePublish);
+        cloud_event_builder = cloud_event_builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH);
 
         let cloud_event1 = cloud_event_builder.build().unwrap();
         let bytes1 = serializer.serialize(&cloud_event1).unwrap();
@@ -238,7 +245,7 @@ mod tests {
         builder = builder.data_with_schema(
             "application/protobuf".to_string(),
             format!("proto://{}", Any::default().type_url),
-            cloud_event_proto.encode_to_vec(),
+            cloud_event_proto.write_to_bytes().unwrap(),
         );
 
         let cloud_event1 = builder.build().unwrap();
@@ -275,7 +282,7 @@ mod tests {
         builder = builder.data_with_schema(
             "application/protobuf".to_string(),
             format!("proto://{}", Any::default().type_url),
-            cloud_event_proto.encode_to_vec(),
+            cloud_event_proto.write_to_bytes().unwrap(),
         );
 
         let cloud_event1 = builder.build().unwrap();
@@ -305,7 +312,7 @@ mod tests {
         builder = builder.data_with_schema(
             "application/protobuf".to_string(),
             format!("proto://{}", Any::default().type_url),
-            cloud_event_proto.encode_to_vec(),
+            cloud_event_proto.write_to_bytes().unwrap(),
         );
 
         let cloud_event1 = builder.build().unwrap();
@@ -363,7 +370,7 @@ mod tests {
     fn build_cloud_event_for_test() -> EventBuilderV10 {
         EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .source("//VCU.VIN/body.access")
     }
 
@@ -388,7 +395,7 @@ mod tests {
         let event = EventBuilderV10::new()
             .id("hello")
             .source("//VCU.VIN/body.access")
-            .ty(UMessageType::UmessageTypePublish)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
                 format!("proto://{}", Any::default().type_url),

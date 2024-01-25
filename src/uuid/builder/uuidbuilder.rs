@@ -16,7 +16,7 @@ use std::convert::Into;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::uprotocol::Uuid as uproto_Uuid;
+use crate::uprotocol::uuid::UUID as uproto_Uuid;
 
 const MAX_COUNT: u64 = 0xfff;
 const MAX_TIMESTAMP_BITS: u8 = 48;

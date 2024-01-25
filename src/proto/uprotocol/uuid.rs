@@ -14,7 +14,7 @@
 use std::str::FromStr;
 use uuid::{Uuid, Variant, Version};
 
-use crate::uprotocol::Uuid as uproto_Uuid;
+use crate::uprotocol::uuid::UUID as uproto_Uuid;
 
 #[derive(Debug)]
 pub struct UuidConversionError {
@@ -38,6 +38,14 @@ impl std::fmt::Display for UuidConversionError {
 impl std::error::Error for UuidConversionError {}
 
 impl uproto_Uuid {
+    pub fn from_u64_pair(high: u64, low: u64) -> Self {
+        uproto_Uuid {
+            msb: high,
+            lsb: low,
+            ..Default::default()
+        }
+    }
+
     /// Returns a string representation of this UUID as defined by
     /// [RFC 4122, Section 3](https://www.rfc-editor.org/rfc/rfc4122.html#section-3).
     pub fn to_hyphenated_string(&self) -> String {
@@ -107,10 +115,7 @@ impl From<Uuid> for uproto_Uuid {
 impl From<&Uuid> for uproto_Uuid {
     fn from(value: &Uuid) -> Self {
         let pair = value.as_u64_pair();
-        uproto_Uuid {
-            msb: pair.0,
-            lsb: pair.1,
-        }
+        uproto_Uuid::from_u64_pair(pair.0, pair.1)
     }
 }
 
@@ -192,10 +197,10 @@ mod tests {
         let hi = 0xa1a2a3a4b1b2c1c2u64;
         let lo = 0xd1d2d3d4d5d6d7d8u64;
 
-        let uuid = Uuid::from(uproto_Uuid { msb: hi, lsb: lo });
+        let uuid = Uuid::from(uproto_Uuid::from_u64_pair(hi, lo));
         assert_eq!(uuid.as_u64_pair(), (hi, lo));
 
-        let uuid = Uuid::from(&uproto_Uuid { msb: hi, lsb: lo });
+        let uuid = Uuid::from(&uproto_Uuid::from_u64_pair(hi, lo));
         assert_eq!(uuid.as_u64_pair(), (hi, lo));
     }
 
@@ -205,10 +210,10 @@ mod tests {
         let lo = 0xd1d2d3d4d5d6d7d8u64;
         let hyphenated_string = "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8".to_string();
 
-        let uuid_string = String::from(uproto_Uuid { msb: hi, lsb: lo });
+        let uuid_string = String::from(uproto_Uuid::from_u64_pair(hi, lo));
         assert_eq!(uuid_string, hyphenated_string);
 
-        let uuid_string = String::from(&uproto_Uuid { msb: hi, lsb: lo });
+        let uuid_string = String::from(&uproto_Uuid::from_u64_pair(hi, lo));
         assert_eq!(uuid_string, hyphenated_string);
     }
 
@@ -247,7 +252,7 @@ mod tests {
         ];
         let hi = 0xa1a2a3a4b1b2c1c2u64;
         let lo = 0xd1d2d3d4d5d6d7d8u64;
-        let uuid = uproto_Uuid { msb: hi, lsb: lo };
+        let uuid = uproto_Uuid::from_u64_pair(hi, lo);
 
         let uuid_as_bytes: [u8; 16] = (&uuid).into();
         assert_eq!(uuid_as_bytes, bytes);
@@ -259,30 +264,30 @@ mod tests {
     #[test]
     fn test_is_uprotocol_uuid_succeeds() {
         // timestamp = 1, ver = 0b1000
-        let msb = 0x0000000000018000u64;
+        let hi = 0x0000000000018000u64;
         // variant = 0b10
-        let lsb = 0x8000000000000000u64;
-        let uuid = uproto_Uuid { msb, lsb };
+        let lo = 0x8000000000000000u64;
+        let uuid = uproto_Uuid::from_u64_pair(hi, lo);
         assert!(uuid.is_uprotocol_uuid());
     }
 
     #[test]
     fn test_is_uprotocol_uuid_fails_for_invalid_version() {
         // timestamp = 1, ver = 0b1100
-        let msb = 0x000000000001C000u64;
+        let hi = 0x000000000001C000u64;
         // variant = 0b10
-        let lsb = 0x8000000000000000u64;
-        let uuid = uproto_Uuid { msb, lsb };
+        let lo = 0x8000000000000000u64;
+        let uuid = uproto_Uuid::from_u64_pair(hi, lo);
         assert!(!uuid.is_uprotocol_uuid());
     }
 
     #[test]
     fn test_is_uprotocol_uuid_fails_for_invalid_variant() {
         // timestamp = 1, ver = 0b1000
-        let msb = 0x0000000000018000u64;
+        let hi = 0x0000000000018000u64;
         // variant = 0b01
-        let lsb = 0x4000000000000000u64;
-        let uuid = uproto_Uuid { msb, lsb };
+        let lo = 0x4000000000000000u64;
+        let uuid = uproto_Uuid::from_u64_pair(hi, lo);
         assert!(!uuid.is_uprotocol_uuid());
     }
 }

@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::{UAuthority, UEntity, UResource, UUri};
+use crate::uprotocol::uri::{UAuthority, UUri};
 use crate::uri::validator::ValidationError;
 
 /// Struct to encapsulate Uri validation logic.
@@ -181,7 +181,9 @@ impl UriValidator {
     /// Returns `true` if the `UAuthority` is of type remote.
     #[allow(clippy::missing_panics_doc)]
     pub fn is_remote(uri: &UUri) -> bool {
-        uri.authority.is_some() && uri.authority.as_ref().unwrap().remote.is_some()
+        uri.authority
+            .as_ref()
+            .map_or(false, |auth| auth.get_name().is_some())
     }
 
     /// Checks if the URI contains numbers so that it can be serialized into micro format.
@@ -194,11 +196,9 @@ impl UriValidator {
     #[allow(clippy::missing_panics_doc)]
     pub fn is_micro_form(uri: &UUri) -> bool {
         !Self::is_empty(uri)
-            && uri.entity.as_ref().map_or(false, UEntity::has_id)
-            && uri.resource.as_ref().map_or(false, UResource::has_id)
-            && (uri.authority.is_none()
-                || UAuthority::has_ip(uri.authority.as_ref().unwrap())
-                || UAuthority::has_id(uri.authority.as_ref().unwrap()))
+            && uri.entity.has_id()
+            && uri.resource.has_id()
+            && (uri.authority.is_none() || uri.authority.has_id() || uri.authority.has_ip())
     }
 
     /// Checks if the URI contains names so that it can be serialized into long format.
@@ -214,19 +214,19 @@ impl UriValidator {
         }
 
         let mut auth_name = String::new();
-        if let Some(authority) = &uri.authority {
+        if let Some(authority) = uri.authority.as_ref() {
             if let Some(name) = UAuthority::get_name(authority) {
                 auth_name = name.to_string();
             }
         }
 
         let mut ent_name = String::new();
-        if let Some(entity) = &uri.entity {
+        if let Some(entity) = uri.entity.as_ref() {
             ent_name = entity.name.to_string();
         }
 
         let mut res_name = String::new();
-        if let Some(resource) = &uri.resource {
+        if let Some(resource) = uri.resource.as_ref() {
             res_name = resource.name.to_string();
         }
 
@@ -241,7 +241,7 @@ mod tests {
     use std::fs;
 
     use crate::{
-        uprotocol::{UEntity, UResource},
+        uprotocol::uri::{UEntity, UResource},
         uri::serializer::{LongUriSerializer, UriSerializer},
     };
 
@@ -290,9 +290,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(UAuthority::default()),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(UAuthority::default()).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -313,9 +314,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(UAuthority::default()),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(UAuthority::default()).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -343,9 +345,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(UAuthority::default()),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(UAuthority::default()).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_response(&uuri);
@@ -400,11 +403,11 @@ mod tests {
         assert!(status.is_ok());
     }
 
-    use crate::uprotocol::u_authority::Remote;
     #[test]
     fn test_topic_uri_invalid_when_uri_has_schema_only() {
         let authority = UAuthority {
-            remote: Some(Remote::Name(":".into())),
+            name: Some(String::from(":")),
+            ..Default::default()
         };
         let entity = UEntity {
             ..Default::default()
@@ -413,9 +416,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate(&uuri);
@@ -436,9 +440,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: None,
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: None.into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate(&uuri);
@@ -462,9 +467,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate(&uuri);
@@ -492,9 +498,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
@@ -528,9 +535,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: None,
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: None.into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate(&uuri);
@@ -587,7 +595,8 @@ mod tests {
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_has_schema_only() {
         let authority = UAuthority {
-            remote: Some(Remote::Name(":".into())),
+            name: Some(String::from(":")),
+            ..Default::default()
         };
         let entity = UEntity {
             ..Default::default()
@@ -596,9 +605,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -633,9 +643,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: None,
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: None.into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -660,9 +671,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -687,9 +699,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -771,7 +784,8 @@ mod tests {
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_has_schema_only() {
         let authority = UAuthority {
-            remote: Some(Remote::Name(":".into())),
+            name: Some(String::from(":")),
+            ..Default::default()
         };
         let entity = UEntity {
             ..Default::default()
@@ -780,9 +794,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -820,9 +835,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -847,9 +863,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -876,9 +893,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(authority),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(authority).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -901,9 +919,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: Some(UAuthority::default()),
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: Some(UAuthority::default()).into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -938,9 +957,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: None,
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: None.into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_method(&uuri);
@@ -1048,9 +1068,10 @@ mod tests {
             ..Default::default()
         };
         let uuri = UUri {
-            entity: Some(entity),
-            resource: Some(resource),
-            authority: None,
+            entity: Some(entity).into(),
+            resource: Some(resource).into(),
+            authority: None.into(),
+            ..Default::default()
         };
 
         let status = UriValidator::validate_rpc_response(&uuri);

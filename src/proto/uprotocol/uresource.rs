@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::UResource;
+use crate::uprotocol::uri::UResource;
 
 impl UResource {
     pub fn has_id(&self) -> bool {
@@ -47,6 +47,7 @@ impl From<&str> for UResource {
             id: None,
             instance: resource_instance,
             message: resource_message,
+            ..Default::default()
         }
     }
 }

@@ -13,7 +13,7 @@
 
 use std::fmt::Display;
 
-use crate::uprotocol::UMessageType;
+use crate::uprotocol::uattributes::UMessageType;
 
 impl From<UMessageType> for String {
     fn from(value: UMessageType) -> Self {
@@ -24,10 +24,10 @@ impl From<UMessageType> for String {
 impl From<&str> for UMessageType {
     fn from(value: &str) -> Self {
         match value {
-            "pub.v1" => UMessageType::UmessageTypePublish,
-            "req.v1" => UMessageType::UmessageTypeRequest,
-            "res.v1" => UMessageType::UmessageTypeResponse,
-            _ => UMessageType::UmessageTypeUnspecified,
+            "pub.v1" => UMessageType::UMESSAGE_TYPE_PUBLISH,
+            "req.v1" => UMessageType::UMESSAGE_TYPE_REQUEST,
+            "res.v1" => UMessageType::UMESSAGE_TYPE_RESPONSE,
+            _ => UMessageType::UMESSAGE_TYPE_UNSPECIFIED,
         }
     }
 }
@@ -35,10 +35,10 @@ impl From<&str> for UMessageType {
 impl Display for UMessageType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UMessageType::UmessageTypePublish => write!(f, "pub.v1"),
-            UMessageType::UmessageTypeRequest => write!(f, "req.v1"),
-            UMessageType::UmessageTypeResponse => write!(f, "res.v1"),
-            UMessageType::UmessageTypeUnspecified => write!(f, "unspec.v1"),
+            UMessageType::UMESSAGE_TYPE_PUBLISH => write!(f, "pub.v1"),
+            UMessageType::UMESSAGE_TYPE_REQUEST => write!(f, "req.v1"),
+            UMessageType::UMESSAGE_TYPE_RESPONSE => write!(f, "res.v1"),
+            UMessageType::UMESSAGE_TYPE_UNSPECIFIED => write!(f, "unspec.v1"),
         }
     }
 }

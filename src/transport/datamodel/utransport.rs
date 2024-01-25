@@ -13,7 +13,10 @@
 
 use async_trait::async_trait;
 
-use crate::uprotocol::{UAttributes, UEntity, UMessage, UPayload, UStatus, UUri};
+use crate::uprotocol::{
+    uattributes::UAttributes, umessage::UMessage, upayload::UPayload, uri::UEntity, uri::UUri,
+    ustatus::UStatus,
+};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
 ///

@@ -11,94 +11,99 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use prost_build::Config;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
-fn main() -> std::io::Result<()> {
-    // use vendored protoc instead of relying on user provided protobuf installation
-    std::env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path().unwrap());
+const UPROTOCOL_BASE_URI: &str = "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.5/uprotocol";
 
-    if let Err(err) = get_and_build_protos(
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    get_and_build_protos(
         &[
             // cloudevent proto definitions
             "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
+        ],
+        "cloudevents",
+    )?;
 
+    get_and_build_protos(
+        &[
             // uProtocol-project proto definitions
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uuid.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uri.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uattributes.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/upayload.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/umessage.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/ustatus.proto",
-
+            format!("{}/uuid.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/uri.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/uattributes.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/upayload.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/umessage.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/ustatus.proto", UPROTOCOL_BASE_URI).as_str(),
             // not used in the SDK yet, but for completeness sake
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/file.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/uprotocol_options.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/udiscovery/v3/udiscovery.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/usubscription/v3/usubscription.proto",
-            "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.3/src/main/proto/core/utwin/v1/utwin.proto",
-        ]
-    ) {
-        let error_message = format!("Failed to fetch and build protobuf file: {err:?}");
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, error_message));
-    }
+            format!("{}/file.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/uprotocol_options.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/core/udiscovery/v3/udiscovery.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!(
+                "{}/core/usubscription/v3/usubscription.proto",
+                UPROTOCOL_BASE_URI
+            )
+            .as_str(),
+            format!("{}/core/utwin/v1/utwin.proto", UPROTOCOL_BASE_URI).as_str(),
+        ],
+        "uprotocol",
+    )?;
 
     Ok(())
 }
 
 // Fetch protobuf definitions from `url`, and build them with prost_build
-fn get_and_build_protos(urls: &[&str]) -> core::result::Result<(), Box<dyn std::error::Error>> {
+fn get_and_build_protos(
+    urls: &[&str],
+    output_folder: &str,
+) -> core::result::Result<(), Box<dyn std::error::Error>> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
+    let proto_folder = Path::new(&out_dir).join("proto");
     let mut proto_files = Vec::new();
 
     for url in urls {
         // Extract filename from the URL
         let filename = url.rsplit('/').next().unwrap_or_default();
-        let dest_path = Path::new(&out_dir).join(filename);
+        let dest_path = proto_folder.join(filename);
 
         // Download the .proto file
-        if let Err(err) = download_and_write_file(url, filename) {
-            panic!("Failed to download and write file: {err:?}");
-        }
+        download_and_write_file(url, &dest_path)?;
         proto_files.push(dest_path);
     }
 
-    // Compile all .proto files together
-    let mut config = Config::new();
-
-    // Some proto files contain comments that will be interpreted as rustdoc comments (and fail to compile)
-    config.disable_comments(["."]);
-
-    config.compile_protos(&proto_files, &[&out_dir])?;
+    protobuf_codegen::Codegen::new()
+        .protoc()
+        // use vendored protoc instead of relying on user provided protobuf installation
+        .protoc_path(&protoc_bin_vendored::protoc_bin_path().unwrap())
+        .include(proto_folder)
+        .inputs(proto_files)
+        .cargo_out_dir(output_folder)
+        .run_from_script();
 
     Ok(())
 }
 
-// Retreives a file from `url` (from GitHub, for instance) and places it in the build directory (`OUT_DIR`) with the name
+// Retrieves a file from `url` (from GitHub, for instance) and places it in the build directory (`OUT_DIR`) with the name
 // provided by `destination` parameter.
 fn download_and_write_file(
     url: &str,
-    destination: &str,
+    dest_path: &PathBuf,
 ) -> core::result::Result<(), Box<dyn std::error::Error>> {
     // Send a GET request to the URL
-    let resp = ureq::get(url).call();
 
-    match resp {
-        Err(error) => Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            error.to_string(),
-        ))),
+    match ureq::get(url).call() {
+        Err(error) => Err(Box::from(error)),
         Ok(response) => {
-            let out_dir = env::var_os("OUT_DIR").unwrap();
-            let dest_path = Path::new(&out_dir).join(destination);
+            if let Some(parent_path) = dest_path.parent() {
+                std::fs::create_dir_all(parent_path)?;
+            }
             let mut out_file = fs::File::create(dest_path)?;
 
             // Write the response body directly to the file
-            let _ = std::io::copy(&mut response.into_reader(), &mut out_file);
-
-            Ok(())
+            std::io::copy(&mut response.into_reader(), &mut out_file)
+                .map(|_| ())
+                .map_err(Box::from)
         }
     }
 }

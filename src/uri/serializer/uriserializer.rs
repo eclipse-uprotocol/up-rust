@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::{Remote, UUri};
+use crate::uprotocol::uri::UUri;
 use crate::uri::serializer::SerializationError;
 use crate::uri::validator::UriValidator;
 
@@ -75,22 +75,23 @@ pub trait UriSerializer<T> {
         let mut ue = micro_uri.entity.unwrap_or_default();
         let mut ure = long_uri.resource.unwrap_or_default();
 
-        if let Some(authority) = long_uri.authority {
-            if let Some(Remote::Name(name)) = authority.remote {
-                auth.remote = Some(Remote::Name(name));
+        if let Some(authority) = long_uri.authority.as_ref() {
+            if let Some(name) = authority.get_name() {
+                auth.name = Some(name.to_owned());
             }
         }
-        if let Some(entity) = long_uri.entity {
-            ue.name = entity.name;
+        if let Some(entity) = long_uri.entity.as_ref() {
+            ue.name = entity.name.clone();
         }
-        if let Some(resource) = micro_uri.resource {
+        if let Some(resource) = micro_uri.resource.as_ref() {
             ure.id = resource.id;
         }
 
         let uri = UUri {
-            authority: Some(auth),
-            entity: Some(ue),
-            resource: Some(ure),
+            authority: Some(auth).into(),
+            entity: Some(ue).into(),
+            resource: Some(ure).into(),
+            ..Default::default()
         };
 
         UriValidator::is_resolved(&uri).then_some(uri)
