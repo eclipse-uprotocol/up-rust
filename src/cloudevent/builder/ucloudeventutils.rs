@@ -18,8 +18,7 @@ use protobuf::well_known_types::any::Any;
 use protobuf::{Enum, Message, MessageFull};
 use std::time::SystemTime;
 
-use crate::uprotocol::uattributes::UPriority;
-use crate::uprotocol::{ustatus::UCode, uuid::UUID};
+use crate::uprotocol::{UCode, UPriority, UUID};
 
 /// Code to extract information from a `CloudEvent`
 #[derive(Debug)]
@@ -491,8 +490,7 @@ mod tests {
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::UCloudEventAttributes;
     use crate::cloudevents::CloudEvent;
-    use crate::uprotocol::uattributes::{UMessageType, UPriority};
-    use crate::uprotocol::uri::{UEntity, UResource, UUri};
+    use crate::uprotocol::{UEntity, UMessageType, UPriority, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
     use crate::uuid::builder::UUIDv8Builder;
 

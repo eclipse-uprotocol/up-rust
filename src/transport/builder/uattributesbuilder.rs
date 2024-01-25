@@ -11,9 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::uattributes::{UAttributes, UMessageType, UPriority};
-use crate::uprotocol::uri::UUri;
-use crate::uprotocol::uuid::UUID;
+use crate::uprotocol::{UAttributes, UMessageType, UPriority, UUri, UUID};
 use crate::uuid::builder::UUIDv8Builder;
 
 /// Builder for easy construction of the `UAttributes` object.

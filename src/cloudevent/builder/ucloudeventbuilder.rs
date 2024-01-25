@@ -18,7 +18,7 @@ use protobuf::Enum;
 use url::{ParseError, Url};
 
 use crate::cloudevent::datamodel::UCloudEventAttributes;
-use crate::uprotocol::uattributes::UMessageType;
+use crate::uprotocol::UMessageType;
 use crate::uuid::builder::UUIDv8Builder;
 
 pub struct UCloudEventBuilder;
@@ -425,9 +425,7 @@ mod tests {
 
     use super::*;
     use crate::cloudevent::builder::UCloudEventUtils;
-    use crate::uprotocol::uattributes::UPriority;
-    use crate::uprotocol::uri::{UAuthority, UEntity, UResource, UUri};
-    use crate::uprotocol::ustatus::UCode;
+    use crate::uprotocol::{UAuthority, UCode, UEntity, UPriority, UResource, UUri};
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 

@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::uri::UUri;
+use crate::uprotocol::UUri;
 use crate::uri::serializer::SerializationError;
 use crate::uri::validator::UriValidator;
 

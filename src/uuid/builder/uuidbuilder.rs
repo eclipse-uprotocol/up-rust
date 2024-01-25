@@ -16,7 +16,7 @@ use std::convert::Into;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::uprotocol::uuid::UUID as uproto_Uuid;
+use crate::uprotocol::UUID;
 
 const MAX_COUNT: u64 = 0xfff;
 const MAX_TIMESTAMP_BITS: u8 = 48;
@@ -88,7 +88,7 @@ impl UUIDv8Builder {
     /// if the system time
     /// * is set to a point in time before UNIX Epoch, or
     /// * is set to a point in time later than UNIX Epoch + 0xFFFFFFFFFFFF seconds
-    pub fn build(&self) -> uproto_Uuid {
+    pub fn build(&self) -> UUID {
         if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
             if let Ok(now) = u64::try_from(now.as_millis()) {
                 self.build_with_instant(now)
@@ -109,7 +109,7 @@ impl UUIDv8Builder {
     /// # Panics
     ///
     /// * if the given timestamp is greater than 2^48 - 1.
-    fn build_with_instant(&self, timestamp: u64) -> uproto_Uuid {
+    fn build_with_instant(&self, timestamp: u64) -> UUID {
         assert!(
             timestamp & MAX_TIMESTAMP_MASK == 0,
             "Timestamp of UUID must not exceed 48 bits"

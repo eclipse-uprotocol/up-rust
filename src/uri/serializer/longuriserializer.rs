@@ -15,7 +15,7 @@
 
 use regex::Regex;
 
-use crate::uprotocol::uri::{UAuthority, UEntity, UResource, UUri};
+use crate::uprotocol::{UAuthority, UEntity, UResource, UUri};
 use crate::uri::serializer::{SerializationError, UriSerializer};
 use crate::uri::validator::UriValidator;
 

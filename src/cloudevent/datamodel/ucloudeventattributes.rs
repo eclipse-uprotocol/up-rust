@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-use crate::uprotocol::uattributes::UPriority;
+use crate::uprotocol::UPriority;
 
 /// Specifies the properties that can configure the `UCloudEvent`.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

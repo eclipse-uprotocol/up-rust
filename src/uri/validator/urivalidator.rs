@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::uri::{UAuthority, UUri};
+use crate::uprotocol::{UAuthority, UUri};
 use crate::uri::validator::ValidationError;
 
 /// Struct to encapsulate Uri validation logic.
@@ -241,7 +241,7 @@ mod tests {
     use std::fs;
 
     use crate::{
-        uprotocol::uri::{UEntity, UResource},
+        uprotocol::{UEntity, UResource},
         uri::serializer::{LongUriSerializer, UriSerializer},
     };
 

@@ -14,7 +14,7 @@
 use bytes::{Buf, BufMut};
 use std::io::Write;
 
-use crate::uprotocol::uri::{UAuthority, UEntity, UUri};
+use crate::uprotocol::{UAuthority, UEntity, UUri};
 use crate::uri::builder::resourcebuilder::UResourceBuilder;
 use crate::uri::serializer::{SerializationError, UriSerializer};
 use crate::uri::validator::UriValidator;
@@ -260,7 +260,7 @@ mod tests {
     use super::*;
     use std::net::{Ipv4Addr, Ipv6Addr};
 
-    use crate::uprotocol::uri::UResource;
+    use crate::uprotocol::UResource;
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
 
     #[test]

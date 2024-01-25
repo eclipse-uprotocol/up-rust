@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::uri::UResource;
+use crate::uprotocol::UResource;
 
 const MAX_RPC_ID: u32 = 1000;
 

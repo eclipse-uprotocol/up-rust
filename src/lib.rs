@@ -138,8 +138,14 @@ pub mod uprotocol {
     // protoc-generated stubs, see build.rs
     include!(concat!(env!("OUT_DIR"), "/uprotocol/mod.rs"));
 
+    pub use self::uuid::UUID;
     pub use crate::proto::uprotocol::upayload::*;
     pub use crate::proto::uprotocol::uuid::*;
+    pub use uattributes::{UAttributes, UMessageType, UPriority};
+    pub use umessage::UMessage;
+    pub use upayload::{upayload::Data, UPayload, UPayloadFormat};
+    pub use uri::{UAuthority, UEntity, UResource, UUri};
+    pub use ustatus::{UCode, UStatus};
 }
 
 #[allow(non_snake_case)]

@@ -16,8 +16,7 @@ use cloudevents::{AttributesReader, Event};
 
 use crate::cloudevent::builder::UCloudEventUtils;
 use crate::cloudevent::validator::ValidationError;
-use crate::uprotocol::uattributes::UMessageType;
-use crate::uprotocol::uri::{UResource, UUri};
+use crate::uprotocol::{UMessageType, UResource, UUri};
 use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 use crate::uri::validator::UriValidator;
 
@@ -543,8 +542,7 @@ impl std::fmt::Display for ResponseValidator {
 mod tests {
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::UCloudEventAttributesBuilder;
-    use crate::uprotocol::uattributes::UPriority;
-    use crate::uprotocol::uri::{UAuthority, UEntity};
+    use crate::uprotocol::{UAuthority, UEntity, UPriority};
     use crate::uuid::builder::UUIDv8Builder;
 
     use super::*;

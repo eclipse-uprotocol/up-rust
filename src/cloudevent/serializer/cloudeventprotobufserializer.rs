@@ -45,8 +45,7 @@ mod tests {
     use crate::cloudevent::datamodel::UCloudEventAttributesBuilder;
     use crate::cloudevent::serializer::cloudeventjsonserializer::CloudEventJsonSerializer;
     use crate::rpc::RpcMapper;
-    use crate::uprotocol::uattributes::{UMessageType, UPriority};
-    use crate::uprotocol::uri::{UAuthority, UEntity, UResource, UUri};
+    use crate::uprotocol::{UAuthority, UEntity, UMessageType, UPriority, UResource, UUri};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     #[test]

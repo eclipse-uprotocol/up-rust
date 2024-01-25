@@ -17,9 +17,7 @@ use std::default::Default;
 use std::fmt;
 
 use crate::rpc::rpcclient::RpcClientResult;
-use crate::uprotocol::upayload::upayload::Data;
-use crate::uprotocol::upayload::{UPayload, UPayloadFormat};
-use crate::uprotocol::ustatus::{UCode, UStatus};
+use crate::uprotocol::{Data, UCode, UPayload, UPayloadFormat, UStatus};
 
 pub type RpcPayloadResult = Result<RpcPayload, RpcMapperError>;
 
@@ -300,7 +298,7 @@ mod tests {
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
 
     use crate::cloudevents::CloudEvent as CloudEventProto;
-    use crate::uprotocol::uattributes::UMessageType;
+    use crate::uprotocol::UMessageType;
 
     fn build_status_response(code: UCode, msg: &str) -> RpcClientResult {
         let status = UStatus::fail_with_code(code, msg);

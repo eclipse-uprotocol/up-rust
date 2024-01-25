@@ -16,9 +16,7 @@ use std::time::SystemTime;
 use protobuf::Enum;
 
 use crate::transport::validator::ValidationError;
-use crate::uprotocol::{
-    uattributes::UAttributes, uattributes::UMessageType, ustatus::UCode, uuid::UUID,
-};
+use crate::uprotocol::{UAttributes, UCode, UMessageType, UUID};
 use crate::uri::validator::UriValidator;
 
 /// `UAttributes` is the struct that defines the Payload. It serves as the configuration for various aspects
@@ -497,9 +495,7 @@ impl UAttributesValidator for ResponseValidator {
 mod tests {
     use super::*;
     use crate::transport::builder::UAttributesBuilder;
-    use crate::uprotocol::{
-        uattributes::UPriority, uri::UAuthority, uri::UEntity, uri::UUri, uuid::UUID,
-    };
+    use crate::uprotocol::{UAuthority, UEntity, UPriority, UUri, UUID};
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
     use crate::uuid::builder::UUIDv8Builder;
 
