@@ -11,99 +11,56 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use mediatype::{names::*, MediaType, Name};
-use protobuf::{well_known_types::any::Any, Message};
+use mediatype::MediaType;
+use protobuf::{well_known_types::any::Any, EnumFull, Message};
 
 pub use crate::types::serializationerror::SerializationError;
 
 pub use crate::types::parsingerror::ParsingError;
-pub use crate::types::serializationerror::SerializationError;
 use crate::uprotocol::{Data, UPayload, UPayloadFormat};
 
-const SUBTYPE_PROTOBUF: Name = Name::new_unchecked("protobuf");
-const SUBTYPE_PROTOBUF_WRAPPED: Name = Name::new_unchecked("x-protobuf");
-const SUBTYPE_SOMEIP: Name = Name::new_unchecked("x-someip");
-const SUBTYPE_SOMEIP_TLV: Name = Name::new_unchecked("x-someip_tlv");
-
-const MEDIA_TYPE_APPLICATION_JSON: MediaType = MediaType::new(APPLICATION, JSON);
-const MEDIA_TYPE_APPLICATION_OCTET_STREAM: MediaType = MediaType::new(APPLICATION, OCTET_STREAM);
-const MEDIA_TYPE_APPLICATION_PROTOBUF: MediaType = MediaType::new(APPLICATION, SUBTYPE_PROTOBUF);
-const MEDIA_TYPE_APPLICATION_PROTOBUF_WRAPPED: MediaType =
-    MediaType::new(APPLICATION, SUBTYPE_PROTOBUF_WRAPPED);
-const MEDIA_TYPE_APPLICATION_SOMEIP: MediaType = MediaType::new(APPLICATION, SUBTYPE_SOMEIP);
-const MEDIA_TYPE_APPLICATION_SOMEIPTLV: MediaType = MediaType::new(APPLICATION, SUBTYPE_SOMEIP_TLV);
-const MEDIA_TYPE_TEXT_PLAIN: MediaType = MediaType::new(TEXT, PLAIN);
-
 impl UPayloadFormat {
-    /// Gets the payload format that corresponds to a given MIME type.
+    /// Gets the payload format that corresponds to a given media type.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// The payload format that corresponds to the MIME type.
-    ///
-    /// Errors
-    ///
-    /// Returns a parsing error if the given string is not a valid MIME type string or
-    /// represents an unsupported MIME type.
-    pub fn from_mime_type(mime_type: &str) -> Result<Self, ParsingError> {
-        match MediaType::parse(mime_type) {
-            Ok(mime) => {
-                if mime.ty == APPLICATION {
-                    if mime.subty == JSON {
-                        return Ok(UPayloadFormat::UpayloadFormatJson);
-                    }
-                    if mime.subty == OCTET_STREAM {
-                        return Ok(UPayloadFormat::UpayloadFormatRaw);
-                    }
-                    if mime.subty == SUBTYPE_PROTOBUF {
-                        return Ok(UPayloadFormat::UpayloadFormatProtobuf);
-                    }
-                    if mime.subty == SUBTYPE_PROTOBUF_WRAPPED {
-                        return Ok(UPayloadFormat::UpayloadFormatProtobufWrappedInAny);
-                    }
-                    if mime.subty == SUBTYPE_SOMEIP {
-                        return Ok(UPayloadFormat::UpayloadFormatSomeip);
-                    }
-                    if mime.subty == SUBTYPE_SOMEIP_TLV {
-                        return Ok(UPayloadFormat::UpayloadFormatSomeipTlv);
-                    }
-                }
-                if mime.ty == TEXT && mime.subty == PLAIN {
-                    return Ok(UPayloadFormat::UpayloadFormatText);
-                }
-                Err(ParsingError::new(format!(
-                    "unsupported MIME type: {}",
-                    mime
-                )))
-            }
-            Err(e) => Err(ParsingError::new(e.to_string())),
+    /// Returns an error if the given string is not a valid media type string or is unsupported by uProtocol.
+    pub fn from_media_type(media_type_string: &str) -> Result<Self, ParsingError> {
+        if let Ok(media_type) = MediaType::parse(media_type_string) {
+            let descriptor = UPayloadFormat::enum_descriptor();
+            return descriptor
+                .values()
+                .find_map(|desc| {
+                    let proto_desc = desc.proto();
+
+                    crate::uprotocol::uprotocol_options::exts::mime_type
+                        .get(proto_desc.options.get_or_default())
+                        .and_then(|mime_type_option_value| {
+                            if let Ok(enum_mime_type) = MediaType::parse(&mime_type_option_value) {
+                                if enum_mime_type.ty == media_type.ty
+                                    && enum_mime_type.subty == media_type.subty
+                                {
+                                    return desc.cast::<Self>();
+                                }
+                            }
+                            None
+                        })
+                })
+                .ok_or(ParsingError::new("unsupported media type"));
         }
+        Err(ParsingError::new("malformed media type"))
     }
 
-    /// Gets the MIME type corresponding to this payload format.
+    /// Gets the media type corresponding to this payload format.
     ///
     /// # Returns
     ///
-    /// The corresponding MIME type or None if the payload format is [`UPayloadFormat::UpayloadFormatUnspecified`].
-    pub fn to_mime_type(&self) -> Option<String> {
-        match self {
-            UPayloadFormat::UpayloadFormatJson => Some(MEDIA_TYPE_APPLICATION_JSON.to_string()),
-            UPayloadFormat::UpayloadFormatProtobuf => {
-                Some(MEDIA_TYPE_APPLICATION_PROTOBUF.to_string())
-            }
-            UPayloadFormat::UpayloadFormatProtobufWrappedInAny => {
-                Some(MEDIA_TYPE_APPLICATION_PROTOBUF_WRAPPED.to_string())
-            }
-            UPayloadFormat::UpayloadFormatRaw => {
-                Some(MEDIA_TYPE_APPLICATION_OCTET_STREAM.to_string())
-            }
-            UPayloadFormat::UpayloadFormatSomeip => Some(MEDIA_TYPE_APPLICATION_SOMEIP.to_string()),
-            UPayloadFormat::UpayloadFormatSomeipTlv => {
-                Some(MEDIA_TYPE_APPLICATION_SOMEIPTLV.to_string())
-            }
-            UPayloadFormat::UpayloadFormatText => Some(MEDIA_TYPE_TEXT_PLAIN.to_string()),
-            _ => None,
-        }
+    /// None if the payload format is [`UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED`].
+    pub fn to_media_type(&self) -> Option<String> {
+        let desc = self.descriptor();
+        let desc_proto = desc.proto();
+        crate::uprotocol::uprotocol_options::exts::mime_type
+            .get(desc_proto.options.get_or_default())
     }
 }
 
@@ -182,7 +139,6 @@ unsafe fn read_memory(_address: u64, _length: i32) -> &'static [u8] {
 
 #[cfg(test)]
 mod tests {
-    use crate::uprotocol::upayload::UPayloadFormat;
     use protobuf::well_known_types::any::Any;
     use protobuf::well_known_types::timestamp::Timestamp;
     use protobuf::EnumOrUnknown;
@@ -190,40 +146,56 @@ mod tests {
 
     use super::*;
 
-    #[test_case("application/json", Some(UPayloadFormat::UpayloadFormatJson))]
+    #[test_case("application/json", Ok(UPayloadFormat::UPAYLOAD_FORMAT_JSON); "map from JSON")]
     #[test_case(
         "application/json; charset=utf-8",
-        Some(UPayloadFormat::UpayloadFormatJson)
+        Ok(UPayloadFormat::UPAYLOAD_FORMAT_JSON);
+        "map from JSON with parameter"
     )]
-    #[test_case("application/protobuf", Some(UPayloadFormat::UpayloadFormatProtobuf))]
+    #[test_case("application/protobuf", Ok(UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF); "map from PROTOBUF")]
     #[test_case(
         "application/x-protobuf",
-        Some(UPayloadFormat::UpayloadFormatProtobufWrappedInAny)
+        Ok(UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY); "map from PROTOBUF_WRAPPED"
     )]
-    #[test_case("application/octet-stream", Some(UPayloadFormat::UpayloadFormatRaw))]
-    #[test_case("application/x-someip", Some(UPayloadFormat::UpayloadFormatSomeip))]
+    #[test_case("application/octet-stream", Ok(UPayloadFormat::UPAYLOAD_FORMAT_RAW); "map from RAW")]
+    #[test_case("application/x-someip", Ok(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP); "map from SOMEIP")]
     #[test_case(
         "application/x-someip_tlv",
-        Some(UPayloadFormat::UpayloadFormatSomeipTlv)
+        Ok(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP_TLV); "map from SOMEIP_TLV"
     )]
-    #[test_case("text/plain", Some(UPayloadFormat::UpayloadFormatText))]
-    #[test_case("application/unsupported; foo=bar", None)]
-    fn test_from_mime_time(media_type: &str, expected_format: Option<UPayloadFormat>) {
-        let parsing_result = UPayloadFormat::from_mime_type(media_type);
-        assert!(parsing_result.is_ok() == expected_format.is_some());
-        if let Some(format) = expected_format {
+    #[test_case("text/plain", Ok(UPayloadFormat::UPAYLOAD_FORMAT_TEXT); "map from TEXT")]
+    #[test_case("application/unsupported; foo=bar", Err(ParsingError::new("")); "fail for unsupported media type")]
+    fn test_from_media_type(
+        media_type: &str,
+        expected_format: Result<UPayloadFormat, ParsingError>,
+    ) {
+        let parsing_result = UPayloadFormat::from_media_type(media_type);
+        assert!(parsing_result.is_ok() == expected_format.is_ok());
+        if let Ok(format) = expected_format {
             assert_eq!(format, parsing_result.unwrap());
         }
     }
 
-    #[test_case(0, true; "unspecified succeeds")]
-    #[test_case(1, true; "wrapped protobuf succeeds")]
-    #[test_case(2, false; "protobuf fails")]
-    #[test_case(3, false; "json fails")]
-    #[test_case(4, false; "SOME/IP fails")]
-    #[test_case(5, false; "SOME/IP TLV fails")]
-    #[test_case(6, false; "raw fails")]
-    #[test_case(7, false; "text fails")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_JSON, Some("application/json".to_string()); "map JSON format to media type")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF, Some("application/protobuf".to_string()); "map PROTOBUF format to media type")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY, Some("application/x-protobuf".to_string()); "map PROTOBUF_WRAPPED format to media type")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_RAW, Some("application/octet-stream".to_string()); "map RAW format to media type")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP, Some("application/x-someip".to_string()); "map SOMEIP format to media type")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP_TLV, Some("application/x-someip_tlv".to_string()); "map SOMEIP_TLV format to media type")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_TEXT, Some("text/plain".to_string()); "map TEXT format to media type")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED, None; "map UNSPECIFIED format to None")]
+    fn test_to_media_type(format: UPayloadFormat, expected_media_type: Option<String>) {
+        assert_eq!(format.to_media_type(), expected_media_type);
+    }
+
+    #[test_case(0, true; "UNSPECIFIED succeeds")]
+    #[test_case(1, true; "PROTOBUF_WRAPPED succeeds")]
+    #[test_case(2, false; "PROTOBUF fails")]
+    #[test_case(3, false; "JSON fails")]
+    #[test_case(4, false; "SOMEIP fails")]
+    #[test_case(5, false; "SOMEIP_TLV fails")]
+    #[test_case(6, false; "RAW fails")]
+    #[test_case(7, false; "TEXT fails")]
     fn test_into_any_with_payload_format(format: i32, should_succeed: bool) {
         let timestamp = Timestamp::default();
         let data = Any::pack(&timestamp).unwrap().write_to_bytes().unwrap();
