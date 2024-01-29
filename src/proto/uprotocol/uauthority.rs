@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::uri::UAuthority;
+use crate::uprotocol::UAuthority;
 
 pub use crate::uri::validator::ValidationError;
 
@@ -52,29 +52,25 @@ impl UAuthority {
     ///
     /// Returns a `ValidationError` in the failure case
     pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
-        match &self.remote {
-            None => {
-                return Err(ValidationError::new("Has Authority, but no remote"));
-            }
-            Some(Remote::Ip(ip)) => {
-                if !(ip.len() == REMOTE_IPV4_BYTES || ip.len() == REMOTE_IPV6_BYTES) {
-                    return Err(ValidationError::new(
-                        "IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)",
-                    ));
-                }
-            }
-            Some(Remote::Id(id)) => {
-                if !matches!(id.len(), REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES) {
-                    return Err(ValidationError::new("ID doesn't fit in bytes allocated"));
-                }
-            }
-            Some(Remote::Name(_)) => {
+        if self.id.is_none() && self.ip.is_none() {
+            return Err(ValidationError::new(
+                "Must have IP address or ID set as UAuthority for micro form. Neither are set.",
+            ));
+        }
+
+        if let Some(ip) = self.ip.as_ref() {
+            if !(ip.len() == REMOTE_IPV4_BYTES || ip.len() == REMOTE_IPV6_BYTES) {
                 return Err(ValidationError::new(
-                    "Must use IP address or ID as UAuthority for micro form.",
+                    "IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)",
                 ));
             }
         }
 
+        if let Some(id) = self.id.as_ref() {
+            if !matches!(id.len(), REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES) {
+                return Err(ValidationError::new("ID doesn't fit in bytes allocated"));
+            }
+        }
         Ok(())
     }
 }

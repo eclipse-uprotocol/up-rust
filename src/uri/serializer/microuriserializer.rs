@@ -11,8 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use byteorder::WriteBytesExt;
-use std::io::Cursor;
+use bytes::{Buf, BufMut};
 use std::io::Write;
 
 use crate::uprotocol::{UAuthority, UEntity, UUri};
@@ -323,7 +322,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Authority: Must use IP address or ID as UAuthority for micro form."
+            "Failed to validate micro URI format: Authority: Must have IP address or ID set as UAuthority for micro form. Neither are set."
         );
     }
 
@@ -593,11 +592,13 @@ mod tests {
                 id: Some(29999),
                 version_major: Some(254),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(0x10000),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
@@ -615,11 +616,13 @@ mod tests {
                 id: Some(0x10000),
                 version_major: Some(254),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(29999),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
@@ -637,11 +640,13 @@ mod tests {
                 id: Some(29999),
                 version_major: Some(0x100),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(29999),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);

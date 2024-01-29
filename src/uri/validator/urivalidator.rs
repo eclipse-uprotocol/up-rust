@@ -1140,11 +1140,13 @@ mod tests {
                 id: Some(29999),
                 version_major: Some(254),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(0x10000),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
@@ -1158,11 +1160,13 @@ mod tests {
                 id: Some(0x10000),
                 version_major: Some(254),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(29999),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
@@ -1176,11 +1180,13 @@ mod tests {
                 id: Some(29999),
                 version_major: Some(0x100),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(29999),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
@@ -1191,17 +1197,21 @@ mod tests {
     fn test_is_micro_form_ip_incorrect_format() {
         let uri = UUri {
             authority: Some(UAuthority {
-                remote: Some(Remote::Ip(vec![127, 0, 0])),
-            }),
+                ip: Some(vec![127, 0, 0]),
+                ..Default::default()
+            })
+            .into(),
             entity: Some(UEntity {
                 id: Some(29999),
                 version_major: Some(254),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(29999),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
@@ -1212,19 +1222,21 @@ mod tests {
     fn test_is_micro_form_id_incorrect_format() {
         let uri = UUri {
             authority: Some(UAuthority {
-                remote: Some(Remote::Id(
-                    (0..=256).map(|i| (i % 256) as u8).collect::<Vec<u8>>(),
-                )),
-            }),
+                id: Some((0..=256).map(|i| (i % 256) as u8).collect::<Vec<u8>>()),
+                ..Default::default()
+            })
+            .into(),
             entity: Some(UEntity {
                 id: Some(29999),
                 version_major: Some(254),
                 ..Default::default()
-            }),
+            })
+            .into(),
             resource: Some(UResource {
                 id: Some(29999),
                 ..Default::default()
-            }),
+            })
+            .into(),
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
