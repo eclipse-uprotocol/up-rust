@@ -13,6 +13,7 @@
 
 use protobuf::well_known_types::any::Any;
 use protobuf::MessageFull;
+use protobuf::MessageField;
 use std::default::Default;
 use std::fmt;
 
@@ -21,7 +22,7 @@ use crate::uprotocol::{Data, UCode, UPayload, UPayloadFormat, UStatus};
 
 pub type RpcPayloadResult = Result<RpcPayload, RpcMapperError>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RpcPayload {
     pub status: UStatus,
     pub payload: Option<UPayload>,
@@ -82,8 +83,11 @@ impl RpcMapper {
     where
         T: MessageFull + Default,
     {
-        let payload = response?; // Directly returns in case of error
-        Any::try_from(payload)
+        let message = response?; // Directly returns in case of error
+        let MessageField(Some(payload)) = message.payload else {
+            return Err(RpcMapperError::InvalidPayload("Payload is empty".to_string()));
+        };
+        Any::try_from(*payload)
             .map_err(|_e| {
                 RpcMapperError::UnknownType("Couldn't decode payload into Any".to_string())
             })
@@ -122,10 +126,14 @@ impl RpcMapper {
     ///
     // TODO This entire thing feels klunky and kludgy; this needs to be revisited...
     pub fn map_response_to_result(response: RpcClientResult) -> RpcPayloadResult {
-        let payload = response?; // Directly returns in case of error
+        let message = response?; // Directly returns in case of error
+        let MessageField(Some(payload)) = message.payload else {
+            return Err(RpcMapperError::InvalidPayload("Payload is empty".to_string()));
+        };
+        let payload = *payload;
         Any::try_from(payload)
-            .map_err(|_e| {
-                RpcMapperError::UnknownType("Couldn't decode payload into Any".to_string())
+            .map_err(|e| {
+                RpcMapperError::UnknownType(format!("Couldn't decode payload into Any: {:?}", e).to_string())
             })
             .and_then(|any| {
                 match Self::unpack_any::<UStatus>(&any) {
@@ -298,12 +306,17 @@ mod tests {
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
 
     use crate::cloudevents::CloudEvent as CloudEventProto;
-    use crate::uprotocol::UMessageType;
+    use crate::uprotocol::{UMessage, UMessageType};
 
     fn build_status_response(code: UCode, msg: &str) -> RpcClientResult {
         let status = UStatus::fail_with_code(code, msg);
         let any = RpcMapper::pack_any(&status)?;
-        Ok(any.try_into().unwrap())
+        let message = UMessage {
+            payload: Some(any.try_into().unwrap()).into(),
+            ..Default::default()
+        };
+
+        Ok(message)
     }
 
     fn build_empty_payload_response() -> RpcClientResult {
@@ -311,7 +324,11 @@ mod tests {
             data: Some(Data::Value(vec![])),
             ..Default::default()
         };
-        Ok(payload)
+        let message = UMessage {
+            payload: Some(payload).into(),
+            ..Default::default()
+        };
+        Ok(message)
     }
 
     fn build_number_response(number: i32) -> RpcClientResult {
@@ -320,7 +337,11 @@ mod tests {
             value: number.to_be_bytes().into(),
             ..Default::default()
         };
-        Ok(any.try_into().unwrap())
+        let message = UMessage {
+            payload: Some(any.try_into().unwrap()).into(),
+            ..Default::default()
+        };
+        Ok(message)
     }
 
     fn build_cloud_event_for_test() -> Event {
@@ -332,12 +353,15 @@ mod tests {
             .unwrap()
     }
 
-    fn build_cloudevent_upayload_for_test() -> UPayload {
+    fn build_cloudevent_umessage_for_test() -> UMessage {
         let event = build_cloud_event_for_test();
         let proto_event = CloudEventProto::from(event);
         let any = RpcMapper::pack_any(&proto_event).unwrap();
 
-        any.try_into().unwrap()
+        UMessage {
+            payload: Some(any.try_into().unwrap()).into(),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -356,7 +380,6 @@ mod tests {
     #[test]
     fn test_compose_that_returns_status() {
         let response = build_status_response(UCode::INVALID_ARGUMENT, "boom");
-
         let result = RpcMapper::map_response_to_result(response).unwrap();
 
         assert!(result.status.is_failed());
@@ -380,11 +403,11 @@ mod tests {
 
     #[test]
     fn test_success_invoke_method_happy_flow_using_map_response_to_rpc_response() {
-        let response_payload = build_cloudevent_upayload_for_test();
+        let response_message = build_cloudevent_umessage_for_test();
 
-        let result = RpcMapper::map_response_to_result(Ok(response_payload.clone())).unwrap();
+        let result = RpcMapper::map_response_to_result(Ok(response_message.clone())).unwrap();
         assert!(result.status.is_failed());
-        assert_eq!(result.payload.unwrap(), response_payload);
+        assert_eq!(result.payload.unwrap(), response_message.payload.unwrap());
     }
 
     #[test]
@@ -417,8 +440,8 @@ mod tests {
 
     #[test]
     fn test_success_invoke_method_happy_flow_using_map_response() {
-        let response_payload = build_cloudevent_upayload_for_test();
-        let e = RpcMapper::map_response::<CloudEventProto>(Ok(response_payload)).unwrap();
+        let response_message = build_cloudevent_umessage_for_test();
+        let e = RpcMapper::map_response::<CloudEventProto>(Ok(response_message)).unwrap();
         let event = Event::from(e);
 
         assert_eq!(event, build_cloud_event_for_test());

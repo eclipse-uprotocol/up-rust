@@ -14,9 +14,9 @@
 use async_trait::async_trait;
 
 use crate::rpc::rpcmapper::RpcMapperError;
-use crate::uprotocol::{UAttributes, UPayload, UUri};
+use crate::uprotocol::{UAttributes, UMessage, UPayload, UUri};
 
-pub type RpcClientResult = Result<UPayload, RpcMapperError>;
+pub type RpcClientResult = Result<UMessage, RpcMapperError>;
 
 /// `RpcClient` serves as an interface to be used by code generators for uProtocol services defined in
 /// `.proto` files, such as the core uProtocol services found in
