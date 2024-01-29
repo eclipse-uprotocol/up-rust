@@ -201,40 +201,29 @@ impl UriValidator {
             Err(ValidationError::new("URI is empty"))?;
         }
 
-        let mut validation_errors = Vec::new();
         if let Some(entity) = uri.entity.as_ref() {
             if let Err(e) = entity.validate_micro_form() {
-                validation_errors.push(ValidationError::new(format!("Entity: {}", e)));
+                return Err(ValidationError::new(format!("Entity: {}", e)));
             }
         } else {
-            validation_errors.push(ValidationError::new("Entity: Is missing"));
+            return Err(ValidationError::new("Entity: Is missing"));
         }
 
         if let Some(resource) = uri.resource.as_ref() {
             if let Err(e) = resource.validate_micro_form() {
-                validation_errors.push(ValidationError::new(format!("Resource: {}", e)));
+                return Err(ValidationError::new(format!("Resource: {}", e)));
             }
         } else {
-            validation_errors.push(ValidationError::new("Resource: Is missing"));
+            return Err(ValidationError::new("Resource: Is missing"));
         }
 
         if let Some(authority) = uri.authority.as_ref() {
             if let Err(e) = authority.validate_micro_form() {
-                validation_errors.push(ValidationError::new(format!("Authority: {}", e)));
+                return Err(ValidationError::new(format!("Authority: {}", e)));
             }
         }
 
-        if !validation_errors.is_empty() {
-            let combined_message = validation_errors
-                .into_iter()
-                .map(|err| err.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            Err(ValidationError::new(combined_message))
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     /// Checks if the URI contains numbers of the appropriate size so that it can be serialized into micro format.

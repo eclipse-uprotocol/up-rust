@@ -52,42 +52,29 @@ impl UAuthority {
     ///
     /// Returns a `ValidationError` in the failure case
     pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
-        let mut validation_errors = Vec::new();
-
         match &self.remote {
             None => {
-                validation_errors.push(ValidationError::new("Has Authority, but no remote"));
+                return Err(ValidationError::new("Has Authority, but no remote"));
             }
             Some(Remote::Ip(ip)) => {
                 if !(ip.len() == REMOTE_IPV4_BYTES || ip.len() == REMOTE_IPV6_BYTES) {
-                    validation_errors.push(ValidationError::new(
+                    return Err(ValidationError::new(
                         "IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)",
                     ));
                 }
             }
             Some(Remote::Id(id)) => {
                 if !matches!(id.len(), REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES) {
-                    validation_errors
-                        .push(ValidationError::new("ID doesn't fit in bytes allocated"));
+                    return Err(ValidationError::new("ID doesn't fit in bytes allocated"));
                 }
             }
             Some(Remote::Name(_)) => {
-                validation_errors.push(ValidationError::new(
+                return Err(ValidationError::new(
                     "Must use IP address or ID as UAuthority for micro form.",
                 ));
             }
         }
 
-        if !validation_errors.is_empty() {
-            let combined_message = validation_errors
-                .into_iter()
-                .map(|err| err.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            Err(ValidationError::new(combined_message))
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }

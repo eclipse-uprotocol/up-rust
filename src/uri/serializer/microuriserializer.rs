@@ -342,7 +342,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: ID must be present, Major version must be present"
+            "Failed to validate micro URI format: Entity: ID must be present"
         );
     }
 

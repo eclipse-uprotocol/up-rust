@@ -35,38 +35,26 @@ impl UEntity {
     ///
     /// Returns a `ValidationError` in the failure case
     pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
-        let mut validation_errors = Vec::new();
-
         if let Some(id) = self.id {
             if id & UENTITY_ID_VALID_BITMASK != 0 {
-                validation_errors.push(ValidationError::new(
+                return Err(ValidationError::new(
                     "ID does not fit within allotted 16 bits in micro form",
                 ));
             }
         } else {
-            validation_errors.push(ValidationError::new("ID must be present"));
+            return Err(ValidationError::new("ID must be present"));
         }
 
         if let Some(major_version) = self.version_major {
             if major_version & UENTITY_MAJOR_VERSION_VALID_BITMASK != 0 {
-                validation_errors.push(ValidationError::new(
+                return Err(ValidationError::new(
                     "Major version does not fit within 16 allotted bits in micro form",
                 ));
             }
         } else {
-            validation_errors.push(ValidationError::new("Major version must be present"));
+            return Err(ValidationError::new("Major version must be present"));
         }
 
-        if !validation_errors.is_empty() {
-            let combined_message = validation_errors
-                .into_iter()
-                .map(|err| err.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            Err(ValidationError::new(combined_message))
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }
