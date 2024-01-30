@@ -12,8 +12,8 @@
  ********************************************************************************/
 
 use protobuf::well_known_types::any::Any;
-use protobuf::MessageFull;
 use protobuf::MessageField;
+use protobuf::MessageFull;
 use std::default::Default;
 use std::fmt;
 
@@ -85,7 +85,9 @@ impl RpcMapper {
     {
         let message = response?; // Directly returns in case of error
         let MessageField(Some(payload)) = message.payload else {
-            return Err(RpcMapperError::InvalidPayload("Payload is empty".to_string()));
+            return Err(RpcMapperError::InvalidPayload(
+                "Payload is empty".to_string(),
+            ));
         };
         Any::try_from(*payload)
             .map_err(|_e| {
@@ -128,12 +130,16 @@ impl RpcMapper {
     pub fn map_response_to_result(response: RpcClientResult) -> RpcPayloadResult {
         let message = response?; // Directly returns in case of error
         let MessageField(Some(payload)) = message.payload else {
-            return Err(RpcMapperError::InvalidPayload("Payload is empty".to_string()));
+            return Err(RpcMapperError::InvalidPayload(
+                "Payload is empty".to_string(),
+            ));
         };
         let payload = *payload;
         Any::try_from(payload)
             .map_err(|e| {
-                RpcMapperError::UnknownType(format!("Couldn't decode payload into Any: {:?}", e).to_string())
+                RpcMapperError::UnknownType(
+                    format!("Couldn't decode payload into Any: {:?}", e).to_string(),
+                )
             })
             .and_then(|any| {
                 match Self::unpack_any::<UStatus>(&any) {
