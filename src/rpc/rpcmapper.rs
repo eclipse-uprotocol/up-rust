@@ -12,7 +12,6 @@
  ********************************************************************************/
 
 use protobuf::well_known_types::any::Any;
-use protobuf::MessageField;
 use protobuf::MessageFull;
 use std::default::Default;
 use std::fmt;
@@ -84,7 +83,7 @@ impl RpcMapper {
         T: MessageFull + Default,
     {
         let message = response?; // Directly returns in case of error
-        let MessageField(Some(payload)) = message.payload else {
+        let Some(payload) = message.payload.as_ref() else {
             return Err(RpcMapperError::InvalidPayload(
                 "Payload is empty".to_string(),
             ));
@@ -129,13 +128,12 @@ impl RpcMapper {
     // TODO This entire thing feels klunky and kludgy; this needs to be revisited...
     pub fn map_response_to_result(response: RpcClientResult) -> RpcPayloadResult {
         let message = response?; // Directly returns in case of error
-        let MessageField(Some(payload)) = message.payload else {
+        let Some(payload) = message.payload.as_ref() else {
             return Err(RpcMapperError::InvalidPayload(
                 "Payload is empty".to_string(),
             ));
         };
-        let payload = *payload;
-        Any::try_from(payload)
+        Any::try_from(*payload)
             .map_err(|e| {
                 RpcMapperError::UnknownType(
                     format!("Couldn't decode payload into Any: {:?}", e).to_string(),
