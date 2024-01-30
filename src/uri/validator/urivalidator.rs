@@ -1150,7 +1150,7 @@ mod tests {
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert_eq!(is_micro_form, false);
+        assert!(!is_micro_form);
     }
 
     #[test]
@@ -1170,7 +1170,7 @@ mod tests {
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert_eq!(is_micro_form, false);
+        assert!(!is_micro_form);
     }
 
     #[test]
@@ -1190,7 +1190,7 @@ mod tests {
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert_eq!(is_micro_form, false);
+        assert!(!is_micro_form);
     }
 
     #[test]
@@ -1215,7 +1215,7 @@ mod tests {
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert_eq!(is_micro_form, false);
+        assert!(!is_micro_form);
     }
 
     #[test]
@@ -1240,7 +1240,7 @@ mod tests {
             ..Default::default()
         };
         let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert_eq!(is_micro_form, false);
+        assert!(!is_micro_form);
     }
 
     fn get_json_object() -> Result<Value, Error> {
