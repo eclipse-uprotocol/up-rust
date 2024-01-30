@@ -82,6 +82,10 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     ///
     /// # Returns
     /// A `Vec<u8>` representing the serialized `UUri`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `SerializationError` in the failure case when the UUri doesn't satisfy Micro-URI spec.
     #[allow(clippy::cast_possible_truncation)]
     fn serialize(uri: &UUri) -> Result<Vec<u8>, SerializationError> {
         if let Err(validation_error) = UriValidator::validate_micro_form(uri) {

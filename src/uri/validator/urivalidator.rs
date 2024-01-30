@@ -185,7 +185,8 @@ impl UriValidator {
             .map_or(false, |auth| auth.get_name().is_some())
     }
 
-    /// Checks if the URI contains numbers of the appropriate size so that it can be serialized into micro format.
+    /// Checks if the URI contains appropriate fields and numbers of the appropriate size so that it can be serialized
+    /// into micro format.
     ///
     /// # Arguments
     /// * `uri` - The `UUri` to check.
