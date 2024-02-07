@@ -48,7 +48,7 @@ impl UEntity {
         if let Some(major_version) = self.version_major {
             if major_version & UENTITY_MAJOR_VERSION_VALID_BITMASK != 0 {
                 return Err(ValidationError::new(
-                    "Major version does not fit within 16 allotted bits in micro form",
+                    "Major version does not fit within 8 allotted bits in micro form",
                 ));
             }
         } else {

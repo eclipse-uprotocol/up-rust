@@ -85,7 +85,62 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     ///
     /// # Errors
     ///
-    /// Returns a `SerializationError` in the failure case when the UUri doesn't satisfy Micro-URI spec.
+    /// Returns a `SerializationError` noting which which portion failed Micro Uri validation
+    /// or another error which occurred during serialization.
+    ///
+    /// # Examples
+    ///
+    /// ## Example which passes the Micro Uri validation
+    ///
+    /// ```
+    /// use uprotocol_sdk::uprotocol::{UEntity, UUri, UResource};
+    /// use uprotocol_sdk::uri::serializer::{UriSerializer, MicroUriSerializer};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(19999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///     ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+    /// assert!(uprotocol_uri.is_ok());
+    /// ```
+    ///
+    /// ## Example which fails the Micro Uri validation due to UEntity ID being > 16 bits
+    ///
+    /// ```
+    /// use uprotocol_sdk::uprotocol::{UEntity, UUri, UResource};
+    /// use uprotocol_sdk::uri::serializer::{UriSerializer, MicroUriSerializer};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(0x10000), // <- note that we've exceeded the allotted 16 bits
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///     ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let uprotocol_uri = MicroUriSerializer::serialize(&uri);
+    /// assert!(uprotocol_uri.is_err());
+    /// assert_eq!(
+    ///     uprotocol_uri.unwrap_err().to_string(),
+    ///     "Failed to validate micro URI format: Entity: ID does not fit within allotted 16 bits in micro form"
+    /// );
+    /// ```
     #[allow(clippy::cast_possible_truncation)]
     fn serialize(uri: &UUri) -> Result<Vec<u8>, SerializationError> {
         if let Err(validation_error) = UriValidator::validate_micro_form(uri) {
@@ -657,7 +712,7 @@ mod tests {
         assert!(uprotocol_uri.is_err());
         assert_eq!(
             uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: Major version does not fit within 16 allotted bits in micro form"
+            "Failed to validate micro URI format: Entity: Major version does not fit within 8 allotted bits in micro form"
         );
     }
 }

@@ -195,7 +195,143 @@ impl UriValidator {
     /// Returns `Ok(())` if the URI contains numbers which will fit in the allotted space,
     /// allowing it to be serialized into micro format.
     ///
+    /// # Errors
+    ///
     /// Otherwise returns `ValidationError` containing description of error.
+    ///
+    /// # Examples
+    ///
+    /// ## UAuthority IP is incorrect format (neither IPv4, nor IPv6)
+    /// ```
+    /// use uprotocol_sdk::uprotocol::{UAuthority, UUri, UEntity, UResource};
+    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     authority: Some(UAuthority {
+    ///         ip: Some(vec![127, 0, 0]), // <- note only 3 bytes, must be 4 (IPv4)
+    ///         ..Default::default()       //    or 16 (IPv6)
+    ///     })
+    ///     .into(),
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert_eq!(val_micro_form.unwrap_err().to_string(),
+    ///           "Authority: IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)");
+    /// ```
+    ///
+    /// ## UAuthority ID is longer than maximum allowed (255 bytes)
+    /// ```
+    /// use uprotocol_sdk::uprotocol::{UAuthority, UUri, UEntity, UResource};
+    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     authority: Some(UAuthority {
+    ///         id: Some((0..=256) // <- note that ID will exceed 255 byte limit
+    ///                 .map(|i| (i % 256) as u8)
+    ///                 .collect::<Vec<u8>>()),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert_eq!(val_micro_form.unwrap_err().to_string(),
+    ///           "Authority: ID doesn't fit in bytes allocated");
+    /// ```
+    ///
+    /// ## Overflowing UEntity ID's 16 bit capacity
+    /// ```
+    /// use uprotocol_sdk::uprotocol::{UUri, UEntity, UResource};
+    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(0x10000), // <- exceeds allotted 16 bits
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert_eq!(val_micro_form.unwrap_err().to_string(),
+    ///           "Entity: ID does not fit within allotted 16 bits in micro form");
+    /// ```
+    ///
+    /// ## Overflowing UEntity Major Version 8 bit capacity
+    /// ```
+    /// use uprotocol_sdk::uprotocol::{UUri, UEntity, UResource};
+    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(0x100), // <- exceeds allotted 8 bits
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert_eq!(val_micro_form.unwrap_err().to_string(),
+    ///           "Entity: Major version does not fit within 8 allotted bits in micro form");
+    /// ```
+    ///
+    /// ## Overflowing UResource ID's 16 bit capacity
+    /// ```
+    /// use uprotocol_sdk::uprotocol::{UUri, UEntity, UResource};
+    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(0x10000), // <- exceeds allotted 16 bits
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert_eq!(val_micro_form.unwrap_err().to_string(),
+    ///           "Resource: ID does not fit within allotted 16 bits in micro form");
+    /// ```
     #[allow(clippy::missing_panics_doc)]
     pub fn validate_micro_form(uri: &UUri) -> Result<(), ValidationError> {
         if Self::is_empty(uri) {
@@ -1132,116 +1268,6 @@ mod tests {
             let status = UriValidator::validate_rpc_response(&uuri);
             assert!(status.is_err());
         }
-    }
-
-    #[test]
-    fn test_is_micro_form_uri_overflow_resource_id() {
-        let uri = UUri {
-            entity: Some(UEntity {
-                id: Some(29999),
-                version_major: Some(254),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                id: Some(0x10000),
-                ..Default::default()
-            })
-            .into(),
-            ..Default::default()
-        };
-        let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert!(!is_micro_form);
-    }
-
-    #[test]
-    fn test_is_micro_form_uri_overflow_entity_id() {
-        let uri = UUri {
-            entity: Some(UEntity {
-                id: Some(0x10000),
-                version_major: Some(254),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                id: Some(29999),
-                ..Default::default()
-            })
-            .into(),
-            ..Default::default()
-        };
-        let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert!(!is_micro_form);
-    }
-
-    #[test]
-    fn test_is_micro_form_version_overflow_entity_version() {
-        let uri = UUri {
-            entity: Some(UEntity {
-                id: Some(29999),
-                version_major: Some(0x100),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                id: Some(29999),
-                ..Default::default()
-            })
-            .into(),
-            ..Default::default()
-        };
-        let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert!(!is_micro_form);
-    }
-
-    #[test]
-    fn test_is_micro_form_ip_incorrect_format() {
-        let uri = UUri {
-            authority: Some(UAuthority {
-                ip: Some(vec![127, 0, 0]),
-                ..Default::default()
-            })
-            .into(),
-            entity: Some(UEntity {
-                id: Some(29999),
-                version_major: Some(254),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                id: Some(29999),
-                ..Default::default()
-            })
-            .into(),
-            ..Default::default()
-        };
-        let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert!(!is_micro_form);
-    }
-
-    #[test]
-    fn test_is_micro_form_id_incorrect_format() {
-        let uri = UUri {
-            authority: Some(UAuthority {
-                id: Some((0..=256).map(|i| (i % 256) as u8).collect::<Vec<u8>>()),
-                ..Default::default()
-            })
-            .into(),
-            entity: Some(UEntity {
-                id: Some(29999),
-                version_major: Some(254),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                id: Some(29999),
-                ..Default::default()
-            })
-            .into(),
-            ..Default::default()
-        };
-        let is_micro_form = UriValidator::is_micro_form(&uri);
-        assert!(!is_micro_form);
     }
 
     fn get_json_object() -> Result<Value, Error> {
