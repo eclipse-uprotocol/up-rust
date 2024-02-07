@@ -61,7 +61,7 @@ impl RpcMapper {
     ///
     /// # Type Parameters
     ///
-    /// - `T`: The declared expected return type of the RPC method. It must implement [`prost::Message`] and [`Default`].
+    /// - `T`: The expected return type of the RPC method.
     ///
     /// # Returns
     ///
