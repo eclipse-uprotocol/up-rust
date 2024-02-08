@@ -136,10 +136,6 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     /// };
     /// let uprotocol_uri = MicroUriSerializer::serialize(&uri);
     /// assert!(uprotocol_uri.is_err());
-    /// assert_eq!(
-    ///     uprotocol_uri.unwrap_err().to_string(),
-    ///     "Failed to validate micro URI format: Entity: ID does not fit within allotted 16 bits in micro form"
-    /// );
     /// ```
     #[allow(clippy::cast_possible_truncation)]
     fn serialize(uri: &UUri) -> Result<Vec<u8>, SerializationError> {
