@@ -291,7 +291,7 @@ mod tests {
     use crate::uprotocol::uri::{UEntity, UResource, UUri};
     use crate::uprotocol::{UAttributes, UAuthority, UPayload, UPayloadFormat};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
-    use crate::uuid::builder::UUIDv8Builder;
+    use crate::uuid::builder::UUIDBuilder;
 
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
     use protobuf::well_known_types::any::Any;
@@ -343,7 +343,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let payload = UPayload {
             data: Some(crate::uprotocol::upayload::upayload::Data::Value(
                 Any::default().value,
