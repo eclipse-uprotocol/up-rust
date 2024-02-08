@@ -326,7 +326,7 @@ mod tests {
     fn build_cloud_event_for_test() -> Event {
         EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
             .source("http://example.com")
             .build()
             .unwrap()

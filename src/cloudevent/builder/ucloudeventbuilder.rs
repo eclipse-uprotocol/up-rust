@@ -96,7 +96,7 @@ impl UCloudEventBuilder {
             attributes,
         )
         .extension("sink", service_method_uri)
-        .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
+        .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
         .build();
 
         bce.unwrap()
@@ -161,7 +161,7 @@ impl UCloudEventBuilder {
         )
         .extension("sink", rpc_uri)
         .extension("reqid", request_id)
-        .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
+        .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
         .build();
 
         bce.unwrap()
@@ -227,7 +227,7 @@ impl UCloudEventBuilder {
         .extension("sink", rpc_uri)
         .extension("reqid", request_id)
         .extension("commstatus", i64::from(communication_status))
-        .ty(UMessageType::UMESSAGE_TYPE_RESPONSE)
+        .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
         .build();
 
         bce.unwrap()
@@ -274,7 +274,7 @@ impl UCloudEventBuilder {
             &payload.type_url,
             attributes,
         )
-        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
         .build();
 
         bce.unwrap()
@@ -332,7 +332,7 @@ impl UCloudEventBuilder {
             attributes,
         )
         .extension("sink", sink)
-        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
         .build();
 
         bce.unwrap()
@@ -464,7 +464,7 @@ mod tests {
             &proto_payload.type_url,
             &ucloud_event_attributes,
         )
-        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
         .build()
         .unwrap();
 
@@ -472,7 +472,7 @@ mod tests {
         assert_eq!("testme", cloud_event.id());
         assert_eq!(source, cloud_event.source().to_string());
         assert_eq!(
-            UMessageType::UMESSAGE_TYPE_PUBLISH.to_string(),
+            UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string(),
             cloud_event.ty()
         );
         assert!(!cloud_event
@@ -533,7 +533,7 @@ mod tests {
             &proto_payload.type_url,
             &ucloud_event_attributes,
         )
-        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+        .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
         .build()
         .unwrap();
 
@@ -541,7 +541,7 @@ mod tests {
         assert_eq!("testme", cloud_event.id());
         assert_eq!(source, cloud_event.source().to_string());
         assert_eq!(
-            UMessageType::UMESSAGE_TYPE_PUBLISH.to_string(),
+            UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string(),
             cloud_event.ty()
         );
         assert!(!cloud_event
@@ -608,7 +608,7 @@ mod tests {
         assert!(!cloud_event.id().is_empty());
         assert_eq!(source, cloud_event.source().to_string());
         assert_eq!(
-            UMessageType::UMESSAGE_TYPE_PUBLISH.to_string(),
+            UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string(),
             cloud_event.ty()
         );
         assert!(!cloud_event
@@ -704,7 +704,7 @@ mod tests {
             .any(|(name, _value)| name.contains("sink")));
         assert_eq!(sink, cloud_event.extension("sink").unwrap().to_string());
         assert_eq!(
-            UMessageType::UMESSAGE_TYPE_PUBLISH.to_string(),
+            UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string(),
             cloud_event.ty()
         );
         assert_eq!(
@@ -1047,7 +1047,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("https://example.com")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",

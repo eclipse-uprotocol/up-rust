@@ -86,7 +86,8 @@ mod tests {
             &proto_payload.type_url,
             &u_cloud_event_attributes,
         );
-        cloud_event_builder = cloud_event_builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH);
+        cloud_event_builder =
+            cloud_event_builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string());
 
         let cloud_event = cloud_event_builder.build().unwrap();
 
@@ -105,7 +106,7 @@ mod tests {
         // Cloud event
         let cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
@@ -118,7 +119,7 @@ mod tests {
         // Another cloud event
         let another_cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST)
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
             .source("/body.access/1/door.front_left".to_string())
             .build()
             .unwrap();
@@ -137,7 +138,7 @@ mod tests {
         // Cloud event
         let cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
@@ -150,7 +151,7 @@ mod tests {
         // Another cloud event
         let another_cloud_event = EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .source("/body.access/1/door.front_left".to_string())
             .data_with_schema(
                 "application/protobuf".to_string(),
@@ -209,7 +210,8 @@ mod tests {
             &proto_payload.type_url,
             &u_cloud_event_attributes,
         );
-        cloud_event_builder = cloud_event_builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH);
+        cloud_event_builder =
+            cloud_event_builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string());
 
         let cloud_event1 = cloud_event_builder.build().unwrap();
         let bytes1 = serializer.serialize(&cloud_event1).unwrap();
@@ -369,7 +371,7 @@ mod tests {
     fn build_cloud_event_for_test() -> EventBuilderV10 {
         EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .source("//VCU.VIN/body.access")
     }
 
@@ -394,7 +396,7 @@ mod tests {
         let event = EventBuilderV10::new()
             .id("hello")
             .source("//VCU.VIN/body.access")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
                 format!("proto://{}", Any::default().type_url),
