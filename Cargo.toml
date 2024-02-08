@@ -50,7 +50,7 @@ uuid = { version = "1.7", features = ["v8"] }
 [build-dependencies]
 protobuf-codegen = { version = "3.3" }
 protoc-bin-vendored = { version = "3.0" }
-ureq = { version = "2.7" }
+ureq = { version = "2.9", features = ["proxy-from-env"] }
 
 [dev-dependencies]
 test-case = { version = "3.3" }
