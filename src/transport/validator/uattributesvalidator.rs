@@ -624,8 +624,14 @@ mod tests {
 
     #[test]
     fn test_validate_attributes_for_publish_message_payload_request_id() {
+        let v4_uuid = uuid::Uuid::new_v4();
+        let invalid_uuid = UUID {
+            msb: v4_uuid.as_u64_pair().0,
+            lsb: v4_uuid.as_u64_pair().1,
+            ..Default::default()
+        };
         let attributes = UAttributesBuilder::publish(UPriority::UPRIORITY_CS0)
-            .with_reqid(UUID::from(uuid::Uuid::new_v4()))
+            .with_reqid(invalid_uuid)
             .build();
 
         let validator = Validators::Publish.validator();
@@ -716,8 +722,14 @@ mod tests {
 
     #[test]
     fn test_validate_attributes_for_rpc_request_message_payload_invalid_request_id() {
+        let v4_uuid = uuid::Uuid::new_v4();
+        let invalid_uuid = UUID {
+            msb: v4_uuid.as_u64_pair().0,
+            lsb: v4_uuid.as_u64_pair().1,
+            ..Default::default()
+        };
         let attributes = UAttributesBuilder::request(UPriority::UPRIORITY_CS4, build_sink(), 1000)
-            .with_reqid(UUID::from(uuid::Uuid::new_v4()))
+            .with_reqid(invalid_uuid)
             .build();
 
         let validator = Validators::Request.validator();
@@ -830,12 +842,18 @@ mod tests {
 
     #[test]
     fn test_validate_attributes_for_rpc_response_message_payload_invalid_request_id() {
+        let v4_uuid = uuid::Uuid::new_v4();
+        let invalid_uuid = UUID {
+            msb: v4_uuid.as_u64_pair().0,
+            lsb: v4_uuid.as_u64_pair().1,
+            ..Default::default()
+        };
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
             UUIDv8Builder::new().build(),
         )
-        .with_reqid(UUID::from(uuid::Uuid::new_v4()))
+        .with_reqid(invalid_uuid)
         .build();
 
         let validator = Validators::Response.validator();
