@@ -61,25 +61,25 @@ jobs:
           cargo tarpaulin -o xml -o lcov -o html
 
       - name: Upload coverage report (xml)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (xml)
           path: cobertura.xml
 
       - name: Upload coberage report (lcov)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (lcov)
           path: lcov.info
 
       - name: Upload coberage report (html)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (html)
           path: tarpaulin-report.html
 
       # - name: Upload coverage report
-      #   uses: actions/upload-artifact@v3
+      #   uses: actions/upload-artifact@v4
       #   with:
       #     name: Code coverage report
       #     path: cobertura.xml
