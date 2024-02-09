@@ -59,23 +59,15 @@ pub trait UriSerializer<T> {
     /// * `micro_uri` - uri serialized as a byte slice.
     ///
     /// # Returns
-    /// Returns an `Option<UUri>` object serialized from one of the forms. Returns `None` if the URI
-    /// cannot be resolved.
-    fn build_resolved(long_uri: &str, micro_uri: &[u8]) -> Option<UUri> {
+    /// If successful, returns an UUri object serialized from the input formats. Returns `SerializationError` if the deserialization
+    /// fails or the resulting uri cannot be resolved.
+    fn build_resolved(long_uri: &str, micro_uri: &[u8]) -> Result<UUri, SerializationError> {
         if long_uri.is_empty() && micro_uri.is_empty() {
-            return Some(UUri {
-                ..Default::default()
-            });
+            return Err(SerializationError::new("Input uris are empty"));
         }
 
-        let long_uri: UUri = match UUri::try_from(long_uri) {
-            Ok(uri) => uri,
-            Err(_) => return None,
-        };
-        let micro_uri: UUri = match UUri::try_from(micro_uri.to_vec()) {
-            Ok(uri) => uri,
-            Err(_) => return None,
-        };
+        let long_uri = UUri::try_from(long_uri)?;
+        let micro_uri = UUri::try_from(micro_uri.to_vec())?;
 
         let mut auth = micro_uri.authority.unwrap_or_default();
         let mut ue = micro_uri.entity.unwrap_or_default();
@@ -100,6 +92,12 @@ pub trait UriSerializer<T> {
             ..Default::default()
         };
 
-        UriValidator::is_resolved(&uri).then_some(uri)
+        if UriValidator::is_resolved(&uri) {
+            Ok(uri)
+        } else {
+            Err(SerializationError::new(format!(
+                "Could not resolve uri {uri}"
+            )))
+        }
     }
 }

@@ -11,19 +11,19 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::uri::UUri as uproto_Uuri;
+use crate::uprotocol::uri::UUri;
 use crate::uprotocol::SerializationError;
 use crate::uri::serializer::{LongUriSerializer, MicroUriSerializer, UriSerializer};
 
-impl TryFrom<uproto_Uuri> for String {
+impl TryFrom<UUri> for String {
     type Error = SerializationError;
 
-    fn try_from(value: uproto_Uuri) -> Result<Self, Self::Error> {
+    fn try_from(value: UUri) -> Result<Self, Self::Error> {
         LongUriSerializer::serialize(&value)
     }
 }
 
-impl TryFrom<&str> for uproto_Uuri {
+impl TryFrom<&str> for UUri {
     type Error = SerializationError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -31,15 +31,15 @@ impl TryFrom<&str> for uproto_Uuri {
     }
 }
 
-impl TryFrom<uproto_Uuri> for Vec<u8> {
+impl TryFrom<UUri> for Vec<u8> {
     type Error = SerializationError;
 
-    fn try_from(value: uproto_Uuri) -> Result<Self, Self::Error> {
+    fn try_from(value: UUri) -> Result<Self, Self::Error> {
         MicroUriSerializer::serialize(&value)
     }
 }
 
-impl TryFrom<Vec<u8>> for uproto_Uuri {
+impl TryFrom<Vec<u8>> for UUri {
     type Error = SerializationError;
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {

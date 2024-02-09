@@ -1203,10 +1203,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_long_and_micro_passing_empty_long_uri_empty_byte_array() {
-        let uri = LongUriSerializer::build_resolved("", &[]);
-        assert!(uri.is_some());
-        let uri2 = LongUriSerializer::serialize(&uri.unwrap());
-        assert!(uri2.is_err());
-        assert_eq!(uri2.unwrap_err().to_string(), "URI is empty");
+        let uri: Result<UUri, SerializationError> = LongUriSerializer::build_resolved("", &[]);
+        assert!(uri.is_err());
     }
 }
