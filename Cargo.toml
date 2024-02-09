@@ -52,5 +52,6 @@ protobuf-codegen = { version = "3.3" }
 protoc-bin-vendored = { version = "3.0" }
 ureq = { version = "2.7" }
 
+
 [dev-dependencies]
 test-case = { version = "3.3" }
