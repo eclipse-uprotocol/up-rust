@@ -12,44 +12,37 @@
  ********************************************************************************/
 
 use crate::uprotocol::uri::UUri as uproto_Uuri;
+use crate::uprotocol::SerializationError;
 use crate::uri::serializer::{LongUriSerializer, MicroUriSerializer, UriSerializer};
 
-impl From<uproto_Uuri> for String {
-    fn from(value: uproto_Uuri) -> Self {
-        if let Ok(uri) = LongUriSerializer::serialize(&value) {
-            uri
-        } else {
-            String::new()
-        }
+impl TryFrom<uproto_Uuri> for String {
+    type Error = SerializationError;
+
+    fn try_from(value: uproto_Uuri) -> Result<Self, Self::Error> {
+        LongUriSerializer::serialize(&value)
     }
 }
 
-impl From<&str> for uproto_Uuri {
-    fn from(value: &str) -> Self {
-        if let Ok(uri) = LongUriSerializer::deserialize(value.to_string()) {
-            uri
-        } else {
-            uproto_Uuri::default()
-        }
+impl TryFrom<&str> for uproto_Uuri {
+    type Error = SerializationError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        LongUriSerializer::deserialize(value.into())
     }
 }
 
-impl From<uproto_Uuri> for Vec<u8> {
-    fn from(value: uproto_Uuri) -> Self {
-        if let Ok(uri) = MicroUriSerializer::serialize(&value) {
-            uri
-        } else {
-            vec![]
-        }
+impl TryFrom<uproto_Uuri> for Vec<u8> {
+    type Error = SerializationError;
+
+    fn try_from(value: uproto_Uuri) -> Result<Self, Self::Error> {
+        MicroUriSerializer::serialize(&value)
     }
 }
 
-impl From<Vec<u8>> for uproto_Uuri {
-    fn from(value: Vec<u8>) -> Self {
-        if let Ok(uri) = MicroUriSerializer::deserialize(value) {
-            uri
-        } else {
-            uproto_Uuri::default()
-        }
+impl TryFrom<Vec<u8>> for uproto_Uuri {
+    type Error = SerializationError;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        MicroUriSerializer::deserialize(value)
     }
 }

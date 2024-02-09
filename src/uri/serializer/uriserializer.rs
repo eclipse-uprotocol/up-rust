@@ -41,22 +41,22 @@ pub trait UriSerializer<T> {
     /// Serializes a `UUri` into a specific serialization format.
     ///
     /// # Arguments
-    /// * `uri` - The `UUri` object to be serialized into the format `T`.
+    /// * `uri` - The uri object to be serialized into the format `T`.
     ///
     /// # Returns
-    /// Returns a `Result<T, SerializationError>` representing the serialized `UUri` in the specified format.
+    /// Returns the serialized uri in the specified format.
     ///
     /// # Errors
     ///
     /// Returns a `SerializationError` if the serialization process fails. This may be due to reasons such as incompatible data
-    /// in the `UUri` that cannot be represented in the desired format, or errors that occur during the serialization process.
+    /// in the uri that cannot be represented in the desired format, or errors that occur during the serialization process.
     fn serialize(uri: &UUri) -> Result<T, SerializationError>;
 
     /// Builds a fully resolved `UUri` from the serialized long format and the serialized micro format.
     ///
     /// # Arguments
-    /// * `long_uri` - `UUri` serialized as a string.
-    /// * `micro_uri` - `UUri` serialized as a byte slice.
+    /// * `long_uri` - uri serialized as a string.
+    /// * `micro_uri` - uri serialized as a byte slice.
     ///
     /// # Returns
     /// Returns an `Option<UUri>` object serialized from one of the forms. Returns `None` if the URI
@@ -68,8 +68,14 @@ pub trait UriSerializer<T> {
             });
         }
 
-        let long_uri = UUri::from(long_uri);
-        let micro_uri = UUri::from(micro_uri.to_vec());
+        let long_uri: UUri = match UUri::try_from(long_uri) {
+            Ok(uri) => uri,
+            Err(_) => return None,
+        };
+        let micro_uri: UUri = match UUri::try_from(micro_uri.to_vec()) {
+            Ok(uri) => uri,
+            Err(_) => return None,
+        };
 
         let mut auth = micro_uri.authority.unwrap_or_default();
         let mut ue = micro_uri.entity.unwrap_or_default();
