@@ -147,7 +147,7 @@ impl RpcMapper {
                         UPayload::try_from(&any)
                             .map_err(|e| RpcMapperError::InvalidPayload(e.to_string()))
                             .map(|payload| RpcPayload {
-                                status: UStatus::fail(&format!(
+                                status: UStatus::fail(format!(
                                     "Unexpected any-payload type {}",
                                     any.type_url
                                 )),

@@ -53,7 +53,7 @@ impl<T> RpcResult<T> {
         match self {
             RpcResult::Success(value) => match func(value) {
                 Ok(val) => RpcResult::Success(val),
-                Err(e) => RpcResult::Failure(UStatus::fail_with_code(UCode::UNKNOWN, &e)),
+                Err(e) => RpcResult::Failure(UStatus::fail_with_code(UCode::UNKNOWN, e)),
             },
             RpcResult::Failure(status) => RpcResult::Failure(status),
         }
@@ -155,7 +155,7 @@ impl<T> RpcResult<T> {
             error_message,
         ));
 
-        let status = UStatus::fail(&error.to_string());
+        let status = UStatus::fail(error.to_string());
         RpcResult::Failure(status)
     }
 
@@ -212,7 +212,7 @@ mod tests {
     }
 
     fn fun_that_returns_a_failure_for_and_then(x: i32) -> RpcResult<i32> {
-        RpcResult::Failure(UStatus::fail(&format!("{} went boom", x)))
+        RpcResult::Failure(UStatus::fail(format!("{} went boom", x)))
     }
 
     fn multiply_by_2(x: i32) -> Result<RpcResult<i32>, String> {
