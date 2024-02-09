@@ -340,7 +340,7 @@ impl UAttributesValidator for PublishValidator {
                 UMessageType::UMESSAGE_TYPE_PUBLISH => Ok(()),
                 _ => Err(ValidationError::new(format!(
                     "Wrong Attribute Type [{}]",
-                    mt
+                    mt.to_type_string()
                 ))),
             },
         }
@@ -374,7 +374,7 @@ impl UAttributesValidator for RequestValidator {
                 UMessageType::UMESSAGE_TYPE_REQUEST => Ok(()),
                 _ => Err(ValidationError::new(format!(
                     "Wrong Attribute Type [{}]",
-                    mt
+                    mt.to_type_string()
                 ))),
             },
         }
@@ -448,7 +448,7 @@ impl UAttributesValidator for ResponseValidator {
                 UMessageType::UMESSAGE_TYPE_RESPONSE => Ok(()),
                 _ => Err(ValidationError::new(format!(
                     "Wrong Attribute Type [{}]",
-                    mt
+                    mt.to_type_string()
                 ))),
             },
         }

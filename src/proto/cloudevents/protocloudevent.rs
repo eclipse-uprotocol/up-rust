@@ -272,7 +272,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+        event.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -305,7 +305,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH)
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",
