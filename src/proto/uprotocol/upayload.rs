@@ -25,6 +25,19 @@ impl UPayloadFormat {
     /// # Errors
     ///
     /// Returns an error if the given string is not a valid media type string or is unsupported by uProtocol.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use uprotocol_sdk::uprotocol::UPayloadFormat;
+    ///
+    /// let parse_attempt = UPayloadFormat::from_media_type("application/json; charset=utf-8");
+    /// assert!(parse_attempt.is_ok());
+    /// assert_eq!(parse_attempt.unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_JSON);
+    ///
+    /// let parse_attempt = UPayloadFormat::from_media_type("application/unsupported");
+    /// assert!(parse_attempt.is_err());
+    /// ```
     pub fn from_media_type(media_type_string: &str) -> Result<Self, ParsingError> {
         if let Ok(media_type) = MediaType::parse(media_type_string) {
             let descriptor = UPayloadFormat::enum_descriptor();
@@ -56,6 +69,15 @@ impl UPayloadFormat {
     /// # Returns
     ///
     /// None if the payload format is [`UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use uprotocol_sdk::uprotocol::UPayloadFormat;
+    ///
+    /// assert_eq!(UPayloadFormat::UPAYLOAD_FORMAT_JSON.to_media_type().unwrap(), "application/json");
+    /// assert!(UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED.to_media_type().is_none());
+    /// ```
     pub fn to_media_type(&self) -> Option<String> {
         let desc = self.descriptor();
         let desc_proto = desc.proto();
