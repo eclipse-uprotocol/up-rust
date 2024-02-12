@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::str::FromStr;
+use std::{hash::Hash, str::FromStr};
 
 use crate::uprotocol::UUID;
 
@@ -187,6 +187,13 @@ impl UUID {
     /// ```
     pub fn is_uprotocol_uuid(&self) -> bool {
         self.is_custom_version() && self.is_rfc_variant()
+    }
+}
+
+impl Hash for UUID {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let bytes = (self.msb, self.lsb);
+        bytes.hash(state)
     }
 }
 
