@@ -29,7 +29,7 @@ impl UPayloadFormat {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UPayloadFormat;
+    /// use up_rust::uprotocol::UPayloadFormat;
     ///
     /// let parse_attempt = UPayloadFormat::from_media_type("application/json; charset=utf-8");
     /// assert!(parse_attempt.is_ok());
@@ -73,7 +73,7 @@ impl UPayloadFormat {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UPayloadFormat;
+    /// use up_rust::uprotocol::UPayloadFormat;
     ///
     /// assert_eq!(UPayloadFormat::UPAYLOAD_FORMAT_JSON.to_media_type().unwrap(), "application/json");
     /// assert!(UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED.to_media_type().is_none());

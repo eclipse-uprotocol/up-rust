@@ -11,10 +11,16 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::uri::UAuthority;
+use protobuf::EnumFull;
 
-impl UAuthority {
-    pub fn get_name(&self) -> Option<&str> {
-        self.name.as_deref()
+use crate::uprotocol::UPriority;
+
+impl UPriority {
+    pub fn to_priority_code(&self) -> String {
+        let desc = self.descriptor();
+        let desc_proto = desc.proto();
+        crate::uprotocol::uprotocol_options::exts::ce_name
+            .get(desc_proto.options.get_or_default())
+            .unwrap_or_default()
     }
 }

@@ -16,7 +16,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-const UPROTOCOL_BASE_URI: &str = "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.5/uprotocol";
+const UPROTOCOL_BASE_URI: &str = "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.6/uprotocol";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     get_and_build_protos(

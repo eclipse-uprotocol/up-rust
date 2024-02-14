@@ -82,7 +82,14 @@ impl RpcMapper {
     where
         T: MessageFull + Default,
     {
-        let payload = response?; // Directly returns in case of error
+        let message = response?; // Directly returns in case of error
+
+        let Some(payload) = message.payload.into_option() else {
+            return Err(RpcMapperError::InvalidPayload(
+                "Payload is empty".to_string(),
+            ));
+        };
+
         Any::try_from(payload)
             .map_err(|_e| {
                 RpcMapperError::UnknownType("Couldn't decode payload into Any".to_string())
@@ -122,7 +129,12 @@ impl RpcMapper {
     ///
     // TODO This entire thing feels klunky and kludgy; this needs to be revisited...
     pub fn map_response_to_result(response: RpcClientResult) -> RpcPayloadResult {
-        let payload = response?; // Directly returns in case of error
+        let message = response?; // Directly returns in case of error
+        let Some(payload) = message.payload.into_option() else {
+            return Err(RpcMapperError::InvalidPayload(
+                "Payload is empty".to_string(),
+            ));
+        };
         Any::try_from(payload)
             .map_err(|_e| {
                 RpcMapperError::UnknownType("Couldn't decode payload into Any".to_string())
@@ -296,14 +308,21 @@ mod tests {
     use super::*;
     use bytes::{Buf, BufMut};
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
+    use protobuf::MessageField;
 
     use crate::cloudevents::CloudEvent as CloudEventProto;
-    use crate::uprotocol::UMessageType;
+    use crate::uprotocol::{UMessage, UMessageType, UPayload};
 
     fn build_status_response(code: UCode, msg: &str) -> RpcClientResult {
-        let status = UStatus::fail_with_code(code, msg);
+        let status: UStatus = UStatus::fail_with_code(code, msg);
         let any = RpcMapper::pack_any(&status)?;
-        Ok(any.try_into().unwrap())
+        let payload =
+            UPayload::try_from(any).map_err(|e| RpcMapperError::InvalidPayload(e.to_string()))?;
+        let message = UMessage {
+            payload: MessageField::some(payload),
+            ..Default::default()
+        };
+        Ok(message)
     }
 
     fn build_empty_payload_response() -> RpcClientResult {
@@ -311,7 +330,11 @@ mod tests {
             data: Some(Data::Value(vec![])),
             ..Default::default()
         };
-        Ok(payload)
+        let message = UMessage {
+            payload: MessageField::some(payload),
+            ..Default::default()
+        };
+        Ok(message)
     }
 
     fn build_number_response(number: i32) -> RpcClientResult {
@@ -320,7 +343,13 @@ mod tests {
             value: number.to_be_bytes().into(),
             ..Default::default()
         };
-        Ok(any.try_into().unwrap())
+        let payload =
+            UPayload::try_from(any).map_err(|e| RpcMapperError::InvalidPayload(e.to_string()))?;
+        let message = UMessage {
+            payload: MessageField::some(payload),
+            ..Default::default()
+        };
+        Ok(message)
     }
 
     fn build_cloud_event_for_test() -> Event {
@@ -332,12 +361,16 @@ mod tests {
             .unwrap()
     }
 
-    fn build_cloudevent_upayload_for_test() -> UPayload {
+    fn build_cloudevent_umessage_for_test() -> UMessage {
         let event = build_cloud_event_for_test();
         let proto_event = CloudEventProto::from(event);
         let any = RpcMapper::pack_any(&proto_event).unwrap();
 
-        any.try_into().unwrap()
+        let payload = UPayload::try_from(any).unwrap();
+        UMessage {
+            payload: MessageField::some(payload),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -373,18 +406,14 @@ mod tests {
         assert_eq!(result.err().unwrap().to_string(), "Unexpected error: Boom");
     }
 
-    // This seems to exclusively test this .exceptionally() method on the Java side, which we don't have here
-    // (and also, which does only very distantly have anything to do with the uProtocol stuff)
-    // #[test]
-    // fn test_compose_with_failure_transform_exception() {}
-
     #[test]
     fn test_success_invoke_method_happy_flow_using_map_response_to_rpc_response() {
-        let response_payload = build_cloudevent_upayload_for_test();
+        let response_message = build_cloudevent_umessage_for_test();
 
-        let result = RpcMapper::map_response_to_result(Ok(response_payload.clone())).unwrap();
+        let result = RpcMapper::map_response_to_result(Ok(response_message.clone())).unwrap();
+
         assert!(result.status.is_failed());
-        assert_eq!(result.payload.unwrap(), response_payload);
+        assert_eq!(result.payload.unwrap(), response_message.payload.unwrap());
     }
 
     #[test]
@@ -397,10 +426,6 @@ mod tests {
         assert_eq!(UCode::INVALID_ARGUMENT, result.status.get_code());
         assert_eq!("boom", result.status.message.unwrap());
     }
-
-    // No exceptions in Rust
-    // #[test]
-    // fn test_fail_invoke_method_when_invoke_method_threw_an_exception_using_map_response_to_rpc_response()
 
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_bad_proto_using_map_response_to_rpc_response(
@@ -417,8 +442,9 @@ mod tests {
 
     #[test]
     fn test_success_invoke_method_happy_flow_using_map_response() {
-        let response_payload = build_cloudevent_upayload_for_test();
-        let e = RpcMapper::map_response::<CloudEventProto>(Ok(response_payload)).unwrap();
+        let response_message = build_cloudevent_umessage_for_test();
+
+        let e = RpcMapper::map_response::<CloudEventProto>(Ok(response_message)).unwrap();
         let event = Event::from(e);
 
         assert_eq!(event, build_cloud_event_for_test());
@@ -431,10 +457,6 @@ mod tests {
 
         assert!(e.is_err());
     }
-
-    // We don't do exceptions
-    // #[test]
-    // fn test_fail_invoke_method_when_invoke_method_threw_an_exception_using_map_response()
 
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_bad_proto_using_map_response() {

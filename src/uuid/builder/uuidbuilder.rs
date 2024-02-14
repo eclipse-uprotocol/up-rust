@@ -48,7 +48,7 @@ impl UUIDv8Builder {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uuid::builder::UUIDv8Builder;
+    /// use up_rust::uuid::builder::UUIDv8Builder;
     ///
     /// let builder = UUIDv8Builder::new();
     /// let uuid1 = builder.build();
@@ -77,7 +77,7 @@ impl UUIDv8Builder {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uuid::builder::UUIDv8Builder;
+    /// use up_rust::uuid::builder::UUIDv8Builder;
     ///
     /// let uuid = UUIDv8Builder::new().build();
     /// assert!(uuid.is_uprotocol_uuid());

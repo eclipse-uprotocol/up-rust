@@ -125,7 +125,10 @@ impl fmt::Display for UCloudEventAttributes {
         write!(
             f,
             "UCloudEventAttributes {{ hash: {:?}, priority: {:?}, ttl: {:?}, token: {:?} }}",
-            self.hash, self.priority, self.ttl, self.token
+            self.hash,
+            self.priority.unwrap_or_default().to_priority_code(),
+            self.ttl,
+            self.token
         )
     }
 }

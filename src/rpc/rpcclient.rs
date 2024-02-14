@@ -13,37 +13,39 @@
 
 use async_trait::async_trait;
 
-use crate::rpc::rpcmapper::RpcMapperError;
-use crate::uprotocol::{UAttributes, UPayload, UUri};
+use crate::rpc::{rpcmapper::RpcMapperError, CallOptions};
+use crate::uprotocol::{UMessage, UPayload, UUri};
 
-pub type RpcClientResult = Result<UPayload, RpcMapperError>;
+pub type RpcClientResult = Result<UMessage, RpcMapperError>;
 
-/// `RpcClient` serves as an interface to be used by code generators for uProtocol services defined in
-/// `.proto` files, such as the core uProtocol services found in
-/// [uProtocol Core API](https://github.com/eclipse-uprotocol/uprotocol-core-api).
+/// `RpcClient` is an interface used by code generators for uProtocol services defined in `.proto` files such as
+/// the core uProtocol services found in [uProtocol Core API](https://github.com/eclipse-uprotocol/uprotocol-core-api).
 ///
-/// The trait provides a clean contract for all transports to implement, enabling support for RPC on their platforms.
-/// Every platform MUST implement this trait.
-///
-/// For more details, please refer to the
+/// The trait provides a clean contract for mapping a RPC requiest to a response. For more details please refer to the
 /// [RpcClient Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l2/README.adoc).
 #[async_trait]
 pub trait RpcClient {
-    /// Support for RPC method invocation.
+    /// Invokes a method on a remote service asynchronously.
+    ///
+    /// This function is an API for clients to send an RPC request and receive a response.
+    /// The client specifies the method to be invoked using the `method` parameter,
+    /// which is the URI of the method. The `request` contains the request message, and
+    /// `options` includes various metadata and settings for the method invocation.
     ///
     /// # Arguments
     ///
-    /// * `topic` - The topic to invoke the method on.
-    /// * `payload` - The payload to send.
-    /// * `attributes` - The attributes to send.
+    /// * `method` - The URI of the method to be invoked. For example, in long form: "/example.hello_world/1/rpc.SayHello".
+    /// * `request` - The request message to be sent to the server.
+    /// * `options` - Call options for the RPC method invocation, as specified by `CallOptions`.
     ///
     /// # Returns
     ///
-    /// Returns a Future with the result or error.
+    /// Returns a `RpcClientResult` which contains the response message.
+    /// If the invocation fails, it contains a `UStatus` detailing the failure reason.
     async fn invoke_method(
         &self,
-        topic: UUri,
-        payload: UPayload,
-        attributes: UAttributes,
+        method: UUri,
+        request: UPayload,
+        options: CallOptions,
     ) -> RpcClientResult;
 }

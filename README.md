@@ -1,32 +1,28 @@
-# Eclipse uProtocol Rust SDK
+# Eclipse uProtocol Rust library
 
 ## Overview
 
-The purpose of this module is to provide language specific code that builds the various data types defined in the [uProtocol Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main).
+This library implements the [uProtocol Language Specific Library Requirements](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/languages.adoc) for Rust defined in [uProtocol Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main). The library is organized into packages that are described below. Each package contains a README file that describes the purpose of the package and how to use it.
 
-The module contains builder methods and validators for all data types used in uProtocol.
-
-The SDKs are then used by the code generators to auto-populate service stubs with generated code that builds uProtocol events. For more information on auto-generating service stubs, please refer to the [uProtocol Main Project](http://github.com/eclipse-uprotocol/uprotocol).
+The module contains the factory methods, serializers, and validators for all data types defined in the specifications, and any data models that either haven't or couldn't be defined in up-core-api yet.
 
 ## Getting Started
 
-### Building the SDK
+### Building the library
 
-Building the SDK is as simple as running `cargo build` in the project root directory.
-Once the SDK is built, you can run the tests with `cargo test`.
+Building the library is as simple as running `cargo build` in the project root directory. You can run the tests with `cargo test`.
 
-__Note:__ the SDK currently builds two protobuf messages from upstream cloudevents and grpc definitions. Specifically, the build process downloads:
+__Note:__ the library current uses protobuf message definitions from the cloudevents project. Specifically, the build process downloads:
 
-- `cloudevents.proto` from the [CNCF CloudEvents specification project](https://github.com/cloudevents/spec/blob/main/cloudevents/formats/cloudevents.proto) and
-- `status.proto` from [Google APIs](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto).
+- `cloudevents.proto` from the [CNCF CloudEvents specification project](https://github.com/cloudevents/spec/blob/main/cloudevents/formats/cloudevents.proto)
 
-Additionally, the build pulls in a set of uprotocol protobuf definitions that constitute the core types used in the SDK. All of these are compiled automatically during build by `build.rs`in the project root. The resulting Rust code is made available to the project via `lib.rs` definitions, in `pub::mod::proto`.
+Additionally, the build pulls [uprotocol protobuf definitions](https://github.com/eclipse-uprotocol/up-core-api) that constitute the core types used in the library. All of these are compiled automatically during build by `build.rs`in the project root. The resulting Rust code is made available to the project via `lib.rs` definitions, in `pub::mod::proto`.
 
-__Note:__ the SDK uses non-stable features from the uuid crate, notably version 8 UUIDs. These features are defined in `cargo.toml` (where the uuid crate dependency is declared), and require a compiler flag to be included in the build. This is configured in `.cargo/config.toml`.
+__Note:__ the library uses non-stable features from the uuid crate, notably version 8 UUIDs. These features are defined in `cargo.toml` (where the uuid crate dependency is declared), and require a compiler flag to be included in the build. This is configured in `.cargo/config.toml`.
 
-### Using the SDK
+### Using the library
 
-The SDK is composed of the main packages as shown below:
+The library contains the following modules:
 
 Package | [uProtocol spec](https://github.com/eclipse-uprotocol/uprotocol-spec) | Purpose
 ---|---|---

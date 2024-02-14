@@ -98,19 +98,18 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
 
         // ADDRESS_TYPE
         if let Some(authority) = uri.authority.as_ref() {
-            if authority.get_name().is_none() {
-                address_type = AddressType::Local;
-            }
-            if let Some(id) = authority.get_id() {
-                authority_id = Some(id.to_vec());
+            if authority.has_id() {
+                authority_id = Some(authority.id().to_vec());
                 address_type = AddressType::ID;
-            } else if let Some(ip) = authority.get_ip() {
-                match ip.len() {
+            } else if authority.has_ip() {
+                match authority.ip().len() {
                     4 => address_type = AddressType::IPv4,
                     16 => address_type = AddressType::IPv6,
                     _ => return Err(SerializationError::new("Invalid IP address")),
                 }
-                remote_ip = Some(ip.to_vec());
+                remote_ip = Some(authority.ip().to_vec());
+            } else {
+                address_type = AddressType::Local;
             }
         }
 
@@ -221,25 +220,24 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
 
         // Calculate uAuthority
         let authority = match address_type {
-            AddressType::IPv4 => {
-                let ip4_address = buf.copy_to_bytes(4);
-                Some(UAuthority {
-                    ip: Some(ip4_address.into()),
-                    ..Default::default()
-                })
-            }
-            AddressType::IPv6 => {
-                let ip6_address = buf.copy_to_bytes(16);
-                Some(UAuthority {
-                    ip: Some(ip6_address.into()),
-                    ..Default::default()
-                })
-            }
+            AddressType::IPv4 => Some(UAuthority {
+                number: Some(crate::uprotocol::uri::uauthority::Number::Ip(
+                    buf.copy_to_bytes(4).to_vec(),
+                )),
+                ..Default::default()
+            }),
+            AddressType::IPv6 => Some(UAuthority {
+                number: Some(crate::uprotocol::uri::uauthority::Number::Ip(
+                    buf.copy_to_bytes(16).to_vec(),
+                )),
+                ..Default::default()
+            }),
             AddressType::ID => {
-                let length = buf.get_u8();
-                let authority_id = buf.copy_to_bytes(length as usize);
+                let len = buf.get_u8() as usize;
                 Some(UAuthority {
-                    id: Some(authority_id.into()),
+                    number: Some(crate::uprotocol::uri::uauthority::Number::Id(
+                        buf.copy_to_bytes(len).to_vec(),
+                    )),
                     ..Default::default()
                 })
             }
@@ -419,7 +417,9 @@ mod tests {
         let address: Ipv4Addr = "10.0.3.3".parse().unwrap();
         let uri = UUri {
             authority: Some(UAuthority {
-                ip: Some(address.octets().to_vec()),
+                number: Some(crate::uprotocol::uri::uauthority::Number::Ip(
+                    address.octets().to_vec(),
+                )),
                 ..Default::default()
             })
             .into(),
@@ -448,7 +448,9 @@ mod tests {
         let address: Ipv6Addr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse().unwrap();
         let uri = UUri {
             authority: Some(UAuthority {
-                ip: Some(address.octets().to_vec()),
+                number: Some(crate::uprotocol::uri::uauthority::Number::Ip(
+                    address.octets().to_vec(),
+                )),
                 ..Default::default()
             })
             .into(),
@@ -482,7 +484,9 @@ mod tests {
         let authority_id: Vec<u8> = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
         let uri = UUri {
             authority: Some(UAuthority {
-                id: Some(authority_id),
+                number: Some(crate::uprotocol::uri::uauthority::Number::Id(
+                    authority_id.to_vec(),
+                )),
                 ..Default::default()
             })
             .into(),
@@ -517,7 +521,9 @@ mod tests {
         let bad_bytes: Vec<u8> = vec![127, 1, 23, 123, 12, 6];
         let uri = UUri {
             authority: Some(UAuthority {
-                ip: Some(bad_bytes),
+                number: Some(crate::uprotocol::uri::uauthority::Number::Ip(
+                    bad_bytes.to_vec(),
+                )),
                 ..Default::default()
             })
             .into(),
@@ -542,7 +548,9 @@ mod tests {
 
         let uri = UUri {
             authority: Some(UAuthority {
-                id: Some(bytes),
+                number: Some(crate::uprotocol::uri::uauthority::Number::Id(
+                    bytes.to_vec(),
+                )),
                 ..Default::default()
             })
             .into(),
