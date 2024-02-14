@@ -112,6 +112,8 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     /// };
     /// let uprotocol_uri = MicroUriSerializer::serialize(&uri);
     /// assert!(uprotocol_uri.is_ok());
+    /// let expected_uri_bytes = vec![0x01, 0x00, 0x75, 0x2F, 0x4E, 0x1F, 0xFE, 0x00];
+    /// assert_eq!(uprotocol_uri.unwrap(), expected_uri_bytes);
     /// ```
     ///
     /// ## Example which fails the Micro Uri validation due to UEntity ID being > 16 bits

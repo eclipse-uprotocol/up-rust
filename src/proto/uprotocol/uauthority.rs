@@ -11,6 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use crate::uprotocol::uri::uauthority::Number;
 use crate::uprotocol::UAuthority;
 
 pub use crate::uri::validator::ValidationError;
@@ -26,22 +27,6 @@ impl UAuthority {
         self.name.as_deref()
     }
 
-    pub fn get_ip(&self) -> Option<&[u8]> {
-        self.ip.as_deref()
-    }
-
-    pub fn has_ip(&self) -> bool {
-        self.ip.is_some()
-    }
-
-    pub fn get_id(&self) -> Option<&[u8]> {
-        self.id.as_deref()
-    }
-
-    pub fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-
     /// Returns whether a `UAuthority` satisfies the requirements of a micro form URI
     ///
     /// # Returns
@@ -52,23 +37,24 @@ impl UAuthority {
     ///
     /// Returns a `ValidationError` in the failure case
     pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
-        if self.id.is_none() && self.ip.is_none() {
+        let Some(number) = &self.number else {
             return Err(ValidationError::new(
                 "Must have IP address or ID set as UAuthority for micro form. Neither are set.",
             ));
-        }
+        };
 
-        if let Some(ip) = self.ip.as_ref() {
-            if !(ip.len() == REMOTE_IPV4_BYTES || ip.len() == REMOTE_IPV6_BYTES) {
-                return Err(ValidationError::new(
-                    "IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)",
-                ));
+        match number {
+            Number::Ip(ip) => {
+                if !(ip.len() == REMOTE_IPV4_BYTES || ip.len() == REMOTE_IPV6_BYTES) {
+                    return Err(ValidationError::new(
+                        "IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)",
+                    ));
+                }
             }
-        }
-
-        if let Some(id) = self.id.as_ref() {
-            if !matches!(id.len(), REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES) {
-                return Err(ValidationError::new("ID doesn't fit in bytes allocated"));
+            Number::Id(id) => {
+                if !matches!(id.len(), REMOTE_ID_MINIMUM_BYTES..=REMOTE_ID_MAXIMUM_BYTES) {
+                    return Err(ValidationError::new("ID doesn't fit in bytes allocated"));
+                }
             }
         }
         Ok(())
