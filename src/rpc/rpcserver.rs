@@ -15,15 +15,14 @@ use async_trait::async_trait;
 
 use crate::uprotocol::{UMessage, UStatus, UUri};
 
-/// `RpcServer` is an interface called by uServices to register method listeners for
-/// incoming RPC requests from clients.
+pub type RpcServerListener = Box<dyn Fn(Result<UMessage, UStatus>) + Send + Sync + 'static>;
+
+/// `RpcServer` is an interface called by uServices to register method listeners for incoming RPC requests from clients.
 ///
-/// For more details, please refer to the
-/// [RpcServer Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l2/README.adoc).
+/// For more details, please refer to the [RpcServer Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/rpcserver.adoc)
 #[async_trait]
 pub trait RpcServer {
-    /// Register a listener for a particular method URI to be notified when requests
-    /// are sent against said method.
+    /// Register a listener for a particular method URI to be notified when requests are sent against said method.
     /// Note: Only one listener is allowed to be registered per method URI.
     ///
     /// # Arguments
@@ -39,7 +38,7 @@ pub trait RpcServer {
     async fn register_rpc_listener(
         &self,
         method: UUri,
-        listener: Box<dyn Fn(Result<UMessage, UStatus>) + Send + Sync + 'static>,
+        listener: RpcServerListener,
     ) -> Result<String, UStatus>;
 
     /// Unregister an RPC listener for a given method Uri. Messages arriving on this method

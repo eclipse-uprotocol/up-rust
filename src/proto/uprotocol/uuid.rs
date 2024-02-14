@@ -98,7 +98,7 @@ impl UUID {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UUID;
+    /// use up_rust::uprotocol::UUID;
     ///
     /// // timestamp = 1, ver = 0b1000
     /// let msb = 0x0000000000018000_u64;
@@ -129,7 +129,7 @@ impl UUID {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UUID;
+    /// use up_rust::uprotocol::UUID;
     ///
     /// // timestamp = 0x018D548EA8E0 (Monday, 29 January 2024, 9:30:52 AM GMT)
     /// // ver = 0b1000
@@ -165,7 +165,7 @@ impl UUID {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UUID;
+    /// use up_rust::uprotocol::UUID;
     ///
     /// // timestamp = 1, ver = 0b1000
     /// let msb = 0x0000000000018000u64;
@@ -228,7 +228,7 @@ impl FromStr for UUID {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UUID;
+    /// use up_rust::uprotocol::UUID;
     ///
     /// // parsing a valid uProtocol UUID succeeds
     /// let parsing_attempt = "00000000-0001-8000-8010-101010101010".parse::<UUID>();

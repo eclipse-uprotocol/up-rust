@@ -23,6 +23,77 @@ use crate::cloudevents::cloud_event::CloudEventAttributeValue;
 use crate::cloudevents::cloud_event::Data as CloudEventData;
 use crate::cloudevents::CloudEvent as CloudEventProto;
 
+use crate::uprotocol::umessage::UMessage;
+use crate::uprotocol::{SerializationError, UPriority};
+use crate::uri::serializer::{LongUriSerializer, UriSerializer};
+
+impl TryFrom<UMessage> for cloudevents::Event {
+    type Error = SerializationError;
+
+    fn try_from(source_event: UMessage) -> Result<Self, Self::Error> {
+        let attributes = source_event.attributes.get_or_default();
+        let source = attributes.source.get_or_default();
+        let payload = source_event.payload.get_or_default();
+        let uri = LongUriSerializer::serialize(source)?;
+
+        if attributes.id.is_none() {
+            return Err(SerializationError::new("Empty attributes ID"));
+        }
+        if attributes.type_.enum_value().is_err() {
+            return Err(SerializationError::new("Bad attributes type"));
+        }
+
+        let event_builder = cloudevents::EventBuilderV10::new()
+            .id(attributes.id.get_or_default())
+            .ty(attributes.type_.enum_value_or_default().to_type_string())
+            .source(uri);
+        let mut event = event_builder
+            .build()
+            .map_err(|e| SerializationError::new(format!("Error creating cloudevent: {e}")))
+            .unwrap();
+
+        let ctype = payload.format.enum_value_or_default();
+        event.set_datacontenttype(ctype.to_media_type());
+
+        if payload.has_value() {
+            event.set_data_unchecked(payload.value().to_vec());
+        }
+        if let Some(ttl) = attributes.ttl {
+            event.set_extension("ttl", ExtensionValue::Integer(ttl as i64));
+        }
+        if let Some(token) = &attributes.token {
+            event.set_extension("token", ExtensionValue::String(token.to_string()));
+        }
+        if attributes
+            .priority
+            .enum_value()
+            .is_ok_and(|p| p != UPriority::UPRIORITY_UNSPECIFIED)
+        {
+            event.set_extension(
+                "priority",
+                ExtensionValue::String(
+                    attributes.priority.enum_value().unwrap().to_priority_code(),
+                ),
+            );
+        }
+        if let Some(sink) = &attributes.sink.clone().into_option() {
+            let uri = LongUriSerializer::serialize(sink)?;
+            event.set_extension("sink", ExtensionValue::String(uri));
+        }
+        if let Some(commstatus) = attributes.commstatus {
+            event.set_extension("commstatus", ExtensionValue::Integer(commstatus as i64));
+        }
+        if let Some(reqid) = &attributes.reqid.clone().into_option() {
+            event.set_extension("reqid", ExtensionValue::String(reqid.to_string()));
+        }
+        if let Some(plevel) = attributes.permission_level {
+            event.set_extension("plevel", ExtensionValue::Integer(plevel as i64));
+        }
+
+        Ok(event)
+    }
+}
+
 impl From<CloudEventProto> for cloudevents::Event {
     fn from(source_event: CloudEventProto) -> Self {
         let mut subject: Option<String> = None;
@@ -124,7 +195,6 @@ impl From<cloudevents::Event> for CloudEventProto {
         let mut ext_list = HashMap::<String, CloudEventAttributeValue>::new();
 
         // subject
-        // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
         if let Some(subject) = source_event.subject() {
             let s = CloudEventAttributeValue {
                 attr: Some(Attr::CeString(subject.to_string())),
@@ -134,7 +204,6 @@ impl From<cloudevents::Event> for CloudEventProto {
         }
 
         // timestamp
-        // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
         if source_event.time().is_some() {
             let time = *source_event.time().unwrap();
             let sys_time: std::time::SystemTime = time.into();
@@ -149,7 +218,6 @@ impl From<cloudevents::Event> for CloudEventProto {
         }
 
         // dataschema
-        // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
         if let Some(schema) = source_event.dataschema() {
             let ds = CloudEventAttributeValue {
                 attr: Some(Attr::CeUri(schema.to_string())),
@@ -159,7 +227,6 @@ impl From<cloudevents::Event> for CloudEventProto {
         }
 
         // contenttype
-        // TODO how is this serialized by eg the Java libraries, considering cloudevent.proto is missing dedicated attributes for this?
         if let Some(contenttype) = source_event.datacontenttype() {
             let ct = CloudEventAttributeValue {
                 attr: Some(Attr::CeString(contenttype.to_string())),
@@ -220,98 +287,117 @@ impl From<cloudevents::Event> for CloudEventProto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloudevent::builder::UCloudEventBuilder;
-    use crate::cloudevent::datamodel::UCloudEventAttributes;
-    use crate::uprotocol::uattributes::{UMessageType, UPriority};
+    use crate::uprotocol::uattributes::UMessageType;
     use crate::uprotocol::uri::{UEntity, UResource, UUri};
+    use crate::uprotocol::{UAttributes, UAuthority, UPayload, UPayloadFormat};
     use crate::uri::serializer::{LongUriSerializer, UriSerializer};
+    use crate::uuid::builder::UUIDv8Builder;
 
-    use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
+    use cloudevents::{Event, EventBuilder, EventBuilderV10};
     use protobuf::well_known_types::any::Any;
 
     #[test]
-    fn test_cloudevent_to_proto() {
-        let origin = build_base_cloud_event_for_test().build().unwrap();
-        let proto = CloudEventProto::from(origin.clone());
-        let dest = cloudevents::Event::from(proto);
+    fn test_umessage_to_event() {
+        let (message, event, _event_proto) = build_message_formats_for_test();
+        let dest = Event::try_from(message).unwrap();
 
-        assert_eq!(origin, dest);
+        assert_eq!(event, dest);
     }
 
-    fn build_base_cloud_event_for_test() -> EventBuilderV10 {
+    #[test]
+    fn test_event_to_eventproto() {
+        let (_message, event, event_proto) = build_message_formats_for_test();
+        let dest = CloudEventProto::from(event);
+
+        assert_eq!(event_proto, dest);
+    }
+
+    #[test]
+    fn test_eventproto_to_event() {
+        let (_message, event, event_proto) = build_message_formats_for_test();
+        let dest = Event::from(event_proto);
+
+        assert_eq!(event, dest);
+    }
+
+    // create different event message objects with equivalent content
+    fn build_message_formats_for_test() -> (UMessage, Event, CloudEventProto) {
+        // common parts
         let uri = UUri {
+            authority: Some(UAuthority {
+                name: Some("VCU.MY_CAR_VIN".into()),
+                ..Default::default()
+            })
+            .into(),
             entity: Some(UEntity {
-                name: "body.access".to_string(),
+                name: "body.access".into(),
                 ..Default::default()
             })
             .into(),
             resource: Some(UResource {
                 name: "door".to_string(),
+                instance: Some("front_left".into()),
+                message: Some("Door".into()),
                 ..Default::default()
             })
             .into(),
             ..Default::default()
         };
-        let source = LongUriSerializer::serialize(&uri).unwrap();
-
-        // fake payload
-        let payload = pack_event_into_any(&build_proto_payload_for_test());
-
-        // additional attributes
-        let attributes = UCloudEventAttributes::builder()
-            .with_hash("somehash".to_string())
-            .with_priority(UPriority::UPRIORITY_CS0)
-            .with_ttl(3)
-            .with_token("someOAuthToken".to_string())
-            .build();
-
-        let event = UCloudEventBuilder::build_base_cloud_event(
-            "testme",
-            &source,
-            &payload.value,
-            payload.type_url.as_str(),
-            &attributes,
-        );
-        event.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
-    }
-
-    fn pack_event_into_any(event: &Event) -> Any {
-        let data_bytes: Vec<u8> = match event.data() {
-            Some(Data::Binary(bytes)) => bytes.clone(),
-            Some(Data::String(s)) => s.as_bytes().to_vec(),
-            Some(Data::Json(j)) => j.to_string().into_bytes(),
-            None => Vec::new(),
-        };
-
-        // The cloudevent crate uses the url crate for storing dataschema, which needs a schema prefix to work,
-        // which gets added in UCloudEventBuilder::build_base_cloud_event() or in related test cases.
-        // And this schema prefix needs to be removed again here:
-        let schema = {
-            let temp_schema = event.dataschema().unwrap().to_string();
-            temp_schema
-                .strip_prefix("proto://")
-                .unwrap_or(&temp_schema)
-                .to_string()
-        };
-
-        Any {
-            type_url: schema,
-            value: data_bytes,
-            ..Default::default()
-        }
-    }
-
-    fn build_proto_payload_for_test() -> Event {
-        EventBuilderV10::new()
-            .id("hello")
-            .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
-            .data_with_schema(
-                "application/octet-stream",
-                "proto://type.googleapis.com/example.demo",
+        let uuid = UUIDv8Builder::new().build();
+        let payload = UPayload {
+            data: Some(crate::uprotocol::upayload::upayload::Data::Value(
                 Any::default().value,
-            )
+            )),
+            format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY.into(),
+            ..Default::default()
+        };
+        let attributes = UAttributes {
+            source: Some(uri.clone()).into(),
+            id: Some(uuid.clone()).into(),
+            type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+            ..Default::default()
+        };
+
+        // CloudEvent
+        let event = EventBuilderV10::new()
+            .id(uuid.to_hyphenated_string())
+            .source(LongUriSerializer::serialize(&uri).unwrap())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .data("application/x-protobuf", Any::default().value)
             .build()
-            .unwrap()
+            .unwrap();
+
+        // UMessage
+        let message = UMessage {
+            attributes: Some(attributes).into(),
+            payload: Some(payload).into(),
+            ..Default::default()
+        };
+
+        // protobuf CloudEvent
+        let mut attr_list = HashMap::<String, CloudEventAttributeValue>::new();
+        attr_list.insert(
+            "contenttype".into(),
+            CloudEventAttributeValue {
+                attr: Some(Attr::CeString("application/x-protobuf".into())),
+                ..Default::default()
+            },
+        );
+
+        let event_proto = CloudEventProto {
+            id: uuid.to_hyphenated_string(),
+            source: LongUriSerializer::serialize(&uri).unwrap(),
+            type_: UMessageType::UMESSAGE_TYPE_PUBLISH
+                .to_type_string()
+                .to_string(),
+            attributes: attr_list,
+            data: Some(crate::cloudevents::cloud_event::Data::BinaryData(
+                Any::default().value,
+            )),
+            spec_version: "1.0".into(),
+            ..Default::default()
+        };
+
+        (message, event, event_proto)
     }
 }

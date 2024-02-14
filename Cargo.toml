@@ -12,10 +12,10 @@
 ################################################################################
 
 [package]
-authors = ["Daniel Krippner <dk.mailbox@gmx.net>"]
+author = "Eclipse Foundation uProtocol project"
 categories = ["api-bindings"]
-description = "Rust implementation of the Eclipse uProtocol SDK"
-documentation = "https://github.com/eclipse-uprotocol/uprotocol-spec#readme"
+description = "Rust implementation of the Eclipse uProtocol library"
+documentation = "https://github.com/eclipse-uprotocol/up-spec#readme"
 edition = "2021"
 exclude = [
     "tests/*",
@@ -27,9 +27,9 @@ exclude = [
 ]
 keywords = ["uProtocol", "SDK"]
 license = "Apache-2.0"
-name = "uprotocol-sdk"
+name = "up-rust"
 readme = "README.md"
-repository = "https://github.com/eclipse-uprotocol/uprotocol-rust"
+repository = "https://github.com/eclipse-uprotocol/up-rust"
 rust-version = "1.66"
 version = "0.1.5"
 

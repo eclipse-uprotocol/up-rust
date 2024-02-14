@@ -21,7 +21,7 @@ impl UStatus {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::{UCode, UStatus};
+    /// use up_rust::uprotocol::{UCode, UStatus};
     ///
     /// let status = UStatus::ok();
     /// assert_eq!(status.code.unwrap(), UCode::OK);
@@ -38,7 +38,7 @@ impl UStatus {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UStatus;
+    /// use up_rust::uprotocol::UStatus;
     ///
     /// let status = UStatus::fail("something went wrong");
     /// assert_eq!(status.message.unwrap(), "something went wrong");
@@ -56,7 +56,7 @@ impl UStatus {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::{UCode, UStatus};
+    /// use up_rust::uprotocol::{UCode, UStatus};
     ///
     /// let status = UStatus::fail_with_code(UCode::DATA_LOSS, "something went wrong");
     /// assert_eq!(status.code.unwrap(), UCode::DATA_LOSS);
@@ -75,7 +75,7 @@ impl UStatus {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UStatus;
+    /// use up_rust::uprotocol::UStatus;
     ///
     /// let failed_status = UStatus::fail("something went wrong");
     /// assert!(failed_status.is_failed());
@@ -92,7 +92,7 @@ impl UStatus {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UStatus;
+    /// use up_rust::uprotocol::UStatus;
     ///
     /// let succeeded_status = UStatus::ok();
     /// assert!(succeeded_status.is_success());
@@ -114,7 +114,7 @@ impl UStatus {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UStatus;
+    /// use up_rust::uprotocol::UStatus;
     ///
     /// let failed_status = UStatus::fail("my error message");
     /// assert_eq!(failed_status.get_message(), "my error message");
@@ -138,7 +138,7 @@ impl UStatus {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::{UCode, UStatus};
+    /// use up_rust::uprotocol::{UCode, UStatus};
     ///
     /// let status = UStatus::fail("my error message");
     /// assert_eq!(status.get_code(), UCode::UNKNOWN);

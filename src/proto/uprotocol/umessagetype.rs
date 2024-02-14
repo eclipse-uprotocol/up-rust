@@ -26,7 +26,7 @@ impl UMessageType {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UMessageType;
+    /// use up_rust::uprotocol::UMessageType;
     ///
     /// assert_eq!(UMessageType::UMESSAGE_TYPE_PUBLISH.to_i32_string(), "1");
     /// ```
@@ -44,7 +44,7 @@ impl UMessageType {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UMessageType;
+    /// use up_rust::uprotocol::UMessageType;
     ///
     /// let message_type = UMessageType::from_i32_string("1");
     /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_PUBLISH);
@@ -73,7 +73,7 @@ impl UMessageType {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UMessageType;
+    /// use up_rust::uprotocol::UMessageType;
     ///
     /// let identifier = UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string();
     /// assert_eq!(identifier, "pub.v1");
@@ -100,7 +100,7 @@ impl UMessageType {
     /// # Examples
     ///
     /// ```rust
-    /// use uprotocol_sdk::uprotocol::UMessageType;
+    /// use up_rust::uprotocol::UMessageType;
     ///
     /// let message_type = UMessageType::from_type_string("pub.v1");
     /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_PUBLISH);

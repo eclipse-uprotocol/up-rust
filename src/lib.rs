@@ -11,15 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-//! # uProtocol-SDK-Rust
+//! # up-rust  - uProtocol Rust library
 //!
-//! The purpose of this crate is to provide Rust specific code that builds the various data types
-//! defined in the [uProtocol Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main).
-//!
-//! The crate contains factory methods and validators for all data types used in uProtocol.
-//!
-//! For the time being, usage examples can be seen in the test cases that are provided for almost every type.
-//! More bespoke examples will be provided asap, once uProtocol runtime components are available.
+//! The purpose of this crate is to provide Rust specific code to work with the various
+//! [uProtocol Core API types](https://github.com/eclipse-uprotocol/up-core-api). The crate contains trait definitions and
+//! convenience functionality for building, converting, validating and serializing uProtocol data types.
 //!
 //! ## This crate includes:
 //!
@@ -30,7 +26,8 @@
 //! - the [`uuid`] module which generates and validates UUIDs as per the uProtocol specification
 //!
 //! ## References
-//! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/tree/main)
+//! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec)
+//! - [Eclipse-uProtocol Core API types](https://github.com/eclipse-uprotocol/up-core-api)
 
 mod types {
     pub mod parsingerror;
@@ -161,6 +158,7 @@ pub(crate) mod proto {
         pub(crate) mod uentity;
         pub(crate) mod umessagetype;
         pub(crate) mod upayload;
+        pub(crate) mod upriority;
         pub(crate) mod uresource;
         pub(crate) mod ustatus;
         pub(crate) mod uuid;

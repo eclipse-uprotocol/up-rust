@@ -62,9 +62,9 @@ impl UCloudEventBuilder {
     ///
     /// ```rust
     /// use protobuf::well_known_types::any::Any;
-    /// use uprotocol_sdk::cloudevent::datamodel::{UCloudEventAttributes};
-    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
-    /// use uprotocol_sdk::uprotocol::uattributes::UPriority;
+    /// use up_rust::cloudevent::datamodel::{UCloudEventAttributes};
+    /// use up_rust::cloudevent::builder::UCloudEventBuilder;
+    /// use up_rust::uprotocol::uattributes::UPriority;
     ///
     /// let rpc_uri = "http://myapp.com/rpc";
     /// let service_method_uri = ":/body.access/1/rpc.UpdateDoor";
@@ -123,8 +123,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```
-    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
+    /// use up_rust::cloudevent::builder::UCloudEventBuilder;
+    /// use up_rust::cloudevent::datamodel::UCloudEventAttributes;
     /// use protobuf::well_known_types::any::Any;
     ///
     /// let rpc_uri = "https://example.com/rpc";
@@ -188,8 +188,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```rust
-    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
+    /// use up_rust::cloudevent::builder::UCloudEventBuilder;
+    /// use up_rust::cloudevent::datamodel::UCloudEventAttributes;
     /// use protobuf::well_known_types::any::Any;
     ///
     /// let application_uri = "http://myapplication.com/rpc";
@@ -252,8 +252,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```rust
-    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
+    /// use up_rust::cloudevent::builder::UCloudEventBuilder;
+    /// use up_rust::cloudevent::datamodel::UCloudEventAttributes;
     /// use protobuf::well_known_types::any::Any;
     ///
     /// let source = "http://myapplication.com/topic";
@@ -302,8 +302,8 @@ impl UCloudEventBuilder {
     /// # Example
     ///
     /// ```rust
-    /// use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
-    /// use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
+    /// use up_rust::cloudevent::builder::UCloudEventBuilder;
+    /// use up_rust::cloudevent::datamodel::UCloudEventAttributes;
     /// use protobuf::well_known_types::any::Any;
     ///
     /// let source = "http://myapplication.com/topic";
@@ -358,8 +358,8 @@ impl UCloudEventBuilder {
     ///
     /// ```rust
     /// # use cloudevents::{Event, EventBuilder, EventBuilderV10};
-    /// # use uprotocol_sdk::cloudevent::builder::UCloudEventBuilder;
-    /// # use uprotocol_sdk::cloudevent::datamodel::UCloudEventAttributes;
+    /// # use up_rust::cloudevent::builder::UCloudEventBuilder;
+    /// # use up_rust::cloudevent::datamodel::UCloudEventAttributes;
     /// # use protobuf::well_known_types::any::Any;
     ///
     /// let id = "unique_id";

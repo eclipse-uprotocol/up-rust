@@ -42,9 +42,18 @@ impl From<&str> for UResource {
             .next()
             .map(std::string::ToString::to_string);
 
+        let mut resource_id: Option<u32> = None;
+        if resource_name.contains("rpc")
+            && resource_instance
+                .as_ref()
+                .is_some_and(|i| i.contains("response"))
+        {
+            resource_id = Some(0);
+        }
+
         UResource {
             name: resource_name,
-            id: None,
+            id: resource_id,
             instance: resource_instance,
             message: resource_message,
             ..Default::default()

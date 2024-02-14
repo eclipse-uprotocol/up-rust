@@ -11,8 +11,6 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-// use regex::Regex;
-
 use regex::Regex;
 
 use crate::uprotocol::{UAuthority, UEntity, UResource, UUri};
