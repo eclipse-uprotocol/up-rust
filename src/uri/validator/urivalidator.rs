@@ -207,8 +207,8 @@ impl UriValidator {
     /// from their impls of `valid_micro_form()`: `UAuthority`, `UEntity`, `UResource`
     ///
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
-    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    /// use up_rust::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
     ///
     /// let uri = UUri {
     ///     authority: Some(UAuthority {
@@ -237,8 +237,8 @@ impl UriValidator {
     ///
     /// ## `UAuthority` IP is incorrect format (neither IPv4, nor IPv6)
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
-    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    /// use up_rust::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
     ///
     /// let uri = UUri {
     ///     authority: Some(UAuthority {
@@ -267,8 +267,8 @@ impl UriValidator {
     ///
     /// ## `UAuthority` ID is longer than maximum allowed (255 bytes)
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
-    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    /// use up_rust::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
     ///
     /// let uri = UUri {
     ///     authority: Some(UAuthority {
@@ -298,8 +298,8 @@ impl UriValidator {
     ///
     /// ## Overflowing `UEntity` ID's 16 bit capacity
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UUri, UEntity, UResource, uri::uauthority::Number};
-    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    /// use up_rust::uprotocol::{UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
     ///
     /// let uri = UUri {
     ///     entity: Some(UEntity {
@@ -321,8 +321,8 @@ impl UriValidator {
     ///
     /// ## Overflowing `UEntity` Major Version 8 bit capacity
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UUri, UEntity, UResource};
-    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    /// use up_rust::uprotocol::{UUri, UEntity, UResource};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
     ///
     /// let uri = UUri {
     ///     entity: Some(UEntity {
@@ -344,8 +344,8 @@ impl UriValidator {
     ///
     /// ## Overflowing `UResource` ID's 16 bit capacity
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UUri, UEntity, UResource};
-    /// use uprotocol_sdk::uri::validator::{UriValidator, ValidationError};
+    /// use up_rust::uprotocol::{UUri, UEntity, UResource};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
     ///
     /// let uri = UUri {
     ///     entity: Some(UEntity {

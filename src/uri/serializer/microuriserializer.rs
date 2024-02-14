@@ -93,8 +93,8 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     /// ## Example which passes the Micro Uri validation
     ///
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UEntity, UUri, UResource};
-    /// use uprotocol_sdk::uri::serializer::{UriSerializer, MicroUriSerializer};
+    /// use up_rust::uprotocol::{UEntity, UUri, UResource};
+    /// use up_rust::uri::serializer::{UriSerializer, MicroUriSerializer};
     ///
     /// let uri = UUri {
     ///     entity: Some(UEntity {
@@ -119,8 +119,8 @@ impl UriSerializer<Vec<u8>> for MicroUriSerializer {
     /// ## Example which fails the Micro Uri validation due to UEntity ID being > 16 bits
     ///
     /// ```
-    /// use uprotocol_sdk::uprotocol::{UEntity, UUri, UResource};
-    /// use uprotocol_sdk::uri::serializer::{UriSerializer, MicroUriSerializer};
+    /// use up_rust::uprotocol::{UEntity, UUri, UResource};
+    /// use up_rust::uri::serializer::{UriSerializer, MicroUriSerializer};
     ///
     /// let uri = UUri {
     ///     entity: Some(UEntity {
