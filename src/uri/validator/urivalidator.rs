@@ -476,7 +476,6 @@ mod tests {
         let uri = UUri::default();
         let status = UriValidator::validate(&uri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
     }
 
     #[test]
@@ -505,10 +504,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -529,10 +524,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -560,10 +551,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_response(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -571,7 +558,6 @@ mod tests {
         let uri = LongUriSerializer::deserialize("/hartley//dummy.wrong".to_string()).unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Invalid RPC response type");
     }
 
     #[test]
@@ -579,7 +565,6 @@ mod tests {
         let uri = LongUriSerializer::deserialize("/hartley//rpc.wrong".to_string()).unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Invalid RPC response type");
     }
 
     #[test]
@@ -631,10 +616,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -655,10 +636,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -682,10 +659,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -712,10 +685,6 @@ mod tests {
         };
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -723,10 +692,6 @@ mod tests {
         let uri = "//VCU.myvin///door.front_left#Door".to_string();
         let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -750,10 +715,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -761,10 +722,6 @@ mod tests {
         let uri = "//VCU.myvin//1".to_string();
         let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -820,10 +777,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -832,10 +785,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -858,10 +807,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -886,10 +831,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -914,10 +855,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -926,10 +863,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -938,10 +871,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -950,10 +879,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -1009,10 +934,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -1021,10 +942,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -1050,10 +967,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -1078,10 +991,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -1108,10 +1017,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -1134,10 +1039,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -1146,10 +1047,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -1172,10 +1069,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]

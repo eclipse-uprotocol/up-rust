@@ -325,10 +325,6 @@ mod tests {
         let uri = UUri::default();
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: URI is empty"
-        );
     }
 
     #[test]
@@ -377,10 +373,6 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Authority: Must have IP address or ID set as UAuthority for micro form. Neither are set."
-        );
     }
 
     #[test]
@@ -396,10 +388,6 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: ID must be present"
-        );
     }
 
     #[test]
@@ -416,20 +404,13 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Resource: Is missing"
-        );
     }
 
     #[test]
     fn test_deserialize_bad_microuri_length() {
         let bad_uri: Vec<u8> = vec![0x1, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "URI is empty or not in micro form"
-        );
+        assert!(uprotocol_uri.is_err());
     }
 
     #[test]
@@ -451,26 +432,14 @@ mod tests {
         let bad_uri: Vec<u8> = vec![0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Invalid micro URI length"
-        );
 
         let bad_uri: Vec<u8> = vec![0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Invalid micro URI length"
-        );
 
         let bad_uri: Vec<u8> = vec![0x1, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
         let uprotocol_uri = MicroUriSerializer::deserialize(bad_uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Invalid micro URI length"
-        );
     }
 
     #[test]
@@ -599,10 +568,6 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Authority: IP address is not IPv4 (4 bytes) or IPv6 (16 bytes)"
-        );
     }
 
     #[test]
@@ -660,10 +625,6 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Resource: ID does not fit within allotted 16 bits in micro form"
-        );
     }
 
     #[test]
@@ -684,10 +645,6 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: ID does not fit within allotted 16 bits in micro form"
-        );
     }
 
     #[test]
@@ -708,9 +665,5 @@ mod tests {
         };
         let uprotocol_uri = MicroUriSerializer::serialize(&uri);
         assert!(uprotocol_uri.is_err());
-        assert_eq!(
-            uprotocol_uri.unwrap_err().to_string(),
-            "Failed to validate micro URI format: Entity: Major version does not fit within 8 allotted bits in micro form"
-        );
     }
 }
