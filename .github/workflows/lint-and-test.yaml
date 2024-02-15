@@ -83,3 +83,13 @@ jobs:
       #   with:
       #     name: Code coverage report
       #     path: cobertura.xml
+
+  build-docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Documentation
+        working-directory: ${{github.workspace}}
+        run: RUSTDOCFLAGS=-Dwarnings cargo doc -p up-rust --no-deps
