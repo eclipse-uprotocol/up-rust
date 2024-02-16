@@ -43,7 +43,7 @@ impl UUIDBuilder {
     /// Creates a new builder for creating uProtocol UUIDs.
     ///
     /// The same bulder instance can be used to create one or more UUIDs
-    /// by means of invoking [`UUIDv8Builder::build`].
+    /// by means of invoking [`UUIDBuilder::build`].
     ///
     /// # Examples
     ///
