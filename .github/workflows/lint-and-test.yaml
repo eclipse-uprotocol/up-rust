@@ -58,7 +58,8 @@ jobs:
           cargo --version
       - name: Run tests and report code coverage
         run: |
-          cargo tarpaulin -o xml -o lcov -o html
+          # enable nightly features so that we can also include Doctests
+          RUSTC_BOOTSTRAP=1 cargo tarpaulin -o xml -o lcov -o html --doc --tests
 
       - name: Upload coverage report (xml)
         uses: actions/upload-artifact@v4
@@ -83,3 +84,13 @@ jobs:
       #   with:
       #     name: Code coverage report
       #     path: cobertura.xml
+
+  build-docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Documentation
+        working-directory: ${{github.workspace}}
+        run: RUSTDOCFLAGS=-Dwarnings cargo doc -p up-rust --no-deps
