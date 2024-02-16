@@ -547,7 +547,7 @@ mod tests {
     use crate::cloudevent::builder::UCloudEventBuilder;
     use crate::cloudevent::datamodel::UCloudEventAttributesBuilder;
     use crate::uprotocol::{UAuthority, UEntity, UPriority};
-    use crate::uuid::builder::UUIDv8Builder;
+    use crate::uuid::builder::UUIDBuilder;
 
     use super::*;
 
@@ -694,7 +694,7 @@ mod tests {
 
     #[test]
     fn validate_cloud_event_version_when_valid() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let builder = build_base_cloud_event_builder_for_test()
             .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .id(uuid);
@@ -725,7 +725,7 @@ mod tests {
 
     #[test]
     fn validate_cloud_event_id_when_valid() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let builder = build_base_cloud_event_builder_for_test()
             .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .id(uuid);
@@ -771,7 +771,7 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_local() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source("/body.access/1/door.front_left#Door".to_string())
@@ -790,7 +790,7 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let uri = "//VCU.myvin/body.access/1/door.front_left#Door";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
@@ -810,7 +810,7 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_valid_when_everything_is_valid_remote_with_a_sink() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let uri = "//VCU.myvin/body.access/1/door.front_left#Door";
         let sink = "//bo.cloud/petapp";
         let event = build_base_cloud_event_builder_for_test()
@@ -828,7 +828,7 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_not_valid_when_remote_with_invalid_sink() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let uri = "//VCU.myvin/body.access/1/door.front_left#Door";
         let sink = "//bo.cloud";
         let event = build_base_cloud_event_builder_for_test()
@@ -851,7 +851,7 @@ mod tests {
 
     #[test]
     fn test_publish_type_cloudevent_is_not_valid_when_source_is_empty() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source("/".to_string())
@@ -925,7 +925,7 @@ mod tests {
 
     #[test]
     fn test_notification_type_cloudevent_is_valid_when_everything_is_valid() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let uri = "/body.access/1/door.front_left#Door";
         let sink = "//bo.cloud/petapp";
         let event = build_base_cloud_event_builder_for_test()
@@ -943,7 +943,7 @@ mod tests {
 
     #[test]
     fn test_notification_type_cloudevent_is_not_valid_missing_sink() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
             .unwrap();
         let event = build_base_cloud_event_builder_for_test()
@@ -961,7 +961,7 @@ mod tests {
 
     #[test]
     fn test_notification_type_cloudevent_is_not_valid_invalid_sink() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
             .unwrap();
         let sink = LongUriSerializer::deserialize("//bo.cloud".to_string()).unwrap();
@@ -981,7 +981,7 @@ mod tests {
 
     #[test]
     fn test_request_type_cloudevent_is_valid_when_everything_is_valid() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//bo.cloud/petapp//rpc.response";
         let sink = "//VCU.myvin/body.access/1/rpc.UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
@@ -1000,7 +1000,7 @@ mod tests {
 
     #[test]
     fn test_request_type_cloudevent_is_not_valid_invalid_source() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//bo.cloud/petapp//dog";
         let sink = "//VCU.myvin/body.access/1/rpc.UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
@@ -1023,7 +1023,7 @@ mod tests {
 
     #[test]
     fn test_request_type_cloudevent_is_not_valid_missing_sink() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//bo.cloud/petapp//rpc.response";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
@@ -1044,7 +1044,7 @@ mod tests {
 
     #[test]
     fn test_request_type_cloudevent_is_not_valid_invalid_sink_not_rpc_command() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//bo.cloud/petapp//rpc.response";
         let sink = "//VCU.myvin/body.access/1/UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
@@ -1067,7 +1067,7 @@ mod tests {
 
     #[test]
     fn test_response_type_cloudevent_is_valid_when_everything_is_valid() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//VCU.myvin/body.access/1/rpc.UpdateDoor";
         let sink = "//bo.cloud/petapp//rpc.response";
         let event = build_base_cloud_event_builder_for_test()
@@ -1086,7 +1086,7 @@ mod tests {
 
     #[test]
     fn test_response_type_cloudevent_is_not_valid_invalid_source() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//VCU.myvin/body.access/1/UpdateDoor";
         let sink = "//bo.cloud/petapp//rpc.response";
         let event = build_base_cloud_event_builder_for_test()
@@ -1109,7 +1109,7 @@ mod tests {
 
     #[test]
     fn test_response_type_cloudevent_is_not_valid_missing_sink_and_invalid_source() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//VCU.myvin/body.access/1/UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
@@ -1130,7 +1130,7 @@ mod tests {
 
     #[test]
     fn test_response_type_cloudevent_is_not_valid_invalid_source_not_rpc_command() {
-        let uuid = UUIDv8Builder::new().build();
+        let uuid = UUIDBuilder::new().build();
         let source = "//bo.cloud/petapp/1/dog";
         let sink = "//VCU.myvin/body.access/1/UpdateDoor";
         let event = build_base_cloud_event_builder_for_test()

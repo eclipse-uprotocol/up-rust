@@ -19,7 +19,7 @@ use url::{ParseError, Url};
 
 use crate::cloudevent::datamodel::UCloudEventAttributes;
 use crate::uprotocol::UMessageType;
-use crate::uuid::builder::UUIDv8Builder;
+use crate::uuid::builder::UUIDBuilder;
 
 pub struct UCloudEventBuilder;
 
@@ -38,7 +38,7 @@ impl UCloudEventBuilder {
     /// Creates the string representation of a `UUIDv8` as defined by
     /// [RFC 4122](https://www.rfc-editor.org/rfc/rfc4122.html#section-3)
     fn create_cloudevent_id() -> String {
-        UUIDv8Builder::new().build().to_hyphenated_string()
+        UUIDBuilder::new().build().to_hyphenated_string()
     }
 
     /// Creates a `CloudEvent` for an event for the use case of an RPC Request message.

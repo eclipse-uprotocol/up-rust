@@ -28,18 +28,18 @@ const MAX_TIMESTAMP_MASK: u64 = 0xffff << MAX_TIMESTAMP_BITS;
 ///
 /// The structure of the UUIDs created by this factory is defined in the
 /// [uProtocol specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/basics/uuid.adoc).
-pub struct UUIDv8Builder {
+pub struct UUIDBuilder {
     msb: AtomicU64,
     lsb: u64,
 }
 
-impl Default for UUIDv8Builder {
+impl Default for UUIDBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl UUIDv8Builder {
+impl UUIDBuilder {
     /// Creates a new builder for creating uProtocol UUIDs.
     ///
     /// The same bulder instance can be used to create one or more UUIDs
@@ -48,9 +48,9 @@ impl UUIDv8Builder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::uuid::builder::UUIDv8Builder;
+    /// use up_rust::uuid::builder::UUIDBuilder;
     ///
-    /// let builder = UUIDv8Builder::new();
+    /// let builder = UUIDBuilder::new();
     /// let uuid1 = builder.build();
     /// assert!(uuid1.is_uprotocol_uuid());
     /// let uuid2 = builder.build();
@@ -58,7 +58,7 @@ impl UUIDv8Builder {
     /// assert_ne!(uuid1, uuid2);
     /// ```
     pub fn new() -> Self {
-        UUIDv8Builder {
+        UUIDBuilder {
             msb: AtomicU64::new(0),
             // set variant to RFC4122
             lsb: rand::thread_rng().gen::<u64>() & BITMASK_CLEAR_VARIANT
@@ -77,9 +77,9 @@ impl UUIDv8Builder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::uuid::builder::UUIDv8Builder;
+    /// use up_rust::uuid::builder::UUIDBuilder;
     ///
-    /// let uuid = UUIDv8Builder::new().build();
+    /// let uuid = UUIDBuilder::new().build();
     /// assert!(uuid.is_uprotocol_uuid());
     /// assert!(uuid.get_time().is_some());
     /// ```
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn test_build_with_instant_creates_uprotocol_uuid() {
         let instant = 0x18C684468F8_u64; // Thu, 14 Dec 2023 12:19:23 GMT
-        let uuid = UUIDv8Builder::new().build_with_instant(instant);
+        let uuid = UUIDBuilder::new().build_with_instant(instant);
         assert!(uuid.is_uprotocol_uuid());
         assert_eq!(uuid.get_time().unwrap(), instant);
 
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn test_uuid_for_subsequent_generation() {
         let instant = 0x18C684468F8_u64; // Thu, 14 Dec 2023 12:19:23 GMT
-        let builder = UUIDv8Builder::new();
+        let builder = UUIDBuilder::new();
 
         let uuid_for_instant = builder.build_with_instant(instant);
         assert!(uuid_for_instant.is_uprotocol_uuid());
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_uuid_for_constant_random() {
-        let factory = UUIDv8Builder::new();
+        let factory = UUIDBuilder::new();
         let uuid1 = factory.build();
         let uuid2 = factory.build();
         assert_eq!(uuid1.lsb, uuid2.lsb);
@@ -187,7 +187,7 @@ mod tests {
         // add 1 millisecond to the maximum duration, to overflow
         let overflowed_48_bit_unix_ts_ms = max_48_bit_unix_ts_ms + 1;
 
-        let builder = UUIDv8Builder::new();
+        let builder = UUIDBuilder::new();
         let _uprotocol_uuid_past_max_unix_ts_ms =
             builder.build_with_instant(overflowed_48_bit_unix_ts_ms);
     }

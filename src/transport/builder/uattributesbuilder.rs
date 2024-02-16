@@ -12,7 +12,7 @@
  ********************************************************************************/
 
 use crate::uprotocol::{UAttributes, UMessageType, UPriority, UUri, UUID};
-use crate::uuid::builder::UUIDv8Builder;
+use crate::uuid::builder::UUIDBuilder;
 
 /// Builder for easy construction of the `UAttributes` object.
 pub struct UAttributesBuilder {
@@ -28,18 +28,21 @@ pub struct UAttributesBuilder {
 }
 
 impl UAttributesBuilder {
-    /// Gets a builder for creating a publish message.
+    /// Gets a builder for creating a publish message with a given priority.
     ///
-    /// # Arguments
+    /// # Examples
     ///
-    /// * `priority` - The priority of the message.
+    /// ```rust
+    /// use up_rust::uprotocol::{UMessageType, UPriority};
+    /// use up_rust::transport::builder::UAttributesBuilder;
     ///
-    /// # Returns
-    ///
-    /// The builder initialized with the given values.
+    /// let attributes = UAttributesBuilder::publish(UPriority::UPRIORITY_CS2).build();
+    /// assert_eq!(attributes.type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
+    /// assert_eq!(attributes.priority, UPriority::UPRIORITY_CS2.into());
+    /// ```
     pub fn publish(priority: UPriority) -> UAttributesBuilder {
         UAttributesBuilder {
-            id: UUIDv8Builder::new().build(),
+            id: UUIDBuilder::new().build(),
             message_type: UMessageType::UMESSAGE_TYPE_PUBLISH,
             priority,
             ttl: None,
@@ -51,19 +54,23 @@ impl UAttributesBuilder {
         }
     }
 
-    /// Gets a builder for creating a notification message.
+    /// Gets a builder for creating a notification message with a given priority and origin.
     ///
-    /// # Arguments
+    /// # Examples
     ///
-    /// * `priority` - The priority of the message.
-    /// * `sink` - The destination URI.
+    /// ```rust
+    /// use up_rust::uprotocol::{UMessageType, UPriority, UUri};
+    /// use up_rust::transport::builder::UAttributesBuilder;
     ///
-    /// # Returns
-    ///
-    /// The builder initialized with the given values.
+    /// let origin = UUri::default();
+    /// let attributes = UAttributesBuilder::notification(UPriority::UPRIORITY_CS2, origin.clone()).build();
+    /// assert_eq!(attributes.type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
+    /// assert_eq!(attributes.priority, UPriority::UPRIORITY_CS2.into());
+    /// assert_eq!(attributes.sink, Some(origin).into());
+    /// ```
     pub fn notification(priority: UPriority, sink: UUri) -> UAttributesBuilder {
         UAttributesBuilder {
-            id: UUIDv8Builder::new().build(),
+            id: UUIDBuilder::new().build(),
             message_type: UMessageType::UMESSAGE_TYPE_PUBLISH,
             priority,
             ttl: None,
@@ -88,7 +95,7 @@ impl UAttributesBuilder {
     /// The builder initialized with the given values.
     pub fn request(priority: UPriority, sink: UUri, ttl: u32) -> UAttributesBuilder {
         UAttributesBuilder {
-            id: UUIDv8Builder::new().build(),
+            id: UUIDBuilder::new().build(),
             message_type: UMessageType::UMESSAGE_TYPE_REQUEST,
             priority,
             ttl: Some(i32::try_from(ttl).unwrap_or(i32::MAX)),
@@ -113,7 +120,7 @@ impl UAttributesBuilder {
     /// The builder initialized with the given values.
     pub fn response(priority: UPriority, sink: UUri, reqid: UUID) -> UAttributesBuilder {
         UAttributesBuilder {
-            id: UUIDv8Builder::new().build(),
+            id: UUIDBuilder::new().build(),
             message_type: UMessageType::UMESSAGE_TYPE_RESPONSE,
             priority,
             ttl: None,

@@ -497,7 +497,7 @@ mod tests {
     use crate::transport::builder::UAttributesBuilder;
     use crate::uprotocol::{UAuthority, UEntity, UPriority, UUri, UUID};
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
-    use crate::uuid::builder::UUIDv8Builder;
+    use crate::uuid::builder::UUIDBuilder;
 
     #[test]
     fn test_fetching_validator_for_valid_types() {
@@ -548,7 +548,7 @@ mod tests {
             .with_sink(build_sink())
             .with_permission_level(2)
             .with_commstatus(3)
-            .with_reqid(UUIDv8Builder::new().build())
+            .with_reqid(UUIDBuilder::new().build())
             .build();
         let validator = Validators::Publish.validator();
         let status = validator.validate(&attributes);
@@ -560,7 +560,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS0,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .build();
 
@@ -655,7 +655,7 @@ mod tests {
         let attributes = UAttributesBuilder::request(UPriority::UPRIORITY_CS4, build_sink(), 1000)
             .with_permission_level(2)
             .with_commstatus(3)
-            .with_reqid(UUIDv8Builder::new().build())
+            .with_reqid(UUIDBuilder::new().build())
             .build();
 
         let validator = Validators::Request.validator();
@@ -668,7 +668,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .with_ttl(1000)
         .build();
@@ -743,7 +743,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .build();
 
@@ -757,7 +757,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .with_permission_level(2)
         .with_commstatus(3)
@@ -783,7 +783,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .with_ttl(0)
         .build();
@@ -799,7 +799,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .with_permission_level(0)
         .build();
@@ -815,7 +815,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .with_commstatus(-42)
         .build();
@@ -851,7 +851,7 @@ mod tests {
         let attributes = UAttributesBuilder::response(
             UPriority::UPRIORITY_CS4,
             build_sink(),
-            UUIDv8Builder::new().build(),
+            UUIDBuilder::new().build(),
         )
         .with_reqid(invalid_uuid)
         .build();
