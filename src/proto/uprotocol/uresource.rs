@@ -13,6 +13,11 @@
 
 use crate::uprotocol::uri::UResource;
 
+pub use crate::uri::validator::ValidationError;
+
+const URESOURCE_ID_LENGTH: usize = 16;
+const URESOURCE_ID_VALID_BITMASK: u32 = 0xffff << URESOURCE_ID_LENGTH;
+
 impl UResource {
     pub fn has_id(&self) -> bool {
         self.id.is_some()
@@ -24,6 +29,29 @@ impl UResource {
 
     pub fn get_instance(&self) -> Option<&str> {
         self.instance.as_deref()
+    }
+
+    /// Returns whether a `UResource` satisfies the requirements of a micro form URI
+    ///
+    /// # Returns
+    /// Returns a `Result<(), ValidationError>` where the ValidationError will contain the reasons it failed or OK(())
+    /// otherwise
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ValidationError` in the failure case
+    pub fn validate_micro_form(&self) -> Result<(), ValidationError> {
+        if let Some(id) = self.id {
+            if id & URESOURCE_ID_VALID_BITMASK != 0 {
+                return Err(ValidationError::new(
+                    "ID does not fit within allotted 16 bits in micro form",
+                ));
+            }
+        } else {
+            return Err(ValidationError::new("ID must be present"));
+        }
+
+        Ok(())
     }
 }
 

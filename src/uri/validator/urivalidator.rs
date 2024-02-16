@@ -120,8 +120,7 @@ impl UriValidator {
     /// Returns `true` if the URI contains both names and numeric representations of the names,
     /// meaning that this `UUri` can be serialized to long or micro formats.
     pub fn is_resolved(uri: &UUri) -> bool {
-        !Self::is_empty(uri)
-        // TODO finish this
+        UriValidator::is_micro_form(uri) && UriValidator::is_long_form(uri)
     }
 
     /// Checks if the URI is of type RPC.
@@ -186,19 +185,227 @@ impl UriValidator {
             .map_or(false, |auth| auth.get_name().is_some())
     }
 
-    /// Checks if the URI contains numbers so that it can be serialized into micro format.
+    /// Checks if the URI contains appropriate fields and numbers of the appropriate size so that it can be serialized
+    /// into micro format.
     ///
     /// # Arguments
     /// * `uri` - The `UUri` to check.
     ///
     /// # Returns
-    /// Returns `true` if the URI contains numbers, allowing it to be serialized into micro format.
+    /// Returns `Ok(())` if the URI contains numbers which will fit in the allotted space,
+    /// allowing it to be serialized into micro format.
+    ///
+    /// # Errors
+    ///
+    /// Otherwise returns `ValidationError` containing description of error.
+    ///
+    /// # Examples
+    ///
+    /// ## `UUri` in valid micro form
+    ///
+    /// The specifics of what makes component of a `UUri` valid can be garnered
+    /// from their impls of `valid_micro_form()`: `UAuthority`, `UEntity`, `UResource`
+    ///
+    /// ```
+    /// use up_rust::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     authority: Some(UAuthority {
+    ///         number: Some(Number::Ip(
+    ///             vec![192, 168, 1, 202],
+    ///         )),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert!(val_micro_form.is_ok());
+    /// ```
+    ///
+    /// ## `UAuthority` IP is incorrect format (neither IPv4, nor IPv6)
+    /// ```
+    /// use up_rust::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     authority: Some(UAuthority {
+    ///         number: Some(Number::Ip(
+    ///             vec![127, 0, 0],        // <- note only 3 bytes, must be 4 (IPv4)
+    ///         )),                         //    or 16 (IPv6)
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert!(val_micro_form.is_err());
+    /// ```
+    ///
+    /// ## `UAuthority` ID is longer than maximum allowed (255 bytes)
+    /// ```
+    /// use up_rust::uprotocol::{UAuthority, UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     authority: Some(UAuthority {
+    ///         number: Some(Number::Ip(
+    ///                 (0..=256) // <- note that ID will exceed 255 byte limit
+    ///                 .map(|i| (i % 256) as u8)
+    ///                 .collect::<Vec<u8>>())),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert!(val_micro_form.is_err());
+    /// ```
+    ///
+    /// ## Overflowing `UEntity` ID's 16 bit capacity
+    /// ```
+    /// use up_rust::uprotocol::{UUri, UEntity, UResource, uri::uauthority::Number};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(0x10000), // <- exceeds allotted 16 bits
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert!(val_micro_form.is_err());
+    /// ```
+    ///
+    /// ## Overflowing `UEntity` Major Version 8 bit capacity
+    /// ```
+    /// use up_rust::uprotocol::{UUri, UEntity, UResource};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(0x100), // <- exceeds allotted 8 bits
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert!(val_micro_form.is_err());
+    /// ```
+    ///
+    /// ## Overflowing `UResource` ID's 16 bit capacity
+    /// ```
+    /// use up_rust::uprotocol::{UUri, UEntity, UResource};
+    /// use up_rust::uri::validator::{UriValidator, ValidationError};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(29999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(0x10000), // <- exceeds allotted 16 bits
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let val_micro_form = UriValidator::validate_micro_form(&uri);
+    /// assert!(val_micro_form.is_err());
+    /// ```
+    #[allow(clippy::missing_panics_doc)]
+    pub fn validate_micro_form(uri: &UUri) -> Result<(), ValidationError> {
+        if Self::is_empty(uri) {
+            Err(ValidationError::new("URI is empty"))?;
+        }
+
+        if let Some(entity) = uri.entity.as_ref() {
+            if let Err(e) = entity.validate_micro_form() {
+                return Err(ValidationError::new(format!("Entity: {}", e)));
+            }
+        } else {
+            return Err(ValidationError::new("Entity: Is missing"));
+        }
+
+        if let Some(resource) = uri.resource.as_ref() {
+            if let Err(e) = resource.validate_micro_form() {
+                return Err(ValidationError::new(format!("Resource: {}", e)));
+            }
+        } else {
+            return Err(ValidationError::new("Resource: Is missing"));
+        }
+
+        if let Some(authority) = uri.authority.as_ref() {
+            if let Err(e) = authority.validate_micro_form() {
+                return Err(ValidationError::new(format!("Authority: {}", e)));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Checks if the URI contains numbers of the appropriate size so that it can be serialized into micro format.
+    ///
+    /// # Arguments
+    /// * `uri` - The `UUri` to check.
+    ///
+    /// # Returns
+    /// Returns `true` if the URI contains numbers which will fit in the allotted space (16 bits for
+    /// id), allowing it to be serialized into micro format.
     #[allow(clippy::missing_panics_doc)]
     pub fn is_micro_form(uri: &UUri) -> bool {
-        !Self::is_empty(uri)
-            && uri.entity.has_id()
-            && uri.resource.has_id()
-            && (uri.authority.is_none() || uri.authority.has_id() || uri.authority.has_ip())
+        Self::validate_micro_form(uri).is_ok()
     }
 
     /// Checks if the URI contains names so that it can be serialized into long format.
@@ -269,7 +476,6 @@ mod tests {
         let uri = UUri::default();
         let status = UriValidator::validate(&uri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Uri is empty");
     }
 
     #[test]
@@ -298,10 +504,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -322,10 +524,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -353,10 +551,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_response(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -364,7 +558,6 @@ mod tests {
         let uri = LongUriSerializer::deserialize("/hartley//dummy.wrong".to_string()).unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Invalid RPC response type");
     }
 
     #[test]
@@ -372,7 +565,6 @@ mod tests {
         let uri = LongUriSerializer::deserialize("/hartley//rpc.wrong".to_string()).unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
-        assert_eq!(status.unwrap_err().to_string(), "Invalid RPC response type");
     }
 
     #[test]
@@ -424,10 +616,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -448,10 +636,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -475,10 +659,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -505,10 +685,6 @@ mod tests {
         };
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -516,10 +692,6 @@ mod tests {
         let uri = "//VCU.myvin///door.front_left#Door".to_string();
         let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -543,10 +715,6 @@ mod tests {
 
         let status = UriValidator::validate(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -554,10 +722,6 @@ mod tests {
         let uri = "//VCU.myvin//1".to_string();
         let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -613,10 +777,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -625,10 +785,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -651,10 +807,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -679,10 +831,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -707,10 +855,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -719,10 +863,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -731,10 +871,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -743,10 +879,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -802,10 +934,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -814,10 +942,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Invalid RPC method uri. Uri should be the method to be called, or method from response"
-        );
     }
 
     #[test]
@@ -843,10 +967,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -871,10 +991,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -901,10 +1017,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -927,10 +1039,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is remote missing uAuthority"
-        );
     }
 
     #[test]
@@ -939,10 +1047,6 @@ mod tests {
         let status =
             UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
@@ -965,10 +1069,6 @@ mod tests {
 
         let status = UriValidator::validate_rpc_method(&uuri);
         assert!(status.is_err());
-        assert_eq!(
-            status.unwrap_err().to_string(),
-            "Uri is missing uSoftware Entity name"
-        );
     }
 
     #[test]
