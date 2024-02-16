@@ -22,58 +22,68 @@ use crate::uprotocol::{UMessage, UStatus, UUri};
 /// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
 #[async_trait]
 pub trait UTransport {
-    /// Sends a message over the transport.
-    ///
-    /// This function asynchronously sends a message over the network transport.
-    /// It's designed to handle the transmission of a message object to a designated recipient.
+    /// Sends a message using this transport's message exchange mechanism.
     ///
     /// # Arguments
-    /// * `message` - The message to be sent. This encapsulates the data intended for transmission.
     ///
-    /// # Returns
-    /// On success, returns `Ok(())`. If the message sending fails, it returns `Err(UStatus)`,
-    /// where `UStatus` contains a `UCode` indicating the specific error or failure reason.
+    /// * `message` - The message to send. The `type`, `source` and`sink` properties of the [`crate::uprotocol::UAttributes`] contained
+    ///   in the message determine the addressing semantics:
+    ///   * `source` - The origin of the message being sent. The address must be resolved. The semantics of the address
+    ///     depends on the value of the given [attributes' type](crate::uprotocol::UAttributes::type_) property .
+    ///     * For a [`PUBLISH`](crate::uprotocol::UMessageType::UMESSAGE_TYPE_PUBLISH) message, this is the topic that the message should be published to,
+    ///     * for a [`REQUEST`](crate::uprotocol::UMessageType::UMESSAGE_TYPE_REQUEST) message, this is the *reply-to* address that the sender expects to receive the response at, and
+    ///     * for a [`RESPONSE`](crate::uprotocol::UMessageType::UMESSAGE_TYPE_RESPONSE) message, this identifies the method that has been invoked.
+    ///   * `sink` - For a `notification`, an RPC `request` or RPC `response` message, the (resolved) address that the message
+    ///     should be sent to.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message could not be sent.
     async fn send(&self, message: UMessage) -> Result<(), UStatus>;
 
     /// Receives a message from the transport.
     ///
-    /// This function asynchronously receives a message from the network transport based on the provided topic.
-    /// It's designed to handle the reception of a message object from the network.
-    ///
     /// # Arguments
-    /// * `topic` - The topic from which to receive messages.
     ///
-    /// # Returns
-    /// On success, returns the received message wrapped in `Ok(_)`.
-    /// If receiving the message fails, it returns `Err(UStatus)`,
-    /// where `UStatus` contains a `UCode` indicating the specific error or failure reason.
+    /// * `topic` - The topic to receive the message from.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no message could be received. Possible reasons are that the topic does not exist
+    /// or that no message is available from the topic.
     async fn receive(&self, topic: UUri) -> Result<UMessage, UStatus>;
 
-    /// Registers a listener to be called asynchronously when a message is received for the specified topic.
+    /// Registers a listener to be called for each message that is received on a given address.
     ///
     /// # Arguments
-    /// * `topic` - Resolved topic uri indicating the topic for which the listener is registered.
-    /// * `listener` - A boxed closure (or function pointer) that takes `Result<UMessage, UStatus>` as an argument and returns nothing.
-    ///                The closure is executed to process the data or handle the error for the topic.
-    ///                It must be `Send`, `Sync` and `'static` to allow transfer across threads and a stable lifetime.
+    ///
+    /// * `address` - The (resolved) address to register the listener for.
+    /// * `listener` - The listener to invoke.
     ///
     /// # Returns
-    /// On success, returns a `String` identifier that can be used for unregistering the listener later.
-    /// On failure, returns `Err(UStatus)` with failure information.
+    ///
+    /// An identifier that can be used for [unregistering the listener](Self::unregister_listener) again.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the listener could not be registered.
     async fn register_listener(
         &self,
         topic: UUri,
         listener: Box<dyn Fn(Result<UMessage, UStatus>) + Send + Sync + 'static>,
     ) -> Result<String, UStatus>;
 
-    /// Unregister a listener for a given topic. Messages arriving on this topic will no longer be processed
-    /// by this listener.
+    /// Unregisters a listener for a given topic.
+    ///
+    /// Messages arriving on this topic will no longer be processed by this listener.
     ///
     /// # Arguments
+    ///
     /// * `topic` - Resolved topic uri where the listener was registered originally.
     /// * `listener` - Identifier of the listener that should be unregistered.
     ///
-    /// # Returns
-    /// Returns () on success, otherwise an Err(UStatus) with failure information.
+    /// # Errors
+    ///
+    /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener(&self, topic: UUri, listener: &str) -> Result<(), UStatus>;
 }
