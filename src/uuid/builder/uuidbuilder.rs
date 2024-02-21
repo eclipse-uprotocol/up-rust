@@ -34,6 +34,19 @@ pub struct UUIDBuilder {
 }
 
 impl Default for UUIDBuilder {
+    /// Creates a new builder for creating uProtocol UUIDs.
+    ///
+    /// Simply invokes [`UUIDBuilder::new`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::uuid::builder::UUIDBuilder;
+    ///
+    /// let builder = UUIDBuilder::default();
+    /// let uuid = builder.build();
+    /// assert!(uuid.is_uprotocol_uuid());
+    /// ```
     fn default() -> Self {
         Self::new()
     }
