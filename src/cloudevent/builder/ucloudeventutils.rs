@@ -491,7 +491,6 @@ mod tests {
     use crate::cloudevent::datamodel::UCloudEventAttributes;
     use crate::cloudevents::CloudEvent;
     use crate::uprotocol::{UEntity, UMessageType, UPriority, UResource, UUri};
-    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
     use crate::uuid::builder::UUIDBuilder;
 
     use chrono::{offset, TimeZone, Utc};
@@ -1187,7 +1186,7 @@ mod tests {
             ..Default::default()
         };
 
-        let source = LongUriSerializer::serialize(&uri).unwrap();
+        let source = String::try_from(&uri).unwrap();
 
         // fake payload
         let payload = pack_event_into_any(&build_proto_payload_for_test());

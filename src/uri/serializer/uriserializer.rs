@@ -11,6 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use std::str::FromStr;
+
 use crate::uprotocol::UUri;
 use crate::uri::serializer::SerializationError;
 use crate::uri::validator::UriValidator;
@@ -66,22 +68,24 @@ pub trait UriSerializer<T> {
             return Err(SerializationError::new("Input uris are empty"));
         }
 
-        let long_uri = UUri::try_from(long_uri)?;
-        let micro_uri = UUri::try_from(micro_uri.to_vec())?;
+        let long_uri_parsed =
+            UUri::from_str(long_uri).map_err(|e| SerializationError::new(e.to_string()))?;
+        let micro_uri_parsed = UUri::try_from(micro_uri.to_vec())
+            .map_err(|e| SerializationError::new(e.to_string()))?;
 
-        let mut auth = micro_uri.authority.unwrap_or_default();
-        let mut ue = micro_uri.entity.unwrap_or_default();
-        let mut ure = long_uri.resource.unwrap_or_default();
+        let mut auth = micro_uri_parsed.authority.unwrap_or_default();
+        let mut ue = micro_uri_parsed.entity.unwrap_or_default();
+        let mut ure = long_uri_parsed.resource.unwrap_or_default();
 
-        if let Some(authority) = long_uri.authority.as_ref() {
+        if let Some(authority) = long_uri_parsed.authority.as_ref() {
             if let Some(name) = authority.get_name() {
                 auth.name = Some(name.to_owned());
             }
         }
-        if let Some(entity) = long_uri.entity.as_ref() {
+        if let Some(entity) = long_uri_parsed.entity.as_ref() {
             ue.name = entity.name.clone();
         }
-        if let Some(resource) = micro_uri.resource.as_ref() {
+        if let Some(resource) = micro_uri_parsed.resource.as_ref() {
             ure.id = resource.id;
         }
 

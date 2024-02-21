@@ -25,7 +25,6 @@ use crate::cloudevents::CloudEvent as CloudEventProto;
 
 use crate::uprotocol::umessage::UMessage;
 use crate::uprotocol::{SerializationError, UPriority};
-use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
 impl TryFrom<UMessage> for cloudevents::Event {
     type Error = SerializationError;
@@ -34,7 +33,7 @@ impl TryFrom<UMessage> for cloudevents::Event {
         let attributes = source_event.attributes.get_or_default();
         let source = attributes.source.get_or_default();
         let payload = source_event.payload.get_or_default();
-        let uri = LongUriSerializer::serialize(source)?;
+        let uri = String::try_from(source).map_err(|e| SerializationError::new(e.to_string()))?;
 
         if attributes.id.is_none() {
             return Err(SerializationError::new("Empty attributes ID"));
@@ -77,7 +76,7 @@ impl TryFrom<UMessage> for cloudevents::Event {
             );
         }
         if let Some(sink) = &attributes.sink.clone().into_option() {
-            let uri = LongUriSerializer::serialize(sink)?;
+            let uri = String::try_from(sink).map_err(|e| SerializationError::new(e.to_string()))?;
             event.set_extension("sink", ExtensionValue::String(uri));
         }
         if let Some(commstatus) = attributes.commstatus {
@@ -290,7 +289,6 @@ mod tests {
     use crate::uprotocol::uattributes::UMessageType;
     use crate::uprotocol::uri::{UEntity, UResource, UUri};
     use crate::uprotocol::{UAttributes, UAuthority, UPayload, UPayloadFormat};
-    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
     use crate::uuid::builder::UUIDBuilder;
 
     use cloudevents::{Event, EventBuilder, EventBuilderV10};
@@ -361,7 +359,7 @@ mod tests {
         // CloudEvent
         let event = EventBuilderV10::new()
             .id(uuid.to_hyphenated_string())
-            .source(LongUriSerializer::serialize(&uri).unwrap())
+            .source(String::try_from(&uri).unwrap())
             .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
             .data("application/x-protobuf", Any::default().value)
             .build()
@@ -386,7 +384,7 @@ mod tests {
 
         let event_proto = CloudEventProto {
             id: uuid.to_hyphenated_string(),
-            source: LongUriSerializer::serialize(&uri).unwrap(),
+            source: String::try_from(&uri).unwrap(),
             type_: UMessageType::UMESSAGE_TYPE_PUBLISH
                 .to_type_string()
                 .to_string(),
