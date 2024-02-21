@@ -427,7 +427,6 @@ mod tests {
     use crate::cloudevent::builder::UCloudEventUtils;
     use crate::uprotocol::{UAuthority, UCode, UEntity, UPriority, UResource, UUri};
     use crate::uri::builder::resourcebuilder::UResourceBuilder;
-    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     use cloudevents::{Data, Event, EventBuilder, EventBuilderV10};
 
@@ -808,7 +807,7 @@ mod tests {
             resource: Some(UResourceBuilder::for_rpc_response()).into(),
             ..Default::default()
         };
-        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri).unwrap();
+        let application_uri_for_rpc = String::try_from(&rpc_uri).unwrap();
 
         // service Method Uri
         let method_uri = UUri {
@@ -825,7 +824,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let service_method_uri = LongUriSerializer::serialize(&method_uri).unwrap();
+        let service_method_uri = String::try_from(&method_uri).unwrap();
 
         // fake payload
         let proto_payload: Any = pack_event_into_any(&build_proto_payload_for_test());
@@ -906,7 +905,7 @@ mod tests {
             resource: Some(UResourceBuilder::for_rpc_response()).into(),
             ..Default::default()
         };
-        let application_uri_for_rpc = LongUriSerializer::serialize(&rpc_uri).unwrap();
+        let application_uri_for_rpc = String::try_from(&rpc_uri).unwrap();
 
         // Service Method Uri
         let method_uri = UUri {
@@ -923,7 +922,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let service_method_uri = LongUriSerializer::serialize(&method_uri).unwrap();
+        let service_method_uri = String::try_from(&method_uri).unwrap();
 
         // Additional attributes
         let ucloud_event_attributes = UCloudEventAttributes {
@@ -1099,6 +1098,6 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        LongUriSerializer::serialize(&uri).unwrap()
+        String::try_from(&uri).unwrap()
     }
 }

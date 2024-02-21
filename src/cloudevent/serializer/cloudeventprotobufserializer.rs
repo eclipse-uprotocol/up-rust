@@ -46,7 +46,6 @@ mod tests {
     use crate::cloudevent::serializer::cloudeventjsonserializer::CloudEventJsonSerializer;
     use crate::rpc::RpcMapper;
     use crate::uprotocol::{UAuthority, UEntity, UMessageType, UPriority, UResource, UUri};
-    use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 
     #[test]
     fn serialize_and_deserialize_cloud_event_to_protobuf() {
@@ -67,7 +66,7 @@ mod tests {
             ..Default::default()
         };
 
-        let source = LongUriSerializer::serialize(&uri).unwrap();
+        let source = String::try_from(&uri).unwrap();
 
         // Fake payload
         let proto_payload = build_proto_payload_for_test();
@@ -189,7 +188,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let source = LongUriSerializer::serialize(&uri).unwrap();
+        let source = String::try_from(&uri).unwrap();
 
         // Fake payload
         let proto_payload = build_other_proto_payload_for_test();

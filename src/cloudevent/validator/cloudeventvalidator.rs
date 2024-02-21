@@ -11,13 +11,14 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use std::str::FromStr;
+
 use cloudevents::event::SpecVersion;
 use cloudevents::{AttributesReader, Event};
 
 use crate::cloudevent::builder::UCloudEventUtils;
 use crate::cloudevent::validator::ValidationError;
 use crate::uprotocol::{UMessageType, UResource, UUri};
-use crate::uri::serializer::{LongUriSerializer, UriSerializer};
 use crate::uri::validator::UriValidator;
 
 /// Validates a `CloudEvent`
@@ -171,7 +172,7 @@ pub trait CloudEventValidator: std::fmt::Display {
     /// - If the sink URI extracted from the `cloud_event` fails the validation checks performed by `self.validate_entity_uri`.
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+            if let Ok(uri) = UUri::from_str(sink.as_str()) {
                 if let Err(e) = self.validate_entity_uri(&uri) {
                     return Err(ValidationError::new(format!(
                         "Invalid CloudEvent sink [{sink}] - {e}"
@@ -352,7 +353,7 @@ impl CloudEventValidators {
 struct PublishValidator;
 impl CloudEventValidator for PublishValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
-        if let Ok(source) = LongUriSerializer::deserialize(cloud_event.source().to_string()) {
+        if let Ok(source) = UUri::from_str(cloud_event.source().as_str()) {
             if let Err(e) = self.validate_topic_uri(&source) {
                 return Err(ValidationError::new(format!(
                     "Invalid Publish type CloudEvent source [{}] - {}",
@@ -399,7 +400,7 @@ impl CloudEventValidator for NotificationValidator {
 
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+            if let Ok(uri) = UUri::from_str(sink.as_str()) {
                 if let Err(e) = self.validate_entity_uri(&uri) {
                     return Err(ValidationError::new(format!(
                         "Invalid Notification type CloudEvent sink [{sink}] - {e}"
@@ -430,7 +431,7 @@ struct RequestValidator;
 impl CloudEventValidator for RequestValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         let source = cloud_event.source();
-        if let Ok(uri) = LongUriSerializer::deserialize(source.clone()) {
+        if let Ok(uri) = UUri::from_str(source.as_str()) {
             if let Err(e) = self.validate_rpc_topic_uri(&uri) {
                 return Err(ValidationError::new(format!(
                     "Invalid RPC Request CloudEvent source [{source}] - {e}"
@@ -446,7 +447,7 @@ impl CloudEventValidator for RequestValidator {
 
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+            if let Ok(uri) = UUri::from_str(sink.as_str()) {
                 if let Err(e) = self.validate_rpc_method(&uri) {
                     return Err(ValidationError::new(format!(
                         "Invalid RPC Request CloudEvent sink [{sink}] - {e}"
@@ -488,7 +489,7 @@ struct ResponseValidator;
 impl CloudEventValidator for ResponseValidator {
     fn validate_source(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         let source = cloud_event.source();
-        if let Ok(uri) = LongUriSerializer::deserialize(source.clone()) {
+        if let Ok(uri) = UUri::from_str(source.as_str()) {
             if let Err(e) = self.validate_rpc_method(&uri) {
                 return Err(ValidationError::new(format!(
                     "Invalid RPC Response CloudEvent source [{source}] - {e}"
@@ -504,7 +505,7 @@ impl CloudEventValidator for ResponseValidator {
 
     fn validate_sink(&self, cloud_event: &Event) -> Result<(), ValidationError> {
         if let Some(sink) = UCloudEventUtils::get_sink(cloud_event) {
-            if let Ok(uri) = LongUriSerializer::deserialize(sink.clone()) {
+            if let Ok(uri) = UUri::from_str(sink.as_str()) {
                 if let Err(e) = self.validate_rpc_topic_uri(&uri) {
                     return Err(ValidationError::new(format!(
                         "Invalid RPC Response CloudEvent sink [{sink}] - {e}"
@@ -944,8 +945,7 @@ mod tests {
     #[test]
     fn test_notification_type_cloudevent_is_not_valid_missing_sink() {
         let uuid = UUIDBuilder::new().build();
-        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
-            .unwrap();
+        let uri = UUri::from_str("/body.access/1/door.front_left#Door").unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source(uri.to_string())
@@ -962,9 +962,8 @@ mod tests {
     #[test]
     fn test_notification_type_cloudevent_is_not_valid_invalid_sink() {
         let uuid = UUIDBuilder::new().build();
-        let uri = LongUriSerializer::deserialize("/body.access/1/door.front_left#Door".to_string())
-            .unwrap();
-        let sink = LongUriSerializer::deserialize("//bo.cloud".to_string()).unwrap();
+        let uri = UUri::from_str("/body.access/1/door.front_left#Door").unwrap();
+        let sink = UUri::from_str("//bo.cloud").unwrap();
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source(uri.to_string())
@@ -1168,7 +1167,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let source = LongUriSerializer::serialize(&uri).unwrap();
+        let source = String::try_from(&uri).unwrap();
         let payload = build_proto_payload_for_test();
         let attributes = UCloudEventAttributesBuilder::new()
             .with_hash("somehash".to_string())

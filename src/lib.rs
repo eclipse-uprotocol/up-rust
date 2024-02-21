@@ -113,12 +113,10 @@ pub mod uri {
         pub use urivalidator::*;
     }
     pub mod serializer {
-        mod longuriserializer;
         mod microuriserializer;
         mod uriserializer;
 
         pub use crate::types::serializationerror::*;
-        pub use longuriserializer::*;
         pub use microuriserializer::*;
         pub use uriserializer::*;
     }

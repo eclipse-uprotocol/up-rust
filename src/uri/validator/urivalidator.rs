@@ -443,31 +443,30 @@ impl UriValidator {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
     use serde_json::{Error, Value};
     use std::fs;
 
-    use crate::{
-        uprotocol::{UEntity, UResource},
-        uri::serializer::{LongUriSerializer, UriSerializer},
-    };
+    use crate::uprotocol::{UEntity, UResource};
 
     #[test]
     fn test_validate_blank_uri() {
-        let uri = LongUriSerializer::deserialize("".to_string());
+        let uri = UUri::from_str("");
         assert!(uri.is_err());
     }
 
     #[test]
     fn test_validate_uri_with_get_entity() {
-        let uri = LongUriSerializer::deserialize("/hartley".to_string()).unwrap();
+        let uri = UUri::from_str("/hartley").unwrap();
         let status = UriValidator::validate(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_validate_with_malformed_uri() {
-        let uri = LongUriSerializer::deserialize("hartley".to_string());
+        let uri = UUri::from_str("hartley");
         assert!(uri.is_err());
     }
 
@@ -480,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_validate_rpc_method_with_valid_uri() {
-        let uri = LongUriSerializer::deserialize("/hartley//rpc.echo".to_string()).unwrap();
+        let uri = UUri::from_str("/hartley//rpc.echo").unwrap();
         let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
@@ -528,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_validate_rpc_response_with_valid_uri() {
-        let uri = LongUriSerializer::deserialize("/hartley//rpc.response".to_string()).unwrap();
+        let uri = UUri::from_str("/hartley//rpc.response").unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_ok());
     }
@@ -555,43 +554,43 @@ mod tests {
 
     #[test]
     fn test_validate_rpc_response_with_rpc_type() {
-        let uri = LongUriSerializer::deserialize("/hartley//dummy.wrong".to_string()).unwrap();
+        let uri = UUri::from_str("/hartley//dummy.wrong").unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
     }
 
     #[test]
     fn test_validate_rpc_response_with_invalid_rpc_response_type() {
-        let uri = LongUriSerializer::deserialize("/hartley//rpc.wrong".to_string()).unwrap();
+        let uri = UUri::from_str("/hartley//rpc.wrong").unwrap();
         let status = UriValidator::validate_rpc_response(&uri);
         assert!(status.is_err());
     }
 
     #[test]
     fn test_topic_uri_with_version_when_it_is_valid_remote() {
-        let uri = "//VCU.MY_CAR_VIN/body.access/1/door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.MY_CAR_VIN/body.access/1/door.front_left#Door").unwrap();
+        let status = UriValidator::validate(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_topic_uri_no_version_when_it_is_valid_remote() {
-        let uri = "//VCU.MY_CAR_VIN/body.access//door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.MY_CAR_VIN/body.access//door.front_left#Door").unwrap();
+        let status = UriValidator::validate(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_topic_uri_with_version_when_it_is_valid_local() {
-        let uri = "/body.access/1/door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/body.access/1/door.front_left#Door").unwrap();
+        let status = UriValidator::validate(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_topic_uri_no_version_when_it_is_valid_local() {
-        let uri = "/body.access//door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/body.access//door.front_left#Door").unwrap();
+        let status = UriValidator::validate(&uri);
         assert!(status.is_ok());
     }
 
@@ -689,8 +688,8 @@ mod tests {
 
     #[test]
     fn test_topic_uri_invalid_when_uri_is_missing_use_remote() {
-        let uri = "//VCU.myvin///door.front_left#Door".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin///door.front_left#Door").unwrap();
+        let status = UriValidator::validate(&uri);
         assert!(status.is_err());
     }
 
@@ -719,40 +718,36 @@ mod tests {
 
     #[test]
     fn test_topic_uri_invalid_when_uri_is_missing_use_name_local() {
-        let uri = "//VCU.myvin//1".to_string();
-        let status = UriValidator::validate(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin//1").unwrap();
+        let status = UriValidator::validate(&uri);
         assert!(status.is_err());
     }
 
     #[test]
     fn test_rpc_topic_uri_with_version_when_it_is_valid_remote() {
-        let uri = "//bo.cloud/petapp/1/rpc.response".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//bo.cloud/petapp/1/rpc.response").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_topic_uri_no_version_when_it_is_valid_remote() {
-        let uri = "//bo.cloud/petapp//rpc.response".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//bo.cloud/petapp//rpc.response").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_topic_uri_with_version_when_it_is_valid_local() {
-        let uri = "/petapp/1/rpc.response".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/petapp/1/rpc.response").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_topic_uri_no_version_when_it_is_valid_local() {
-        let uri = "/petapp//rpc.response".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/petapp//rpc.response").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
@@ -781,9 +776,8 @@ mod tests {
 
     #[test]
     fn test_rpc_topic_uri_with_version_when_it_is_not_valid_missing_rpc_response_local() {
-        let uri = "/petapp/1/dog".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/petapp/1/dog").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_err());
     }
 
@@ -859,57 +853,50 @@ mod tests {
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_missing_use() {
-        let uri = "//VCU.myvin".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_err());
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_remote() {
-        let uri = "/1".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/1").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_err());
     }
 
     #[test]
     fn test_rpc_topic_uri_invalid_when_uri_is_missing_use_name_local() {
-        let uri = "//VCU.myvin//1".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin//1").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_err());
     }
 
     #[test]
     fn test_rpc_method_uri_with_version_when_it_is_valid_remote() {
-        let uri = "//VCU.myvin/body.access/1/rpc.UpdateDoor".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin/body.access/1/rpc.UpdateDoor").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_method_uri_no_version_when_it_is_valid_remote() {
-        let uri = "//VCU.myvin/body.access//rpc.UpdateDoor".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin/body.access//rpc.UpdateDoor").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_method_uri_with_version_when_it_is_valid_local() {
-        let uri = "/body.access/1/rpc.UpdateDoor".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/body.access/1/rpc.UpdateDoor").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
     #[test]
     fn test_rpc_method_uri_no_version_when_it_is_valid_local() {
-        let uri = "/body.access//rpc.UpdateDoor".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/body.access//rpc.UpdateDoor").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_ok());
     }
 
@@ -938,9 +925,8 @@ mod tests {
 
     #[test]
     fn test_rpc_method_uri_with_version_when_it_is_not_valid_not_rpc_method_local() {
-        let uri = "/body.access//UpdateDoor".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("/body.access//UpdateDoor").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_err());
     }
 
@@ -1043,9 +1029,8 @@ mod tests {
 
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_is_missing_use() {
-        let uri = "//VCU.myvin".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_err());
     }
 
@@ -1073,9 +1058,8 @@ mod tests {
 
     #[test]
     fn test_rpc_method_uri_invalid_when_uri_is_missing_use_name_remote() {
-        let uri = "//VCU.myvin//1/rpc.UpdateDoor".to_string();
-        let status =
-            UriValidator::validate_rpc_method(&LongUriSerializer::deserialize(uri).unwrap());
+        let uri = UUri::from_str("//VCU.myvin//1/rpc.UpdateDoor").unwrap();
+        let status = UriValidator::validate_rpc_method(&uri);
         assert!(status.is_err());
     }
 
@@ -1084,8 +1068,7 @@ mod tests {
         let json_object = get_json_object().expect("Failed to parse JSON");
         if let Some(valid_uris) = json_object.get("validUris").and_then(|v| v.as_array()) {
             for uri in valid_uris {
-                let uri: String = uri.as_str().unwrap_or_default().to_string();
-                let uuri = LongUriSerializer::deserialize(uri).unwrap();
+                let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
                 let status = UriValidator::validate(&uuri);
                 assert!(status.is_ok());
             }
@@ -1099,7 +1082,7 @@ mod tests {
 
         for uri_object in invalid_uris {
             let uri = uri_object.get("uri").unwrap().as_str().unwrap();
-            if let Ok(uuri) = LongUriSerializer::deserialize(uri.into()) {
+            if let Ok(uuri) = UUri::from_str(uri) {
                 let status = UriValidator::validate(&uuri);
                 assert!(status.is_err());
                 let message = uri_object.get("status_message").unwrap().as_str().unwrap();
@@ -1114,7 +1097,7 @@ mod tests {
         let valid_rpc_uris = json_object.get("validRpcUris").unwrap().as_array().unwrap();
 
         for uri in valid_rpc_uris {
-            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
+            let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
             let status = UriValidator::validate_rpc_method(&uuri);
             assert!(status.is_ok());
         }
@@ -1131,7 +1114,7 @@ mod tests {
 
         for uri_object in invalid_rpc_uris {
             let uri = uri_object.get("uri").unwrap().as_str().unwrap();
-            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
+            let uuri = UUri::from_str(uri).unwrap();
             let status = UriValidator::validate_rpc_method(&uuri);
             assert!(status.is_err());
             let message = uri_object.get("status_message").unwrap().as_str().unwrap();
@@ -1149,7 +1132,7 @@ mod tests {
             .unwrap();
 
         for uri in valid_rpc_response_uris {
-            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
+            let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
             let status = UriValidator::validate_rpc_response(&uuri);
             assert!(UriValidator::is_rpc_response(&uuri));
             assert!(status.is_ok());
@@ -1189,7 +1172,7 @@ mod tests {
             .unwrap();
 
         for uri in invalid_rpc_response_uris {
-            let uuri = LongUriSerializer::deserialize(uri.to_string()).unwrap();
+            let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
             let status = UriValidator::validate_rpc_response(&uuri);
             assert!(status.is_err());
         }
