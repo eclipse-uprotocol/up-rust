@@ -450,6 +450,7 @@ mod tests {
     use std::fs;
 
     use crate::uprotocol::{UEntity, UResource};
+    use crate::uri::builder::resourcebuilder::UResourceBuilder;
 
     #[test]
     fn test_validate_blank_uri() {
@@ -1145,11 +1146,7 @@ mod tests {
             name: "hartley".into(),
             ..Default::default()
         };
-        let resource = UResource {
-            name: "rpc".into(),
-            id: Some(19999),
-            ..Default::default()
-        };
+        let resource = UResourceBuilder::for_rpc_response();
         let uuri = UUri {
             entity: Some(entity).into(),
             resource: Some(resource).into(),
