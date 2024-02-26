@@ -13,13 +13,15 @@
 
 use std::str::FromStr;
 
+use bytes::{Buf, BufMut};
 use regex::Regex;
+use std::io::Write;
 
-use crate::uprotocol::uri::UUri;
+use crate::proto::uprotocol::uauthority::AddressType;
+use crate::uprotocol::uri::{uauthority::Number, UUri};
 use crate::uprotocol::{UAuthority, UEntity, UResource};
+use crate::uri::builder::resourcebuilder::UResourceBuilder;
 use crate::uri::validator::UriValidator;
-
-use crate::uri::serializer::{MicroUriSerializer, UriSerializer};
 
 #[derive(Debug, PartialEq)]
 pub struct SerializationError {
@@ -44,6 +46,11 @@ impl std::fmt::Display for SerializationError {
 }
 
 impl std::error::Error for SerializationError {}
+
+const LOCAL_MICRO_URI_LENGTH: usize = 8; // local micro URI length
+const IPV4_MICRO_URI_LENGTH: usize = 12; // IPv4 micro URI length
+const IPV6_MICRO_URI_LENGTH: usize = 24; // IPv6 micro URI length
+const UP_VERSION: u8 = 0x1; // UP version
 
 impl TryFrom<&UUri> for String {
     type Error = SerializationError;
@@ -293,19 +300,234 @@ impl TryFrom<&str> for UUri {
     }
 }
 
-impl TryFrom<UUri> for Vec<u8> {
+impl TryFrom<&UUri> for Vec<u8> {
     type Error = SerializationError;
 
-    fn try_from(value: UUri) -> Result<Self, Self::Error> {
-        MicroUriSerializer::serialize(&value).map_err(|e| SerializationError::new(e.to_string()))
+    /// Serializes a `UUri` into a `Vec<u8>` following the Micro-URI specifications.
+    ///
+    /// # Parameters
+    /// * `uri`: A reference to the `UUri` data object.
+    ///
+    /// # Returns
+    /// A `Vec<u8>` representing the serialized `UUri`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `SerializationError` noting which which portion failed Micro Uri validation
+    /// or another error which occurred during serialization.
+    ///
+    /// # Examples
+    ///
+    /// ## Example which passes the Micro Uri validation
+    ///
+    /// ```
+    /// use up_rust::uprotocol::{UEntity, UUri, UResource};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(19999),
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///     ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let uprotocol_uri = Vec::try_from(&uri);
+    /// assert!(uprotocol_uri.is_ok());
+    /// let expected_uri_bytes = vec![0x01, 0x00, 0x75, 0x2F, 0x4E, 0x1F, 0xFE, 0x00];
+    /// assert_eq!(uprotocol_uri.unwrap(), expected_uri_bytes);
+    /// ```
+    ///
+    /// ## Example which fails the Micro Uri validation due to UEntity ID being > 16 bits
+    ///
+    /// ```
+    /// use up_rust::uprotocol::{UEntity, UUri, UResource};
+    ///
+    /// let uri = UUri {
+    ///     entity: Some(UEntity {
+    ///         id: Some(0x10000), // <- note that we've exceeded the allotted 16 bits
+    ///         version_major: Some(254),
+    ///         ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     resource: Some(UResource {
+    ///         id: Some(29999),
+    ///     ..Default::default()
+    ///     })
+    ///     .into(),
+    ///     ..Default::default()
+    /// };
+    /// let uprotocol_uri = Vec::try_from(&uri);
+    /// assert!(uprotocol_uri.is_err());
+    /// ```
+    fn try_from(uri: &UUri) -> Result<Self, Self::Error> {
+        if let Err(validation_error) = UriValidator::validate_micro_form(uri) {
+            let error_message =
+                format!("Failed to validate micro URI format: {}", validation_error);
+            return Err(SerializationError::new(error_message));
+        }
+
+        let mut buf = vec![];
+
+        // UP_VERSION
+        buf.put_u8(UP_VERSION);
+
+        // ADDRESS_TYPE
+        let address_type: AddressType = match uri.authority.as_ref() {
+            Some(authority) => AddressType::try_from(authority)?,
+            _ => AddressType::Local,
+        };
+        buf.put_u8(address_type.value());
+
+        // URESOURCE_ID
+        if let Some(id) = uri.resource.as_ref().and_then(|resource| resource.id) {
+            buf.write_all(&[(id >> 8) as u8])
+                .map_err(|e| SerializationError::new(e.to_string()))?;
+            buf.write_all(&[id as u8])
+                .map_err(|e| SerializationError::new(e.to_string()))?;
+        }
+
+        // UENTITY_ID
+        if let Some(id) = uri.entity.as_ref().and_then(|entity| entity.id) {
+            buf.write_all(&[(id >> 8) as u8])
+                .map_err(|e| SerializationError::new(e.to_string()))?;
+            buf.write_all(&[id as u8])
+                .map_err(|e| SerializationError::new(e.to_string()))?;
+        }
+
+        // UENTITY_VERSION
+        let version = uri
+            .entity
+            .as_ref()
+            .and_then(|entity| entity.version_major)
+            .unwrap_or(0);
+        buf.put_u8(version as u8);
+
+        // UNUSED
+        buf.put_u8(0);
+
+        // UAUTHORITY
+        if let Some(authority) = uri.authority.as_ref() {
+            buf.put(Vec::try_from(authority)?.as_slice());
+        }
+
+        Ok(buf)
+    }
+}
+
+impl TryFrom<&[u8]> for UUri {
+    type Error = SerializationError;
+
+    /// Creates a `UUri` data object from a uProtocol micro URI.
+    ///
+    /// # Arguments
+    ///
+    /// * `micro_uri` - A byte slice representing the uProtocol micro URI.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `UUri` data object.
+    fn try_from(micro_uri: &[u8]) -> Result<Self, Self::Error> {
+        if micro_uri.len() < LOCAL_MICRO_URI_LENGTH {
+            return Err(SerializationError::new("URI is empty or not in micro form"));
+        }
+
+        let mut buf: &[u8] = micro_uri;
+        // Need to be version 1
+        if buf.get_u8() != UP_VERSION {
+            return Err(SerializationError::new(format!(
+                "URI is not of expected uProtocol version {}",
+                UP_VERSION
+            )));
+        }
+        let address_type = AddressType::try_from(buf.get_u8())?;
+
+        match address_type {
+            AddressType::Local => {
+                if micro_uri.len() != LOCAL_MICRO_URI_LENGTH {
+                    return Err(SerializationError::new("Invalid micro URI length"));
+                }
+            }
+            AddressType::IPv4 => {
+                if micro_uri.len() != IPV4_MICRO_URI_LENGTH {
+                    return Err(SerializationError::new("Invalid micro URI length"));
+                }
+            }
+            AddressType::IPv6 => {
+                if micro_uri.len() != IPV6_MICRO_URI_LENGTH {
+                    return Err(SerializationError::new("Invalid micro URI length"));
+                }
+            }
+            AddressType::ID => {
+                // we cannot perform any reasonable check at this point because we do not
+                // know the (variable) length of the authority ID yet
+            }
+        }
+
+        // RESOURCE
+        let uresource_id = u32::from(buf.get_u16());
+        let resource = Some(UResourceBuilder::from_id(uresource_id));
+
+        // UENTITY
+        let ue_id = buf.get_u16();
+        let ue_version = u32::from(buf.get_u8());
+        let entity = Some(UEntity {
+            id: Some(ue_id.into()),
+            version_major: Some(ue_version),
+            ..Default::default()
+        });
+
+        // skip unused byte
+        buf.advance(1);
+
+        // Calculate uAuthority
+        let authority = match address_type {
+            AddressType::IPv4 => Some(UAuthority {
+                number: Some(Number::Ip(buf.copy_to_bytes(4).to_vec())),
+                ..Default::default()
+            }),
+            AddressType::IPv6 => Some(UAuthority {
+                number: Some(Number::Ip(buf.copy_to_bytes(16).to_vec())),
+                ..Default::default()
+            }),
+            AddressType::ID => {
+                let len = buf.get_u8() as usize;
+                Some(UAuthority {
+                    number: Some(Number::Id(buf.copy_to_bytes(len).to_vec())),
+                    ..Default::default()
+                })
+            }
+            AddressType::Local => None,
+        };
+
+        Ok(UUri {
+            authority: authority.into(),
+            entity: entity.into(),
+            resource: resource.into(),
+            ..Default::default()
+        })
     }
 }
 
 impl TryFrom<Vec<u8>> for UUri {
     type Error = SerializationError;
 
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        MicroUriSerializer::deserialize(value).map_err(|e| SerializationError::new(e.to_string()))
+    /// Creates a `UUri` data object from a uProtocol micro URI.
+    ///
+    /// # Arguments
+    ///
+    /// * `micro_uri` - A byte vec representing the uProtocol micro URI.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `UUri` data object.
+    fn try_from(micro_uri: Vec<u8>) -> Result<Self, Self::Error> {
+        UUri::try_from(micro_uri.as_slice())
     }
 }
 
@@ -328,7 +550,7 @@ impl UUri {
         }
 
         let long_uri_parsed = UUri::from_str(long_uri)?;
-        let micro_uri_parsed = UUri::try_from(micro_uri.to_vec())?;
+        let micro_uri_parsed = UUri::try_from(micro_uri)?;
 
         let mut auth = match micro_uri_parsed.authority.into_option() {
             Some(value) => value,
@@ -459,6 +681,10 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
+    use crate::uprotocol::UResource;
+
+    // LONG/STRING URI TESTS
+
     #[test_case(""; "fail for empty string")]
     #[test_case("/"; "fail for schema and slash")]
     #[test_case("//"; "fail for schema and double slash")]
@@ -466,13 +692,13 @@ mod tests {
     #[test_case("////body.access"; "fail for schema and 4 slash and content")]
     #[test_case("/////body.access"; "fail for schema and 5 slash and content")]
     #[test_case("//////body.access"; "fail for schema and 6 slash and content")]
-    fn test_try_from_string_fail(string: &str) {
+    fn test_long_try_from_string_fail(string: &str) {
         let parsing_result = UUri::from_str(string);
         assert!(parsing_result.is_err());
     }
 
     #[test_case(UUri::default(); "fail for default uri")]
-    fn test_try_from_uri_fail(uri: UUri) {
+    fn test_long_try_from_uri_fail(uri: UUri) {
         let parsing_result = String::try_from(&uri);
         assert!(parsing_result.is_err());
     }
@@ -615,7 +841,7 @@ mod tests {
             ..Default::default()
         };
         "succeed for remote rpc uri with service with version")]
-    fn test_try_from_success(string: &str, expected_uri: UUri) {
+    fn test_long_try_from_success(string: &str, expected_uri: UUri) {
         let parsing_result = UUri::from_str(string);
         assert!(parsing_result.is_ok());
         let parsed_uri = parsing_result.unwrap();
@@ -641,7 +867,7 @@ mod tests {
             ..Default::default()
         };
         "succeed for remote uri with custom scheme with service with resource name with instance with message")]
-    fn test_try_from_custom_scheme_success(string: &str, expected_uri: UUri) {
+    fn test_long_try_from_custom_scheme_success(string: &str, expected_uri: UUri) {
         let parsing_result = UUri::from_str(string);
         assert!(parsing_result.is_ok());
         let parsed_uri = parsing_result.unwrap();
@@ -653,9 +879,147 @@ mod tests {
         assert_eq!(string, parsing_result.unwrap());
     }
 
+    // MICRO/VEC URI TESTS
+
+    #[test_case(UUri::default(); "fail for default uri")]
+    #[test_case(
+        UUri {
+            authority: Some(UAuthority { name: Some(String::from("vcu.vin")), ..Default::default() } ).into(),
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(19999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "fail for remote service without address")]
+    #[test_case(
+        UUri {
+            entity: Some( UEntity { name: "kaputt".to_string(), ..Default::default() } ).into(),
+            resource: Some(UResource { name: "rpc".to_string(), instance: Some("response".to_string()), id: Some(0),  ..Default::default() }).into(),    // id is '0' for rpc repsonses
+            ..Default::default()
+        };
+        "fail for rpc response without ids")]
+    #[test_case(
+        UUri {
+            entity: Some( UEntity { name: "kaputt".to_string(), id: Some(2999), version_major: Some(1), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "fail for local service without resource")]
+    #[test_case(
+        UUri {
+            authority: Some( UAuthority { number: Some(crate::uprotocol::uri::uauthority::Number::Ip(vec![127, 1, 23, 123, 12, 6])), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "fail for remote service with bad length ip address")]
+    #[test_case(
+        UUri {
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(0x10000), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "fail for service overflow in resource id")]
+    #[test_case(
+        UUri {
+            entity: Some( UEntity { id: Some(0x10000), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(29999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "fail for service overflow in entity id")]
+    #[test_case(
+        UUri {
+            entity: Some( UEntity { id: Some(29999), version_major: Some(0x100), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(29999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "fail for service overflow in entity version")]
+    fn test_micro_try_from_uri_fail(uri: UUri) {
+        let parsing_result = Vec::try_from(&uri);
+        assert!(parsing_result.is_err());
+    }
+
+    #[test_case(vec![0x1, 0x0, 0x0, 0x0, 0x0]; "fail for bad microuri length")]
+    #[test_case(vec![0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]; "fail for bad microuri version")]
+    #[test_case(vec![0x1, 0x5, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]; "fail for invalid microuri address type")]
+    #[test_case(vec![0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]; "fail for invalid microuri length 0")]
+    #[test_case(vec![0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]; "fail for invalid microuri length 1")]
+    #[test_case(vec![0x1, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]; "fail for invalid microuri length 2")]
+    fn test_micro_try_from_vec_fail(uri: Vec<u8>) {
+        let parsing_result = UUri::try_from(uri.as_slice());
+        assert!(parsing_result.is_err());
+    }
+
+    #[test_case(vec![1, 0, 78, 31, 117, 47, 254, 0],
+        UUri {
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(19999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "succeed for local service with id with version with resource id")]
+    #[test_case(vec![1, 0, 78, 31, 117, 47, 254, 0],
+        UUri {
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(19999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "succeed for remote service with id with version with resource id")]
+    #[test_case(vec![1, 1, 78, 31, 117, 47, 254, 0, 10, 0, 3, 3],
+        UUri {
+            authority: Some(UAuthority { number: Some(crate::uprotocol::uri::uauthority::Number::Ip(vec![10, 0, 3, 3])), ..Default::default() } ).into(),
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(19999), ..Default::default() } ).into(), // id below MAX_RPC_ID=1000 -> "rpc" resource
+            ..Default::default()
+        };
+        "succeed for remote service with ipv4 authority with entity id with version with resource id")]
+    #[test_case(vec![1, 2, 78, 31, 117, 47, 254, 0, 32, 1, 13, 184, 133, 163, 0, 0, 0, 0, 138, 46, 3, 112, 115, 52],
+        UUri {
+            authority: Some(UAuthority { number: Some(crate::uprotocol::uri::uauthority::Number::Ip(vec![32, 1, 13, 184, 133, 163, 0, 0, 0, 0, 138, 46, 3, 112, 115, 52])), ..Default::default() } ).into(),
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(19999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "succeed for remote service with ipv6 authority with entity id with version with resource id")]
+    #[test_case(vec![1, 3, 78, 31, 117, 47, 254, 0, 9, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        UUri {
+            authority: Some(UAuthority { number: Some(crate::uprotocol::uri::uauthority::Number::Id(vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09])), ..Default::default() } ).into(),
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(19999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "succeed for remote service with id authority with entity id with version with resource id")]
+    #[test_case(add_many_bytes(Some(vec![1, 3, 78, 31, 117, 47, 254, 0, 129]), 129),
+        UUri {
+            authority: Some(UAuthority { number: Some(crate::uprotocol::uri::uauthority::Number::Id(add_many_bytes(None, 129))), ..Default::default() } ).into(),
+            entity: Some( UEntity { id: Some(29999), version_major: Some(254), ..Default::default() } ).into(),
+            resource: Some( UResource { id: Some(19999), ..Default::default() } ).into(),
+            ..Default::default()
+        };
+        "succeed for remote service with long authority id with entity id with version with resource id")]
+    fn test_micro_try_from_success(vec: Vec<u8>, expected_uri: UUri) {
+        let parsing_result = UUri::try_from(vec.as_slice());
+        assert!(parsing_result.is_ok());
+        let parsed_uri = parsing_result.unwrap();
+        assert_eq!(expected_uri, parsed_uri);
+        assert!(UriValidator::is_micro_form(&parsed_uri));
+
+        let parsing_result = Vec::try_from(&parsed_uri);
+        assert!(parsing_result.is_ok());
+        assert_eq!(vec, parsing_result.unwrap());
+    }
+
+    // MISC/OTHER TESTS
+
     #[test]
     fn test_build_resolved_passing_empty_long_uri_empty_micro_uri() {
         let uri: Result<UUri, SerializationError> = UUri::build_resolved("", &[]);
         assert!(uri.is_err());
+    }
+
+    // HELPERS
+
+    // Add a sequence of bytes to the end of a given byte vector, or create a new vector if None start_bytes were given
+    fn add_many_bytes(start_bytes: Option<Vec<u8>>, size: usize) -> Vec<u8> {
+        if let Some(mut bytes) = start_bytes {
+            bytes.extend((0..size).map(|i| i as u8));
+            return bytes;
+        }
+        (0..size).map(|i| i as u8).collect()
     }
 }

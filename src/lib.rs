@@ -112,14 +112,6 @@ pub mod uri {
         pub use crate::types::validationerror::*;
         pub use urivalidator::*;
     }
-    pub mod serializer {
-        mod microuriserializer;
-        mod uriserializer;
-
-        pub use crate::types::serializationerror::*;
-        pub use microuriserializer::*;
-        pub use uriserializer::*;
-    }
 }
 
 pub mod uuid {
