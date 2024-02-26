@@ -85,9 +85,9 @@ pub mod rpc {
 
 pub mod transport {
     pub mod builder {
-        mod uattributesbuilder;
+        mod umessagebuilder;
 
-        pub use uattributesbuilder::*;
+        pub use umessagebuilder::*;
     }
     pub mod datamodel {
         mod utransport;
