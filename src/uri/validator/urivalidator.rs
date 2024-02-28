@@ -161,7 +161,7 @@ impl UriValidator {
                 let has_valid_instance = resource
                     .instance
                     .as_ref()
-                    .map_or(false, |instance| instance.contains("response"));
+                    .map_or(false, |instance| instance == "response");
 
                 let has_zero_id = resource.id.map_or(false, |id| id == 0);
 
