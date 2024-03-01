@@ -133,7 +133,7 @@ impl UriValidator {
     pub fn is_rpc_method(uri: &UUri) -> bool {
         if !Self::is_empty(uri) {
             if let Some(resource) = uri.resource.as_ref() {
-                if resource.name.contains("rpc") {
+                if resource.name == "rpc" {
                     let has_valid_instance = resource
                         .instance
                         .as_ref()
@@ -161,11 +161,11 @@ impl UriValidator {
                 let has_valid_instance = resource
                     .instance
                     .as_ref()
-                    .map_or(false, |instance| instance.contains("response"));
+                    .map_or(false, |instance| instance == "response");
 
-                let has_non_zero_id = resource.id.map_or(false, |id| id != 0);
+                let has_zero_id = resource.id.map_or(false, |id| id == 0);
 
-                return has_valid_instance || has_non_zero_id;
+                return resource.name == "rpc" && has_valid_instance && has_zero_id;
             }
         }
         false
@@ -1147,7 +1147,8 @@ mod tests {
         };
         let resource = UResource {
             name: "rpc".into(),
-            id: Some(19999),
+            instance: Some("response".to_string()),
+            id: Some(0),
             ..Default::default()
         };
         let uuri = UUri {
