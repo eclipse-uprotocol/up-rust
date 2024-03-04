@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::uprotocol::{UCode, UStatus};
+use crate::{UCode, UStatus};
 
 /// A wrapper for RPC stub calls.
 ///

@@ -13,8 +13,7 @@
 
 use async_trait::async_trait;
 
-use crate::rpc::{rpcmapper::RpcMapperError, CallOptions};
-use crate::uprotocol::{UMessage, UPayload, UUri};
+use crate::{CallOptions, RpcMapperError, UMessage, UPayload, UUri};
 
 pub type RpcClientResult = Result<UMessage, RpcMapperError>;
 

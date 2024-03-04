@@ -19,139 +19,73 @@
 //!
 //! ## This crate includes:
 //!
-//! - the [`cloudevent`] module that offers a common way to represent uProtocol messages using the `CloudEvent` data model
-//! - the [`rpc`] module which offers wrappers for dealing with uProtocol payload in the context of RPC method invokation
-//! - the [`transport`] module as a set of abstractions for various transport-level concerns like status representation and serialization
-//! - the [`uri`] module, providing convenience wrappers for creation and validation of uProtocol-style resource identifiers
-//! - the [`uuid`] module which generates and validates UUIDs as per the uProtocol specification
+//! - the [cloudevents] module that offers a common way to represent uProtocol messages using the [cloudevents data model](https://cloudevents.io/)
+//! - the rpc module which offers wrappers for dealing with uProtocol payload in the context of RPC method invocation
+//! - the uattributes module with uProtocol message attribute types and validators
+//! - the umessage module which defines the uProtocol core message type and provides related convenience functionality
+//! - the upayload module which defines payload representation for uProtocol messages
+//! - the uri module providing convenience wrappers for creation and validation of uProtocol-style resource identifiers
+//! - the ustatus module which provices uProtocol types for representing status and status codes
+//! - the utransport module as an interface contract between uProtocol and specific transport protocol implementations
+//! - the uuid module which generates and validates UUIDs as per the uProtocol specification
+//!
+//! For user convenience, all of these modules export their types on up_rust top-level, except for (future) optional features.
 //!
 //! ## References
 //! - [Eclipse-uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec)
 //! - [Eclipse-uProtocol Core API types](https://github.com/eclipse-uprotocol/up-core-api)
 
-mod types {
-    pub mod parsingerror;
-    pub mod serializationerror;
-    pub mod validationerror;
-}
+// up_core_api types used and augmented by up_rust - symbols re-exported to toplevel, errors are module-specific
+mod rpc;
+pub use rpc::{CallOptions, CallOptionsBuilder};
+pub use rpc::{RpcClient, RpcClientResult};
+pub use rpc::{RpcMapper, RpcMapperError};
+pub use rpc::{RpcPayload, RpcPayloadResult, RpcResult};
+pub use rpc::{RpcServer, RpcServerListener};
 
-pub mod cloudevent {
-    pub mod builder {
-        mod ucloudeventbuilder;
-        mod ucloudeventutils;
+mod uattributes;
+pub use uattributes::{
+    PublishValidator, RequestValidator, ResponseValidator, UAttributesValidator,
+    UAttributesValidators,
+};
+pub use uattributes::{UAttributes, UAttributesError, UMessageType, UPriority};
 
-        pub use ucloudeventbuilder::*;
-        pub use ucloudeventutils::*;
-    }
-    pub mod datamodel {
-        mod ucloudeventattributes;
+mod umessage;
+pub use umessage::{UMessage, UMessageBuilder, UMessageBuilderError};
 
-        pub use ucloudeventattributes::*;
-    }
-    pub mod serializer {
-        mod cloudeventjsonserializer;
-        mod cloudeventprotobufserializer;
-        mod cloudeventserializer;
+mod upayload;
+pub use upayload::{Data, UPayload, UPayloadError, UPayloadFormat};
 
-        pub use crate::types::serializationerror::*;
-        pub use cloudeventjsonserializer::*;
-        pub use cloudeventprotobufserializer::*;
-        pub use cloudeventserializer::*;
-    }
-    pub mod validator {
-        mod cloudeventvalidator;
+mod uri;
+pub use uri::{AddressType, Number, UAuthority, UEntity, UResource, UResourceBuilder};
+pub use uri::{UUri, UUriError, UriValidator};
 
-        pub use crate::types::validationerror::*;
-        pub use cloudeventvalidator::*;
-    }
-}
+mod ustatus;
+pub use ustatus::{UCode, UStatus};
+
+mod utransport;
+pub use utransport::UTransport;
+
+mod uuid;
+pub use uuid::{UUIDBuilder, UUID};
+
+// Types not used by up_rust, but re-exported to up_rust users, keeping them in their respective submodules
+pub use up_core_api::udiscovery;
+pub use up_core_api::usubscription;
+pub use up_core_api::utwin;
+
+// Types from up_core_api that we're not re-exporting for now (might change if need arises)
+// pub use up_core_api::file;
+// pub use up_core_api::uprotocol_options;
 
 // protoc-generated stubs, see build.rs
-include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
-
-pub mod rpc {
-    mod calloptions;
-    mod rpcclient;
-    mod rpcmapper;
-    mod rpcresult;
-    mod rpcserver;
-
-    pub use calloptions::*;
-    pub use rpcclient::*;
-    pub use rpcmapper::*;
-    pub use rpcresult::*;
-    pub use rpcserver::*;
-}
-
-pub mod transport {
-    pub mod builder {
-        mod umessagebuilder;
-
-        pub use umessagebuilder::*;
-    }
-    pub mod datamodel {
-        mod utransport;
-
-        pub use utransport::*;
-    }
-    pub mod validator {
-        mod uattributesvalidator;
-
-        pub use crate::types::validationerror::*;
-        pub use uattributesvalidator::*;
-    }
-}
-
-pub mod uri {
-    pub mod builder {
-        pub mod resourcebuilder;
-    }
-    pub mod validator {
-        mod urivalidator;
-
-        pub use crate::types::validationerror::*;
-        pub use urivalidator::*;
-    }
-}
-
-pub mod uuid {
-    pub mod builder {
-        mod uuidbuilder;
-
-        pub use uuidbuilder::*;
-    }
-}
-
-pub mod uprotocol {
-    // protoc-generated stubs, see build.rs
+mod up_core_api {
     include!(concat!(env!("OUT_DIR"), "/uprotocol/mod.rs"));
-
-    pub use self::uuid::UUID;
-    pub use crate::proto::uprotocol::upayload::*;
-    pub use crate::proto::uprotocol::uuid::*;
-    pub use uattributes::{UAttributes, UMessageType, UPriority};
-    pub use umessage::UMessage;
-    pub use upayload::{upayload::Data, UPayload, UPayloadFormat};
-    pub use uri::{UAuthority, UEntity, UResource, UUri};
-    pub use ustatus::{UCode, UStatus};
 }
 
-#[allow(non_snake_case)]
-pub(crate) mod proto {
-
-    pub(crate) mod cloudevents {
-        pub(crate) mod protocloudevent;
-    }
-
-    pub(crate) mod uprotocol {
-        pub(crate) mod uauthority;
-        pub(crate) mod uentity;
-        pub(crate) mod umessagetype;
-        pub(crate) mod upayload;
-        pub(crate) mod upriority;
-        pub(crate) mod uresource;
-        pub(crate) mod ustatus;
-        pub(crate) mod uuid;
-        pub(crate) mod uuri;
-    }
+// cloudevent-proto, generated and augmented types
+pub mod cloudevents;
+mod proto_cloudevents {
+    include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
+    pub(crate) use self::cloudevents::cloud_event::*; // re-export for crate use, remove triple-redundant names
 }
