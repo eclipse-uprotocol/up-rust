@@ -11,13 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use protobuf::well_known_types::any::Any;
-use protobuf::MessageFull;
-use std::default::Default;
-use std::fmt;
+use std::{default::Default, fmt};
 
-use crate::rpc::rpcclient::RpcClientResult;
-use crate::uprotocol::{Data, UCode, UPayload, UPayloadFormat, UStatus};
+use protobuf::{well_known_types::any::Any, MessageFull};
+
+use crate::{Data, RpcClientResult, UCode, UPayload, UPayloadFormat, UStatus};
 
 pub type RpcPayloadResult = Result<RpcPayload, RpcMapperError>;
 
@@ -307,11 +305,15 @@ impl RpcMapper {
 mod tests {
     use super::*;
     use bytes::{Buf, BufMut};
-    use cloudevents::{Event, EventBuilder, EventBuilderV10};
     use protobuf::MessageField;
 
-    use crate::cloudevents::CloudEvent as CloudEventProto;
-    use crate::uprotocol::{UMessage, UMessageType, UPayload};
+    // cloudevents-sdk
+    use cloudevents::{Event, EventBuilder, EventBuilderV10};
+
+    // protoc-generated code from cloudevents.proto
+    use crate::proto_cloudevents::cloudevents::CloudEvent as ProtoCloudEvent;
+
+    use crate::{UMessage, UMessageType};
 
     fn build_status_response(code: UCode, msg: &str) -> RpcClientResult {
         let status: UStatus = UStatus::fail_with_code(code, msg);
@@ -363,7 +365,7 @@ mod tests {
 
     fn build_cloudevent_umessage_for_test() -> UMessage {
         let event = build_cloud_event_for_test();
-        let proto_event = CloudEventProto::from(event);
+        let proto_event = ProtoCloudEvent::from(event);
         let any = RpcMapper::pack_any(&proto_event).unwrap();
 
         let payload = UPayload::try_from(any).unwrap();
@@ -444,7 +446,7 @@ mod tests {
     fn test_success_invoke_method_happy_flow_using_map_response() {
         let response_message = build_cloudevent_umessage_for_test();
 
-        let e = RpcMapper::map_response::<CloudEventProto>(Ok(response_message)).unwrap();
+        let e = RpcMapper::map_response::<ProtoCloudEvent>(Ok(response_message)).unwrap();
         let event = Event::from(e);
 
         assert_eq!(event, build_cloud_event_for_test());
@@ -453,7 +455,7 @@ mod tests {
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_status_using_map_response() {
         let response = build_status_response(UCode::ABORTED, "hello");
-        let e = RpcMapper::map_response::<CloudEventProto>(response);
+        let e = RpcMapper::map_response::<ProtoCloudEvent>(response);
 
         assert!(e.is_err());
     }
@@ -461,7 +463,7 @@ mod tests {
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_bad_proto_using_map_response() {
         let response = build_number_response(42);
-        let e = RpcMapper::map_response::<CloudEventProto>(response);
+        let e = RpcMapper::map_response::<ProtoCloudEvent>(response);
 
         assert!(e.is_err());
     }
@@ -473,7 +475,7 @@ mod tests {
         let response = Err(RpcMapperError::InvalidPayload(
             "not a CloudEvent".to_string(),
         ));
-        let result = RpcMapper::map_response::<CloudEventProto>(response);
+        let result = RpcMapper::map_response::<ProtoCloudEvent>(response);
 
         assert!(result.is_err());
         assert_eq!(

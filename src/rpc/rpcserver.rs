@@ -13,7 +13,7 @@
 
 use async_trait::async_trait;
 
-use crate::uprotocol::{UMessage, UStatus, UUri};
+use crate::{UMessage, UStatus, UUri};
 
 pub type RpcServerListener = Box<dyn Fn(Result<UMessage, UStatus>) + Send + Sync + 'static>;
 
