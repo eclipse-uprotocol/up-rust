@@ -11,13 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::fmt;
-
 /// This struct is used when making `uRPC` calls to pass additional options.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CallOptions {
     timeout: u32,
-    token: String,
+    token: Option<String>,
 }
 
 impl CallOptions {
@@ -25,7 +23,7 @@ impl CallOptions {
 
     pub const DEFAULT: CallOptions = CallOptions {
         timeout: CallOptions::TIMEOUT_DEFAULT,
-        token: String::new(),
+        token: None,
     };
 
     /// Constructs a new builder.
@@ -39,14 +37,8 @@ impl CallOptions {
     }
 
     /// Get an `OAuth2` access token.
-    pub fn token(&self) -> Option<&str> {
-        // I don't agree with the trim() here - a space is a valid character, so if I don't want to have them
-        // here, I should fail noisily on creation. But, to be compliant with the Java SDK...
-        if self.token.trim().is_empty() {
-            None
-        } else {
-            Some(&self.token)
-        }
+    pub fn token(&self) -> Option<String> {
+        self.token.clone()
     }
 }
 
@@ -54,14 +46,14 @@ impl CallOptions {
 #[derive(Debug, Clone)]
 pub struct CallOptionsBuilder {
     timeout: u32,
-    token: String,
+    token: Option<String>,
 }
 
 impl Default for CallOptionsBuilder {
     fn default() -> Self {
         Self {
             timeout: CallOptions::TIMEOUT_DEFAULT,
-            token: String::new(),
+            token: None,
         }
     }
 }
@@ -79,9 +71,15 @@ impl CallOptionsBuilder {
     }
 
     /// Add an `OAuth2` access token.
+    ///
+    /// # Panics
+    ///
+    /// if the given token is an empty string.
     #[must_use]
     pub fn with_token(mut self, token: impl Into<String>) -> Self {
-        self.token = token.into();
+        let value: String = token.into();
+        assert!(!value.is_empty());
+        self.token = Some(value);
         self
     }
 
@@ -91,16 +89,6 @@ impl CallOptionsBuilder {
             timeout: self.timeout,
             token: self.token,
         }
-    }
-}
-
-impl fmt::Display for CallOptions {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "CallOptions {{ timeout: {}, token: '{}' }}",
-            self.timeout, self.token
-        )
     }
 }
 
@@ -126,17 +114,6 @@ mod tests {
     }
 
     #[test]
-    fn test_to_string() {
-        let call_options = CallOptions::builder()
-            .with_timeout(30)
-            .with_token("someToken")
-            .build();
-
-        let expected = "CallOptions { timeout: 30, token: 'someToken' }";
-        assert_eq!(expected, call_options.to_string());
-    }
-
-    #[test]
     fn test_creating_call_options_default() {
         let call_options = CallOptions::DEFAULT;
         assert_eq!(CallOptions::TIMEOUT_DEFAULT, call_options.timeout());
@@ -153,31 +130,19 @@ mod tests {
         assert_eq!("someToken", token);
     }
 
-    // Omitted, because in Rust there is no 'null' where an object should be
-    // #[test]
-    // fn test_creating_call_options_with_none_token() {
-    //     let call_options = CallOptions::builder()
-    //         .with_token(None)
-    //         .build();
-
-    //     assert_eq!(TIMEOUT_DEFAULT, call_options.timeout());
-    //     assert!(call_options.token().is_none());
-    // }
-
     #[test]
+    #[should_panic]
     fn test_creating_call_options_with_empty_string_token() {
-        let call_options = CallOptions::builder().with_token(String::from("")).build();
-
-        assert_eq!(CallOptions::TIMEOUT_DEFAULT, call_options.timeout());
-        assert!(call_options.token().is_none());
+        let _ = CallOptions::builder().with_token(String::from(""));
     }
 
     #[test]
     fn test_creating_call_options_with_a_token_with_only_spaces() {
-        let call_options = CallOptions::builder().with_token("   ".to_string()).build();
+        let token = "   ".to_string();
+        let call_options = CallOptions::builder().with_token(token.clone()).build();
 
         assert_eq!(CallOptions::TIMEOUT_DEFAULT, call_options.timeout());
-        assert!(call_options.token().is_none());
+        assert_eq!(call_options.token(), Some(token));
     }
 
     #[test]
@@ -187,13 +152,4 @@ mod tests {
         assert_eq!(30, call_options.timeout());
         assert!(call_options.token().is_none());
     }
-
-    // Omitted, because there is no negative timeout with an u32
-    // #[test]
-    // fn test_creating_call_options_with_a_negative_timeout() {
-    //     let call_options = CallOptions::builder().with_timeout(-3 as u32).build();
-
-    //     assert_eq!(CallOptions::TIMEOUT_DEFAULT, call_options.timeout());
-    //     assert!(call_options.token().is_none());
-    // }
 }
