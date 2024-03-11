@@ -11,6 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use crate::{rpc::CallOptions, UUri, UUID};
+
 mod uattributesvalidator;
 mod upriority;
 
@@ -51,3 +53,58 @@ impl std::fmt::Display for UAttributesError {
 }
 
 impl std::error::Error for UAttributesError {}
+
+impl UAttributes {
+    /// Creates attributes representing an RPC request message.
+    ///
+    /// The message's priority will be set to [`UPriority::UPRIORITY_CS4`].
+    ///
+    /// # Arguments
+    ///
+    /// * `message_id` - The message's identifier. This identifier will also be used as the correlation ID
+    ///                  in RPC response messages created by the service being invoked.
+    /// * `method` - The URI identifying the method to invoke.
+    /// * `reply_to_address` - The URI that the sender of the request expects to receive the response message at.
+    /// * `options` - Additional attributes relevant for the request. The time-to-live value will be capped at [`i32::MAX`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{CallOptions, UAttributes, UMessageType, UPriority, UUIDBuilder, UUri};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let uuid_builder = UUIDBuilder::new();
+    /// let message_id = uuid_builder.build();
+    /// let method_to_invoke = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
+    /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
+    /// let options = CallOptions::builder().with_timeout(5_000).with_token("my_token").build();
+    /// let attributes = UAttributes::request(message_id.clone(), method_to_invoke.clone(), reply_to_address.clone(), options);
+    /// assert_eq!(attributes.type_, UMessageType::UMESSAGE_TYPE_REQUEST.into());
+    /// assert_eq!(attributes.id, Some(message_id).into());
+    /// assert_eq!(attributes.priority, UPriority::UPRIORITY_CS4.into());
+    /// assert_eq!(attributes.source, Some(reply_to_address).into());
+    /// assert_eq!(attributes.sink, Some(method_to_invoke).into());
+    /// assert_eq!(attributes.ttl, Some(5000));
+    /// assert_eq!(attributes.token, Some("my_token".to_string()));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn request(
+        message_id: UUID,
+        method: UUri,
+        reply_to_address: UUri,
+        options: CallOptions,
+    ) -> Self {
+        let ttl = i32::try_from(options.timeout()).unwrap_or(i32::MAX);
+        Self {
+            type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
+            id: Some(message_id).into(),
+            priority: UPriority::UPRIORITY_CS4.into(),
+            source: Some(reply_to_address).into(),
+            sink: Some(method).into(),
+            ttl: Some(ttl),
+            token: options.token().map(|s| s.to_string()),
+            ..Default::default()
+        }
+    }
+}
