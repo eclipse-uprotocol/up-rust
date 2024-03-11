@@ -19,6 +19,7 @@ use std::path::PathBuf;
 const UPROTOCOL_BASE_URI: &str = "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.6/uprotocol";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "cloudevents")]
     get_and_build_protos(
         &[
             // cloudevent proto definitions
@@ -39,12 +40,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // not used in the SDK yet, but for completeness sake
             format!("{}/file.proto", UPROTOCOL_BASE_URI).as_str(),
             format!("{}/uprotocol_options.proto", UPROTOCOL_BASE_URI).as_str(),
+            // optional up-core-api features
+            #[cfg(feature = "udiscovery")]
             format!("{}/core/udiscovery/v3/udiscovery.proto", UPROTOCOL_BASE_URI).as_str(),
+            #[cfg(feature = "usubscription")]
             format!(
                 "{}/core/usubscription/v3/usubscription.proto",
                 UPROTOCOL_BASE_URI
             )
             .as_str(),
+            #[cfg(feature = "utwin")]
             format!("{}/core/utwin/v1/utwin.proto", UPROTOCOL_BASE_URI).as_str(),
         ],
         "uprotocol",

@@ -8,27 +8,28 @@ The module contains the factory methods, serializers, and validators for all dat
 
 ## Getting Started
 
-### Building the library
+### Working with the library
 
-Building the library is as simple as running `cargo build` in the project root directory. You can run the tests with `cargo test`.
-
-__Note:__ the library current uses protobuf message definitions from the cloudevents project. Specifically, the build process downloads:
-
-- `cloudevents.proto` from the [CNCF CloudEvents specification project](https://github.com/cloudevents/spec/blob/main/cloudevents/formats/cloudevents.proto)
-
-Additionally, the build pulls [uprotocol protobuf definitions](https://github.com/eclipse-uprotocol/up-core-api) that constitute the core types used in the library. All of these are compiled automatically during build by `build.rs`in the project root. The resulting Rust code is made available to the project via `lib.rs` definitions, in `pub::mod::proto`.
+Building the library is as simple as running `cargo build` in the project root directory. The build pulls [uprotocol protobuf definitions](https://github.com/eclipse-uprotocol/up-core-api) that constitute the core types used in the library. All of these are compiled automatically by `build.rs`. The resulting Rust code is made available to the project via the `up_core_api::` internal module.
 
 __Note:__ the library uses non-stable features from the uuid crate, notably version 8 UUIDs. These features are defined in `cargo.toml` (where the uuid crate dependency is declared), and require a compiler flag to be included in the build. This is configured in `.cargo/config.toml`.
 
+### Optional features
+
+The up-rust crate contains some optional features, as per the crate documentation (refer to src/lib.rs). One of these features is the usage of protobuf message definitions from the cloudevents project. Specifically, with this feature enabled the build process downloads:
+
+- `cloudevents.proto` from the [CNCF CloudEvents specification project](https://github.com/cloudevents/spec/blob/main/cloudevents/formats/cloudevents.proto)
+
+To tell VSCode to just build all crate features automatically, place the following in `./vscode/settings.json`:
+
+```json
+{
+    "rust-analyzer.cargo.features": "all"
+}
+```
+
+For more details on Rust (cargo) features, please refer to [The Cargo Book](https://doc.rust-lang.org/cargo/reference/features.html).
+
 ### Using the library
 
-The library contains the following modules:
-
-Package | [uProtocol spec](https://github.com/eclipse-uprotocol/uprotocol-spec) | Purpose
----|---|---
-cloudevent | [uProtocol CloudEvents](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/cloudevents.adoc) | Common way to represent uProtocol messages using CloudEvent data model
-proto | | Various augmentations and convenience functions on generated protobuf code, like Display trait implementations or various conversions
-transport | [uP-L1 Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc) | Interface (and data model) used for bidirectional point-2-point communication between uEs. Interface is to be implemented by the different communication technologies (ex. Binder, MQTT, Zenoh, SOME/IP, DDS, HTTP, etc…​)
-uri | [URI, UAthority, UEntity, UResource](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uri.adoc) | Uniform Resource Identifier (RFC3986) used to address things (devices, software, methods, topics, etc…​) on the network
-uuid | [uProtocol UUIDs](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/basics/uuid.adoc) | Identifier used to uniquely identify messages that are sent between devices. also includes timestamp for the message
-types | | Types commonly used across the SDK
+Sub-modules of this crate, as well as optional features, are listed in the crate documentation in `src/lib.rs`.

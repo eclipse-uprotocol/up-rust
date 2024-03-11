@@ -307,13 +307,7 @@ mod tests {
     use bytes::{Buf, BufMut};
     use protobuf::MessageField;
 
-    // cloudevents-sdk
-    use cloudevents::{Event, EventBuilder, EventBuilderV10};
-
-    // protoc-generated code from cloudevents.proto
-    use crate::proto_cloudevents::cloudevents::CloudEvent as ProtoCloudEvent;
-
-    use crate::{UMessage, UMessageType};
+    use crate::UMessage;
 
     fn build_status_response(code: UCode, msg: &str) -> RpcClientResult {
         let status: UStatus = UStatus::fail_with_code(code, msg);
@@ -354,27 +348,6 @@ mod tests {
         Ok(message)
     }
 
-    fn build_cloud_event_for_test() -> Event {
-        EventBuilderV10::new()
-            .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
-            .source("http://example.com")
-            .build()
-            .unwrap()
-    }
-
-    fn build_cloudevent_umessage_for_test() -> UMessage {
-        let event = build_cloud_event_for_test();
-        let proto_event = ProtoCloudEvent::from(event);
-        let any = RpcMapper::pack_any(&proto_event).unwrap();
-
-        let payload = UPayload::try_from(any).unwrap();
-        UMessage {
-            payload: MessageField::some(payload),
-            ..Default::default()
-        }
-    }
-
     #[test]
     fn test_map_response_to_result_happy_path() {
         let result = RpcMapper::map_response_to_result(build_number_response(3)).unwrap();
@@ -409,16 +382,6 @@ mod tests {
     }
 
     #[test]
-    fn test_success_invoke_method_happy_flow_using_map_response_to_rpc_response() {
-        let response_message = build_cloudevent_umessage_for_test();
-
-        let result = RpcMapper::map_response_to_result(Ok(response_message.clone())).unwrap();
-
-        assert!(result.status.is_failed());
-        assert_eq!(result.payload.unwrap(), response_message.payload.unwrap());
-    }
-
-    #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_status_using_map_response_to_rpc_response(
     ) {
         let response = build_status_response(UCode::INVALID_ARGUMENT, "boom");
@@ -442,20 +405,41 @@ mod tests {
         );
     }
 
+    // Create a generic UMessage for use in test cases
+    fn build_umessage_for_test() -> UMessage {
+        let arbitrary_proto = crate::up_core_api::file::FileBatch::default();
+        let any = RpcMapper::pack_any(&arbitrary_proto).unwrap();
+
+        let payload = UPayload::try_from(any).unwrap();
+        UMessage {
+            payload: MessageField::some(payload),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_success_invoke_method_happy_flow_using_map_response_to_rpc_response() {
+        let response_message = build_umessage_for_test();
+        let result = RpcMapper::map_response_to_result(Ok(response_message.clone())).unwrap();
+
+        assert!(result.status.is_failed());
+        assert_eq!(result.payload.unwrap(), response_message.payload.unwrap());
+    }
+
     #[test]
     fn test_success_invoke_method_happy_flow_using_map_response() {
-        let response_message = build_cloudevent_umessage_for_test();
+        let response_message = build_umessage_for_test();
+        let file_batch =
+            RpcMapper::map_response::<crate::up_core_api::file::FileBatch>(Ok(response_message))
+                .unwrap();
 
-        let e = RpcMapper::map_response::<ProtoCloudEvent>(Ok(response_message)).unwrap();
-        let event = Event::from(e);
-
-        assert_eq!(event, build_cloud_event_for_test());
+        assert_eq!(file_batch, crate::up_core_api::file::FileBatch::default());
     }
 
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_status_using_map_response() {
         let response = build_status_response(UCode::ABORTED, "hello");
-        let e = RpcMapper::map_response::<ProtoCloudEvent>(response);
+        let e = RpcMapper::map_response::<crate::up_core_api::file::FileBatch>(response);
 
         assert!(e.is_err());
     }
@@ -463,7 +447,7 @@ mod tests {
     #[test]
     fn test_fail_invoke_method_when_invoke_method_returns_a_bad_proto_using_map_response() {
         let response = build_number_response(42);
-        let e = RpcMapper::map_response::<ProtoCloudEvent>(response);
+        let e = RpcMapper::map_response::<crate::up_core_api::file::FileBatch>(response);
 
         assert!(e.is_err());
     }
@@ -475,7 +459,7 @@ mod tests {
         let response = Err(RpcMapperError::InvalidPayload(
             "not a CloudEvent".to_string(),
         ));
-        let result = RpcMapper::map_response::<ProtoCloudEvent>(response);
+        let result = RpcMapper::map_response::<crate::up_core_api::file::FileBatch>(response);
 
         assert!(result.is_err());
         assert_eq!(

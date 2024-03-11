@@ -442,11 +442,8 @@ impl UriValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use std::fs;
     use std::str::FromStr;
-
-    use serde_json::{Error, Value};
+    use test_case::test_case;
 
     use crate::{UEntity, UResource};
 
@@ -1063,82 +1060,6 @@ mod tests {
     }
 
     #[test]
-    fn test_all_valid_uris() {
-        let json_object = get_json_object().expect("Failed to parse JSON");
-        if let Some(valid_uris) = json_object.get("validUris").and_then(|v| v.as_array()) {
-            for uri in valid_uris {
-                let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
-                let status = UriValidator::validate(&uuri);
-                assert!(status.is_ok());
-            }
-        }
-    }
-
-    #[test]
-    fn test_all_invalid_uris() {
-        let json_object = get_json_object().expect("Failed to parse JSON");
-        let invalid_uris = json_object.get("invalidUris").unwrap().as_array().unwrap();
-
-        for uri_object in invalid_uris {
-            let uri = uri_object.get("uri").unwrap().as_str().unwrap();
-            if let Ok(uuri) = UUri::from_str(uri) {
-                let status = UriValidator::validate(&uuri);
-                assert!(status.is_err());
-                let message = uri_object.get("status_message").unwrap().as_str().unwrap();
-                assert!(status.unwrap_err().to_string().contains(message));
-            }
-        }
-    }
-
-    #[test]
-    fn test_all_valid_rpc_uris() {
-        let json_object = get_json_object().expect("Failed to parse JSON");
-        let valid_rpc_uris = json_object.get("validRpcUris").unwrap().as_array().unwrap();
-
-        for uri in valid_rpc_uris {
-            let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
-            let status = UriValidator::validate_rpc_method(&uuri);
-            assert!(status.is_ok());
-        }
-    }
-
-    #[test]
-    fn test_all_invalid_rpc_uris() {
-        let json_object = get_json_object().expect("Failed to parse JSON");
-        let invalid_rpc_uris = json_object
-            .get("invalidRpcUris")
-            .unwrap()
-            .as_array()
-            .unwrap();
-
-        for uri_object in invalid_rpc_uris {
-            let uri = uri_object.get("uri").unwrap().as_str().unwrap();
-            let uuri = UUri::from_str(uri).unwrap();
-            let status = UriValidator::validate_rpc_method(&uuri);
-            assert!(status.is_err());
-            let message = uri_object.get("status_message").unwrap().as_str().unwrap();
-            assert!(status.unwrap_err().to_string().contains(message));
-        }
-    }
-
-    #[test]
-    fn test_all_valid_rpc_response_uris() {
-        let json_object = get_json_object().expect("Failed to parse JSON");
-        let valid_rpc_response_uris = json_object
-            .get("validRpcResponseUris")
-            .unwrap()
-            .as_array()
-            .unwrap();
-
-        for uri in valid_rpc_response_uris {
-            let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
-            let status = UriValidator::validate_rpc_response(&uuri);
-            assert!(UriValidator::is_rpc_response(&uuri));
-            assert!(status.is_ok());
-        }
-    }
-
-    #[test]
     fn test_valid_rpc_response_uri() {
         let entity = UEntity {
             name: "hartley".into(),
@@ -1162,27 +1083,90 @@ mod tests {
         assert!(status.is_ok());
     }
 
-    #[test]
-    fn test_all_invalid_rpc_response_uris() {
-        let json_object = get_json_object().expect("Failed to parse JSON");
-        let invalid_rpc_response_uris = json_object
-            .get("invalidRpcResponseUris")
-            .unwrap()
-            .as_array()
-            .unwrap();
-
-        for uri in invalid_rpc_response_uris {
-            let uuri = UUri::from_str(uri.as_str().unwrap_or_default()).unwrap();
-            let status = UriValidator::validate_rpc_response(&uuri);
-            assert!(status.is_err());
+    #[test_case("/example"; "succeed for service")]
+    #[test_case("/example//"; "succeed for service with empty version'")]
+    #[test_case("example/0"; "succeed for service with version")]
+    #[test_case("/1"; "succeed for empty service version")]
+    #[test_case("/body.access/1"; "succeed for local service with version")]
+    #[test_case("/body.access/1/door.front_left#Door"; "succeed for service with version with resource with instance with message")]
+    #[test_case("//vcu.vin/body.access/1/door.front_left#Door"; "succeed for remote authority with service with version with resource with instance with message")]
+    #[test_case("/body.access/1/rpc.OpenWindow"; "succeed for rpc request")]
+    #[test_case("/body.access/1/rpc.response"; "succeed for rpc response")]
+    fn test_valid_uris(uri: &str) {
+        if let Ok(uuri) = UUri::from_str(uri) {
+            let status = UriValidator::validate(&uuri);
+            assert!(status.is_ok());
+        } else {
+            panic!()
         }
     }
 
-    fn get_json_object() -> Result<Value, Error> {
-        let current_directory = std::env::current_dir().expect("Failed to get current directory");
-        let json_path = current_directory.join("tests").join("uris.json");
+    #[test_case("//vcu", "Uri is missing uSoftware Entity name"; "fail for uri with incomplete entity")]
+    #[test_case("//vcu.vin/", "Uri is missing uSoftware Entity name"; "fail for uri missing entity")]
+    #[test_case("", "URI is empty"; "fail for empty uri")]
+    #[test_case(":", "URI missing UEntity or UResource"; "fail for colon uri")]
+    #[test_case("/", "URI missing UEntity or UResource"; "fail for one slash uri")]
+    #[test_case("//", "URI missing UEntity or UResource"; "fail for two slashes uri")]
+    #[test_case("///", "URI missing UEntity or UResource"; "fail for three slashes uri")]
+    #[test_case("////", "URI missing UEntity or UResource"; "fail for four slashes uri")]
+    #[test_case("1", "URI missing UEntity or UResource"; "fail for single digit uri")]
+    #[test_case("a", "URI missing UEntity or UResource"; "fail for single letter uri")]
+    fn test_invalid_uris(uri: &str, message: &str) {
+        match UUri::from_str(uri) {
+            Ok(uuri) => {
+                let status = UriValidator::validate(&uuri);
+                assert!(status.is_err());
+                assert!(status.unwrap_err().to_string().contains(message));
+            }
+            Err(e) => {
+                assert!(e.to_string().contains(message));
+            }
+        }
+    }
 
-        let json_string = fs::read_to_string(json_path).expect("Failed to read the JSON file");
-        serde_json::from_str(&json_string)
+    #[test_case("/petapp/1/rpc.OpenWindow"; "succeed for rpc request uri")]
+    #[test_case("/petapp/1/rpc.response"; "succeed for rpc response uri")]
+    fn test_valid_rpc_uris(uri: &str) {
+        if let Ok(uuri) = UUri::from_str(uri) {
+            let status = UriValidator::validate_rpc_method(&uuri);
+            assert!(status.is_ok());
+        } else {
+            panic!()
+        }
+    }
+
+    #[test_case("/petapp", "Invalid RPC method uri. Uri should be the method to be called, or method from response"; "fail for empty version")]
+    #[test_case("/petapp//", "Invalid RPC method uri. Uri should be the method to be called, or method from response"; "fail for missing version")]
+    #[test_case("/petapp/1/", "Invalid RPC method uri. Uri should be the method to be called, or method from response"; "fail for empty rpc method name")]
+    #[test_case("/petapp/1/rpc_dummy", "Invalid RPC method uri. Uri should be the method to be called, or method from response"; "fail for bad rpc method name")]
+    fn test_invalid_rpc_uris(uri: &str, message: &str) {
+        if let Ok(uuri) = UUri::from_str(uri) {
+            let status = UriValidator::validate_rpc_method(&uuri);
+            assert!(status.is_err());
+            assert!(status.unwrap_err().to_string().contains(message));
+        } else {
+            panic!()
+        }
+    }
+
+    #[test_case("/petapp/1/rpc.response"; "succeed for rpc response uri")]
+    fn test_valid_rpc_response_uris(uri: &str) {
+        if let Ok(uuri) = UUri::from_str(uri) {
+            let status = UriValidator::validate_rpc_response(&uuri);
+            assert!(status.is_ok());
+        } else {
+            panic!()
+        }
+    }
+
+    #[test_case( "/petapp/1/rpc.OpenWindow", "Invalid RPC response type"; "fail for bad rpc response uri")]
+    fn test_invalid_rpc_response_uris(uri: &str, message: &str) {
+        if let Ok(uuri) = UUri::from_str(uri) {
+            let status = UriValidator::validate_rpc_response(&uuri);
+            assert!(status.is_err());
+            assert!(status.unwrap_err().to_string().contains(message));
+        } else {
+            panic!()
+        }
     }
 }
