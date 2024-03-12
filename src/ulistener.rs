@@ -54,37 +54,37 @@ mod tests {
 
     #[async_trait]
     impl UTransport for UpClientFoo {
-        async fn send(&self, message: UMessage) -> Result<(), UStatus> {
+        async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
             todo!()
         }
 
-        async fn receive(&self, topic: UUri) -> Result<UMessage, UStatus> {
+        async fn receive(&self, _topic: UUri) -> Result<UMessage, UStatus> {
             todo!()
         }
 
         async fn register_listener(
             &self,
-            topic: UUri,
+            _topic: UUri,
             listener: ListenerType,
         ) -> Result<String, UStatus> {
             match listener {
-                ListenerType::Notification(notificationListener) => {
+                ListenerType::Notification(_notification_listener) => {
                     // implement Foo-specific means of allowing protocol to perform filtering for Notifications
                     todo!()
                 }
-                ListenerType::Publish(publishListener) => {
+                ListenerType::Publish(_publish_listener) => {
                     // implement Foo-specific means of allowing protocol to perform filtering for Publish
                     todo!()
                 }
-                ListenerType::Request(requestListener) => {
+                ListenerType::Request(_request_listener) => {
                     // implement Foo-specific means of allowing protocol to perform filtering for Request
                     todo!()
                 }
-                ListenerType::Response(responseListener) => {
+                ListenerType::Response(_response_listener) => {
                     // implement Foo-specific means of allowing protocol to perform filtering for Response
                     todo!()
                 }
-                ListenerType::Generic(genericListener) => {
+                ListenerType::Generic(generic_listener) => {
                     // assume that we have another thread / async task that's being pinged on each
                     // message received and that we skim thru listeners in order to check if each
                     // one is a match
@@ -94,13 +94,13 @@ mod tests {
                         UStatus::fail_with_code(UCode::INTERNAL, "Failed to get lock on listeners")
                     })?;
 
-                    listeners.push(genericListener);
+                    listeners.push(generic_listener);
                     Ok("here's your handle".to_string())
                 }
             }
         }
 
-        async fn unregister_listener(&self, topic: UUri, listener: &str) -> Result<(), UStatus> {
+        async fn unregister_listener(&self, _topic: UUri, _listener: &str) -> Result<(), UStatus> {
             todo!()
         }
     }
@@ -108,7 +108,7 @@ mod tests {
     struct MyClientFooNotificationListener;
 
     impl UListener for MyClientFooNotificationListener {
-        fn on_receive(&self, message: Result<UMessage, UStatus>) {
+        fn on_receive(&self, _message: Result<UMessage, UStatus>) {
             todo!()
         }
     }
@@ -118,7 +118,7 @@ mod tests {
     struct MyClientFooPublishListener;
 
     impl UListener for MyClientFooPublishListener {
-        fn on_receive(&self, message: Result<UMessage, UStatus>) {
+        fn on_receive(&self, _message: Result<UMessage, UStatus>) {
             todo!()
         }
     }
@@ -128,7 +128,7 @@ mod tests {
     struct MyClientFooRequestListener;
 
     impl UListener for MyClientFooRequestListener {
-        fn on_receive(&self, message: Result<UMessage, UStatus>) {
+        fn on_receive(&self, _message: Result<UMessage, UStatus>) {
             todo!()
         }
     }
@@ -138,7 +138,7 @@ mod tests {
     struct MyClientFooResponseListener;
 
     impl UListener for MyClientFooResponseListener {
-        fn on_receive(&self, message: Result<UMessage, UStatus>) {
+        fn on_receive(&self, _message: Result<UMessage, UStatus>) {
             todo!()
         }
     }
@@ -150,7 +150,7 @@ mod tests {
     }
 
     impl UListener for MyClientFooPriorityMatcherListener {
-        fn on_receive(&self, message: Result<UMessage, UStatus>) {
+        fn on_receive(&self, _message: Result<UMessage, UStatus>) {
             todo!()
         }
     }
@@ -164,7 +164,7 @@ mod tests {
                             return true;
                         }
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         return false;
                     }
                 }
@@ -177,37 +177,37 @@ mod tests {
 
     #[async_trait]
     impl UTransport for UpClientBar {
-        async fn send(&self, message: UMessage) -> Result<(), UStatus> {
+        async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
             todo!()
         }
 
-        async fn receive(&self, topic: UUri) -> Result<UMessage, UStatus> {
+        async fn receive(&self, _topic: UUri) -> Result<UMessage, UStatus> {
             todo!()
         }
 
         async fn register_listener(
             &self,
-            topic: UUri,
+            _topic: UUri,
             listener: ListenerType,
         ) -> Result<String, UStatus> {
             match listener {
-                ListenerType::Notification(notificationListener) => {
+                ListenerType::Notification(_notification_listener) => {
                     // implement Bar-specific means of allowing protocol to perform filtering for Notifications
                     todo!()
                 }
-                ListenerType::Publish(publishListener) => {
+                ListenerType::Publish(_publish_listener) => {
                     // implement Bar-specific means of allowing protocol to perform filtering for Publish
                     todo!()
                 }
-                ListenerType::Request(requestListener) => {
+                ListenerType::Request(_request_listener) => {
                     // implement Bar-specific means of allowing protocol to perform filtering for Request
                     todo!()
                 }
-                ListenerType::Response(responseListener) => {
+                ListenerType::Response(_response_listener) => {
                     // implement Bar-specific means of allowing protocol to perform filtering for Response
                     todo!()
                 }
-                ListenerType::Generic(genericListener) => {
+                ListenerType::Generic(_generic_listener) => {
                     // for UpClientBar we only handle this at the protocol level, with no generic
                     // mechanism to handle incoming messages
                     return Err(UStatus::fail_with_code(
@@ -218,7 +218,7 @@ mod tests {
             }
         }
 
-        async fn unregister_listener(&self, topic: UUri, listener: &str) -> Result<(), UStatus> {
+        async fn unregister_listener(&self, _topic: UUri, _listener: &str) -> Result<(), UStatus> {
             todo!()
         }
     }
