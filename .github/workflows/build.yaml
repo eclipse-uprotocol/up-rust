@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Format and Lint
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -42,7 +42,7 @@ jobs:
         run: cargo clippy --all-targets -- -W warnings -D warnings
 
   test:
-    name: Check and Test
+    name: Test
     runs-on: ubuntu-latest
 
     steps:
