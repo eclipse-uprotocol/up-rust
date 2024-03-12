@@ -164,12 +164,10 @@ mod tests {
                             return true;
                         }
                     }
-                    Err(_e) => {
-                        return false;
-                    }
+                    Err(_e) => {}
                 }
             }
-            return false;
+            false
         }
     }
 
