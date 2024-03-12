@@ -13,6 +13,7 @@
 
 use async_trait::async_trait;
 
+use crate::ulistener::ListenerType;
 use crate::{UMessage, UStatus, UUri};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
@@ -70,7 +71,7 @@ pub trait UTransport {
     async fn register_listener(
         &self,
         topic: UUri,
-        listener: Box<dyn Fn(Result<UMessage, UStatus>) + Send + Sync + 'static>,
+        listener: ListenerType,
     ) -> Result<String, UStatus>;
 
     /// Unregisters a listener for a given topic.

@@ -85,6 +85,8 @@ mod up_core_api {
 
 // cloudevent-proto, generated and augmented types
 pub mod cloudevents;
+pub mod ulistener;
+
 mod proto_cloudevents {
     include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
     pub(crate) use self::cloudevents::cloud_event::*; // re-export for crate use, remove triple-redundant names
