@@ -11,40 +11,46 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::{UMessage, UStatus, UUri};
+use crate::{UMessage, UStatus};
 
 pub trait UListener {
     fn on_receive(&self, message: Result<UMessage, UStatus>);
 }
 
-pub trait NotificationUListener: UListener {}
+pub trait NotificationUListener: UListener + Send + Sync {}
 
-pub trait PublishUListener: UListener {}
+pub trait PublishUListener: UListener + Send + Sync {}
 
-pub trait RequestUListener: UListener {}
+pub trait RequestUListener: UListener + Send + Sync {}
 
-pub trait ResponseUListener: UListener {}
+pub trait ResponseUListener: UListener + Send + Sync {}
 
-pub trait GenericUListener: UListener {}
+pub trait GenericUListener: UListener + Send + Sync {
+    fn is_match(&self, message: UMessage) -> bool;
+}
 
 pub enum ListenerType {
     Notification(Box<dyn NotificationUListener>),
     Publish(Box<dyn PublishUListener>),
     Request(Box<dyn RequestUListener>),
     Response(Box<dyn ResponseUListener>),
-    Generic(UUri, Box<dyn GenericUListener>),
+    /// May be left unimplemented if wished to do so and only use protocol-level filtering
+    Generic(Box<dyn GenericUListener>),
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ulistener::{
-        ListenerType, NotificationUListener, PublishUListener, RequestUListener, ResponseUListener,
-        UListener,
+        GenericUListener, ListenerType, NotificationUListener, PublishUListener, RequestUListener,
+        ResponseUListener, UListener,
     };
-    use crate::{UMessage, UStatus, UTransport, UUri};
+    use crate::{UCode, UMessage, UPriority, UStatus, UTransport, UUri};
     use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
 
-    struct UpClientFoo;
+    struct UpClientFoo {
+        listeners: Arc<Mutex<Vec<Box<dyn GenericUListener>>>>,
+    }
 
     #[async_trait]
     impl UTransport for UpClientFoo {
@@ -78,8 +84,18 @@ mod tests {
                     // implement Foo-specific means of allowing protocol to perform filtering for Response
                     todo!()
                 }
-                ListenerType::Generic(uuri, genericListener) => {
-                    todo!()
+                ListenerType::Generic(genericListener) => {
+                    // assume that we have another thread / async task that's being pinged on each
+                    // message received and that we skim thru listeners in order to check if each
+                    // one is a match
+                    //
+                    // and if a match is found, we call that genericListener from the Vec's on_receive()
+                    let mut listeners = self.listeners.lock().map_err(|_| {
+                        UStatus::fail_with_code(UCode::INTERNAL, "Failed to get lock on listeners")
+                    })?;
+
+                    listeners.push(genericListener);
+                    Ok("here's your handle".to_string())
                 }
             }
         }
@@ -128,4 +144,82 @@ mod tests {
     }
 
     impl ResponseUListener for MyClientFooResponseListener {}
+
+    struct MyClientFooPriorityMatcherListener {
+        priority_match: UPriority,
+    }
+
+    impl UListener for MyClientFooPriorityMatcherListener {
+        fn on_receive(&self, message: Result<UMessage, UStatus>) {
+            todo!()
+        }
+    }
+
+    impl GenericUListener for MyClientFooPriorityMatcherListener {
+        fn is_match(&self, message: UMessage) -> bool {
+            if let Some(attributes) = message.attributes.as_ref() {
+                match attributes.priority.enum_value() {
+                    Ok(priority) => {
+                        if self.priority_match == priority {
+                            return true;
+                        }
+                    }
+                    Err(e) => {
+                        return false;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+    struct UpClientBar {}
+
+    #[async_trait]
+    impl UTransport for UpClientBar {
+        async fn send(&self, message: UMessage) -> Result<(), UStatus> {
+            todo!()
+        }
+
+        async fn receive(&self, topic: UUri) -> Result<UMessage, UStatus> {
+            todo!()
+        }
+
+        async fn register_listener(
+            &self,
+            topic: UUri,
+            listener: ListenerType,
+        ) -> Result<String, UStatus> {
+            match listener {
+                ListenerType::Notification(notificationListener) => {
+                    // implement Bar-specific means of allowing protocol to perform filtering for Notifications
+                    todo!()
+                }
+                ListenerType::Publish(publishListener) => {
+                    // implement Bar-specific means of allowing protocol to perform filtering for Publish
+                    todo!()
+                }
+                ListenerType::Request(requestListener) => {
+                    // implement Bar-specific means of allowing protocol to perform filtering for Request
+                    todo!()
+                }
+                ListenerType::Response(responseListener) => {
+                    // implement Bar-specific means of allowing protocol to perform filtering for Response
+                    todo!()
+                }
+                ListenerType::Generic(genericListener) => {
+                    // for UpClientBar we only handle this at the protocol level, with no generic
+                    // mechanism to handle incoming messages
+                    return Err(UStatus::fail_with_code(
+                        UCode::UNIMPLEMENTED,
+                        "No generic matching capabilities.",
+                    ));
+                }
+            }
+        }
+
+        async fn unregister_listener(&self, topic: UUri, listener: &str) -> Result<(), UStatus> {
+            todo!()
+        }
+    }
 }
