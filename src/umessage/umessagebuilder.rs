@@ -12,7 +12,7 @@
  ********************************************************************************/
 
 use bytes::Bytes;
-use protobuf::Message;
+use protobuf::{Enum, Message};
 
 use crate::uattributes::UAttributesError;
 use crate::{
@@ -173,6 +173,8 @@ impl UMessageBuilder {
     /// A request message is used to invoke a service's method with some input data, expecting
     /// the service to reply with a response message which is correlated by means of the `request_id`.
     ///
+    /// The builder will be initialized with [`UPriority::UPRIORITY_CS4`].
+    ///
     /// # Arguments
     ///
     /// * `method_to_invoke` - The URI identifying the method to invoke.
@@ -193,7 +195,7 @@ impl UMessageBuilder {
     ///                    .with_message_id(uuid_builder.build())
     ///                    .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_REQUEST.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
+    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
     /// assert_eq!(message.attributes.source, Some(reply_to_address).into());
     /// assert_eq!(message.attributes.sink, Some(method_to_invoke).into());
     /// assert_eq!(message.attributes.ttl, Some(5000));
@@ -207,6 +209,7 @@ impl UMessageBuilder {
             source: Some(reply_to_address),
             sink: Some(method_to_invoke),
             ttl: Some(i32::try_from(ttl).unwrap_or(i32::MAX)),
+            priority: UPriority::UPRIORITY_CS4,
             ..Default::default()
         }
     }
@@ -215,6 +218,8 @@ impl UMessageBuilder {
     ///
     /// A response message is used to send the outcome of processing a request message
     /// to the original sender of the request message.
+    ///
+    /// The builder will be initialized with [`UPriority::UPRIORITY_CS4`].
     ///
     /// # Arguments
     ///
@@ -237,7 +242,7 @@ impl UMessageBuilder {
     ///                    .with_message_id(uuid_builder.build())
     ///                    .build()?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
+    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
     /// assert_eq!(message.attributes.source, Some(invoked_method).into());
     /// assert_eq!(message.attributes.sink, Some(reply_to_address).into());
     /// assert_eq!(message.attributes.reqid, Some(request_id).into());
@@ -255,6 +260,7 @@ impl UMessageBuilder {
             source: Some(invoked_method),
             sink: Some(reply_to_address),
             request_id: Some(request_id),
+            priority: UPriority::UPRIORITY_CS4,
             ..Default::default()
         }
     }
@@ -263,6 +269,8 @@ impl UMessageBuilder {
     ///
     /// A response message is used to send the outcome of processing a request message
     /// to the original sender of the request message.
+    ///
+    /// The builder will be initialized with values from the given request attributes.
     ///
     /// # Arguments
     ///
@@ -285,9 +293,10 @@ impl UMessageBuilder {
     ///
     /// let response_message = UMessageBuilder::response_for_request(&request_message.attributes)
     ///                           .with_message_id(uuid_builder.build())
+    ///                           .with_priority(UPriority::UPRIORITY_CS5)
     ///                           .build()?;
     /// assert_eq!(response_message.attributes.type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
-    /// assert_eq!(response_message.attributes.priority, UPriority::UPRIORITY_CS1.into());
+    /// assert_eq!(response_message.attributes.priority, UPriority::UPRIORITY_CS5.into());
     /// assert_eq!(response_message.attributes.source, Some(method_to_invoke).into());
     /// assert_eq!(response_message.attributes.sink, Some(reply_to_address).into());
     /// assert_eq!(response_message.attributes.reqid, Some(request_message_id).into());
@@ -301,6 +310,9 @@ impl UMessageBuilder {
             source: request_attributes.sink.as_ref().cloned(),
             sink: request_attributes.source.as_ref().cloned(),
             request_id: request_attributes.id.as_ref().cloned(),
+            priority: request_attributes
+                .priority
+                .enum_value_or(UPriority::UPRIORITY_CS4),
             ..Default::default()
         }
     }
@@ -390,6 +402,11 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn with_priority(&mut self, priority: UPriority) -> &mut UMessageBuilder {
+        if self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST
+            || self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE
+        {
+            assert!(priority.value() >= UPriority::UPRIORITY_CS4.value())
+        }
         self.priority = priority;
         self
     }
@@ -719,7 +736,7 @@ impl UMessageBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::UUIDBuilder;
+    use crate::{UCode, UUIDBuilder};
 
     use super::*;
 
@@ -892,22 +909,25 @@ mod tests {
         let request_message =
             UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
                 .with_message_id(request_message_id.clone())
+                .with_priority(UPriority::UPRIORITY_CS5)
                 .build()
                 .expect("should have been able to create message");
         let message = UMessageBuilder::response_for_request(&request_message.attributes)
             .with_message_id(response_message_id.clone())
-            .with_comm_status(0)
-            .with_priority(UPriority::UPRIORITY_CS4)
-            .with_ttl(0)
+            .with_comm_status(UCode::DEADLINE_EXCEEDED.value())
+            .with_ttl(4000)
             .build()
             .expect("should have been able to create message");
         assert_eq!(message.attributes.id, Some(response_message_id).into());
-        assert_eq!(message.attributes.commstatus, Some(0));
-        assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
+        assert_eq!(
+            message.attributes.commstatus,
+            Some(UCode::DEADLINE_EXCEEDED.value())
+        );
+        assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS5.into());
         assert_eq!(message.attributes.reqid, Some(request_message_id).into());
         assert_eq!(message.attributes.sink, Some(reply_to_address).into());
         assert_eq!(message.attributes.source, Some(method_to_invoke).into());
-        assert_eq!(message.attributes.ttl, Some(0));
+        assert_eq!(message.attributes.ttl, Some(4000));
         assert_eq!(
             message.attributes.type_,
             UMessageType::UMESSAGE_TYPE_RESPONSE.into()
@@ -929,14 +949,17 @@ mod tests {
             method_to_invoke.clone(),
         )
         .with_message_id(message_id.clone())
-        .with_comm_status(0)
-        .with_priority(UPriority::UPRIORITY_CS4)
+        .with_comm_status(UCode::DEADLINE_EXCEEDED.value())
+        .with_priority(UPriority::UPRIORITY_CS5)
         .with_ttl(0)
         .build()
         .expect("should have been able to create message");
         assert_eq!(message.attributes.id, Some(message_id).into());
-        assert_eq!(message.attributes.commstatus, Some(0));
-        assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
+        assert_eq!(
+            message.attributes.commstatus,
+            Some(UCode::DEADLINE_EXCEEDED.value())
+        );
+        assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS5.into());
         assert_eq!(message.attributes.reqid, Some(request_id).into());
         assert_eq!(message.attributes.sink, Some(reply_to_address).into());
         assert_eq!(message.attributes.source, Some(method_to_invoke).into());

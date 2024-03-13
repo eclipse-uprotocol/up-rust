@@ -15,7 +15,7 @@ use std::time::SystemTime;
 
 use protobuf::Enum;
 
-use crate::{UAttributes, UCode, UMessageType, UriValidator, UUID};
+use crate::{UAttributes, UCode, UMessageType, UPriority, UriValidator, UUID};
 
 use crate::UAttributesError;
 
@@ -161,6 +161,32 @@ pub trait UAttributesValidator {
         }
         Ok(())
     }
+}
+
+/// Verifies that a set of attributes contains a priority that is appropriate for an RPC request message.
+///
+/// # Errors
+///
+/// If [`UAttributes::priority`] contains a value that is less [`UPriority::UPRIORITY_CS4`].
+pub fn validate_rpc_priority(attributes: &UAttributes) -> Result<(), UAttributesError> {
+    attributes
+        .priority
+        .enum_value()
+        .map_err(|unknown_code| {
+            UAttributesError::ValidationError(format!(
+                "RPC message must have a valid priority [{}]",
+                unknown_code
+            ))
+        })
+        .and_then(|prio| {
+            if prio.value() < UPriority::UPRIORITY_CS4.value() {
+                Err(UAttributesError::ValidationError(
+                    "RPC message must have a priority of at least CS4".to_string(),
+                ))
+            } else {
+                Ok(())
+            }
+        })
 }
 
 /// Enum that hold the implementations of uattributesValidator according to type.
@@ -338,6 +364,7 @@ impl UAttributesValidator for RequestValidator {
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
     /// * [`RequestValidator::validate_permission_level`]
+    /// * `validate_rpc_priority`
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
             self.validate_type(attributes),
@@ -346,6 +373,7 @@ impl UAttributesValidator for RequestValidator {
             self.validate_source(attributes),
             self.validate_sink(attributes),
             self.validate_permission_level(attributes),
+            validate_rpc_priority(attributes),
         ]
         .into_iter()
         .filter_map(Result::err)
@@ -471,6 +499,7 @@ impl UAttributesValidator for ResponseValidator {
     /// * [`UAttributesValidator::validate_sink`]
     /// * [`ResponseValidator::validate_reqid`]
     /// * [`ResponseValidator::validate_commstatus`]
+    /// * `validate_rpc_priority`
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
             self.validate_type(attributes),
@@ -480,6 +509,7 @@ impl UAttributesValidator for ResponseValidator {
             self.validate_sink(attributes),
             self.validate_reqid(attributes),
             self.validate_commstatus(attributes),
+            validate_rpc_priority(attributes),
         ]
         .into_iter()
         .filter_map(Result::err)
@@ -660,9 +690,9 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(2000), None, true; "succeeds for mandatory attributes")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(String::from("token")), true; "succeeds for valid attributes")]
-    #[test_case(None, Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(String::from("token")), false; "fails for missing message ID")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for mandatory attributes")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), true; "succeeds for valid attributes")]
+    #[test_case(None, Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -674,30 +704,35 @@ mod tests {
         Some(reply_to_address()),
         None,
         Some(2000),
+        Some(UPriority::UPRIORITY_CS4),
         None,
         false;
         "fails for invalid message id")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), None, None, Some(2000), None, false; "fails for missing reply-to-address")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(UUri::default()), None, Some(2000), None, false; "fails for invalid reply-to-address")]
-    #[test_case(Some(UUIDBuilder::new().build()), None, Some(reply_to_address()), None, Some(2000), None, false; "fails for missing method-to-invoke")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), None, false; "fails for invalid method-to-invoke")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, None, false; "fails for missing ttl")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), None, false; "fails for ttl < 1")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, true; "succeeds for valid permission level")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(-1), Some(2000), None, false; "fails for invalid permission level")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), None, None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(UUri::default()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing method-to-invoke")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid method-to-invoke")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, None, false; "fails for missing priority")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS3), None, false; "fails for invalid priority")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing ttl")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), Some(UPriority::UPRIORITY_CS4), None, false; "fails for ttl < 1")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for valid permission level")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(-1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid permission level")]
+    #[allow(clippy::too_many_arguments)]
     fn test_validate_attributes_for_rpc_request_message(
         id: Option<UUID>,
         method_to_invoke: Option<UUri>,
         reply_to_address: Option<UUri>,
         perm_level: Option<i32>,
         ttl: Option<i32>,
+        priority: Option<UPriority>,
         token: Option<String>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
             type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
             id: id.into(),
-            priority: UPriority::UPRIORITY_CS1.into(),
+            priority: priority.unwrap_or(UPriority::UPRIORITY_UNSPECIFIED).into(),
             source: reply_to_address.into(),
             sink: method_to_invoke.into(),
             permission_level: perm_level,
@@ -721,9 +756,9 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, true; "succeeds for mandatory attributes")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), true; "succeeds for valid attributes")]
-    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), false; "fails for missing message ID")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for mandatory attributes")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid attributes")]
+    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), Some(UPriority::UPRIORITY_CS4), false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -736,18 +771,21 @@ mod tests {
         Some(UUIDBuilder::new().build()),
         None,
         None,
+        Some(UPriority::UPRIORITY_CS4),
         false;
         "fails for invalid message id")]
-    #[test_case(Some(UUIDBuilder::new().build()), None, Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, false; "fails for missing reply-to-address")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, false; "fails for invalid reply-to-address")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), None, Some(UUIDBuilder::new().build()), None, None, false; "fails for missing invoked-method")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(UUri::default()), Some(UUIDBuilder::new().build()), None, None, false; "fails for invalid invoked-method")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), None, true; "succeeds for valid commstatus")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(-42), None, false; "fails for invalid commstatus")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(100), true; "succeeds for ttl > 0)")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(0), true; "succeeds for ttl = 0")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(-1), false; "fails for ttl < 0")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), None, None, None, false; "fails for missing request id")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), None, Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing invoked-method")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(UUri::default()), Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid invoked-method")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(-42), None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid commstatus")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl > 0)")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(0), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl = 0")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(-1), Some(UPriority::UPRIORITY_CS4), false; "fails for ttl < 0")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), None, false; "fails for missing priority")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), Some(UPriority::UPRIORITY_CS3), false; "fails for invalid priority")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), None, None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing request id")]
     #[test_case(
         Some(UUIDBuilder::new().build()),
         Some(reply_to_address()),
@@ -760,9 +798,10 @@ mod tests {
         }),
         None,
         None,
+        Some(UPriority::UPRIORITY_CS4),
         false;
         "fails for invalid request id")]
-
+    #[allow(clippy::too_many_arguments)]
     fn test_validate_attributes_for_rpc_response_message(
         id: Option<UUID>,
         reply_to_address: Option<UUri>,
@@ -770,12 +809,13 @@ mod tests {
         reqid: Option<UUID>,
         commstatus: Option<i32>,
         ttl: Option<i32>,
+        priority: Option<UPriority>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
             type_: UMessageType::UMESSAGE_TYPE_RESPONSE.into(),
             id: id.into(),
-            priority: UPriority::UPRIORITY_CS1.into(),
+            priority: priority.unwrap_or(UPriority::UPRIORITY_UNSPECIFIED).into(),
             reqid: reqid.into(),
             source: invoked_method.into(),
             sink: reply_to_address.into(),
