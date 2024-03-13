@@ -87,12 +87,12 @@ jobs:
         with:
           name: Test Coverage Results (xml)
           path: cobertura.xml
-      - name: Upload coberage report (lcov)
+      - name: Upload coverage report (lcov)
         uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (lcov)
           path: lcov.info
-      - name: Upload coberage report (html)
+      - name: Upload coverage report (html)
         uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (html)
