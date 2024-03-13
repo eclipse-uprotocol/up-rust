@@ -11,7 +11,7 @@
 #  SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************/
 
-name: Lint and Test
+name: Build checks and tests
 
 on:
   push:
@@ -50,40 +50,53 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         run: |
-          cargo install cargo-tarpaulin
+          cargo install cargo-all-features
       - name: Show toolchain information
         working-directory: ${{github.workspace}}
         run: |
           rustup toolchain list
           cargo --version
-      - name: Run tests and report code coverage
+      - name: cargo-check all possible feature combinations
+        run: |
+          cargo check-all-features
+      - name: cargo-test all possible feature combinations
+        run: |
+          cargo test-all-features
+
+  coverage:
+    name: Collect coverage info
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: |
+          cargo install cargo-tarpaulin
+      - name: Show toolchain information
+        working-directory: ${{github.workspace}}
+        run: |
+          rustup toolchain list
+          cargo --version  
+      - name: Run tests to collect code coverage information
         run: |
           # enable nightly features so that we can also include Doctests
-          RUSTC_BOOTSTRAP=1 cargo tarpaulin -o xml -o lcov -o html --doc --tests
-
+          RUSTC_BOOTSTRAP=1 cargo tarpaulin -o xml -o lcov -o html --doc --tests --all-features
       - name: Upload coverage report (xml)
         uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (xml)
           path: cobertura.xml
-
-      - name: Upload coberage report (lcov)
+      - name: Upload coverage report (lcov)
         uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (lcov)
           path: lcov.info
-
-      - name: Upload coberage report (html)
+      - name: Upload coverage report (html)
         uses: actions/upload-artifact@v4
         with:
           name: Test Coverage Results (html)
           path: tarpaulin-report.html
-
-      # - name: Upload coverage report
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Code coverage report
-      #     path: cobertura.xml
 
   build-docs:
     name: Build documentation
