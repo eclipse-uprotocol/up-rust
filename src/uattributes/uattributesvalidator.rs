@@ -27,79 +27,71 @@ use crate::UAttributesError;
 /// `UAttributesValidator` is a trait implemented by all validators for `UAttributes`. It provides functionality
 /// to help validate that a given `UAttributes` instance is correctly configured to define the Payload.
 pub trait UAttributesValidator {
-    /// Takes a `UAttributes` object and runs validations.
+    /// Checks if a given set of attributes complies with the rules specified for
+    /// the type of message they describe.
     ///
-    /// # Arguments
-    /// * `attributes` - The `UAttributes` to validate.
-    ///
-    /// # Returns
-    /// Returns a `UStatus` that indicates success or failure. If failed, it includes a message containing
-    /// all validation errors for invalid configurations.
     /// # Errors
     ///
-    /// Returns a `UAttributesError` when one or more validations fail. The error will contain a concatenated message of all the validation errors separated by a semicolon (`;`). Each part of the message corresponds to a failure from one of the specific validation functions called within `validate`. These may include errors from:
-    ///
-    /// - `validate_type` if the message type in `UAttributes` fails validation.
-    /// - `validate_ttl` if the time-to-live value is invalid.
-    /// - `validate_source_and_sink` if any of source or sink URI does not pass validation.
-    /// - `validate_commstatus` if the communication status is invalid.
-    /// - `validate_permission_level` if the permission level is below the required threshold.
-    /// - `validate_reqid` if the request ID is not a valid UUID.
-    ///
-    /// If all validations pass, the function returns `Ok(())`, indicating no errors were found.
-    fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        let error_message = vec![
-            self.validate_type(attributes),
-            self.validate_ttl(attributes),
-            self.validate_source_and_sink(attributes),
-            self.validate_commstatus(attributes),
-            self.validate_permission_level(attributes),
-            self.validate_reqid(attributes),
-        ]
-        .into_iter()
-        .filter_map(Result::err)
-        .map(|e| e.to_string())
-        .collect::<Vec<_>>()
-        .join("; ");
+    /// Returns an error if the attributes are not consistent with the rules specified for the message type.
+    fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError>;
 
-        if error_message.is_empty() {
-            Ok(())
-        } else {
-            Err(UAttributesError::validation_error(error_message))
+    /// Verifies that this validator is appropriate for a set of attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if [`UAttributes::type_`] does not match the type returned by [`UAttributesValidator::message_type`].
+    fn validate_type(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        let expected_type = self.message_type();
+        match attributes.type_.enum_value() {
+            Ok(mt) if mt == expected_type => Ok(()),
+            Ok(mt) => Err(UAttributesError::validation_error(format!(
+                "Wrong Message Type [{}]",
+                mt.to_type_string()
+            ))),
+            Err(unknown_code) => Err(UAttributesError::validation_error(format!(
+                "Unknown Message Type code [{}]",
+                unknown_code
+            ))),
         }
     }
 
-    /// Return the name of the specific Validator implementation.
-    fn type_name(&self) -> &'static str;
-
-    /// Indicates whether the payload with these [`UAttributes`] has expired.
-    ///
-    /// # Parameters
-    ///
-    /// * `attributes`: Reference to a [`UAttributes`] struct containing the time-to-live value.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// Verifies that a set of attributes contains a valid message ID.
     ///
     /// # Errors
     ///
-    /// Returns a `UAttributesError` in the following cases:
+    /// Returns an error if [`UAttributes::id`] does not contain a [valid uProtocol UUID](`UUID::is_uprotocol_uuid`).
+    fn validate_id(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if attributes
+            .id
+            .as_ref()
+            .map_or(false, |id| id.is_uprotocol_uuid())
+        {
+            Ok(())
+        } else {
+            Err(UAttributesError::validation_error(
+                "Attributes must contain valid uProtocol UUID in id property",
+            ))
+        }
+    }
+
+    /// Returns the type of message that this validator can be used with.
+    fn message_type(&self) -> UMessageType;
+
+    /// Checks if the message that is described by these attributes should be considered expired.
     ///
-    /// - "Payload is expired": If the `ttl` (time-to-live) is present, valid, and greater than 0, but the payload has expired. This is determined by comparing the current time duration since the UNIX epoch against the timestamp extracted from the UUID and the `ttl` value.
+    /// # Errors
     ///
-    /// - "Invalid duration": If there is an error in converting the current time duration to a valid `u64` format, indicating an issue with the duration calculation.
-    ///
-    /// - "Invalid TTL": If the `ttl` value is present but cannot be converted to a valid `u64`, suggesting an invalid `ttl` value.
-    ///
-    /// - System error message: If there is an error in calculating the current time duration since the UNIX epoch, possibly due to a system time error.
-    ///
-    /// The function returns `Ok(())` (indicating no error) in cases where `ttl` is not present, is less than or equal to 0, or if no UUID is present, or if the UUID does not contain a valid time component.
+    /// Returns an error if [`UAttributes::ttl`] (time-to-live) contains a value greater than 0, but
+    /// * the message has expired according to the timestamp extracted from [`UAttributes::id`] and the time-to-live value, or
+    /// * the current system time cannot be determined.
     fn is_expired(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let ttl = match attributes.ttl {
-            Some(t) if t > 0 => t,
-            Some(_) => return Ok(()),
-            None => 0,
+            Some(t) if t > 0 => {
+                // this will not be needed anymore once up-core-api 1.5.7 is released and
+                // ttl is defined as a uint32
+                u64::try_from(t).expect("should have been able to convert positive i32 to u64")
+            }
+            _ => return Ok(()),
         };
 
         if let Some(time) = attributes.id.as_ref().and_then(UUID::get_time) {
@@ -114,94 +106,54 @@ pub trait UAttributesValidator {
                 Err(e) => return Err(UAttributesError::validation_error(e.to_string())),
             };
 
-            if ttl <= 0 {
-                return Ok(());
-            }
-
-            if let Ok(ttl) = u64::try_from(ttl) {
-                if delta >= ttl {
-                    return Err(UAttributesError::validation_error("Payload is expired"));
-                }
-            } else {
-                return Err(UAttributesError::validation_error("Invalid TTL"));
+            if delta >= ttl {
+                return Err(UAttributesError::validation_error("Payload is expired"));
             }
         }
         Ok(())
     }
 
-    /// Validate the time to live configuration. If the `UAttributes` does not contain a time to live
-    /// then the `UStatus` is ok.
+    /// Verifies that the message has a valid time-to-live.
     ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the message priority to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
     /// # Errors
     ///
-    /// Returns a `UAttributesError` in the following case:
-    ///
-    /// - If the `UAttributes` object contains a `ttl` (time to live) and it is less than 1.
-    ///   The error message will specify the invalid TTL value, indicating that it does not meet the minimum threshold considered valid.
-    ///
-    /// The function does not return an error if the `UAttributes` object does not contain a `ttl`, considering it a valid case.
+    /// This default implementation returns an error if [`UAttributes::ttl`] (time-to-live) contains a value less than 0.
     fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(ttl) = attributes.ttl {
-            if ttl < 0 {
-                return Err(UAttributesError::validation_error(format!(
-                    "Invalid TTL [{ttl}]"
-                )));
-            }
+        match attributes.ttl {
+            Some(t) if t < 0 => Err(UAttributesError::validation_error(format!(
+                "TTL must not be negative [{t}]"
+            ))),
+            _ => Ok(()),
         }
-        Ok(())
     }
 
-    /// Validates the source URI for the default case. If the `UAttributes` does not contain a source
-    /// then the `ValidationResult` is ok.
+    /// Verifies that a set of attributes contains a valid source URI.
     ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the sink to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.    
     /// # Errors
     ///
-    /// Returns a `UAttributesError` in the following case:
+    /// If the [`UAttributes::source`] property does not contain a valid URI as required by the type of message, an error is returned.
     ///
-    /// - If the `UAttributes` object contains a `source` and the source URI does not pass the validation criteria set by `UriValidator`.
-    ///   The error will provide details about why the source URI is considered invalid, such as format issues or other validation failures.
-    ///
-    /// The function does not return an error if the `UAttributes` object does not contain a `source`, considering it a valid case.
+    /// This default implementation returns an error if the [`UAttributes::source`] property does not contain a
+    /// valid URI according to [`UriValidator::validate`].
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(source) = attributes.source.as_ref() {
-            return UriValidator::validate(source)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()));
+            UriValidator::validate(source)
+                .map_err(|e| UAttributesError::validation_error(e.to_string()))
+        } else {
+            Err(UAttributesError::validation_error(
+                "Attributes must contain a source URI",
+            ))
         }
-        Ok(())
     }
 
-    /// Validates the sink URI for the default case. If the `UAttributes` does not contain a sink
-    /// then the `ValidationResult` is ok.
+    /// Verifies that a set of attributes contains a valid sink URI.
     ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the sink to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.    
     /// # Errors
     ///
-    /// Returns a `UAttributesError` in the following case:
+    /// If the [`UAttributes::sink`] property does not contain a valid URI as required by the type of message, an error is returned.
     ///
-    /// - If the `UAttributes` object contains a `sink` and the sink URI does not pass the validation criteria set by `UriValidator`.
-    ///   The error will provide details about why the sink URI is considered invalid, such as format issues or other validation failures.
-    ///
-    /// The function does not return an error if the `UAttributes` object does not contain a `sink`, considering it a valid case.
+    /// This default implementation only verifies that the property, if present, contains a valid URI according to
+    /// [`UriValidator::validate`].
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(sink) = attributes.sink.as_ref() {
             return UriValidator::validate(sink)
@@ -209,126 +161,6 @@ pub trait UAttributesValidator {
         }
         Ok(())
     }
-
-    fn validate_source_and_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        self.validate_source(attributes)
-            .and_then(|_| self.validate_sink(attributes))
-    }
-
-    /// Validates the permission level for the default case. If the `UAttributes` does not contain
-    /// a permission level then the `ValidationResult` is ok.
-    ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the permission level to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    /// # Errors
-    ///
-    /// Returns a `UAttributesError` in the following case:
-    ///
-    /// - If the `UAttributes` object contains a `permission_level` and it is less than 1.
-    ///   The error will indicate that the permission level is invalid, suggesting that it does not meet the minimum required level.
-    ///
-    /// The function does not return an error if the `UAttributes` object does not contain a `permission_level`, considering it a valid case.
-    fn validate_permission_level(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(plevel) = attributes.permission_level {
-            if plevel < 1 {
-                return Err(UAttributesError::validation_error(
-                    "Invalid Permission Level",
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    /// Validates the communication status (`commStatus`) for the default case. If the `UAttributes`
-    /// does not contain a request id then the `UStatus` is ok.
-    ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the communication status to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `UAttributesError` in the following case:
-    ///
-    /// - If the `UAttributes` object contains a `reqid` (request ID) and it is not a valid UUID.
-    ///   The error will indicate that the request ID format is invalid, helping to identify issues with the input `UAttributes`.
-    ///
-    /// The function does not return an error if the `UAttributes` object does not contain a `reqid`, considering it a valid case.
-    fn validate_commstatus(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(cs) = attributes.commstatus {
-            if UCode::from_i32(cs).is_none() {
-                return Err(UAttributesError::validation_error(format!(
-                    "Invalid Communication Status Code [{cs}]"
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Validates the `correlationId` for the default case. If the `UAttributes` does not contain
-    /// a request id then the `UStatus` is ok.
-    ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `Attributes` object containing the request id to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    /// # Errors
-    ///
-    /// This function returns a `UAttributesError` in the following scenario:
-    ///
-    /// - If `UAttributes` contains a request ID (`reqid`), but it is not a valid UUID.
-    ///   The `UAttributesError` will contain a message such as "Invalid UUID" to indicate the nature of the validation failure.
-    /// - If the attributes do not contain a request ID but the message type requires one as indicated by [`UAttributesValidator::requires_request_id`].
-    /// The function considers the absence of a request ID in `UAttributes` as a valid case and does not return an error in such a scenario.
-    fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(reqid) = attributes.reqid.as_ref() {
-            if !reqid.is_uprotocol_uuid() {
-                return Err(UAttributesError::validation_error("Invalid UUID"));
-            }
-        } else if self.requires_request_id() {
-            return Err(UAttributesError::validation_error("Missing Request ID"));
-        }
-        Ok(())
-    }
-
-    /// Checks if the type of message covered by this validator requires a *request ID* to be set.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the message requires a request ID. This default implementation returns `false`.
-    fn requires_request_id(&self) -> bool {
-        false
-    }
-
-    /// Validates the `MessageType` of `UAttributes`.
-    ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the message type to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    ///
-    /// # Errors
-    ///
-    /// This function returns a `UAttributesError` in cases where:
-    ///
-    /// - The `MessageType` in `UAttributes` does not conform to the expected format or value.
-    /// - The `UAttributes` object contains inconsistent or invalid data that fails the validation criteria.
-    fn validate_type(&self, attributes: &UAttributes) -> Result<(), UAttributesError>;
 }
 
 /// Enum that hold the implementations of uattributesValidator according to type.
@@ -339,6 +171,26 @@ pub enum UAttributesValidators {
 }
 
 impl UAttributesValidators {
+    /// Gets the validator corresponding to this enum value.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
+    /// let attributes = UAttributes {
+    ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+    ///    id: Some(UUIDBuilder::new().build()).into(),
+    ///    source: Some(topic).into(),
+    ///    ..Default::default()
+    /// };
+    /// let validator = UAttributesValidators::Publish.validator();
+    /// assert!(validator.validate(&attributes).is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn validator(&self) -> Box<dyn UAttributesValidator> {
         match self {
             UAttributesValidators::Publish => Box::new(PublishValidator),
@@ -347,10 +199,50 @@ impl UAttributesValidators {
         }
     }
 
+    /// Gets a validator that can be used to check a given set of attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
+    /// let attributes = UAttributes {
+    ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+    ///    id: Some(UUIDBuilder::new().build()).into(),
+    ///    source: Some(topic).into(),
+    ///    ..Default::default()
+    /// };
+    /// let validator = UAttributesValidators::get_validator_for_attributes(&attributes);
+    /// assert!(validator.validate(&attributes).is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn get_validator_for_attributes(attributes: &UAttributes) -> Box<dyn UAttributesValidator> {
         Self::get_validator(attributes.type_.enum_value_or_default())
     }
 
+    /// Gets a validator that can be used to check attributes of a given type of message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
+    /// let attributes = UAttributes {
+    ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+    ///    id: Some(UUIDBuilder::new().build()).into(),
+    ///    source: Some(topic).into(),
+    ///    ..Default::default()
+    /// };
+    /// let validator = UAttributesValidators::get_validator(UMessageType::UMESSAGE_TYPE_PUBLISH);
+    /// assert!(validator.validate(&attributes).is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn get_validator(message_type: UMessageType) -> Box<dyn UAttributesValidator> {
         match message_type {
             UMessageType::UMESSAGE_TYPE_REQUEST => Box::new(RequestValidator),
@@ -360,147 +252,158 @@ impl UAttributesValidators {
     }
 }
 
-/// Validate `UAttributes` with type `UMessageType::Publish`
+/// Validates attributes describing a Publish or Notification message.
 pub struct PublishValidator;
 
 impl UAttributesValidator for PublishValidator {
-    fn type_name(&self) -> &'static str {
-        "UAttributesValidator.Publish"
+    fn message_type(&self) -> UMessageType {
+        UMessageType::UMESSAGE_TYPE_PUBLISH
     }
 
-    /// Validates that attributes for a message meant to publish state changes has the correct type.
+    /// Checks if a given set of attributes complies with the rules specified for
+    /// publish and notification messages.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `attributes` - `UAttributes` object containing the message type to validate.
+    /// Returns an error if any of the following checks fail for the given attributes:
     ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_type(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        match attributes.type_.enum_value() {
-            Err(unknown_code) => Err(UAttributesError::validation_error(format!(
-                "Unknown Message Type [{}]",
-                unknown_code
-            ))),
-            Ok(mt) => match mt {
-                UMessageType::UMESSAGE_TYPE_PUBLISH => Ok(()),
-                _ => Err(UAttributesError::validation_error(format!(
-                    "Wrong Message Type [{}]",
-                    mt.to_type_string()
-                ))),
-            },
-        }
-    }
+    /// * [`UAttributesValidator::validate_type`]
+    /// * [`UAttributesValidator::validate_id`]
+    /// * [`UAttributesValidator::validate_ttl`]
+    /// * [`UAttributesValidator::validate_source`]
+    /// * [`UAttributesValidator::validate_sink`]
+    fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        let error_message = vec![
+            self.validate_type(attributes),
+            self.validate_id(attributes),
+            self.validate_ttl(attributes),
+            self.validate_source(attributes),
+            self.validate_sink(attributes),
+        ]
+        .into_iter()
+        .filter_map(Result::err)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("; ");
 
-    fn validate_source_and_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if (attributes.source.is_none() && attributes.sink.is_none())
-            || (attributes.source.is_some() && attributes.sink.is_some())
-        {
-            return Err(UAttributesError::validation_error(
-                "Message of type PUBLISH must contain either a source or sink",
-            ));
+        if error_message.is_empty() {
+            Ok(())
+        } else {
+            Err(UAttributesError::validation_error(error_message))
         }
-        self.validate_source(attributes)
-            .and_then(|_| self.validate_sink(attributes))
     }
 }
 
 /// Validate `UAttributes` with type `UMessageType::Request`
 pub struct RequestValidator;
 
+impl RequestValidator {
+    /// Verifies that a set of attributes contains a valid permission level.
+    ///
+    /// # Errors
+    ///
+    /// If [`UAttributes::permission_level`] contains a value that is less than 0, an error is returned.
+    pub fn validate_permission_level(
+        &self,
+        attributes: &UAttributes,
+    ) -> Result<(), UAttributesError> {
+        // this check will be obsolete once up-core-api 1.5.7 is released and
+        // permission level is defined as a uint32
+        if let Some(plevel) = attributes.permission_level {
+            if plevel < 0 {
+                return Err(UAttributesError::validation_error(format!(
+                    "Permission Level must not be negative [{plevel}]"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl UAttributesValidator for RequestValidator {
-    fn type_name(&self) -> &'static str {
-        "UAttributesValidator.Request"
+    fn message_type(&self) -> UMessageType {
+        UMessageType::UMESSAGE_TYPE_REQUEST
     }
 
-    fn requires_request_id(&self) -> bool {
-        true
-    }
+    /// Checks if a given set of attributes complies with the rules specified for
+    /// RPC request messages.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the following checks fail for the given attributes:
+    ///
+    /// * [`UAttributesValidator::validate_type`]
+    /// * [`UAttributesValidator::validate_id`]
+    /// * [`UAttributesValidator::validate_ttl`]
+    /// * [`UAttributesValidator::validate_source`]
+    /// * [`UAttributesValidator::validate_sink`]
+    /// * [`RequestValidator::validate_permission_level`]
+    fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        let error_message = vec![
+            self.validate_type(attributes),
+            self.validate_id(attributes),
+            self.validate_ttl(attributes),
+            self.validate_source(attributes),
+            self.validate_sink(attributes),
+            self.validate_permission_level(attributes),
+        ]
+        .into_iter()
+        .filter_map(Result::err)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("; ");
 
-    /// Validates that attributes for a message meant for an RPC request has the correct type.
-    ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the message type to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_type(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        match attributes.type_.enum_value() {
-            Err(unknown_code) => Err(UAttributesError::validation_error(format!(
-                "Unknown Attribute Type [{}]",
-                unknown_code
-            ))),
-            Ok(mt) => match mt {
-                UMessageType::UMESSAGE_TYPE_REQUEST => Ok(()),
-                _ => Err(UAttributesError::validation_error(format!(
-                    "Wrong Attribute Type [{}]",
-                    mt.to_type_string()
-                ))),
-            },
+        if error_message.is_empty() {
+            Ok(())
+        } else {
+            Err(UAttributesError::validation_error(error_message))
         }
     }
 
-    /// Validates that attributes for a message meant for an RPC request contain a reply-to-address.
+    /// Verifies that attributes for a message representing an RPC request contain a reply-to-address.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `attributes` - `UAttributes` object to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// If the [`UAttributes::source`] property does not contain a valid reply-to-address according to
+    /// [`UriValidator::validate_rpc_response`], an error is returned.
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(source) = attributes.source.as_ref() {
             UriValidator::validate_rpc_response(source)
                 .map_err(|e| UAttributesError::validation_error(e.to_string()))
         } else {
-            Err(UAttributesError::validation_error("Missing Source"))
+            Err(UAttributesError::validation_error("Attributes for a request message must contain a reply-to address in the source property"))
         }
     }
 
-    /// Validates that attributes for a message meant for an RPC request has a destination sink.
-    /// In the case of an RPC request, the sink is required.
+    /// Verifies that attributes for a message representing an RPC request indicate the method to invoke.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `attributes` - `UAttributes` object containing the sink to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// If the [`UAttributes::sink`] property does not contain a URI representing a method according to
+    /// [`UriValidator::validate_rpc_method`], an error is returned.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(sink) = attributes.sink.as_ref() {
             UriValidator::validate_rpc_method(sink)
                 .map_err(|e| UAttributesError::validation_error(e.to_string()))
         } else {
-            Err(UAttributesError::validation_error("Missing Sink"))
+            Err(UAttributesError::validation_error("Attributes for a request message must contain a method-to-invoke in the sink property"))
         }
     }
 
-    /// Validate the time to live configuration. In the case of an RPC request,
-    /// the time to live is required.
+    /// Verifies that a set of attributes representing an RPC request contain a valid time-to-live.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `attributes` - `UAttributes` object containing the ttl to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// Returns an error if [`UAttributes::ttl`] (time-to-live) is empty or contains a value less than 1.
     fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(ttl) = attributes.ttl {
-            if ttl > 0 {
-                Ok(())
-            } else {
-                Err(UAttributesError::validation_error(format!(
-                    "Invalid TTL [{ttl}]"
-                )))
-            }
-        } else {
-            Err(UAttributesError::validation_error("Missing TTL"))
+        match attributes.ttl {
+            Some(ttl) if ttl > 0 => Ok(()),
+            Some(invalid_ttl) => Err(UAttributesError::validation_error(format!(
+                "RPC request message's TTL must be a positive integer [{invalid_ttl}]"
+            ))),
+            None => Err(UAttributesError::validation_error(
+                "RPC request message must contain a TTL",
+            )),
         }
     }
 }
@@ -508,45 +411,96 @@ impl UAttributesValidator for RequestValidator {
 /// Validate `UAttributes` with type `UMessageType::Response`
 pub struct ResponseValidator;
 
-impl UAttributesValidator for ResponseValidator {
-    fn type_name(&self) -> &'static str {
-        "UAttributesValidator.Response"
-    }
-
-    /// Validates that attributes for a message meant for an RPC response has the correct type.
+impl ResponseValidator {
+    /// Verifies that the attributes contain a valid request ID.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `attributes` - `UAttributes` object containing the message type to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_type(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        match attributes.type_.enum_value() {
-            Err(unknown_code) => Err(UAttributesError::validation_error(format!(
-                "Unknown Attribute Type [{}]",
-                unknown_code
-            ))),
-            Ok(mt) => match mt {
-                UMessageType::UMESSAGE_TYPE_RESPONSE => Ok(()),
-                _ => Err(UAttributesError::validation_error(format!(
-                    "Wrong Attribute Type [{}]",
-                    mt.to_type_string()
-                ))),
-            },
+    /// Returns an error if [`UAttributes::reqid`] is empty or contains a value which is not
+    /// a [valid uProtocol UUID](`UUID::is_uprotocol_uuid`).
+    pub fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if !attributes
+            .reqid
+            .as_ref()
+            .map_or(false, |id| id.is_uprotocol_uuid())
+        {
+            Err(UAttributesError::validation_error(
+                "Request ID is not a valid uProtocol UUID",
+            ))
+        } else {
+            Ok(())
         }
     }
 
-    /// Validates that attributes for a message meant for an RPC response contain the invoked method.
+    /// Verifies that a set of attributes contains a valid communication status.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `attributes` - `UAttributes` object to validate.
+    /// Returns an error if [`UAttributes::commstatus`] does not contain a value that is a [`UCode`].
+    pub fn validate_commstatus(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if let Some(status) = attributes.commstatus {
+            if UCode::from_i32(status).is_some() {
+                Ok(())
+            } else {
+                Err(UAttributesError::validation_error(format!(
+                    "Invalid Communication Status code [{status}]"
+                )))
+            }
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl UAttributesValidator for ResponseValidator {
+    fn message_type(&self) -> UMessageType {
+        UMessageType::UMESSAGE_TYPE_RESPONSE
+    }
+
+    /// Checks if a given set of attributes complies with the rules specified for
+    /// RPC response messages.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// Returns an error if any of the following checks fail for the given attributes:
+    ///
+    /// * [`UAttributesValidator::validate_type`]
+    /// * [`UAttributesValidator::validate_id`]
+    /// * [`UAttributesValidator::validate_ttl`]
+    /// * [`UAttributesValidator::validate_source`]
+    /// * [`UAttributesValidator::validate_sink`]
+    /// * [`ResponseValidator::validate_reqid`]
+    /// * [`ResponseValidator::validate_commstatus`]
+    fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        let error_message = vec![
+            self.validate_type(attributes),
+            self.validate_id(attributes),
+            self.validate_ttl(attributes),
+            self.validate_source(attributes),
+            self.validate_sink(attributes),
+            self.validate_reqid(attributes),
+            self.validate_commstatus(attributes),
+        ]
+        .into_iter()
+        .filter_map(Result::err)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("; ");
+
+        if error_message.is_empty() {
+            Ok(())
+        } else {
+            Err(UAttributesError::validation_error(error_message))
+        }
+    }
+
+    /// Verifies that attributes for a message representing an RPC response indicate the method that has
+    /// been invoked.
+    ///  
+    /// # Errors
+    ///
+    /// If the [`UAttributes::source`] property does not contain a URI representing a method according to
+    /// [`UriValidator::validate_rpc_method`], an error is returned.
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(source) = attributes.source.as_ref() {
             UriValidator::validate_rpc_method(source)
@@ -556,16 +510,13 @@ impl UAttributesValidator for ResponseValidator {
         }
     }
 
-    /// Validates that attributes for a message meant for an RPC response contain a reply-to-address.
-    /// In the case of an RPC response, the sink is required.
+    /// Verifies that attributes for a message representing an RPC response contain a valid
+    /// reply-to-address.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `attributes` - `UAttributes` object containing the sink to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
+    /// If the [`UAttributes::sink`] property does not contain a valid reply-to-address according to
+    /// [`UriValidator::validate_rpc_response`], an error is returned.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(sink) = &attributes.sink.as_ref() {
             UriValidator::validate_rpc_response(sink)
@@ -574,47 +525,49 @@ impl UAttributesValidator for ResponseValidator {
             Err(UAttributesError::validation_error("Missing Sink"))
         }
     }
-
-    /// Validate the correlationId. In the case of an RPC response, the correlation id is required.
-    ///
-    /// # Arguments
-    ///
-    /// * `attributes` - `UAttributes` object containing the request id to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ValidationResult` that is success or failed with a failure message.
-    fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(reqid) = &attributes.reqid.as_ref() {
-            if reqid.is_uprotocol_uuid() {
-                return Ok(());
-            }
-        }
-        Err(UAttributesError::validation_error("Missing correlation ID"))
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
+    use protobuf::EnumOrUnknown;
     use test_case::test_case;
 
+    use super::*;
     use crate::{
         UAuthority, UEntity, UPriority, UResource, UResourceBuilder, UUIDBuilder, UUri, UUID,
     };
 
-    #[test_case(UMessageType::UMESSAGE_TYPE_UNSPECIFIED, "UAttributesValidator.Publish"; "succeeds for Unspecified message")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, "UAttributesValidator.Publish"; "succeeds for Publish message")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, "UAttributesValidator.Request"; "succeeds for Request message")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, "UAttributesValidator.Response"; "succeeds for Response message")]
+    #[test]
+    fn test_validate_type_fails_for_unknown_type_code() {
+        let attributes = UAttributes {
+            type_: EnumOrUnknown::from_i32(20),
+            ..Default::default()
+        };
+        assert!(UAttributesValidators::Publish
+            .validator()
+            .validate_type(&attributes)
+            .is_err());
+        assert!(UAttributesValidators::Request
+            .validator()
+            .validate_type(&attributes)
+            .is_err());
+        assert!(UAttributesValidators::Response
+            .validator()
+            .validate_type(&attributes)
+            .is_err());
+    }
+
+    #[test_case(UMessageType::UMESSAGE_TYPE_UNSPECIFIED, UMessageType::UMESSAGE_TYPE_PUBLISH; "succeeds for Unspecified message")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, UMessageType::UMESSAGE_TYPE_PUBLISH; "succeeds for Publish message")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, UMessageType::UMESSAGE_TYPE_REQUEST; "succeeds for Request message")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, UMessageType::UMESSAGE_TYPE_RESPONSE; "succeeds for Response message")]
     fn test_get_validator_returns_matching_validator(
         message_type: UMessageType,
-        expected_validator_type: &str,
+        expected_validator_type: UMessageType,
     ) {
         let validator: Box<dyn UAttributesValidator> =
             UAttributesValidators::get_validator(message_type);
-        assert_eq!(validator.type_name(), expected_validator_type);
+        assert_eq!(validator.message_type(), expected_validator_type);
     }
 
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, None, false; "for Publish message without ID nor TTL")]
@@ -655,46 +608,40 @@ mod tests {
         assert!(validator.is_expired(&attributes).is_err() == should_be_expired);
     }
 
-    #[test_case(Some(publish_topic()), None, None, None, None, None, true; "succeeds for topic only")]
-    #[test_case(None, Some(destination()), None, None, None, None, true; "succeeds for destination only")]
-    #[test_case(Some(publish_topic()), Some(destination()), None, None, None, None, false; "fails for both topic and destination")]
-    #[test_case(None, None, None, None, None, None, false; "fails for neither topic nor destination")]
-    #[test_case(Some(publish_topic()), None, Some(UUIDBuilder::new().build()), Some(1), Some(1), Some(100), true; "succeeds for valid attributes")]
-    #[test_case(Some(publish_topic()), None, None, None, None, Some(-1), false; "fails for ttl < 0")]
-    #[test_case(Some(publish_topic()), None, None, Some(-42), None, None, false; "fails for invalid commstatus")]
-    #[test_case(Some(publish_topic()), None, None, None, Some(0), None, false; "fails for permission level < 1")]
-    #[test_case(None, Some(UUri::default()), None, None, None, None, false; "fails for invalid destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), Some(destination()), None, true; "succeeds for both topic and destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, Some(destination()), None, false; "fails for missing topic")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid topic")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), Some(UUri::default()), None, false; "fails for invalid destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, None, None, false; "fails for neither topic nor destination")]
+    #[test_case(None, Some(publish_topic()), None, None, false; "fails for missing message ID")]
     #[test_case(
-        None,
-        None,
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
             msb: 0x000000000001C000u64,
             lsb: 0x8000000000000000u64,
             ..Default::default()
         }),
-        None,
+        Some(publish_topic()),
         None,
         None,
         false;
-        "fails for invalid request id")]
+        "fails for invalid message id")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, Some(-1), false; "fails for ttl < 0")]
     fn test_validate_attributes_for_publish_message(
+        id: Option<UUID>,
         source: Option<UUri>,
         sink: Option<UUri>,
-        reqid: Option<UUID>,
-        commstatus: Option<i32>,
-        perm_level: Option<i32>,
         ttl: Option<i32>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
             type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+            id: id.into(),
             priority: UPriority::UPRIORITY_CS1.into(),
-            reqid: reqid.into(),
             source: source.into(),
             sink: sink.into(),
-            commstatus,
-            permission_level: perm_level,
             ttl,
             ..Default::default()
         };
@@ -713,39 +660,35 @@ mod tests {
         }
     }
 
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), None, None, Some(2000), None, true; "succeeds for mandatory attributes")]
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), Some(1), Some(1), Some(2000), Some(String::from("token")), true; "succeeds for valid attributes")]
-    #[test_case(Some(method_to_invoke()), None, Some(UUIDBuilder::new().build()), None, None, Some(100), None, false; "fails for missing reply-to-address")]
-    #[test_case(Some(method_to_invoke()), Some(UUri::default()), Some(UUIDBuilder::new().build()), None, None, Some(2000), None, false; "fails for invalid reply-to-address")]
-    #[test_case(None, Some(reply_to_address()), Some(UUIDBuilder::new().build()), None, None, Some(100), None, false; "fails for missing method-to-invoke")]
-    #[test_case(Some(UUri::default()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), None, None, Some(2000), None, false; "fails for invalid method-to-invoke")]
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), None, None, None, None, false; "fails for missing ttl")]
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), None, None, Some(0), None, false; "fails for ttl < 1")]
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), Some(-42), None, Some(2000), None, false; "fails for invalid commstatus")]
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), None, Some(1), Some(2000), None, true; "succeeds for valid permission level")]
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), Some(UUIDBuilder::new().build()), None, Some(0), Some(2000), None, false; "fails for invalid permission level")]
-    #[test_case(Some(method_to_invoke()), Some(reply_to_address()), None, None, None, Some(2000), None, false; "fails for missing request ID")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(2000), None, true; "succeeds for mandatory attributes")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(String::from("token")), true; "succeeds for valid attributes")]
+    #[test_case(None, Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(String::from("token")), false; "fails for missing message ID")]
     #[test_case(
-        Some(method_to_invoke()),
-        Some(reply_to_address()),
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
             msb: 0x000000000001C000u64,
             lsb: 0x8000000000000000u64,
             ..Default::default()
         }),
+        Some(method_to_invoke()),
+        Some(reply_to_address()),
         None,
-        Some(1),
         Some(2000),
         None,
         false;
-        "fails for invalid request id")]
-    #[allow(clippy::too_many_arguments)]
+        "fails for invalid message id")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), None, None, Some(2000), None, false; "fails for missing reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(UUri::default()), None, Some(2000), None, false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, Some(reply_to_address()), None, Some(2000), None, false; "fails for missing method-to-invoke")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), None, false; "fails for invalid method-to-invoke")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, None, false; "fails for missing ttl")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), None, false; "fails for ttl < 1")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, true; "succeeds for valid permission level")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(-1), Some(2000), None, false; "fails for invalid permission level")]
     fn test_validate_attributes_for_rpc_request_message(
+        id: Option<UUID>,
         method_to_invoke: Option<UUri>,
         reply_to_address: Option<UUri>,
-        reqid: Option<UUID>,
-        commstatus: Option<i32>,
         perm_level: Option<i32>,
         ttl: Option<i32>,
         token: Option<String>,
@@ -753,11 +696,10 @@ mod tests {
     ) {
         let attributes = UAttributes {
             type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
+            id: id.into(),
             priority: UPriority::UPRIORITY_CS1.into(),
             source: reply_to_address.into(),
             sink: method_to_invoke.into(),
-            reqid: reqid.into(),
-            commstatus,
             permission_level: perm_level,
             ttl,
             token,
@@ -779,21 +721,35 @@ mod tests {
         }
     }
 
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, None, true; "succeeds for mandatory attributes")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(1), Some(100), true; "succeeds for valid attributes")]
-    #[test_case(None, Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, None, false; "fails for missing reply-to-address")]
-    #[test_case(Some(UUri::default()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, None, false; "fails for invalid reply-to-address")]
-    #[test_case(Some(reply_to_address()), None, Some(UUIDBuilder::new().build()), None, None, None, false; "fails for missing invoked-method")]
-    #[test_case(Some(reply_to_address()), Some(UUri::default()), Some(UUIDBuilder::new().build()), None, None, None, false; "fails for invalid invoked-method")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), None, None, true; "succeeds for valid commstatus")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(-42), None, None, false; "fails for invalid commstatus")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(1), None, true; "succeeds for valid permission level")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(0), None, false; "fails for invalid permission level")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(100), true; "succeeds for ttl > 0)")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(0), true; "succeeds for ttl = 0")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(-1), false; "fails for ttl < 0")]
-    #[test_case(Some(reply_to_address()), Some(method_to_invoke()), None, None, None, None, false; "fails for missing request id")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, true; "succeeds for mandatory attributes")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), true; "succeeds for valid attributes")]
+    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), false; "fails for missing message ID")]
     #[test_case(
+        Some(UUID {
+            // invalid UUID version (not 0b1000 but 0b1010)
+            msb: 0x000000000001C000u64,
+            lsb: 0x8000000000000000u64,
+            ..Default::default()
+        }),
+        Some(reply_to_address()),
+        Some(method_to_invoke()),
+        Some(UUIDBuilder::new().build()),
+        None,
+        None,
+        false;
+        "fails for invalid message id")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, false; "fails for missing reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), None, Some(UUIDBuilder::new().build()), None, None, false; "fails for missing invoked-method")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(UUri::default()), Some(UUIDBuilder::new().build()), None, None, false; "fails for invalid invoked-method")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), None, true; "succeeds for valid commstatus")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(-42), None, false; "fails for invalid commstatus")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(100), true; "succeeds for ttl > 0)")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(0), true; "succeeds for ttl = 0")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(-1), false; "fails for ttl < 0")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), None, None, None, false; "fails for missing request id")]
+    #[test_case(
+        Some(UUIDBuilder::new().build()),
         Some(reply_to_address()),
         Some(method_to_invoke()),
         Some(UUID {
@@ -804,27 +760,26 @@ mod tests {
         }),
         None,
         None,
-        None,
         false;
         "fails for invalid request id")]
 
     fn test_validate_attributes_for_rpc_response_message(
+        id: Option<UUID>,
         reply_to_address: Option<UUri>,
         invoked_method: Option<UUri>,
         reqid: Option<UUID>,
         commstatus: Option<i32>,
-        perm_level: Option<i32>,
         ttl: Option<i32>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
             type_: UMessageType::UMESSAGE_TYPE_RESPONSE.into(),
+            id: id.into(),
             priority: UPriority::UPRIORITY_CS1.into(),
             reqid: reqid.into(),
             source: invoked_method.into(),
             sink: reply_to_address.into(),
             commstatus,
-            permission_level: perm_level,
             ttl,
             ..Default::default()
         };
