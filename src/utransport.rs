@@ -61,10 +61,6 @@ pub trait UTransport {
     /// * `address` - The (resolved) address to register the listener for.
     /// * `listener` - The listener to invoke.
     ///
-    /// # Returns
-    ///
-    /// An identifier that can be used for [unregistering the listener](Self::unregister_listener) again.
-    ///
     /// # Errors
     ///
     /// Returns an error if the listener could not be registered.
@@ -263,6 +259,17 @@ mod tests {
         let umessage = UMessage::default();
         let check_on_receive_res =  up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
+    }
+
+    #[test]
+    fn test_if_no_listeners() {
+        let up_client_foo = UPClientFoo::new();
+        let uuri_1 = uuri_factory(1);
+
+        let umessage = UMessage::default();
+        let check_on_receive_res =  up_client_foo.check_on_receive(&uuri_1, &umessage);
+
+        assert_eq!(check_on_receive_res.is_err(), true);
     }
 
 }
