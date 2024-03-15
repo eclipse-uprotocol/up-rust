@@ -60,3 +60,4 @@ ureq = { version = "2.9.1", features = ["proxy-from-env"] }
 
 [dev-dependencies]
 test-case = { version = "3.3" }
+async-std = { version = "1.12.0" }
