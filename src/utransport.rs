@@ -101,6 +101,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     struct UPClientFoo {
+        #[allow(clippy::type_complexity)]
         listeners: Arc<Mutex<HashMap<UUri, HashSet<Box<dyn UListener>>>>>,
     }
 
@@ -111,6 +112,7 @@ mod tests {
             }
         }
 
+        #[allow(clippy::type_complexity)]
         pub fn get_hashmap(&self) -> Arc<Mutex<HashMap<UUri, HashSet<Box<dyn UListener>>>>> {
             self.listeners.clone()
         }
@@ -153,7 +155,7 @@ mod tests {
             listener: Box<dyn UListener>,
         ) -> Result<(), UStatus> {
             let mut topics_listeners = self.listeners.lock().unwrap();
-            let listeners = topics_listeners.entry(topic).or_insert_with(HashSet::new);
+            let listeners = topics_listeners.entry(topic).or_default();
             listeners.insert(listener);
 
             Ok(())
@@ -291,6 +293,6 @@ mod tests {
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
 
-        assert_eq!(check_on_receive_res.is_err(), true);
+        assert!(check_on_receive_res.is_err());
     }
 }
