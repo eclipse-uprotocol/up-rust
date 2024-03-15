@@ -11,9 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::hash::{Hash, Hasher};
 pub use crate::up_core_api::uri::UEntity;
 use crate::uri::UUriError;
+use std::hash::{Hash, Hasher};
 
 const UENTITY_ID_LENGTH: usize = 16;
 const UENTITY_ID_VALID_BITMASK: u32 = 0xffff << UENTITY_ID_LENGTH;

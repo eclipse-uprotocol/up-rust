@@ -11,8 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::hash::{Hash, Hasher};
 use bytes::BufMut;
+use std::hash::{Hash, Hasher};
 
 pub use crate::up_core_api::uri::{uauthority::Number, UAuthority};
 use crate::uri::UUriError;

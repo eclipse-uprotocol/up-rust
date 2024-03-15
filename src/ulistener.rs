@@ -11,10 +11,10 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use crate::{UMessage, UStatus};
 use std::any::Any;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
-use crate::{UMessage, UStatus};
 
 /// `UListener` is the uP-L1 interface that provides a means to create listeners which are registered to `UTransport`
 ///

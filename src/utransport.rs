@@ -13,8 +13,8 @@
 
 use async_trait::async_trait;
 
-use crate::{UMessage, UStatus, UUri};
 use crate::ulistener::UListener;
+use crate::{UMessage, UStatus, UUri};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
 ///
@@ -82,28 +82,32 @@ pub trait UTransport {
     /// # Errors
     ///
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
-    async fn unregister_listener(&self, topic: UUri, listener: Box<dyn UListener>) -> Result<(), UStatus>;
+    async fn unregister_listener(
+        &self,
+        topic: UUri,
+        listener: Box<dyn UListener>,
+    ) -> Result<(), UStatus>;
 }
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
-    use std::collections::{HashMap, HashSet};
-    use std::collections::hash_map::Entry;
-    use std::sync::{Arc, Mutex};
+    use crate::ulistener::UListener;
+    use crate::{Number, UAuthority, UCode, UMessage, UStatus, UTransport, UUri};
     use async_std::task;
     use async_trait::async_trait;
-    use crate::{Number, UAuthority, UCode, UMessage, UStatus, UTransport, UUri};
-    use crate::ulistener::UListener;
+    use std::any::Any;
+    use std::collections::hash_map::Entry;
+    use std::collections::{HashMap, HashSet};
+    use std::sync::{Arc, Mutex};
 
     struct UPClientFoo {
-        listeners: Arc<Mutex<HashMap<UUri, HashSet<Box<dyn UListener>>>>>
+        listeners: Arc<Mutex<HashMap<UUri, HashSet<Box<dyn UListener>>>>>,
     }
 
     impl UPClientFoo {
         pub fn new() -> Self {
             Self {
-                listeners: Arc::new(Mutex::new(HashMap::new()))
+                listeners: Arc::new(Mutex::new(HashMap::new())),
             }
         }
 
@@ -116,7 +120,10 @@ mod tests {
             let listeners = topics_listeners.entry(uuri.clone());
             match listeners {
                 Entry::Vacant(_) => {
-                    return Err(UStatus::fail_with_code(UCode::NOT_FOUND, format!("No listeners registered for topic: {:?}", &uuri)))
+                    return Err(UStatus::fail_with_code(
+                        UCode::NOT_FOUND,
+                        format!("No listeners registered for topic: {:?}", &uuri),
+                    ))
                 }
                 Entry::Occupied(mut e) => {
                     let occupied = e.get_mut();
@@ -140,7 +147,11 @@ mod tests {
             todo!()
         }
 
-        async fn register_listener(&self, topic: UUri, listener: Box<dyn UListener>) -> Result<(), UStatus> {
+        async fn register_listener(
+            &self,
+            topic: UUri,
+            listener: Box<dyn UListener>,
+        ) -> Result<(), UStatus> {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic).or_insert_with(HashSet::new);
             listeners.insert(listener);
@@ -148,12 +159,19 @@ mod tests {
             Ok(())
         }
 
-        async fn unregister_listener(&self, topic: UUri, listener: Box<dyn UListener>) -> Result<(), UStatus> {
+        async fn unregister_listener(
+            &self,
+            topic: UUri,
+            listener: Box<dyn UListener>,
+        ) -> Result<(), UStatus> {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic.clone());
             match listeners {
                 Entry::Vacant(_) => {
-                    return Err(UStatus::fail_with_code(UCode::NOT_FOUND, format!("No listeners registered for topic: {:?}", &topic)))
+                    return Err(UStatus::fail_with_code(
+                        UCode::NOT_FOUND,
+                        format!("No listeners registered for topic: {:?}", &topic),
+                    ))
                 }
                 Entry::Occupied(mut e) => {
                     let occupied = e.get_mut();
@@ -191,19 +209,16 @@ mod tests {
 
     fn uuri_factory(uuri_index: u8) -> UUri {
         match uuri_index {
-            1 => {
-                UUri {
-                    authority: Some(UAuthority {
-                        name: Some("uuri_1".to_string()),
-                        number: Some(Number::Ip(vec![192, 168, 1, 200])),
-                        ..Default::default()
-                    }).into(),
+            1 => UUri {
+                authority: Some(UAuthority {
+                    name: Some("uuri_1".to_string()),
+                    number: Some(Number::Ip(vec![192, 168, 1, 200])),
                     ..Default::default()
-                }
-            }
-            _ => {
-                UUri::default()
-            }
+                })
+                .into(),
+                ..Default::default()
+            },
+            _ => UUri::default(),
         }
     }
 
@@ -212,13 +227,14 @@ mod tests {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Box<dyn UListener> = Box::new(ListenerBaz);
-        let register_res = task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
+        let register_res =
+            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
         let listeners_after_ops = up_client_foo.get_hashmap();
         println!("{listeners_after_ops:#?}");
         assert_eq!(register_res, Ok(()));
 
         let umessage = UMessage::default();
-        let check_on_receive_res =  up_client_foo.check_on_receive(&uuri_1, &umessage);
+        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
     }
 
@@ -227,14 +243,18 @@ mod tests {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
         let listener_baz_for_register: Box<dyn UListener> = Box::new(ListenerBaz);
-        let register_res = task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz_for_register));
+        let register_res = task::block_on(
+            up_client_foo.register_listener(uuri_1.clone(), listener_baz_for_register),
+        );
 
         let listeners_after_register = up_client_foo.get_hashmap();
         println!("{listeners_after_register:#?}");
         assert_eq!(register_res, Ok(()));
 
         let listener_baz_for_unregister: Box<dyn UListener> = Box::new(ListenerBaz);
-        let unregister_res = task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister));
+        let unregister_res = task::block_on(
+            up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister),
+        );
         let listeners_after_unregister = up_client_foo.get_hashmap();
         println!("{listeners_after_unregister:#?}");
         assert_eq!(unregister_res, Ok(()));
@@ -245,19 +265,21 @@ mod tests {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Box<dyn UListener> = Box::new(ListenerBaz);
-        let register_res = task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
+        let register_res =
+            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
         let listeners_after_ops = up_client_foo.get_hashmap();
         println!("{listeners_after_ops:#?}");
         assert_eq!(register_res, Ok(()));
 
         let listener_bar: Box<dyn UListener> = Box::new(ListenerBar);
-        let register_res = task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_bar));
+        let register_res =
+            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_bar));
         let listeners_after_ops = up_client_foo.get_hashmap();
         println!("{listeners_after_ops:#?}");
         assert_eq!(register_res, Ok(()));
 
         let umessage = UMessage::default();
-        let check_on_receive_res =  up_client_foo.check_on_receive(&uuri_1, &umessage);
+        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
     }
 
@@ -267,9 +289,8 @@ mod tests {
         let uuri_1 = uuri_factory(1);
 
         let umessage = UMessage::default();
-        let check_on_receive_res =  up_client_foo.check_on_receive(&uuri_1, &umessage);
+        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
 
         assert_eq!(check_on_receive_res.is_err(), true);
     }
-
 }
