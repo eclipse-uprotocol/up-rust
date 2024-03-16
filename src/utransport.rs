@@ -66,7 +66,7 @@ pub trait UTransport {
     /// Returns an error if the listener could not be registered.
     async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: Copy + UListener + 'static;
+        T: Clone + UListener + 'static;
 
     /// Unregisters a listener for a given topic.
     ///
@@ -82,7 +82,7 @@ pub trait UTransport {
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: Copy + UListener + 'static;
+        T: Clone + UListener + 'static;
 }
 
 #[cfg(test)]
