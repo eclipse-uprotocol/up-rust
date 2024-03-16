@@ -40,6 +40,12 @@ where
     }
 }
 
+impl CloneBoxUListener for Box<dyn ClonableBoxUListener> {
+    fn clone_box(&self) -> Box<dyn ClonableBoxUListener + 'static> {
+        self.as_ref().clone_box()
+    }
+}
+
 pub trait ClonableBoxUListener: UListener + CloneBoxUListener {}
 
 impl<T> ClonableBoxUListener for T where T: UListener + Clone + Send + Sync {}
