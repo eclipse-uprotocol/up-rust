@@ -13,7 +13,7 @@
 
 use async_trait::async_trait;
 
-use crate::ulistener::UListener;
+use crate::ulistener::ClonableBoxUListener;
 use crate::{UMessage, UStatus, UUri};
 
 /// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
@@ -66,7 +66,7 @@ pub trait UTransport {
     /// Returns an error if the listener could not be registered.
     async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: Clone + UListener + 'static;
+        T: ClonableBoxUListener + 'static;
 
     /// Unregisters a listener for a given topic.
     ///
@@ -82,12 +82,13 @@ pub trait UTransport {
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: Clone + UListener + 'static;
+        T: ClonableBoxUListener + 'static;
 }
 
 #[cfg(test)]
 mod tests {
     use crate::listener_wrapper::ListenerWrapper;
+    use crate::ulistener::ClonableBoxUListener;
     use crate::ulistener::UListener;
     use crate::{Number, UAuthority, UCode, UMessage, UStatus, UTransport, UUri};
     use async_std::task;
@@ -150,7 +151,7 @@ mod tests {
 
         async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
         where
-            T: UListener + 'static,
+            T: ClonableBoxUListener + 'static,
         {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic).or_default();
@@ -165,7 +166,7 @@ mod tests {
 
         async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
         where
-            T: UListener + 'static,
+            T: ClonableBoxUListener + 'static,
         {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic.clone());
@@ -189,7 +190,7 @@ mod tests {
         }
     }
 
-    #[derive(Copy, Clone, Debug)]
+    #[derive(Clone, Debug)]
     struct ListenerBaz;
     impl UListener for ListenerBaz {
         fn on_receive(&self, received: Result<UMessage, UStatus>) {
@@ -197,7 +198,7 @@ mod tests {
         }
     }
 
-    #[derive(Copy, Clone, Debug)]
+    #[derive(Clone, Debug)]
     struct ListenerBar;
     impl UListener for ListenerBar {
         fn on_receive(&self, received: Result<UMessage, UStatus>) {
