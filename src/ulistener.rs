@@ -30,70 +30,63 @@ pub trait UListener: Any + Send + Sync {
     fn on_receive(&self, received: Result<UMessage, UStatus>);
 }
 
-
-pub trait UListenerTypeTag {
-    fn as_any(&self) -> &dyn Any;
+/// A wrapper type around UListener that can be used by `up-client-foo-rust` UPClient libraries
+/// to ease some common development scenarios
+///
+/// # Note
+///
+/// Not necessary for end-user uEs to use. Primarily intended for `up-client-foo-rust` UPClient libraries
+///
+/// # Rationale
+///
+/// The wrapper type is implemented such that it can be used in any location you may wish to
+/// hold a generic UListener
+///
+/// Also implements necessary traits to allow hashing, so that you may hold the wrapper type in
+/// collections which require that, such as a `HashMap` or `HashSet`
+pub struct ListenerWrapper {
+    listener: Box<dyn UListener + 'static>,
+    type_id: TypeId
 }
 
-pub struct ListenerWrapper<T: UListener + 'static> {
-    listener: T,
-}
-
-impl<T: UListener + 'static> ListenerWrapper<T> {
-    pub fn new(listener: T) -> Self {
-        ListenerWrapper { listener }
-    }
-}
-
-impl<T: UListener + 'static> UListener for ListenerWrapper<T> {
-    fn on_receive(&self, received: Result<UMessage, UStatus>) {
-        self.listener.on_receive(received)
-    }
-}
-
-impl<T: UListener + 'static> UListenerTypeTag for ListenerWrapper<T> {
-    fn as_any(&self) -> &dyn Any {
-        &self.listener
-    }
-}
-
-pub trait AnyListener: Send + Sync {
-    fn on_receive(&self, received: Result<UMessage, UStatus>);
-}
-
-impl<T: UListener + 'static> AnyListener for ListenerWrapper<T> {
-    fn on_receive(&self, received: Result<UMessage, UStatus>) {
-        self.listener.on_receive(received);
-    }
-}
-
-pub struct TypeIdentifiedListener {
-    pub listener: Box<dyn AnyListener>,
-    type_id: TypeId,
-}
-
-impl TypeIdentifiedListener {
+impl ListenerWrapper {
     pub fn new<T>(listener: T) -> Self
         where
             T: UListener + 'static,
     {
-        let any_listener = Box::new(ListenerWrapper::new(listener)) as Box<dyn AnyListener>;
-        TypeIdentifiedListener {
+        let any_listener = Box::new(listener) as Box<dyn UListener + 'static>;
+        Self {
             listener: any_listener,
             type_id: TypeId::of::<T>(),
         }
     }
 }
 
-impl PartialEq for TypeIdentifiedListener {
+impl UListener for ListenerWrapper {
+    fn on_receive(&self, received: Result<UMessage, UStatus>) {
+        self.listener.on_receive(received)
+    }
+}
+
+pub trait UListenerTypeTag {
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl UListenerTypeTag for ListenerWrapper {
+    fn as_any(&self) -> &dyn Any {
+        &self.listener
+    }
+}
+
+impl PartialEq for ListenerWrapper {
     fn eq(&self, other: &Self) -> bool {
         self.type_id == other.type_id
     }
 }
 
-impl Eq for TypeIdentifiedListener {}
+impl Eq for ListenerWrapper {}
 
-impl Hash for TypeIdentifiedListener {
+impl Hash for ListenerWrapper {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.type_id.hash(state);
     }

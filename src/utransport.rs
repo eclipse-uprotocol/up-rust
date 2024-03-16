@@ -91,7 +91,7 @@ pub trait UTransport {
 
 #[cfg(test)]
 mod tests {
-    use crate::ulistener::{ListenerWrapper, UListener, TypeIdentifiedListener};
+    use crate::ulistener::{ListenerWrapper, UListener};
     use crate::{Number, UAuthority, UCode, UMessage, UStatus, UTransport, UUri};
     use async_std::task;
     use async_trait::async_trait;
@@ -101,7 +101,7 @@ mod tests {
 
     struct UPClientFoo {
         #[allow(clippy::type_complexity)]
-        listeners: Arc<Mutex<HashMap<UUri, HashSet<TypeIdentifiedListener>>>>,
+        listeners: Arc<Mutex<HashMap<UUri, HashSet<ListenerWrapper>>>>,
     }
 
     impl UPClientFoo {
@@ -132,7 +132,7 @@ mod tests {
                     }
 
                     for listener in occupied.iter() {
-                        listener.listener.on_receive(Ok(umessage.clone()));
+                        listener.on_receive(Ok(umessage.clone()));
                     }
                 }
             }
@@ -159,10 +159,10 @@ mod tests {
         ) -> Result<(), UStatus> where T: UListener + 'static{
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic).or_default();
-            let identified_listener = TypeIdentifiedListener::new(listener);
+            let identified_listener = ListenerWrapper::new(listener);
             listeners.insert(identified_listener);
 
-            Ok(())
+            Err(UStatus::fail_with_code(UCode::OK, format!("{}", listeners.len())))
         }
 
         async fn unregister_listener<T>(
@@ -181,12 +181,11 @@ mod tests {
                 }
                 Entry::Occupied(mut e) => {
                     let occupied = e.get_mut();
-                    let identified_listener = TypeIdentifiedListener::new(listener);
+                    let identified_listener = ListenerWrapper::new(listener);
                     occupied.remove(&identified_listener);
+                    return Err(UStatus::fail_with_code(UCode::OK, format!("{}", occupied.len())));
                 }
             }
-
-            Ok(())
         }
     }
 
@@ -225,9 +224,9 @@ mod tests {
     fn test_register_and_receive() {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
-        let listener_baz = ListenerWrapper::new(ListenerBaz);
+        let listener_baz = ListenerBaz;
         let register_res = task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
-        assert_eq!(register_res, Ok(()));
+        assert_eq!(register_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
@@ -238,21 +237,21 @@ mod tests {
     fn test_register_and_unregister() {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
-        let listener_baz_for_register = ListenerWrapper::new(ListenerBaz);
+        let listener_baz_for_register = ListenerBaz;
         let register_res = task::block_on(
             up_client_foo.register_listener(uuri_1.clone(), listener_baz_for_register),
         );
-        assert_eq!(register_res, Ok(()));
+        assert_eq!(register_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
-        let listener_baz_for_unregister = ListenerWrapper::new(ListenerBaz);
+        let listener_baz_for_unregister = ListenerBaz;
         let unregister_res = task::block_on(
             up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister),
         );
-        assert_eq!(unregister_res, Ok(()));
+        assert_eq!(unregister_res, Err(UStatus::fail_with_code(UCode::OK, "0")));
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
@@ -263,26 +262,27 @@ mod tests {
     fn test_register_multiple_listeners_on_one_uuri() {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
-        let listener_baz = ListenerWrapper::new(ListenerBaz);
+        let listener_baz = ListenerBaz;
+        let listener_bar = ListenerBar;
+
         let register_res =
             task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
-        assert_eq!(register_res, Ok(()));
+        assert_eq!(register_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
 
-        let listener_bar = ListenerWrapper::new(ListenerBar);
         let register_res =
             task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_bar));
-        assert_eq!(register_res, Ok(()));
+        assert_eq!(register_res, Err(UStatus::fail_with_code(UCode::OK, "2")));
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
-        let listener_baz_for_unregister = ListenerWrapper::new(ListenerBaz);
-        let listener_bar_for_unregister = ListenerWrapper::new(ListenerBar);
+        let listener_baz_for_unregister = ListenerBaz;
+        let listener_bar_for_unregister = ListenerBar;
         let unregister_baz_res = task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister));
-        assert_eq!(unregister_baz_res, Ok(()));
+        assert_eq!(unregister_baz_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
         let unregister_bar_res = task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_bar_for_unregister));
-        assert_eq!(unregister_bar_res, Ok(()));
+        assert_eq!(unregister_bar_res, Err(UStatus::fail_with_code(UCode::OK, "0")));
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert!(check_on_receive_res.is_err());
@@ -303,23 +303,23 @@ mod tests {
     fn test_register_multiple_same_listeners_on_one_uuri() {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
-        let listener_baz_1 = ListenerWrapper::new(ListenerBaz);
+        let listener_baz_1 = ListenerBaz;
         let register_res =
             task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz_1));
-        assert_eq!(register_res, Ok(()));
+        assert_eq!(register_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
 
-        let listener_baz_2 = ListenerWrapper::new(ListenerBaz);
+        let listener_baz_2 = ListenerBaz;
         let register_res =
             task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz_2));
-        assert_eq!(register_res, Ok(()));
+        assert_eq!(register_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
-        let listener_baz_for_unregister = ListenerWrapper::new(ListenerBaz);
+        let listener_baz_for_unregister = ListenerBaz;
         let unregister_baz_res = task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister));
-        assert_eq!(unregister_baz_res, Ok(()));
+        assert_eq!(unregister_baz_res, Err(UStatus::fail_with_code(UCode::OK, "0")));
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert!(check_on_receive_res.is_err());
