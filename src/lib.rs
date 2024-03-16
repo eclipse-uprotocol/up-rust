@@ -98,6 +98,7 @@ pub use up_core_api::utwin;
 // cloudevent-proto, generated and augmented types
 #[cfg(feature = "cloudevents")]
 pub mod cloudevents;
+pub mod listener_wrapper;
 
 #[cfg(feature = "cloudevents")]
 mod proto_cloudevents {

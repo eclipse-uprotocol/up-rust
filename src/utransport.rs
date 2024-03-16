@@ -87,7 +87,8 @@ pub trait UTransport {
 
 #[cfg(test)]
 mod tests {
-    use crate::ulistener::{ListenerWrapper, UListener};
+    use crate::listener_wrapper::ListenerWrapper;
+    use crate::ulistener::UListener;
     use crate::{Number, UAuthority, UCode, UMessage, UStatus, UTransport, UUri};
     use async_std::task;
     use async_trait::async_trait;
