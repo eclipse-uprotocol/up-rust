@@ -14,6 +14,7 @@
 use crate::{UMessage, UStatus};
 use std::any::{Any, TypeId};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 /// `UListener` is the uP-L1 interface that provides a means to create listeners which are registered to `UTransport`
 ///
@@ -61,12 +62,6 @@ impl ListenerWrapper {
     }
 }
 
-impl UListener for ListenerWrapper {
-    fn on_receive(&self, received: Result<UMessage, UStatus>) {
-        self.listener.on_receive(received)
-    }
-}
-
 pub trait UListenerTypeTag {
     fn as_any(&self) -> &dyn Any;
 }
@@ -88,5 +83,13 @@ impl Eq for ListenerWrapper {}
 impl Hash for ListenerWrapper {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.type_id.hash(state);
+    }
+}
+
+impl Deref for ListenerWrapper {
+    type Target = Box<dyn UListener + 'static>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.listener
     }
 }
