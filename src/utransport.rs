@@ -66,7 +66,7 @@ pub trait UTransport {
     /// Returns an error if the listener could not be registered.
     async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: ClonableBoxUListener + 'static;
+        T: Clone + ClonableBoxUListener + 'static;
 
     /// Unregisters a listener for a given topic.
     ///
@@ -82,7 +82,7 @@ pub trait UTransport {
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: ClonableBoxUListener + 'static;
+        T: Clone + ClonableBoxUListener + 'static;
 }
 
 #[cfg(test)]
@@ -151,7 +151,7 @@ mod tests {
 
         async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
         where
-            T: ClonableBoxUListener + 'static,
+            T: Clone + ClonableBoxUListener + 'static,
         {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic).or_default();
@@ -166,7 +166,7 @@ mod tests {
 
         async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
         where
-            T: ClonableBoxUListener + 'static,
+            T: Clone + ClonableBoxUListener + 'static,
         {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic.clone());
