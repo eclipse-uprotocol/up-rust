@@ -66,7 +66,7 @@ pub trait UTransport {
     /// Returns an error if the listener could not be registered.
     async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: UListener + 'static;
+        T: Copy + UListener + 'static;
 
     /// Unregisters a listener for a given topic.
     ///
@@ -82,7 +82,7 @@ pub trait UTransport {
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
     where
-        T: UListener + 'static;
+        T: Copy + UListener + 'static;
 }
 
 #[cfg(test)]
@@ -189,7 +189,7 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Copy, Clone, Debug)]
     struct ListenerBaz;
     impl UListener for ListenerBaz {
         fn on_receive(&self, received: Result<UMessage, UStatus>) {
@@ -197,7 +197,7 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Copy, Clone, Debug)]
     struct ListenerBar;
     impl UListener for ListenerBar {
         fn on_receive(&self, received: Result<UMessage, UStatus>) {
