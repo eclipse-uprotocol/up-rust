@@ -64,11 +64,9 @@ pub trait UTransport {
     /// # Errors
     ///
     /// Returns an error if the listener could not be registered.
-    async fn register_listener<T>(
-        &self,
-        topic: UUri,
-        listener: T,
-    ) -> Result<(), UStatus> where T: UListener + 'static;
+    async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
+    where
+        T: UListener + 'static;
 
     /// Unregisters a listener for a given topic.
     ///
@@ -82,11 +80,9 @@ pub trait UTransport {
     /// # Errors
     ///
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
-    async fn unregister_listener<T>(
-        &self,
-        topic: UUri,
-        listener: T,
-    ) -> Result<(), UStatus> where T: UListener + 'static;
+    async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
+    where
+        T: UListener + 'static;
 }
 
 #[cfg(test)]
@@ -128,7 +124,7 @@ mod tests {
                         return Err(UStatus::fail_with_code(
                             UCode::NOT_FOUND,
                             format!("No listeners registered for topic: {:?}", &uuri),
-                        ))
+                        ));
                     }
 
                     for listener in occupied.iter() {
@@ -141,7 +137,6 @@ mod tests {
         }
     }
 
-
     #[async_trait]
     impl UTransport for UPClientFoo {
         async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
@@ -152,24 +147,25 @@ mod tests {
             todo!()
         }
 
-        async fn register_listener<T>(
-            &self,
-            topic: UUri,
-            listener: T,
-        ) -> Result<(), UStatus> where T: UListener + 'static{
+        async fn register_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
+        where
+            T: UListener + 'static,
+        {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic).or_default();
             let identified_listener = ListenerWrapper::new(listener);
             listeners.insert(identified_listener);
 
-            Err(UStatus::fail_with_code(UCode::OK, format!("{}", listeners.len())))
+            Err(UStatus::fail_with_code(
+                UCode::OK,
+                format!("{}", listeners.len()),
+            ))
         }
 
-        async fn unregister_listener<T>(
-            &self,
-            topic: UUri,
-            listener: T,
-        ) -> Result<(), UStatus> where T: UListener + 'static{
+        async fn unregister_listener<T>(&self, topic: UUri, listener: T) -> Result<(), UStatus>
+        where
+            T: UListener + 'static,
+        {
             let mut topics_listeners = self.listeners.lock().unwrap();
             let listeners = topics_listeners.entry(topic.clone());
             match listeners {
@@ -183,7 +179,10 @@ mod tests {
                     let occupied = e.get_mut();
                     let identified_listener = ListenerWrapper::new(listener);
                     occupied.remove(&identified_listener);
-                    return Err(UStatus::fail_with_code(UCode::OK, format!("{}", occupied.len())));
+                    return Err(UStatus::fail_with_code(
+                        UCode::OK,
+                        format!("{}", occupied.len()),
+                    ));
                 }
             }
         }
@@ -225,7 +224,8 @@ mod tests {
         let up_client_foo = UPClientFoo::new();
         let uuri_1 = uuri_factory(1);
         let listener_baz = ListenerBaz;
-        let register_res = task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
+        let register_res =
+            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz));
         assert_eq!(register_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
 
         let umessage = UMessage::default();
@@ -279,10 +279,20 @@ mod tests {
 
         let listener_baz_for_unregister = ListenerBaz;
         let listener_bar_for_unregister = ListenerBar;
-        let unregister_baz_res = task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister));
-        assert_eq!(unregister_baz_res, Err(UStatus::fail_with_code(UCode::OK, "1")));
-        let unregister_bar_res = task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_bar_for_unregister));
-        assert_eq!(unregister_bar_res, Err(UStatus::fail_with_code(UCode::OK, "0")));
+        let unregister_baz_res = task::block_on(
+            up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister),
+        );
+        assert_eq!(
+            unregister_baz_res,
+            Err(UStatus::fail_with_code(UCode::OK, "1"))
+        );
+        let unregister_bar_res = task::block_on(
+            up_client_foo.unregister_listener(uuri_1.clone(), listener_bar_for_unregister),
+        );
+        assert_eq!(
+            unregister_bar_res,
+            Err(UStatus::fail_with_code(UCode::OK, "0"))
+        );
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert!(check_on_receive_res.is_err());
@@ -318,8 +328,13 @@ mod tests {
         assert_eq!(check_on_receive_res, Ok(()));
 
         let listener_baz_for_unregister = ListenerBaz;
-        let unregister_baz_res = task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister));
-        assert_eq!(unregister_baz_res, Err(UStatus::fail_with_code(UCode::OK, "0")));
+        let unregister_baz_res = task::block_on(
+            up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_for_unregister),
+        );
+        assert_eq!(
+            unregister_baz_res,
+            Err(UStatus::fail_with_code(UCode::OK, "0"))
+        );
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert!(check_on_receive_res.is_err());

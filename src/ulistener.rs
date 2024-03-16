@@ -15,7 +15,6 @@ use crate::{UMessage, UStatus};
 use std::any::{Any, TypeId};
 use std::hash::{Hash, Hasher};
 
-
 /// `UListener` is the uP-L1 interface that provides a means to create listeners which are registered to `UTransport`
 ///
 /// Implementations of `UListener` contain the details for what should occur when a message is received
@@ -46,13 +45,13 @@ pub trait UListener: Any + Send + Sync {
 /// collections which require that, such as a `HashMap` or `HashSet`
 pub struct ListenerWrapper {
     listener: Box<dyn UListener + 'static>,
-    type_id: TypeId
+    type_id: TypeId,
 }
 
 impl ListenerWrapper {
     pub fn new<T>(listener: T) -> Self
-        where
-            T: UListener + 'static,
+    where
+        T: UListener + 'static,
     {
         let any_listener = Box::new(listener) as Box<dyn UListener + 'static>;
         Self {
