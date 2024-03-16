@@ -49,3 +49,9 @@ impl CloneBoxUListener for Box<dyn ClonableBoxUListener> {
 pub trait ClonableBoxUListener: UListener + CloneBoxUListener {}
 
 impl<T> ClonableBoxUListener for T where T: UListener + Clone + Send + Sync {}
+
+impl Clone for Box<dyn ClonableBoxUListener> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
