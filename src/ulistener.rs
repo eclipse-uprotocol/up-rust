@@ -12,40 +12,16 @@
  ********************************************************************************/
 
 use crate::{UMessage, UStatus};
-use std::any::Any;
-use std::fmt::Debug;
+use std::any::{Any, TypeId};
 use std::hash::{Hash, Hasher};
+
 
 /// `UListener` is the uP-L1 interface that provides a means to create listeners which are registered to `UTransport`
 ///
 /// Implementations of `UListener` contain the details for what should occur when a message is received
 /// For more information, please refer to
 /// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
-pub trait UListener: Debug + Any + Send + Sync {
-    /// This function is necessary to disambiguate concrete implementations of UListener
-    /// Arises from limitations surrounding Rust's type system
-    ///
-    /// Each concrete implementation will implement this function in the same way:
-    /// ```
-    /// use std::any::Any;
-    /// use up_rust::ulistener::UListener;
-    /// use up_rust::{UMessage, UStatus};
-    ///
-    /// #[derive(Debug)]
-    /// struct ListenerFoo;
-    /// impl UListener for ListenerFoo {
-    ///     fn as_any(&self) -> &dyn Any {
-    ///         self
-    ///     }
-    ///
-    ///     fn on_receive(&self, received: Result<UMessage, UStatus>) {
-    ///         todo!()
-    ///     }
-    ///
-    /// }
-    /// ```
-    fn as_any(&self) -> &dyn Any;
-
+pub trait UListener: Any + Send + Sync {
     /// Performs some action on receipt
     ///
     /// # Arguments
@@ -54,16 +30,71 @@ pub trait UListener: Debug + Any + Send + Sync {
     fn on_receive(&self, received: Result<UMessage, UStatus>);
 }
 
-impl Hash for dyn UListener {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_any().type_id().hash(state);
+
+pub trait UListenerTypeTag {
+    fn as_any(&self) -> &dyn Any;
+}
+
+pub struct ListenerWrapper<T: UListener + 'static> {
+    listener: T,
+}
+
+impl<T: UListener + 'static> ListenerWrapper<T> {
+    pub fn new(listener: T) -> Self {
+        ListenerWrapper { listener }
     }
 }
 
-impl PartialEq for dyn UListener {
+impl<T: UListener + 'static> UListener for ListenerWrapper<T> {
+    fn on_receive(&self, received: Result<UMessage, UStatus>) {
+        self.listener.on_receive(received)
+    }
+}
+
+impl<T: UListener + 'static> UListenerTypeTag for ListenerWrapper<T> {
+    fn as_any(&self) -> &dyn Any {
+        &self.listener
+    }
+}
+
+pub trait AnyListener: Send + Sync {
+    fn on_receive(&self, received: Result<UMessage, UStatus>);
+}
+
+impl<T: UListener + 'static> AnyListener for ListenerWrapper<T> {
+    fn on_receive(&self, received: Result<UMessage, UStatus>) {
+        self.listener.on_receive(received);
+    }
+}
+
+pub struct TypeIdentifiedListener {
+    pub listener: Box<dyn AnyListener>,
+    type_id: TypeId,
+}
+
+impl TypeIdentifiedListener {
+    pub fn new<T>(listener: T) -> Self
+        where
+            T: UListener + 'static,
+    {
+        let any_listener = Box::new(ListenerWrapper::new(listener)) as Box<dyn AnyListener>;
+        TypeIdentifiedListener {
+            listener: any_listener,
+            type_id: TypeId::of::<T>(),
+        }
+    }
+}
+
+impl PartialEq for TypeIdentifiedListener {
     fn eq(&self, other: &Self) -> bool {
-        Any::type_id(self) == Any::type_id(other)
+        self.type_id == other.type_id
     }
 }
 
-impl Eq for dyn UListener {}
+impl Eq for TypeIdentifiedListener {}
+
+impl Hash for TypeIdentifiedListener {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.type_id.hash(state);
+    }
+}
