@@ -818,7 +818,7 @@ mod tests {
 
         let builder = cloudevents::EventBuilderV10::new()
             .id("id")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .source("/body.accss//door.front_left#Door")
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -966,7 +966,7 @@ mod tests {
 
         let builder = cloudevents::EventBuilderV10::new()
             .id("someid")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .source("/body.accss//door.front_left#Door")
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -989,7 +989,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             // The url crate does not accept URLs without a base
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
@@ -1012,7 +1012,7 @@ mod tests {
     fn test_extract_payload_from_cloud_event_when_payload_is_bad_proto_object() {
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             // The url crate does not accept URLs without a base
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
@@ -1040,7 +1040,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1060,7 +1060,7 @@ mod tests {
 
         let cloud_event = cloudevents::EventBuilderV10::new()
             .id("someId")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1080,7 +1080,7 @@ mod tests {
         // Creating a protobuf CloudEvent message
         let source_event = cloudevents::EventBuilderV10::new()
             .id("hello")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .source(Url::parse("up://VCU.MY_CAR_VIN/someService").unwrap())
             .ty("example.demo")
             .data(
@@ -1096,7 +1096,7 @@ mod tests {
         // Creating the CloudEvent
         let cloud_event = EventBuilderV10::new()
             .id("someId")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .source(Url::parse("up:/body.access/1/door.front_left#Door").unwrap())
             .data_with_schema(
                 UCloudEventBuilder::PROTOBUF_CONTENT_TYPE,
@@ -1211,7 +1211,7 @@ mod tests {
             payload.type_url.as_str(),
             &attributes,
         );
-        event.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+        event.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
     }
 
     fn pack_event_into_any(event: &Event) -> Any {
@@ -1244,7 +1244,7 @@ mod tests {
         EventBuilderV10::new()
             .id("hello")
             .source("//VCU.MY_CAR_VIN/body.access//door.front_left#Door")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",
