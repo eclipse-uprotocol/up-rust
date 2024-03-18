@@ -46,7 +46,7 @@ pub trait UAttributesValidator {
             Ok(mt) if mt == expected_type => Ok(()),
             Ok(mt) => Err(UAttributesError::validation_error(format!(
                 "Wrong Message Type [{}]",
-                mt.to_type_string()
+                mt.to_cloudevent_type()
             ))),
             Err(unknown_code) => Err(UAttributesError::validation_error(format!(
                 "Unknown Message Type code [{}]",

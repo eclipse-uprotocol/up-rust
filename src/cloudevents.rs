@@ -103,7 +103,10 @@ impl TryFrom<UMessage> for cloudevents::Event {
 
         let event_builder = cloudevents::EventBuilderV10::new()
             .id(attributes.id.get_or_default())
-            .ty(attributes.type_.enum_value_or_default().to_type_string())
+            .ty(attributes
+                .type_
+                .enum_value_or_default()
+                .to_cloudevent_type())
             .source(uri);
         let mut event = event_builder
             .build()
@@ -420,7 +423,7 @@ mod tests {
         let event = EventBuilderV10::new()
             .id(uuid.to_hyphenated_string())
             .source(String::try_from(&uri).unwrap())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .data("application/x-protobuf", Any::default().value)
             .build()
             .unwrap();
@@ -446,7 +449,7 @@ mod tests {
             id: uuid.to_hyphenated_string(),
             source: String::try_from(&uri).unwrap(),
             type_: UMessageType::UMESSAGE_TYPE_PUBLISH
-                .to_type_string()
+                .to_cloudevent_type()
                 .to_string(),
             attributes: attr_list,
             data: Some(ProtoCloudEventData::BinaryData(Any::default().value)),

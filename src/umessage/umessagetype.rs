@@ -11,110 +11,90 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use protobuf::Enum;
+use protobuf::EnumFull;
 
+use crate::uattributes::UAttributesError;
 pub use crate::up_core_api::uattributes::UMessageType;
-
-const MESSAGE_TYPE_PUBLISH: &str = "pub.v1";
-const MESSAGE_TYPE_REQUEST: &str = "req.v1";
-const MESSAGE_TYPE_RESPONSE: &str = "res.v1";
-const MESSAGE_TYPE_UNSPECIFIED: &str = "unspec.v1";
+use crate::up_core_api::uprotocol_options::exts::ce_name;
 
 impl UMessageType {
-    /// Gets this message type's integer code as a [`String`].
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UMessageType;
-    ///
-    /// assert_eq!(UMessageType::UMESSAGE_TYPE_PUBLISH.to_i32_string(), "1");
-    /// ```
-    pub fn to_i32_string(&self) -> String {
-        self.value().to_string()
-    }
-
-    /// Gets the message type for an integer encoded as a string.
+    /// Gets this message type's CloudEvent type name.
     ///
     /// # Returns
     ///
-    /// [`UMessageType::UMESSAGE_TYPE_UNSPECIFIED`] if the string cannot be parsed
-    /// into an [`i32`] or the integer does not match any of the supported message types.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UMessageType;
-    ///
-    /// let message_type = UMessageType::from_i32_string("1");
-    /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_PUBLISH);
-    ///
-    /// let message_type = UMessageType::from_i32_string("16");
-    /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_UNSPECIFIED);
-    ///
-    /// let message_type = UMessageType::from_i32_string("foo.bar");
-    /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_UNSPECIFIED);
-    /// ```
-    pub fn from_i32_string<S: Into<String>>(value: S) -> Self {
-        if let Ok(code) = value.into().parse::<i32>() {
-            UMessageType::from_i32(code).unwrap_or(UMessageType::UMESSAGE_TYPE_UNSPECIFIED)
-        } else {
-            UMessageType::UMESSAGE_TYPE_UNSPECIFIED
-        }
+    /// The value to use for the *type* property when mapping to a CloudEvent.
+    pub fn to_cloudevent_type(&self) -> String {
+        let desc = self.descriptor();
+        let desc_proto = desc.proto();
+        ce_name
+            .get(desc_proto.options.get_or_default())
+            .unwrap_or_default()
     }
 
-    /// Gets this message type's string identifier.
+    /// Gets the message type for a CloudEvent type name.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// A stable identifier which can be used to encode a message type and decode it
-    /// again using [`UMessageType::from_type_string`].
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UMessageType;
-    ///
-    /// let identifier = UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string();
-    /// assert_eq!(identifier, "pub.v1");
-    ///
-    /// let message_type = UMessageType::from_type_string(identifier);
-    /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_PUBLISH);
-    /// ```
-    pub fn to_type_string(&self) -> &'static str {
-        match self {
-            UMessageType::UMESSAGE_TYPE_PUBLISH => MESSAGE_TYPE_PUBLISH,
-            UMessageType::UMESSAGE_TYPE_REQUEST => MESSAGE_TYPE_REQUEST,
-            UMessageType::UMESSAGE_TYPE_RESPONSE => MESSAGE_TYPE_RESPONSE,
-            UMessageType::UMESSAGE_TYPE_UNSPECIFIED => MESSAGE_TYPE_UNSPECIFIED,
-        }
-    }
-
-    /// Gets the message type for a string identifier.
-    ///
-    /// # Returns
-    ///
-    /// [`UMessageType::UMESSAGE_TYPE_UNSPECIFIED`] if the identifier does not match
+    /// Returns a [`UAttributesError::ParsingError`] if the given name does not match
     /// any of the supported message types.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UMessageType;
-    ///
-    /// let message_type = UMessageType::from_type_string("pub.v1");
-    /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_PUBLISH);
-    ///
-    /// let message_type = UMessageType::from_type_string("foo.bar");
-    /// assert_eq!(message_type, UMessageType::UMESSAGE_TYPE_UNSPECIFIED);
-    /// ```
-    pub fn from_type_string<S: Into<String>>(value: S) -> Self {
+    pub fn try_from_cloudevent_type<S: Into<String>>(value: S) -> Result<Self, UAttributesError> {
         let type_string = value.into();
-        match type_string.as_str() {
-            MESSAGE_TYPE_PUBLISH => UMessageType::UMESSAGE_TYPE_PUBLISH,
-            MESSAGE_TYPE_REQUEST => UMessageType::UMESSAGE_TYPE_REQUEST,
-            MESSAGE_TYPE_RESPONSE => UMessageType::UMESSAGE_TYPE_RESPONSE,
-            _ => UMessageType::UMESSAGE_TYPE_UNSPECIFIED,
+
+        Self::enum_descriptor()
+            .values()
+            .find_map(|desc| {
+                let proto_desc = desc.proto();
+
+                ce_name
+                    .get(proto_desc.options.get_or_default())
+                    .and_then(|prio_option_value| {
+                        if prio_option_value.eq(type_string.as_str()) {
+                            desc.cast::<Self>()
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .ok_or_else(|| {
+                UAttributesError::parsing_error(format!("unknown message type: {}", type_string))
+            })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use test_case::test_case;
+
+    use crate::{UAttributesError, UMessageType};
+
+    const PUBLISH_TYPE: &str = "pub.v1";
+    const REQUEST_TYPE: &str = "req.v1";
+    const RESPONSE_TYPE: &str = "res.v1";
+
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, PUBLISH_TYPE; "for PUBLISH")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, REQUEST_TYPE; "for REQUEST")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, RESPONSE_TYPE; "for RESPONSE")]
+    fn test_to_cloudevent_type(message_type: UMessageType, expected_ce_name: &str) {
+        assert_eq!(message_type.to_cloudevent_type(), expected_ce_name);
+    }
+
+    #[test_case(PUBLISH_TYPE, Some(UMessageType::UMESSAGE_TYPE_PUBLISH); "succeeds for PUBLISH")]
+    #[test_case(REQUEST_TYPE, Some(UMessageType::UMESSAGE_TYPE_REQUEST); "succeeds for REQUEST")]
+    #[test_case(RESPONSE_TYPE, Some(UMessageType::UMESSAGE_TYPE_RESPONSE); "succeeds for RESPONSE")]
+    #[test_case("foo.bar", None; "fails for unknown type")]
+    fn test_try_from_cloudevent_type(
+        cloudevent_type: &str,
+        expected_message_type: Option<UMessageType>,
+    ) {
+        let result = UMessageType::try_from_cloudevent_type(cloudevent_type);
+        assert!(result.is_ok() == expected_message_type.is_some());
+        if expected_message_type.is_some() {
+            assert_eq!(result.unwrap(), expected_message_type.unwrap())
+        } else {
+            assert!(matches!(
+                result.unwrap_err(),
+                UAttributesError::ParsingError(_msg)
+            ))
         }
     }
 }

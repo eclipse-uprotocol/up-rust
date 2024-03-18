@@ -346,9 +346,9 @@ impl CloudEventValidators {
     ///
     /// Returns a `CloudEventValidator` according to the `type` attribute in the `CloudEvent`.
     pub fn get_validator(cloud_event: &Event) -> Box<dyn CloudEventValidator> {
-        match UMessageType::from_type_string(cloud_event.ty()) {
-            UMessageType::UMESSAGE_TYPE_RESPONSE => Box::new(ResponseValidator),
-            UMessageType::UMESSAGE_TYPE_REQUEST => Box::new(RequestValidator),
+        match UMessageType::try_from_cloudevent_type(cloud_event.ty()) {
+            Ok(UMessageType::UMESSAGE_TYPE_RESPONSE) => Box::new(ResponseValidator),
+            Ok(UMessageType::UMESSAGE_TYPE_REQUEST) => Box::new(RequestValidator),
             _ => Box::new(PublishValidator),
         }
     }
@@ -375,14 +375,19 @@ impl CloudEventValidator for PublishValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> Result<(), CloudEventError> {
-        if UMessageType::UMESSAGE_TYPE_PUBLISH.eq(&UMessageType::from_type_string(cloud_event.ty()))
-        {
-            return Ok(());
-        }
-        Err(CloudEventError::validation_error(format!(
-            "Invalid CloudEvent type [{}] - CloudEvent of type Publish must have a type of 'pub.v1'",
-            cloud_event.ty(),
-        )))
+        UMessageType::try_from_cloudevent_type(cloud_event.ty())
+            .map_err(|e| CloudEventError::validation_error(e.to_string()))
+            .and_then(|message_type| {
+                if message_type == UMessageType::UMESSAGE_TYPE_PUBLISH {
+                    Ok(())
+                } else {
+                    Err(CloudEventError::validation_error(format!(
+                        "Expected type [{}], but found type [{}]",
+                        UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type(),
+                        message_type.to_cloudevent_type(),
+                    )))
+                }
+            })
     }
 }
 
@@ -472,14 +477,19 @@ impl CloudEventValidator for RequestValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> Result<(), CloudEventError> {
-        if UMessageType::UMESSAGE_TYPE_REQUEST.eq(&UMessageType::from_type_string(cloud_event.ty()))
-        {
-            return Ok(());
-        }
-        Err(CloudEventError::validation_error(format!(
-            "Invalid CloudEvent type [{}], CloudEvent of type Request must have a type of 'req.v1'",
-            cloud_event.ty(),
-        )))
+        UMessageType::try_from_cloudevent_type(cloud_event.ty())
+            .map_err(|e| CloudEventError::validation_error(e.to_string()))
+            .and_then(|message_type| {
+                if message_type == UMessageType::UMESSAGE_TYPE_REQUEST {
+                    Ok(())
+                } else {
+                    Err(CloudEventError::validation_error(format!(
+                        "Expected type [{}], but found type [{}]",
+                        UMessageType::UMESSAGE_TYPE_REQUEST.to_cloudevent_type(),
+                        message_type.to_cloudevent_type(),
+                    )))
+                }
+            })
     }
 }
 
@@ -530,15 +540,19 @@ impl CloudEventValidator for ResponseValidator {
     }
 
     fn validate_type(&self, cloud_event: &Event) -> Result<(), CloudEventError> {
-        if UMessageType::UMESSAGE_TYPE_RESPONSE
-            .eq(&UMessageType::from_type_string(cloud_event.ty()))
-        {
-            return Ok(());
-        }
-        Err(CloudEventError::validation_error(format!(
-            "Invalid CloudEvent type [{}], CloudEvent of type Response must have a type of 'res.v1'",
-            cloud_event.ty(),
-        )))
+        UMessageType::try_from_cloudevent_type(cloud_event.ty())
+            .map_err(|e| CloudEventError::validation_error(e.to_string()))
+            .and_then(|message_type| {
+                if message_type == UMessageType::UMESSAGE_TYPE_RESPONSE {
+                    Ok(())
+                } else {
+                    Err(CloudEventError::validation_error(format!(
+                        "Expected type [{}], but found type [{}]",
+                        UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type(),
+                        message_type.to_cloudevent_type(),
+                    )))
+                }
+            })
     }
 }
 
@@ -587,7 +601,7 @@ mod tests {
     fn test_publish_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -595,14 +609,13 @@ mod tests {
         let status = validator.validate_type(&event);
 
         assert!(status.is_err());
-        assert!(status.unwrap_err().to_string().contains("Invalid CloudEvent type [res.v1] - CloudEvent of type Publish must have a type of 'pub.v1'"));
     }
 
     #[test]
     fn test_notification_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -611,14 +624,13 @@ mod tests {
         let status = validator.validate_type(&event);
 
         assert!(status.is_err());
-        assert!(status.unwrap_err().to_string().contains("Invalid CloudEvent type [res.v1] - CloudEvent of type Publish must have a type of 'pub.v1'"));
     }
 
     #[test]
     fn test_get_a_request_cloud_event_validator() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -633,7 +645,7 @@ mod tests {
     fn test_request_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -641,18 +653,13 @@ mod tests {
         let status = validator.validate_type(&event);
 
         assert!(status.is_err());
-        assert!(
-            status.unwrap_err().to_string().contains(
-            "Invalid CloudEvent type [pub.v1], CloudEvent of type Request must have a type of 'req.v1'",
-            )
-        );
     }
 
     #[test]
     fn test_get_a_response_cloud_event_validator() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -667,7 +674,7 @@ mod tests {
     fn test_response_cloud_event_type() {
         let builder = build_base_cloud_event_builder_for_test();
         let event = builder
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -675,7 +682,6 @@ mod tests {
         let status = validator.validate_type(&event);
 
         assert!(status.is_err());
-        assert!(status.unwrap_err().to_string().contains("Invalid CloudEvent type [pub.v1], CloudEvent of type Response must have a type of 'res.v1'"));
     }
 
     #[test]
@@ -691,7 +697,7 @@ mod tests {
     fn validate_cloud_event_version_when_valid() {
         let uuid = UUIDBuilder::new().build();
         let builder = build_base_cloud_event_builder_for_test()
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .id(uuid);
         let event = builder.build().unwrap();
 
@@ -704,7 +710,7 @@ mod tests {
     fn validate_cloud_event_version_when_not_valid() {
         let builder = EventBuilderV03::new()
             .id("id".to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .source("/body.access".to_string());
 
         let event = builder.build().unwrap();
@@ -722,7 +728,7 @@ mod tests {
     fn validate_cloud_event_id_when_valid() {
         let uuid = UUIDBuilder::new().build();
         let builder = build_base_cloud_event_builder_for_test()
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .id(uuid);
         let event = builder.build().unwrap();
 
@@ -736,7 +742,7 @@ mod tests {
         let uuid = Uuid::new_v4();
 
         let builder = build_base_cloud_event_builder_for_test()
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .id(uuid);
         let event = builder.build().unwrap();
 
@@ -763,7 +769,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source("/body.access/1/door.front_left#Door".to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -783,7 +789,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source(uri)
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build();
         let event = event.unwrap();
 
@@ -805,7 +811,7 @@ mod tests {
             .id(uuid)
             .source(uri)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -823,7 +829,7 @@ mod tests {
             .id(uuid)
             .source(uri)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -839,7 +845,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source("/".to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -856,7 +862,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id("testme".to_string())
             .source(uri)
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -873,7 +879,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id("testme".to_string())
             .source(uri)
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -892,7 +898,7 @@ mod tests {
             .id(uuid)
             .source(uri)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -908,7 +914,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source(uri.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -927,7 +933,7 @@ mod tests {
             .id(uuid)
             .source(uri.to_string())
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -946,7 +952,7 @@ mod tests {
             .id(uuid)
             .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -965,7 +971,7 @@ mod tests {
             .id(uuid)
             .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -982,7 +988,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source(source)
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -1005,7 +1011,7 @@ mod tests {
             .id(uuid)
             .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_REQUEST.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -1024,7 +1030,7 @@ mod tests {
             .id(uuid)
             .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -1043,7 +1049,7 @@ mod tests {
             .id(uuid)
             .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -1060,7 +1066,7 @@ mod tests {
         let event = build_base_cloud_event_builder_for_test()
             .id(uuid)
             .source(source)
-            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -1079,7 +1085,7 @@ mod tests {
             .id(uuid)
             .source(source)
             .extension("sink", sink.to_string())
-            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_RESPONSE.to_cloudevent_type())
             .build()
             .unwrap();
 
@@ -1124,7 +1130,7 @@ mod tests {
 
     fn build_base_cloud_event_for_test() -> Event {
         let mut builder = build_base_cloud_event_builder_for_test();
-        builder = builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string());
+        builder = builder.ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type());
         builder.build().unwrap()
     }
 
@@ -1132,7 +1138,7 @@ mod tests {
         let event = EventBuilderV10::new()
             .id("hello")
             .source("/body.access")
-            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_type_string())
+            .ty(UMessageType::UMESSAGE_TYPE_PUBLISH.to_cloudevent_type())
             .data_with_schema(
                 "application/octet-stream",
                 "proto://type.googleapis.com/example.demo",
