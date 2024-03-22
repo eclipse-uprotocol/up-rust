@@ -390,7 +390,6 @@ impl UAttributesValidator for RequestValidator {
             Err(UAttributesError::validation_error("Attributes for a request message must contain a method-to-invoke in the sink property"))
         }
     }
-
 }
 
 /// Validate `UAttributes` with type `UMessageType::Response`
