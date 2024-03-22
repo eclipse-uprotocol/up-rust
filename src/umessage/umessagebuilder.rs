@@ -12,12 +12,12 @@
  ********************************************************************************/
 
 use bytes::Bytes;
-use protobuf::{Enum, Message};
+use protobuf::{Enum, EnumOrUnknown, Message};
 
 use crate::uattributes::UAttributesError;
 use crate::{
     Data, PublishValidator, RequestValidator, ResponseValidator, UAttributes, UAttributesValidator,
-    UMessage, UMessageType, UPayload, UPayloadFormat, UPriority, UUri, UUID,
+    UCode, UMessage, UMessageType, UPayload, UPayloadFormat, UPriority, UUri, UUID,
 };
 
 #[derive(Debug)]
@@ -65,10 +65,10 @@ pub struct UMessageBuilder {
     source: Option<UUri>,
     sink: Option<UUri>,
     priority: UPriority,
-    ttl: Option<i32>,
+    ttl: Option<u32>,
     token: Option<String>,
-    permission_level: Option<i32>,
-    comm_status: Option<i32>,
+    permission_level: Option<u32>,
+    comm_status: Option<EnumOrUnknown<UCode>>,
     request_id: Option<UUID>,
     payload: Option<Bytes>,
     payload_format: UPayloadFormat,
@@ -208,7 +208,7 @@ impl UMessageBuilder {
             message_type: UMessageType::UMESSAGE_TYPE_REQUEST,
             source: Some(reply_to_address),
             sink: Some(method_to_invoke),
-            ttl: Some(i32::try_from(ttl).unwrap_or(i32::MAX)),
+            ttl: Some(ttl),
             priority: UPriority::UPRIORITY_CS4,
             ..Default::default()
         }
@@ -439,7 +439,7 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn with_ttl(&mut self, ttl: u32) -> &mut UMessageBuilder {
-        self.ttl = Some(i32::try_from(ttl).unwrap_or(i32::MAX));
+        self.ttl = Some(ttl);
         self
     }
 
@@ -515,10 +515,7 @@ impl UMessageBuilder {
     /// ```
     pub fn with_permission_level(&mut self, level: u32) -> &mut UMessageBuilder {
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST);
-        self.permission_level =
-            // this will not be needed anymore once up-core-api 1.5.7 is released and
-            // permission_level is defined as a uint32
-            Some(i32::try_from(level).expect("permission level must not exceed i32::MAX"));
+        self.permission_level = Some(level);
         self
     }
 
@@ -539,7 +536,7 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use protobuf::Enum;
+    /// use protobuf::{Enum, EnumOrUnknown};
     /// use up_rust::{UCode, UMessageBuilder, UPriority, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -551,13 +548,13 @@ impl UMessageBuilder {
     ///                     .with_message_id(uuid_builder.build())
     ///                     .with_comm_status(status)
     ///                     .build()?;
-    /// assert_eq!(message.attributes.commstatus, Some(status));
+    /// assert_eq!(message.attributes.commstatus, Some(EnumOrUnknown::from_i32(status)));
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_comm_status(&mut self, comm_status: i32) -> &mut UMessageBuilder {
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE);
-        self.comm_status = Some(comm_status);
+        self.comm_status = Some(EnumOrUnknown::from_i32(comm_status));
         self
     }
 
@@ -798,7 +795,6 @@ mod tests {
     }
 
     #[test_case(Some(5), None; "for comm status")]
-    #[test_case(None, Some(i32::MAX as u32 + 1); "for non i32 permission level value")]
     #[should_panic]
     fn test_request_message_builder_panics(comm_status: Option<i32>, perm_level: Option<u32>) {
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
@@ -812,18 +808,6 @@ mod tests {
         } else if let Some(level) = perm_level {
             builder.with_permission_level(level);
         }
-    }
-
-    #[test]
-    fn test_with_ttl_caps_value() {
-        let uuid_builder = UUIDBuilder::new();
-        let topic = UUri::try_from(TOPIC).expect("should have been able to create UUri");
-        let message = UMessageBuilder::publish(topic)
-            .with_message_id(uuid_builder.build())
-            .with_ttl(i32::MAX as u32 + 10)
-            .build_with_payload("locked".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
-            .expect("should have been able to create message");
-        assert_eq!(message.attributes.ttl, Some(i32::MAX));
     }
 
     #[test]
@@ -921,7 +905,7 @@ mod tests {
         assert_eq!(message.attributes.id, Some(response_message_id).into());
         assert_eq!(
             message.attributes.commstatus,
-            Some(UCode::DEADLINE_EXCEEDED.value())
+            Some(EnumOrUnknown::from(UCode::DEADLINE_EXCEEDED))
         );
         assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS5.into());
         assert_eq!(message.attributes.reqid, Some(request_message_id).into());
@@ -957,7 +941,7 @@ mod tests {
         assert_eq!(message.attributes.id, Some(message_id).into());
         assert_eq!(
             message.attributes.commstatus,
-            Some(UCode::DEADLINE_EXCEEDED.value())
+            Some(EnumOrUnknown::from(UCode::DEADLINE_EXCEEDED))
         );
         assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS5.into());
         assert_eq!(message.attributes.reqid, Some(request_id).into());

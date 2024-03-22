@@ -45,18 +45,16 @@
 
 // up_core_api types used and augmented by up_rust - symbols re-exported to toplevel, errors are module-specific
 mod rpc;
-pub use rpc::{CallOptions, CallOptionsBuilder};
 pub use rpc::{RpcClient, RpcClientResult};
 pub use rpc::{RpcMapper, RpcMapperError};
 pub use rpc::{RpcPayload, RpcPayloadResult, RpcResult};
-pub use rpc::{RpcServer, RpcServerListener};
 
 mod uattributes;
+pub use uattributes::{CallOptions, UAttributes, UAttributesError, UMessageType, UPriority};
 pub use uattributes::{
     PublishValidator, RequestValidator, ResponseValidator, UAttributesValidator,
     UAttributesValidators,
 };
-pub use uattributes::{UAttributes, UAttributesError, UMessageType, UPriority};
 
 mod umessage;
 pub use umessage::{UMessage, UMessageBuilder, UMessageBuilderError};

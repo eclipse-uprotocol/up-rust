@@ -15,7 +15,7 @@ use std::time::SystemTime;
 
 use protobuf::Enum;
 
-use crate::{UAttributes, UCode, UMessageType, UPriority, UriValidator, UUID};
+use crate::{UAttributes, UMessageType, UPriority, UriValidator, UUID};
 
 use crate::UAttributesError;
 
@@ -86,11 +86,7 @@ pub trait UAttributesValidator {
     /// * the current system time cannot be determined.
     fn is_expired(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let ttl = match attributes.ttl {
-            Some(t) if t > 0 => {
-                // this will not be needed anymore once up-core-api 1.5.7 is released and
-                // ttl is defined as a uint32
-                u64::try_from(t).expect("should have been able to convert positive i32 to u64")
-            }
+            Some(t) if t > 0 => u64::from(t),
             _ => return Ok(()),
         };
 
@@ -105,26 +101,11 @@ pub trait UAttributesValidator {
                 }
                 Err(e) => return Err(UAttributesError::validation_error(e.to_string())),
             };
-
             if delta >= ttl {
                 return Err(UAttributesError::validation_error("Payload is expired"));
             }
         }
         Ok(())
-    }
-
-    /// Verifies that the message has a valid time-to-live.
-    ///
-    /// # Errors
-    ///
-    /// This default implementation returns an error if [`UAttributes::ttl`] (time-to-live) contains a value less than 0.
-    fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        match attributes.ttl {
-            Some(t) if t < 0 => Err(UAttributesError::validation_error(format!(
-                "TTL must not be negative [{t}]"
-            ))),
-            _ => Ok(()),
-        }
     }
 
     /// Verifies that a set of attributes contains a valid source URI.
@@ -295,14 +276,12 @@ impl UAttributesValidator for PublishValidator {
     ///
     /// * [`UAttributesValidator::validate_type`]
     /// * [`UAttributesValidator::validate_id`]
-    /// * [`UAttributesValidator::validate_ttl`]
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
             self.validate_type(attributes),
             self.validate_id(attributes),
-            self.validate_ttl(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
         ]
@@ -324,25 +303,21 @@ impl UAttributesValidator for PublishValidator {
 pub struct RequestValidator;
 
 impl RequestValidator {
-    /// Verifies that a set of attributes contains a valid permission level.
+    /// Verifies that a set of attributes representing an RPC request contain a valid time-to-live.
     ///
     /// # Errors
     ///
-    /// If [`UAttributes::permission_level`] contains a value that is less than 0, an error is returned.
-    pub fn validate_permission_level(
-        &self,
-        attributes: &UAttributes,
-    ) -> Result<(), UAttributesError> {
-        // this check will be obsolete once up-core-api 1.5.7 is released and
-        // permission level is defined as a uint32
-        if let Some(plevel) = attributes.permission_level {
-            if plevel < 0 {
-                return Err(UAttributesError::validation_error(format!(
-                    "Permission Level must not be negative [{plevel}]"
-                )));
-            }
+    /// Returns an error if [`UAttributes::ttl`] (time-to-live) is empty or contains a value less than 1.
+    pub fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        match attributes.ttl {
+            Some(ttl) if ttl > 0 => Ok(()),
+            Some(invalid_ttl) => Err(UAttributesError::validation_error(format!(
+                "RPC request message's TTL must be a positive integer [{invalid_ttl}]"
+            ))),
+            None => Err(UAttributesError::validation_error(
+                "RPC request message must contain a TTL",
+            )),
         }
-        Ok(())
     }
 }
 
@@ -360,10 +335,9 @@ impl UAttributesValidator for RequestValidator {
     ///
     /// * [`UAttributesValidator::validate_type`]
     /// * [`UAttributesValidator::validate_id`]
-    /// * [`UAttributesValidator::validate_ttl`]
+    /// * [`RequestValidator::validate_ttl`]
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
-    /// * [`RequestValidator::validate_permission_level`]
     /// * `validate_rpc_priority`
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
@@ -372,7 +346,6 @@ impl UAttributesValidator for RequestValidator {
             self.validate_ttl(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
-            self.validate_permission_level(attributes),
             validate_rpc_priority(attributes),
         ]
         .into_iter()
@@ -418,22 +391,6 @@ impl UAttributesValidator for RequestValidator {
         }
     }
 
-    /// Verifies that a set of attributes representing an RPC request contain a valid time-to-live.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if [`UAttributes::ttl`] (time-to-live) is empty or contains a value less than 1.
-    fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        match attributes.ttl {
-            Some(ttl) if ttl > 0 => Ok(()),
-            Some(invalid_ttl) => Err(UAttributesError::validation_error(format!(
-                "RPC request message's TTL must be a positive integer [{invalid_ttl}]"
-            ))),
-            None => Err(UAttributesError::validation_error(
-                "RPC request message must contain a TTL",
-            )),
-        }
-    }
 }
 
 /// Validate `UAttributes` with type `UMessageType::Response`
@@ -464,19 +421,21 @@ impl ResponseValidator {
     ///
     /// # Errors
     ///
-    /// Returns an error if [`UAttributes::commstatus`] does not contain a value that is a [`UCode`].
+    /// Returns an error if [`UAttributes::commstatus`] does not contain a value that is a `UCode`.
     pub fn validate_commstatus(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(status) = attributes.commstatus {
-            if UCode::from_i32(status).is_some() {
-                Ok(())
-            } else {
-                Err(UAttributesError::validation_error(format!(
-                    "Invalid Communication Status code [{status}]"
-                )))
+            match status.enum_value() {
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(e) => {
+                    return Err(UAttributesError::validation_error(format!(
+                        "Invalid Communication Status code: {e}"
+                    )));
+                }
             }
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 }
 
@@ -494,7 +453,6 @@ impl UAttributesValidator for ResponseValidator {
     ///
     /// * [`UAttributesValidator::validate_type`]
     /// * [`UAttributesValidator::validate_id`]
-    /// * [`UAttributesValidator::validate_ttl`]
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
     /// * [`ResponseValidator::validate_reqid`]
@@ -504,7 +462,6 @@ impl UAttributesValidator for ResponseValidator {
         let error_message = vec![
             self.validate_type(attributes),
             self.validate_id(attributes),
-            self.validate_ttl(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
             self.validate_reqid(attributes),
@@ -564,7 +521,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        UAuthority, UEntity, UPriority, UResource, UResourceBuilder, UUIDBuilder, UUri, UUID,
+        UAuthority, UCode, UEntity, UPriority, UResource, UResourceBuilder, UUIDBuilder, UUri, UUID,
     };
 
     #[test]
@@ -624,7 +581,7 @@ mod tests {
     fn test_is_expired(
         message_type: UMessageType,
         id: Option<UUID>,
-        ttl: Option<i32>,
+        ttl: Option<u32>,
         should_be_expired: bool,
     ) {
         let attributes = UAttributes {
@@ -658,12 +615,11 @@ mod tests {
         None,
         false;
         "fails for invalid message id")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, Some(-1), false; "fails for ttl < 0")]
     fn test_validate_attributes_for_publish_message(
         id: Option<UUID>,
         source: Option<UUri>,
         sink: Option<UUri>,
-        ttl: Option<i32>,
+        ttl: Option<u32>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
@@ -717,14 +673,13 @@ mod tests {
     #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing ttl")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), Some(UPriority::UPRIORITY_CS4), None, false; "fails for ttl < 1")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for valid permission level")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(method_to_invoke()), Some(reply_to_address()), Some(-1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid permission level")]
     #[allow(clippy::too_many_arguments)]
     fn test_validate_attributes_for_rpc_request_message(
         id: Option<UUID>,
         method_to_invoke: Option<UUri>,
         reply_to_address: Option<UUri>,
-        perm_level: Option<i32>,
-        ttl: Option<i32>,
+        perm_level: Option<u32>,
+        ttl: Option<u32>,
         priority: Option<UPriority>,
         token: Option<String>,
         expected_result: bool,
@@ -757,8 +712,8 @@ mod tests {
     }
 
     #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for mandatory attributes")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid attributes")]
-    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), Some(UPriority::UPRIORITY_CS4), false; "fails for missing message ID")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid attributes")]
+    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -778,13 +733,12 @@ mod tests {
     #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), None, Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing invoked-method")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(UUri::default()), Some(UUIDBuilder::new().build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid invoked-method")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(-42), None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid commstatus")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(EnumOrUnknown::from_i32(-42)), None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid commstatus")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl > 0)")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(0), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl = 0")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), None, Some(-1), Some(UPriority::UPRIORITY_CS4), false; "fails for ttl < 0")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), None, false; "fails for missing priority")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(1), Some(100), Some(UPriority::UPRIORITY_CS3), false; "fails for invalid priority")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), None, false; "fails for missing priority")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::new().build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS3), false; "fails for invalid priority")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(reply_to_address()), Some(method_to_invoke()), None, None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing request id")]
     #[test_case(
         Some(UUIDBuilder::new().build()),
@@ -807,8 +761,8 @@ mod tests {
         reply_to_address: Option<UUri>,
         invoked_method: Option<UUri>,
         reqid: Option<UUID>,
-        commstatus: Option<i32>,
-        ttl: Option<i32>,
+        commstatus: Option<EnumOrUnknown<UCode>>,
+        ttl: Option<u32>,
         priority: Option<UPriority>,
         expected_result: bool,
     ) {
