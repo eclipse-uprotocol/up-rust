@@ -71,10 +71,10 @@ pub use uri::{UUri, UUriError, UriValidator};
 mod ustatus;
 pub use ustatus::{UCode, UStatus};
 
+mod ulistener;
 mod utransport;
-pub use utransport::UTransport;
-pub mod ulistener;
-
+pub use ulistener::UListener;
+pub use utransport::{ComparableListener, UTransport};
 mod uuid;
 pub use uuid::{UUIDBuilder, UUID};
 
@@ -98,7 +98,6 @@ pub use up_core_api::utwin;
 // cloudevent-proto, generated and augmented types
 #[cfg(feature = "cloudevents")]
 pub mod cloudevents;
-pub mod listener_wrapper;
 
 #[cfg(feature = "cloudevents")]
 mod proto_cloudevents {

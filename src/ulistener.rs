@@ -12,18 +12,24 @@
  ********************************************************************************/
 
 use crate::{UMessage, UStatus};
-use std::any::Any;
 
 /// `UListener` is the uP-L1 interface that provides a means to create listeners which are registered to `UTransport`
 ///
 /// Implementations of `UListener` contain the details for what should occur when a message is received
 /// For more information, please refer to
 /// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
-pub trait UListener: Any + Send + Sync {
-    /// Performs some action on receipt
+pub trait UListener: 'static + Send + Sync {
+    /// Performs some action on receipt of a message
     ///
-    /// # Arguments
+    /// # Parameters
     ///
-    /// * `received` - Either the message or error `UStatus` received
-    fn on_receive(&self, received: Result<UMessage, UStatus>);
+    /// * `msg` - The message
+    fn on_receive(&self, msg: UMessage);
+
+    /// Performs some action on receipt of an error
+    ///
+    /// # Parameters
+    ///
+    /// * `err` - The error as `UStatus`
+    fn on_error(&self, err: UStatus);
 }
