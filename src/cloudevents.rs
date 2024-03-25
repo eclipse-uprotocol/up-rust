@@ -145,7 +145,10 @@ impl TryFrom<UMessage> for cloudevents::Event {
             event.set_extension("sink", ExtensionValue::String(uri));
         }
         if let Some(commstatus) = attributes.commstatus {
-            event.set_extension("commstatus", ExtensionValue::Integer(commstatus as i64));
+            event.set_extension(
+                "commstatus",
+                ExtensionValue::Integer(commstatus.value() as i64),
+            );
         }
         if let Some(reqid) = &attributes.reqid.clone().into_option() {
             event.set_extension("reqid", ExtensionValue::String(reqid.to_string()));

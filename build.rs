@@ -16,7 +16,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-const UPROTOCOL_BASE_URI: &str = "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.6/uprotocol";
+const UPROTOCOL_BASE_URI: &str = "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.7/uprotocol";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(feature = "cloudevents")]
@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .as_str(),
             #[cfg(feature = "utwin")]
-            format!("{}/core/utwin/v1/utwin.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}/core/utwin/v2/utwin.proto", UPROTOCOL_BASE_URI).as_str(),
         ],
         "uprotocol",
     )?;

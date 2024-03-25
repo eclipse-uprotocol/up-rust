@@ -11,14 +11,10 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-mod calloptions;
 mod rpcclient;
 mod rpcmapper;
 mod rpcresult;
-mod rpcserver;
 
-pub use calloptions::*;
 pub use rpcclient::*;
 pub use rpcmapper::*;
 pub use rpcresult::*;
-pub use rpcserver::*;
