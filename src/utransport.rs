@@ -16,13 +16,33 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::ulistener::UListener;
 use crate::{UMessage, UStatus, UUri};
 
-/// `UTransport` is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
+/// `UListener` is the uP-L1 interface that provides a means to create listeners which are registered to `UTransport`
 ///
-/// Implementations of `UTransport` contain the details for connecting to the underlying transport technology and
-/// sending `UMessage` using the configured technology. For more information, please refer to
+/// Implementations of `UListener` contain the details for what should occur when a message is received
+/// For more information, please refer to
+/// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
+pub trait UListener: 'static + Send + Sync {
+    /// Performs some action on receipt of a message
+    ///
+    /// # Parameters
+    ///
+    /// * `msg` - The message
+    fn on_receive(&self, msg: UMessage);
+
+    /// Performs some action on receipt of an error
+    ///
+    /// # Parameters
+    ///
+    /// * `err` - The error as `UStatus`
+    fn on_error(&self, err: UStatus);
+}
+
+/// [`UTransport`] is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
+///
+/// Implementations of [`UTransport`] contain the details for connecting to the underlying transport technology and
+/// sending [`UMessage`][crate::UMessage] using the configured technology. For more information, please refer to
 /// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
 #[async_trait]
 pub trait UTransport {
@@ -89,26 +109,20 @@ pub trait UTransport {
 }
 
 /// A wrapper type around UListener that can be used by `up-client-foo-rust` UPClient libraries
-/// to ease some common development scenarios when we want to compare `UListener`
+/// to ease some common development scenarios when we want to compare [`UListener`][crate::UListener]
 ///
 /// # Note
 ///
 /// Not necessary for end-user uEs to use. Primarily intended for `up-client-foo-rust` UPClient libraries
+/// when implementing [`UTransport`]
 ///
 /// # Rationale
 ///
 /// The wrapper type is implemented such that it can be used in any location you may wish to
-/// hold a generic `UListener`
+/// hold a type implementing [`UListener`][crate::UListener]
 ///
-/// Also implements necessary traits to allow hashing, so that you may hold the wrapper type in
+/// Implements necessary traits to allow hashing, so that you may hold the wrapper type in
 /// collections which require that, such as a `HashMap` or `HashSet`
-///
-/// Note that the implementation is such that if the same instance of `Arc<T>` is used multiple times
-/// to construct multiple different wrappers, then these wrappers are all considered equivalent
-/// due to using the Arc's pointer as unique identifier
-///
-/// In the reverse, if two different instances of `Arc<T>` are used to construct two wrappers,
-/// they will not be considered equivalent due to the Arc pointer being different for each instance
 #[derive(Clone)]
 pub struct ComparableListener {
     listener: Arc<dyn UListener>,
@@ -121,6 +135,7 @@ impl ComparableListener {
     }
 }
 
+/// Allows us to call the methods on the held `Arc<dyn UListener>` directly
 impl Deref for ComparableListener {
     type Target = dyn UListener;
 
@@ -129,12 +144,17 @@ impl Deref for ComparableListener {
     }
 }
 
+/// The `Hash` implementation uses the held `Arc` pointer so that the same hash should result only
+/// in the case that two [`ComparableListener`] were constructed with the same `Arc<T>` where `T`
+/// implements [`UListener`][crate::UListener]
 impl Hash for ComparableListener {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Arc::as_ptr(&self.listener).hash(state);
     }
 }
 
+/// Uses pointer equality to ensure that two [`ComparableListener`] are equal only if they were
+/// constructed with the same `Arc<T>` where `T` implements [`UListener`][crate::UListener]
 impl PartialEq for ComparableListener {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.listener, &other.listener)

@@ -71,10 +71,8 @@ pub use uri::{UUri, UUriError, UriValidator};
 mod ustatus;
 pub use ustatus::{UCode, UStatus};
 
-mod ulistener;
 mod utransport;
-pub use ulistener::UListener;
-pub use utransport::{ComparableListener, UTransport};
+pub use utransport::{ComparableListener, UListener, UTransport};
 mod uuid;
 pub use uuid::{UUIDBuilder, UUID};
 
