@@ -11,6 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::str::FromStr;
 
@@ -548,6 +549,16 @@ impl TryFrom<Vec<u8>> for UUri {
         UUri::try_from(micro_uri.as_slice())
     }
 }
+
+impl Hash for UUri {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.authority.hash(state);
+        self.entity.hash(state);
+        self.resource.hash(state);
+    }
+}
+
+impl Eq for UUri {}
 
 impl UUri {
     /// Builds a fully resolved `UUri` from the serialized long format and the serialized micro format.

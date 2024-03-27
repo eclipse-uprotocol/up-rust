@@ -13,9 +13,18 @@
 
 pub use crate::up_core_api::uri::UResource;
 use crate::uri::UUriError;
+use std::hash::{Hash, Hasher};
 
 const URESOURCE_ID_LENGTH: usize = 16;
 const URESOURCE_ID_VALID_BITMASK: u32 = 0xffff << URESOURCE_ID_LENGTH;
+
+impl Hash for UResource {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl Eq for UResource {}
 
 impl UResource {
     pub fn has_id(&self) -> bool {
