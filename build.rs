@@ -96,19 +96,20 @@ fn download_and_write_file(
     dest_path: &PathBuf,
 ) -> core::result::Result<(), Box<dyn std::error::Error>> {
     // Send a GET request to the URL
-
-    match ureq::get(url).call() {
-        Err(error) => Err(Box::from(error)),
-        Ok(response) => {
+    match reqwest::blocking::get(url) {
+        Ok(mut response) => {
             if let Some(parent_path) = dest_path.parent() {
                 std::fs::create_dir_all(parent_path)?;
             }
             let mut out_file = fs::File::create(dest_path)?;
 
-            // Write the response body directly to the file
-            std::io::copy(&mut response.into_reader(), &mut out_file)
+            let result: Result<(), Box<dyn std::error::Error>> = response
+                .copy_to(&mut out_file)
                 .map(|_| ())
-                .map_err(Box::from)
+                .map_err(|e| e.to_string().into());
+
+            result
         }
+        Err(e) => Err(Box::from(e)),
     }
 }
