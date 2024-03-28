@@ -12,7 +12,6 @@
 ################################################################################
 
 [package]
-author = "Eclipse Foundation uProtocol project"
 categories = ["api-bindings"]
 description = "Rust implementation of the Eclipse uProtocol library"
 documentation = "https://github.com/eclipse-uprotocol/up-spec#readme"
@@ -56,7 +55,7 @@ uuid = { version = "1.7", features = ["v8"] }
 [build-dependencies]
 protobuf-codegen = { version = "3.3" }
 protoc-bin-vendored = { version = "3.0" }
-ureq = { version = "2.9.1", features = ["proxy-from-env"] }
+reqwest = { version = "0.12", features = ["blocking"] }
 
 [dev-dependencies]
 test-case = { version = "3.3" }
