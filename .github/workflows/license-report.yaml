@@ -1,0 +1,57 @@
+# ********************************************************************************
+#  Copyright (c) 2023 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************/
+
+# Use cargo-about to create a comprehensive report on licenses used by crate and all dependencies
+# Upload license report for potential re-use in publication workflow, returns the corresponding download URL as an output on workflow_call
+# Note: this feature builds on the license statements as declared by their authors  
+
+name: License report
+
+on:
+  workflow_call:
+    outputs:
+      license_report_url:
+        description: "URL of the license report artifact"
+        value: ${{ jobs.coverage.outputs.test_coverage_url }}
+  workflow_dispatch:
+          
+env:
+    RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+    RUSTFLAGS: -Dwarnings
+    CARGO_TERM_COLOR: always
+      
+jobs:
+  coverage:
+    name: create
+    runs-on: ubuntu-latest
+    outputs:
+      test_coverage_url: ${{ steps.license_report.outputs.artifact-url }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@master
+      with: 
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-about
+      run: |
+        cargo install cargo-about
+    - name: Create license report
+      run: |
+        mkdir -p release
+        cargo about generate about.hbs > licenses.html
+    - uses: actions/upload-artifact@v4
+      id: license_report
+      with:
+        name: license-report
+        path: licenses.html

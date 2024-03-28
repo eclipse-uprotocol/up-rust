@@ -1,0 +1,81 @@
+# ********************************************************************************
+#  Copyright (c) 2023 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************/
+
+# Run all test for all features to collect test code coverage information
+# Upload coverage info for potential re-use in publication workflow, returns the corresponding download URL as an output on workflow_call
+# Can publish coverage info to CodeCov platform, this is controlled by setting CODECOV_TOKEN secret in the github workspace
+
+name: Test coverage
+
+on:
+  workflow_call:
+    outputs:
+      test_coverage_url:
+        description: 'URL of the test coverage artifact'
+        value: ${{ jobs.coverage.outputs.test_coverage_url }}
+  workflow_dispatch:
+          
+env:
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  RUSTFLAGS: -Dwarnings
+  CARGO_TERM_COLOR: always
+          
+jobs:
+  coverage:
+    name: collect
+    runs-on: ubuntu-latest
+    outputs:
+      test_coverage_url: ${{ steps.test_coverage_html.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@cargo-tarpaulin
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run tests and report code coverage
+        run: |
+          # enable nightly features so that we can also include Doctests
+          RUSTC_BOOTSTRAP=1 cargo tarpaulin -o xml -o lcov -o html --doc --tests
+
+      - name: Upload coverage report (lcov)
+        uses: actions/upload-artifact@v4
+        id: test_coverage_lcov
+        with:
+          name: code-coverage-lcov
+          path: lcov.info
+      - name: Upload coverage report (xml)
+        uses: actions/upload-artifact@v4
+        id: test_coverage_xml
+        with:
+          name: code-coverage-xml
+          path: cobertura.xml
+      - name: Upload coverage report (html)
+        uses: actions/upload-artifact@v4
+        id: test_coverage_html
+        with:
+          name: code-coverage-html
+          path: tarpaulin-report.html
+
+      - name: Upload coverage reports to Codecov
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: env.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ${{ vars.GITHUB_REPOSITORY }}
+          files: lcov.info

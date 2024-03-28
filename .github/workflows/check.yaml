@@ -1,0 +1,150 @@
+# ********************************************************************************
+#  Copyright (c) 2023 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************/
+
+# Comprehensive combination of checks, linting, feature-checks, testing to be run on merge and on PR
+# Upload test results for potential re-use in publication workflow, returns the corresponding download URL as an output on workflow_call
+
+name: Cargo
+
+on:
+  push:
+    branches: 
+      - main
+  pull_request:
+    paths:
+      - "src/**"
+      - "Cargo.*"
+      - "build.rs"
+      - "deny.toml"
+  workflow_call:
+    outputs:
+      test_results_url:
+        description: "URL of the test results artifact"
+        value: ${{ jobs.nextest.outputs.test_results_url }}
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  RUSTFLAGS: -Dwarnings
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@master
+      with: 
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
+    - uses: taiki-e/install-action@cargo-deny
+    - name: Run cargo deny check
+      run: |
+        cargo deny check
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@master
+      with: 
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
+    - name: Run cargo check
+      run: |
+        cargo check --all --tests
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+      - name: Run cargo fmt
+        run: |
+          cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+      - name: Run cargo clippy
+        run: |
+          cargo clippy --tests --examples
+
+  docu:
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Run rustdoc
+        run: |
+          cargo doc --no-deps
+
+  feature-check:
+    # Comprehensive check on dependencies for all feature flag combinations, excluding development dependencies
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+      - name: Run cargo hack powerset
+        run: |
+          cargo hack check --feature-powerset --no-dev-deps
+
+  nextest:
+    # Subset of feature-combos, on only one OS - more complete testing in test-featurematrix.yaml
+    outputs:
+      test_results_url: ${{ steps.test_results.outputs.artifact-url }}
+    runs-on: ubuntu-latest
+    env: 
+      NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
+    strategy:
+      matrix:
+        feature-flags: ["", "--no-default-features", "--all-features"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      # Using nextest because it's faster than built-in test
+      - uses: taiki-e/install-action@nextest
+      - name: Run cargo nextest
+        run: |
+          cargo nextest run --message-format libtest-json-plus ${{ matrix.feature-flags }} > testresults${{ matrix.feature-flags }}.json
+
+      - name: Upload all-features test results artifact
+        id: test_results
+        if: matrix.feature-flags == '--all-features'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: testresults--all-features.json
+          
