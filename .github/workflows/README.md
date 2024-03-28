@@ -16,7 +16,7 @@ This is implemented in `check.yaml`
 
 ### Release publication
 
-We want comprehensive tests and all possible checks, as well as creation of license reports, collection of quality artifacts and publication to crates.io. This workflow pulls in other pieces like the build workflow. An actual release is triggered by pushing a tag that begins with 'v', else this workflow just generates and collects artifacts on workflow level. This will also publish to crates.io if the CRATES_TOKEN secret is set.
+We want exhaustive tests and all possible checks, as well as creation of license reports, collection of quality artifacts and publication to crates.io. This workflow pulls in other pieces like the build workflow. An actual release is triggered by pushing a tag that begins with 'v', else this workflow just generates and collects artifacts on workflow level. This will also publish to crates.io if the CRATES_TOKEN secret is set.
 
 This is implemented in `release.yaml`
 
