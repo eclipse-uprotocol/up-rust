@@ -1,0 +1,67 @@
+# ********************************************************************************
+#  Copyright (c) 2023 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************/
+
+# Run all-feature tests on multiple architecture targets
+# Note: tbd whether this adds any actual value...
+
+name: X-platform
+
+on:
+  workflow_call:
+  workflow_dispatch:
+            
+env:
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  RUSTFLAGS: -Dwarnings
+  CARGO_TERM_COLOR: always  
+
+jobs:
+  build:
+    name: build and test
+    runs-on: ${{ matrix.runner }}
+    env: 
+      NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
+    strategy:
+      matrix:
+        include:
+          - name: linux-amd64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: linux-arm64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - name: win-amd64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: macos-amd64
+            runner: macos-latest
+            target: x86_64-apple-darwin
+          - name: macos-arm64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v4
+     
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: "${{ matrix.target }}"
+      - uses: Swatinem/rust-cache@v2
+      # Using nextest because it's faster than built-in test
+      - uses: taiki-e/install-action@nextest
+     
+      - name: Run cargo nextest
+        run: |
+          cargo nextest run --all-features
