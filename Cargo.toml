@@ -44,6 +44,7 @@ bytes = { version = "1.5" }
 chrono = { version = "0.4.32" }
 cloudevents-sdk = { version = "0.7", optional = true }
 mediatype = "0.19"
+once_cell = { version = "1.19" }
 protobuf = { version = "3.3" }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
@@ -58,4 +59,6 @@ protoc-bin-vendored = { version = "3.0" }
 reqwest = { version = "0.12", features = ["blocking"] }
 
 [dev-dependencies]
+futures = { version = "0.3.30" }
 test-case = { version = "3.3" }
+async-std = {  version = "1.12.0", features = ["attributes"] }

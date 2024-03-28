@@ -38,7 +38,7 @@ impl UCloudEventBuilder {
     /// Creates the string representation of a `UUIDv8` as defined by
     /// [RFC 4122](https://www.rfc-editor.org/rfc/rfc4122.html#section-3)
     fn create_cloudevent_id() -> String {
-        UUIDBuilder::new().build().to_hyphenated_string()
+        UUIDBuilder::build().to_hyphenated_string()
     }
 
     /// Creates a `CloudEvent` for an event for the use case of an RPC Request message.

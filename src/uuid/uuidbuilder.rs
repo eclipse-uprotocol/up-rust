@@ -11,7 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use rand::Rng;
+use once_cell::sync::Lazy;
+use rand::random;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,8 +22,6 @@ const BITMASK_CLEAR_VERSION: u64 = 0xffffffffffff0fff;
 const BITMASK_CLEAR_VARIANT: u64 = 0x3fffffffffffffff;
 
 const MAX_COUNT: u64 = 0xfff;
-const MAX_TIMESTAMP_BITS: u8 = 48;
-const MAX_TIMESTAMP_MASK: u64 = 0xffff << MAX_TIMESTAMP_BITS;
 
 /// A factory for creating UUIDs that can be used with uProtocol.
 ///
@@ -33,79 +32,49 @@ pub struct UUIDBuilder {
     lsb: u64,
 }
 
-impl Default for UUIDBuilder {
-    /// Creates a new builder for creating uProtocol UUIDs.
-    ///
-    /// Simply invokes [`UUIDBuilder::new`].
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UUIDBuilder;
-    ///
-    /// let builder = UUIDBuilder::default();
-    /// let uuid = builder.build();
-    /// assert!(uuid.is_uprotocol_uuid());
-    /// ```
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl UUIDBuilder {
+    /// Builds a new UUID with consistent `rand_b` portion no matter which thread or task this is
+    /// called from. The `rand_b` portion is what uniquely identifies this uE.
+    ///
+    /// # Returns
+    ///
+    /// UUID with consistent `rand_b` portion, which uniquely identifies this uE
+    pub fn build() -> UUID {
+        #[allow(clippy::redundant_closure)]
+        static UUIDBUILDER_SINGLETON: Lazy<UUIDBuilder> = Lazy::new(|| UUIDBuilder::new());
+        UUIDBUILDER_SINGLETON.build_from_instance()
+    }
+
     /// Creates a new builder for creating uProtocol UUIDs.
     ///
-    /// The same bulder instance can be used to create one or more UUIDs
-    /// by means of invoking [`UUIDBuilder::build`].
+    /// The same builder instance can be used to create one or more UUIDs
+    /// by means of invoking [`UUIDBuilder::build_from_instance`].
     ///
-    /// # Examples
+    /// # Note
     ///
-    /// ```rust
-    /// use up_rust::UUIDBuilder;
-    ///
-    /// let builder = UUIDBuilder::new();
-    /// let uuid1 = builder.build();
-    /// assert!(uuid1.is_uprotocol_uuid());
-    /// let uuid2 = builder.build();
-    /// assert!(uuid2.is_uprotocol_uuid());
-    /// assert_ne!(uuid1, uuid2);
-    /// ```
-    pub fn new() -> Self {
+    /// For internal testing purposes only. For end-users, please use [`UUIDBuilder::build()`]
+    pub(crate) fn new() -> Self {
         UUIDBuilder {
             msb: AtomicU64::new(0),
-            // set variant to RFC4122
-            lsb: rand::thread_rng().gen::<u64>() & BITMASK_CLEAR_VARIANT
-                | crate::uuid::VARIANT_RFC4122,
+            lsb: random::<u64>() & BITMASK_CLEAR_VARIANT | crate::uuid::VARIANT_RFC4122,
         }
     }
 
     /// Creates a new UUID for the current system time.
     ///
-    /// # Panics
+    /// # Note
     ///
-    /// if the system time is either
-    /// * set to a point in time before UNIX Epoch, or
-    /// * set to a point in time later than UNIX Epoch + 0xFFFFFFFFFFFF seconds
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UUIDBuilder;
-    ///
-    /// let uuid = UUIDBuilder::new().build();
-    /// assert!(uuid.is_uprotocol_uuid());
-    /// assert!(uuid.get_time().is_some());
-    /// ```
-    pub fn build(&self) -> UUID {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("current system time is set to a point in time before UNIX Epoch");
-        let now_millis = u64::try_from(now.as_millis())
-            .expect("current system time is set to a point in time too far in the future");
-        self.build_with_instant(now_millis)
+    /// For internal testing purposes only. For end-users, please use [`UUIDBuilder::build()`]
+    pub(crate) fn build_from_instance(&self) -> UUID {
+        self.build_internal()
     }
 
     /// Creates a new UUID for a given timestamp.
+    ///
+    /// # Note
+    ///
+    /// We use a compare-and-swap (CAS) technique to attempt to repeatedly build a fresh UUID
+    /// until we succeed. Benchmarks roughly twice as fast as using a Mutex.
     ///
     /// # Arguments
     ///
@@ -114,93 +83,145 @@ impl UUIDBuilder {
     /// # Panics
     ///
     /// * if the given timestamp is greater than 2^48 - 1.
-    pub(crate) fn build_with_instant(&self, timestamp: u64) -> UUID {
-        assert!(
-            timestamp & MAX_TIMESTAMP_MASK == 0,
-            "Timestamp of UUID must not exceed 48 bits"
-        );
-
-        let new_msb = {
+    pub(crate) fn build_internal(&self) -> UUID {
+        loop {
             let current_msb = self.msb.load(Ordering::SeqCst);
 
-            if timestamp == (current_msb >> 16) {
-                if (current_msb & MAX_COUNT) < MAX_COUNT {
-                    self.msb.fetch_add(1, Ordering::SeqCst);
+            let cas_top_of_loop_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("current system time is set to a point in time before UNIX Epoch");
+            let cas_top_of_loop_millis = u64::try_from(cas_top_of_loop_time.as_millis())
+                .expect("current system time is set to a point in time too far in the future");
+
+            let current_timestamp = current_msb >> 16;
+            let new_msb;
+
+            if cas_top_of_loop_millis == current_timestamp {
+                // If the timestamp hasn't changed, attempt to increment the counter.
+                let current_counter = current_msb & MAX_COUNT;
+                if current_counter < MAX_COUNT {
+                    // Prepare new msb with incremented counter.
+                    new_msb = current_msb + 1;
                 } else {
                     // this should never happen in practice because we
                     // do not expect any uEntity to emit more than
                     // 4095 messages/ms
                     // so we simply keep the current counter at MAX_COUNT
+                    new_msb = current_msb
                 }
             } else {
-                self.msb.store(timestamp << 16, Ordering::SeqCst);
+                // New timestamp, reset counter.
+                new_msb = (cas_top_of_loop_millis << 16) & BITMASK_CLEAR_VERSION
+                    | crate::uuid::VERSION_CUSTOM;
             }
 
-            // set UUID's version to 'custom'
-            self.msb.load(Ordering::SeqCst) & BITMASK_CLEAR_VERSION | crate::uuid::VERSION_CUSTOM
-        };
-
-        UUID::from_u64_pair(new_msb, self.lsb)
-            .expect("should have been able to create UUID for valid timestamp")
+            // Try to update the MSB atomically.
+            match self.msb.compare_exchange(
+                current_msb,
+                new_msb,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => {
+                    return UUID::from_u64_pair(new_msb, self.lsb)
+                        .expect("should have been able to create UUID for valid timestamp")
+                }
+                Err(_) => continue, // If the compare-and-swap fails, retry.
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_build_with_instant_creates_uprotocol_uuid() {
-        let instant = 0x18C684468F8_u64; // Thu, 14 Dec 2023 12:19:23 GMT
-        let uuid = UUIDBuilder::new().build_with_instant(instant);
-        assert!(uuid.is_uprotocol_uuid());
-        assert_eq!(uuid.get_time().unwrap(), instant);
-
-        // instant, version (8) and counter (000) should show up in UUID
-        assert!(uuid
-            .to_hyphenated_string()
-            .starts_with("018c6844-68f8-8000-"));
-    }
-
-    #[test]
-    fn test_uuid_for_subsequent_generation() {
-        let instant = 0x18C684468F8_u64; // Thu, 14 Dec 2023 12:19:23 GMT
-        let builder = UUIDBuilder::new();
-
-        let uuid_for_instant = builder.build_with_instant(instant);
-        assert!(uuid_for_instant.is_uprotocol_uuid());
-        // instant, version (8) and counter (000) should show up in UUID
-        assert!(uuid_for_instant
-            .to_hyphenated_string()
-            .starts_with("018c6844-68f8-8000-"));
-
-        let uuid_for_same_instant = builder.build_with_instant(instant);
-        assert!(uuid_for_same_instant.is_uprotocol_uuid());
-        // same instant, version (8) and _incremented_ counter (001) should show up in UUID
-        assert!(uuid_for_same_instant
-            .to_hyphenated_string()
-            .starts_with("018c6844-68f8-8001-"));
-    }
+    use async_std::task;
+    use std::collections::HashSet;
+    use std::time::Instant;
 
     #[test]
     fn test_uuid_for_constant_random() {
         let factory = UUIDBuilder::new();
-        let uuid1 = factory.build();
-        let uuid2 = factory.build();
+        let uuid1 = factory.build_from_instance();
+        let uuid2 = factory.build_from_instance();
         assert_eq!(uuid1.lsb, uuid2.lsb);
     }
 
-    #[test]
-    #[should_panic]
-    fn test_uuid_panics_for_invalid_timestamp() {
-        // maximum value that can be stored in a 48-bit timestamp (in milliseconds)
-        let max_48_bit_unix_ts_ms = (1u64 << 48) - 1;
+    #[async_std::test]
+    async fn test_uuidbuilder_concurrency_safety_with_lsb_check() {
+        // we get near to but do not cross over 4096 messages / ms
+        let num_tasks = 10; // Number of concurrent tasks
+        let uuids_per_task = 409; // Adjusted to ensure total does not exceed 4095 in a ms burst (10 * 409 = 4090 max UUIDs per ms)
 
-        // add 1 millisecond to the maximum duration, to overflow
-        let overflowed_48_bit_unix_ts_ms = max_48_bit_unix_ts_ms + 1;
+        // Obtain a UUID before spawning tasks to determine the expected LSB
+        let expected_lsb = UUIDBuilder::build().lsb;
 
-        let builder = UUIDBuilder::new();
-        let _uprotocol_uuid_past_max_unix_ts_ms =
-            builder.build_with_instant(overflowed_48_bit_unix_ts_ms);
+        let mut tasks = Vec::new();
+
+        // Record the start time before any tasks are spawned
+        let start = Instant::now();
+
+        for task_id in 0..num_tasks {
+            let expected_lsb_clone = expected_lsb;
+            let task = task::spawn(async move {
+                let mut local_uuids = Vec::new();
+                for _ in 0..uuids_per_task {
+                    let uuid = UUIDBuilder::build();
+                    assert_eq!(
+                        uuid.lsb, expected_lsb_clone,
+                        "LSB does not match the expected value."
+                    );
+                    local_uuids.push((task_id, uuid));
+                }
+                local_uuids
+            });
+            tasks.push(task);
+        }
+
+        // Await all tasks and collect their results
+        let results = futures::future::join_all(tasks).await;
+
+        // Record the end time after all tasks are completed
+        let end = Instant::now();
+
+        let duration = end.duration_since(start);
+
+        println!("All tasks completed in {:?}.", duration);
+
+        #[allow(clippy::mutable_key_type)]
+        let mut all_uuids = HashSet::new();
+        let mut duplicates = Vec::new();
+        for local_uuids in results {
+            for (task_id, uuid) in local_uuids {
+                if !all_uuids.insert(uuid.clone()) {
+                    duplicates.push((task_id, uuid));
+                }
+            }
+        }
+
+        for (task_id, uuid) in &duplicates {
+            let msb = uuid.msb;
+            let timestamp = msb >> 16;
+            let counter = msb & MAX_COUNT;
+
+            println!("task_id: {task_id} timestamp: {timestamp} counter: {counter}");
+        }
+
+        assert!(
+            duplicates.is_empty(),
+            "Found {} duplicates. First duplicate from task {}: {:?}",
+            duplicates.len(),
+            duplicates
+                .first()
+                .map(|(task_id, _)| *task_id as isize)
+                .unwrap_or(-1),
+            duplicates.first().map(|(_, uuid)| uuid)
+        );
+
+        assert_eq!(
+            all_uuids.len(),
+            num_tasks * uuids_per_task,
+            "Mismatch in the total number of expected UUIDs."
+        );
     }
 }

@@ -761,7 +761,7 @@ mod tests {
 
     #[test]
     fn test_extract_creation_timestamp_from_cloud_event_uuidv8_id_when_uuidv8_id_is_valid() {
-        let uuid = UUIDBuilder::new().build();
+        let uuid = UUIDBuilder::build();
         let builder = build_base_cloud_event_for_test();
         let cloud_event = builder.id(uuid).build().unwrap();
 
@@ -894,7 +894,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_minus_one() {
-        let uuid = UUIDBuilder::new().build();
+        let uuid = UUIDBuilder::build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", -1)
             .id(uuid);
@@ -905,7 +905,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_is_not_expired_when_ttl_is_large_number_mili() {
-        let uuid = UUIDBuilder::new().build();
+        let uuid = UUIDBuilder::build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", i64::MAX)
             .id(uuid);
@@ -919,7 +919,7 @@ mod tests {
         use std::thread;
         use std::time::Duration;
 
-        let uuid = UUIDBuilder::new().build();
+        let uuid = UUIDBuilder::build();
         let builder = build_base_cloud_event_for_test()
             .extension("ttl", 1)
             .id(uuid);
@@ -932,7 +932,7 @@ mod tests {
 
     #[test]
     fn test_cloudevent_has_a_v8_uuid() {
-        let uuid = UUIDBuilder::new().build();
+        let uuid = UUIDBuilder::build();
         let builder = build_base_cloud_event_for_test().id(uuid);
         let cloud_event = builder.build().unwrap();
 
