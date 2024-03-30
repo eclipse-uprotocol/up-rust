@@ -14,7 +14,7 @@
 use bytes::Bytes;
 use protobuf::{Enum, EnumOrUnknown, Message};
 
-use crate::uattributes::UAttributesError;
+use crate::uattributes::{NotificationValidator, UAttributesError};
 use crate::{
     Data, PublishValidator, RequestValidator, ResponseValidator, UAttributes, UAttributesValidator,
     UCode, UMessage, UMessageType, UPayload, UPayloadFormat, UPriority, UUri, UUID,
@@ -151,7 +151,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
     ///                    .with_message_id(uuid_builder.build())
     ///                    .build_with_payload("unexpected movement".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
+    /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_NOTIFICATION.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
     /// assert_eq!(message.attributes.source, Some(origin).into());
     /// assert_eq!(message.attributes.sink, Some(destination).into());
@@ -160,8 +160,8 @@ impl UMessageBuilder {
     /// ```
     pub fn notification(origin: UUri, destination: UUri) -> UMessageBuilder {
         UMessageBuilder {
-            validator: Box::new(PublishValidator),
-            message_type: UMessageType::UMESSAGE_TYPE_PUBLISH,
+            validator: Box::new(NotificationValidator),
+            message_type: UMessageType::UMESSAGE_TYPE_NOTIFICATION,
             source: Some(origin),
             sink: Some(destination),
             ..Default::default()

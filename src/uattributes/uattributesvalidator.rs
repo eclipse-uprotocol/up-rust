@@ -173,6 +173,7 @@ pub fn validate_rpc_priority(attributes: &UAttributes) -> Result<(), UAttributes
 /// Enum that hold the implementations of uattributesValidator according to type.
 pub enum UAttributesValidators {
     Publish,
+    Notification,
     Request,
     Response,
 }
@@ -201,6 +202,7 @@ impl UAttributesValidators {
     pub fn validator(&self) -> Box<dyn UAttributesValidator> {
         match self {
             UAttributesValidators::Publish => Box::new(PublishValidator),
+            UAttributesValidators::Notification => Box::new(NotificationValidator),
             UAttributesValidators::Request => Box::new(RequestValidator),
             UAttributesValidators::Response => Box::new(ResponseValidator),
         }
@@ -254,12 +256,13 @@ impl UAttributesValidators {
         match message_type {
             UMessageType::UMESSAGE_TYPE_REQUEST => Box::new(RequestValidator),
             UMessageType::UMESSAGE_TYPE_RESPONSE => Box::new(ResponseValidator),
+            UMessageType::UMESSAGE_TYPE_NOTIFICATION => Box::new(NotificationValidator),
             _ => Box::new(PublishValidator),
         }
     }
 }
 
-/// Validates attributes describing a Publish or Notification message.
+/// Validates attributes describing a Publish message.
 pub struct PublishValidator;
 
 impl UAttributesValidator for PublishValidator {
@@ -268,7 +271,7 @@ impl UAttributesValidator for PublishValidator {
     }
 
     /// Checks if a given set of attributes complies with the rules specified for
-    /// publish and notification messages.
+    /// publish messages.
     ///
     /// # Errors
     ///
@@ -295,6 +298,63 @@ impl UAttributesValidator for PublishValidator {
             Ok(())
         } else {
             Err(UAttributesError::validation_error(error_message))
+        }
+    }
+}
+
+/// Validates attributes describing a Notification message.
+pub struct NotificationValidator;
+
+impl UAttributesValidator for NotificationValidator {
+    fn message_type(&self) -> UMessageType {
+        UMessageType::UMESSAGE_TYPE_NOTIFICATION
+    }
+
+    /// Checks if a given set of attributes complies with the rules specified for
+    /// notification messages.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the following checks fail for the given attributes:
+    ///
+    /// * [`UAttributesValidator::validate_type`]
+    /// * [`UAttributesValidator::validate_id`]
+    /// * [`UAttributesValidator::validate_source`]
+    /// * [`UAttributesValidator::validate_sink`]
+    fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        let error_message = vec![
+            self.validate_type(attributes),
+            self.validate_id(attributes),
+            self.validate_source(attributes),
+            self.validate_sink(attributes),
+        ]
+        .into_iter()
+        .filter_map(Result::err)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("; ");
+
+        if error_message.is_empty() {
+            Ok(())
+        } else {
+            Err(UAttributesError::validation_error(error_message))
+        }
+    }
+
+    /// Verifies that attributes for a notification message contains a valid sink URI.
+    ///
+    /// # Errors
+    ///
+    /// If the [`UAttributes::sink`] property does not contain a valid URI according to
+    /// [`UriValidator::validate`], an error is returned.
+    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if let Some(sink) = attributes.sink.as_ref() {
+            UriValidator::validate(sink)
+                .map_err(|e| UAttributesError::validation_error(e.to_string()))
+        } else {
+            Err(UAttributesError::validation_error(
+                "Attributes must contain a sink URI",
+            ))
         }
     }
 }
@@ -533,6 +593,10 @@ mod tests {
             .validator()
             .validate_type(&attributes)
             .is_err());
+        assert!(UAttributesValidators::Notification
+            .validator()
+            .validate_type(&attributes)
+            .is_err());
         assert!(UAttributesValidators::Request
             .validator()
             .validate_type(&attributes)
@@ -545,6 +609,7 @@ mod tests {
 
     #[test_case(UMessageType::UMESSAGE_TYPE_UNSPECIFIED, UMessageType::UMESSAGE_TYPE_PUBLISH; "succeeds for Unspecified message")]
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, UMessageType::UMESSAGE_TYPE_PUBLISH; "succeeds for Publish message")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, UMessageType::UMESSAGE_TYPE_NOTIFICATION; "succeeds for Notification message")]
     #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, UMessageType::UMESSAGE_TYPE_REQUEST; "succeeds for Request message")]
     #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, UMessageType::UMESSAGE_TYPE_RESPONSE; "succeeds for Response message")]
     fn test_get_validator_returns_matching_validator(
@@ -563,6 +628,13 @@ mod tests {
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(create_id_for_timestamp(1000)), Some(0), false; "for Publish message with ID and TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(create_id_for_timestamp(1000)), Some(500), true; "for Publish message with ID and expired TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(create_id_for_timestamp(1000)), Some(2000), false; "for Publish message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, None, false; "for Notification message without ID nor TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(0), false; "for Notification message without ID with TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(500), false; "for Notification message without ID with TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(create_id_for_timestamp(1000)), None, false; "for Notification message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(create_id_for_timestamp(1000)), Some(0), false; "for Notification message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(create_id_for_timestamp(1000)), Some(500), true; "for Notification message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(create_id_for_timestamp(1000)), Some(2000), false; "for Notification message with ID and non-expired TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, None, false; "for Request message without ID nor TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, Some(0), false; "for Request message without ID with TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, Some(500), false; "for Request message without ID with TTL")]
@@ -634,6 +706,65 @@ mod tests {
         let status = validator.validate(&attributes);
         assert!(status.is_ok() == expected_result);
         if status.is_ok() {
+            assert!(UAttributesValidators::Notification
+                .validator()
+                .validate(&attributes)
+                .is_err());
+            assert!(UAttributesValidators::Request
+                .validator()
+                .validate(&attributes)
+                .is_err());
+            assert!(UAttributesValidators::Response
+                .validator()
+                .validate(&attributes)
+                .is_err());
+        }
+    }
+
+    #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), None, None, false; "fails for missing destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), Some(destination()), None, true; "succeeds for both topic and destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), Some(destination()), Some(100), true; "succeeds for valid attributes")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, Some(destination()), None, false; "fails for missing topic")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid topic")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), Some(UUri::default()), None, false; "fails for invalid destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, None, None, false; "fails for neither topic nor destination")]
+    #[test_case(None, Some(origin()), Some(destination()), None, false; "fails for missing message ID")]
+    #[test_case(
+        Some(UUID {
+            // invalid UUID version (not 0b1000 but 0b1010)
+            msb: 0x000000000001C000u64,
+            lsb: 0x8000000000000000u64,
+            ..Default::default()
+        }),
+        Some(origin()),
+        Some(destination()),
+        None,
+        false;
+        "fails for invalid message id")]
+    fn test_validate_attributes_for_notification_message(
+        id: Option<UUID>,
+        source: Option<UUri>,
+        sink: Option<UUri>,
+        ttl: Option<u32>,
+        expected_result: bool,
+    ) {
+        let attributes = UAttributes {
+            type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
+            id: id.into(),
+            priority: UPriority::UPRIORITY_CS1.into(),
+            source: source.into(),
+            sink: sink.into(),
+            ttl,
+            ..Default::default()
+        };
+        let validator = UAttributesValidators::Notification.validator();
+        let status = validator.validate(&attributes);
+        assert!(status.is_ok() == expected_result);
+        if status.is_ok() {
+            assert!(UAttributesValidators::Publish
+                .validator()
+                .validate(&attributes)
+                .is_err());
             assert!(UAttributesValidators::Request
                 .validator()
                 .validate(&attributes)
@@ -700,6 +831,10 @@ mod tests {
         assert!(status.is_ok() == expected_result);
         if status.is_ok() {
             assert!(UAttributesValidators::Publish
+                .validator()
+                .validate(&attributes)
+                .is_err());
+            assert!(UAttributesValidators::Notification
                 .validator()
                 .validate(&attributes)
                 .is_err());
@@ -785,6 +920,10 @@ mod tests {
                 .validator()
                 .validate(&attributes)
                 .is_err());
+            assert!(UAttributesValidators::Notification
+                .validator()
+                .validate(&attributes)
+                .is_err());
             assert!(UAttributesValidators::Request
                 .validator()
                 .validate(&attributes)
@@ -802,6 +941,30 @@ mod tests {
     }
 
     fn publish_topic() -> UUri {
+        UUri {
+            authority: Some(UAuthority {
+                name: Some(String::from("vcu.someVin")),
+                ..Default::default()
+            })
+            .into(),
+            entity: Some(UEntity {
+                name: "cabin".to_string(),
+                version_major: Some(1),
+                ..Default::default()
+            })
+            .into(),
+            resource: Some(UResource {
+                name: "door".to_string(),
+                instance: Some("driver_seat".to_string()),
+                message: Some("status".to_string()),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        }
+    }
+
+    fn origin() -> UUri {
         UUri {
             authority: Some(UAuthority {
                 name: Some(String::from("vcu.someVin")),
