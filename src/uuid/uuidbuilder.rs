@@ -40,9 +40,8 @@ impl UUIDBuilder {
     ///
     /// UUID with consistent `rand_b` portion, which uniquely identifies this uE
     pub fn build() -> UUID {
-        #[allow(clippy::redundant_closure)]
-        static UUIDBUILDER_SINGLETON: Lazy<UUIDBuilder> = Lazy::new(|| UUIDBuilder::new());
-        UUIDBUILDER_SINGLETON.build_from_instance()
+        static UUIDBUILDER_SINGLETON: Lazy<UUIDBuilder> = Lazy::new(UUIDBuilder::new);
+        UUIDBUILDER_SINGLETON.build_internal()
     }
 
     /// Creates a new builder for creating uProtocol UUIDs.
@@ -60,15 +59,6 @@ impl UUIDBuilder {
         }
     }
 
-    /// Creates a new UUID for the current system time.
-    ///
-    /// # Note
-    ///
-    /// For internal testing purposes only. For end-users, please use [`UUIDBuilder::build()`]
-    pub(crate) fn build_from_instance(&self) -> UUID {
-        self.build_internal()
-    }
-
     /// Creates a new UUID for a given timestamp.
     ///
     /// # Note
@@ -76,13 +66,6 @@ impl UUIDBuilder {
     /// We use a compare-and-swap (CAS) technique to attempt to repeatedly build a fresh UUID
     /// until we succeed. Benchmarks roughly twice as fast as using a Mutex.
     ///
-    /// # Arguments
-    ///
-    /// * `timestamp` - The timestamp (in milliseconds since UNIX EPOCH) to use.
-    ///
-    /// # Panics
-    ///
-    /// * if the given timestamp is greater than 2^48 - 1.
     pub(crate) fn build_internal(&self) -> UUID {
         loop {
             let current_msb = self.msb.load(Ordering::SeqCst);
@@ -115,18 +98,14 @@ impl UUIDBuilder {
                     | crate::uuid::VERSION_CUSTOM;
             }
 
-            // Try to update the MSB atomically.
-            match self.msb.compare_exchange(
-                current_msb,
-                new_msb,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
-                Ok(_) => {
-                    return UUID::from_u64_pair(new_msb, self.lsb)
-                        .expect("should have been able to create UUID for valid timestamp")
-                }
-                Err(_) => continue, // If the compare-and-swap fails, retry.
+            // Only return if CAS succeeds
+            if self
+                .msb
+                .compare_exchange(current_msb, new_msb, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                return UUID::from_u64_pair(new_msb, self.lsb)
+                    .expect("should have been able to create UUID for valid timestamp");
             }
         }
     }
@@ -136,24 +115,20 @@ impl UUIDBuilder {
 mod tests {
     use super::*;
     use async_std::task;
+    use log::*;
     use std::collections::HashSet;
     use std::time::Instant;
 
-    #[test]
-    fn test_uuid_for_constant_random() {
-        let factory = UUIDBuilder::new();
-        let uuid1 = factory.build_from_instance();
-        let uuid2 = factory.build_from_instance();
-        assert_eq!(uuid1.lsb, uuid2.lsb);
-    }
-
     #[async_std::test]
     async fn test_uuidbuilder_concurrency_safety_with_lsb_check() {
+        let _ = env_logger::try_init();
+
         // we get near to but do not cross over 4096 messages / ms
         let num_tasks = 10; // Number of concurrent tasks
         let uuids_per_task = 409; // Adjusted to ensure total does not exceed 4095 in a ms burst (10 * 409 = 4090 max UUIDs per ms)
 
-        // Obtain a UUID before spawning tasks to determine the expected LSB
+        // Obtain a UUID before spawning tasks to determine the expected LSB and ensure consistent
+        // across all threads / tasks
         let expected_lsb = UUIDBuilder::build().lsb;
 
         let mut tasks = Vec::new();
@@ -186,7 +161,7 @@ mod tests {
 
         let duration = end.duration_since(start);
 
-        println!("All tasks completed in {:?}.", duration);
+        info!("All tasks completed in {:?}.", duration);
 
         #[allow(clippy::mutable_key_type)]
         let mut all_uuids = HashSet::new();
@@ -204,7 +179,7 @@ mod tests {
             let timestamp = msb >> 16;
             let counter = msb & MAX_COUNT;
 
-            println!("task_id: {task_id} timestamp: {timestamp} counter: {counter}");
+            error!("task_id: {task_id} timestamp: {timestamp} counter: {counter}");
         }
 
         assert!(

@@ -625,13 +625,13 @@ mod tests {
         assert_eq!(validator.message_type(), expected_validator_type);
     }
 
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, None, None, false; "for Publish message without ID nor TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, None, Some(0), false; "for Publish message without ID with TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, None, Some(500), false; "for Publish message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(1000), Some(UUIDBuilder::build()), None, false; "for Publish message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(1000), Some(UUIDBuilder::build()), Some(0), false; "for Publish message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(1000), Some(UUIDBuilder::build()), Some(500), true; "for Publish message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(1000), Some(UUIDBuilder::build()), Some(2000), false; "for Publish message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, 0, None, None, false; "for Publish message without ID nor TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, 0, None, Some(0), false; "for Publish message without ID with TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, 0, None, Some(500), false; "for Publish message without ID with TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, 1000, Some(UUIDBuilder::build()), None, false; "for Publish message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, 1000, Some(UUIDBuilder::build()), Some(0), false; "for Publish message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, 1000, Some(UUIDBuilder::build()), Some(500), true; "for Publish message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, 1000, Some(UUIDBuilder::build()), Some(2000), false; "for Publish message with ID and non-expired TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, None, false; "for Notification message without ID nor TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(0), false; "for Notification message without ID with TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(500), false; "for Notification message without ID with TTL")]
@@ -639,23 +639,23 @@ mod tests {
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(create_id_for_timestamp(1000)), Some(0), false; "for Notification message with ID and TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(create_id_for_timestamp(1000)), Some(500), true; "for Notification message with ID and expired TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(create_id_for_timestamp(1000)), Some(2000), false; "for Notification message with ID and non-expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, None, None, false; "for Request message without ID nor TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, None, Some(0), false; "for Request message without ID with TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, None, Some(500), false; "for Request message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(1000), Some(UUIDBuilder::build()), None, false; "for Request message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(1000), Some(UUIDBuilder::build()), Some(0), false; "for Request message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(1000), Some(UUIDBuilder::build()), Some(500), true; "for Request message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(1000), Some(UUIDBuilder::build()), Some(2000), false; "for Request message with ID and non-expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, None, None, false; "for Response message without ID nor TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, None, Some(0), false; "for Response message without ID with TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, None, Some(500), false; "for Response message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(1000), Some(UUIDBuilder::build()), None, false; "for Response message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(1000), Some(UUIDBuilder::build()), Some(0), false; "for Response message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(1000), Some(UUIDBuilder::build()), Some(500), true; "for Response message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(1000), Some(UUIDBuilder::build()), Some(2000), false; "for Response message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, 0, None, None, false; "for Request message without ID nor TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, 0, None, Some(0), false; "for Request message without ID with TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, 0, None, Some(500), false; "for Request message without ID with TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, 1000, Some(UUIDBuilder::build()), None, false; "for Request message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, 1000, Some(UUIDBuilder::build()), Some(0), false; "for Request message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, 1000, Some(UUIDBuilder::build()), Some(500), true; "for Request message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, 1000, Some(UUIDBuilder::build()), Some(2000), false; "for Request message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, 0, None, None, false; "for Response message without ID nor TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, 0, None, Some(0), false; "for Response message without ID with TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, 0, None, Some(500), false; "for Response message without ID with TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, 1000, Some(UUIDBuilder::build()), None, false; "for Response message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, 1000, Some(UUIDBuilder::build()), Some(0), false; "for Response message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, 1000, Some(UUIDBuilder::build()), Some(500), true; "for Response message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, 1000, Some(UUIDBuilder::build()), Some(2000), false; "for Response message with ID and non-expired TTL")]
     fn test_is_expired(
         message_type: UMessageType,
-        created_millis_ago: Option<u64>,
+        created_millis_ago: u64,
         id: Option<UUID>,
         ttl: Option<u32>,
         should_be_expired: bool,
@@ -668,19 +668,17 @@ mod tests {
             ..Default::default()
         };
 
-        if let Some(created_millis_ago) = created_millis_ago {
-            thread::sleep(std::time::Duration::from_millis(created_millis_ago));
-        }
+        thread::sleep(std::time::Duration::from_millis(created_millis_ago));
 
         let validator = UAttributesValidators::get_validator(message_type);
         assert!(validator.is_expired(&attributes).is_err() == should_be_expired);
     }
 
-    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), Some(destination()), None, false; "fails for containing destination")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
-    #[test_case(Some(UUIDBuilder::new().build()), None, None, None, false; "fails for missing topic")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), None, None, false; "fails for invalid topic")]
+    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
+    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), Some(destination()), None, false; "fails for containing destination")]
+    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
+    #[test_case(Some(UUIDBuilder::build()), None, None, None, false; "fails for missing topic")]
+    #[test_case(Some(UUIDBuilder::build()), Some(UUri::default()), None, None, false; "fails for invalid topic")]
     #[test_case(None, Some(publish_topic()), None, None, false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {

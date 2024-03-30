@@ -43,6 +43,8 @@ async-trait = { version = "0.1" }
 bytes = { version = "1.5" }
 chrono = { version = "0.4.32" }
 cloudevents-sdk = { version = "0.7", optional = true }
+env_logger = { version = "0.11.3" }
+log = { version = "0.4" }
 mediatype = "0.19"
 once_cell = { version = "1.19" }
 protobuf = { version = "3.3" }
