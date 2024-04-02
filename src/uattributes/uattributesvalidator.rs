@@ -128,20 +128,7 @@ pub trait UAttributesValidator {
     }
 
     /// Verifies that a set of attributes contains a valid sink URI.
-    ///
-    /// # Errors
-    ///
-    /// If the [`UAttributes::sink`] property does not contain a valid URI as required by the type of message, an error is returned.
-    ///
-    /// This default implementation only verifies that the property, if present, contains a valid URI according to
-    /// [`UriValidator::validate`].
-    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(sink) = attributes.sink.as_ref() {
-            return UriValidator::validate(sink)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()));
-        }
-        Ok(())
-    }
+    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError>;
 }
 
 /// Verifies that a set of attributes contains a priority that is appropriate for an RPC request message.
@@ -298,6 +285,21 @@ impl UAttributesValidator for PublishValidator {
             Ok(())
         } else {
             Err(UAttributesError::validation_error(error_message))
+        }
+    }
+
+    /// Verifies that attributes for a publish message contains a valid sink URI.
+    ///
+    /// # Errors
+    ///
+    /// If the [`UAttributes::sink`] property contains any URI, an error is returned.
+    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if attributes.sink.as_ref().is_some() {
+            Err(UAttributesError::validation_error(
+                "Attributes must not contain a sink URI in Publish Message",
+            ))
+        } else {
+            Ok(())
         }
     }
 }
@@ -667,12 +669,10 @@ mod tests {
     }
 
     #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), Some(destination()), None, true; "succeeds for both topic and destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), Some(destination()), None, false; "fails for containing destination")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
-    #[test_case(Some(UUIDBuilder::new().build()), None, Some(destination()), None, false; "fails for missing topic")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid topic")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(publish_topic()), Some(UUri::default()), None, false; "fails for invalid destination")]
-    #[test_case(Some(UUIDBuilder::new().build()), None, None, None, false; "fails for neither topic nor destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, None, None, false; "fails for missing topic")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), None, None, false; "fails for invalid topic")]
     #[test_case(None, Some(publish_topic()), None, None, false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
