@@ -1,5 +1,5 @@
 # ********************************************************************************
-#  Copyright (c) 2023 Contributors to the Eclipse Foundation
+#  Copyright (c) 2024 Contributors to the Eclipse Foundation
 #
 #  See the NOTICE file(s) distributed with this work for additional
 #  information regarding copyright ownership.
@@ -174,4 +174,3 @@ jobs:
         run: cargo publish --all-features --dry-run
       - if: env.CRATES_TOKEN != ''
         run: cargo publish --all-features --token ${CRATES_TOKEN}
-        
