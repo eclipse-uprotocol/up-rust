@@ -182,6 +182,7 @@ mod tests {
             error!("task_id: {task_id} timestamp: {timestamp} counter: {counter}");
         }
 
+        // triggers if we have overrun the counter of 4095 messages / ms
         assert!(
             duplicates.is_empty(),
             "Found {} duplicates. First duplicate from task {}: {:?}",
@@ -193,6 +194,8 @@ mod tests {
             duplicates.first().map(|(_, uuid)| uuid)
         );
 
+        // another check which would trigger if we've overrun the counter of 4095 messages / ms
+        // since if these are not equal, it means we had duplicate UUIDs
         assert_eq!(
             all_uuids.len(),
             num_tasks * uuids_per_task,
