@@ -722,12 +722,12 @@ mod tests {
     }
 
     #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), None, None, false; "fails for missing destination")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), Some(destination()), None, true; "succeeds for both topic and destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), Some(destination()), None, true; "succeeds for both origin and destination")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), Some(destination()), Some(100), true; "succeeds for valid attributes")]
-    #[test_case(Some(UUIDBuilder::new().build()), None, Some(destination()), None, false; "fails for missing topic")]
-    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid topic")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, Some(destination()), None, false; "fails for missing origin")]
+    #[test_case(Some(UUIDBuilder::new().build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid origin")]
     #[test_case(Some(UUIDBuilder::new().build()), Some(origin()), Some(UUri::default()), None, false; "fails for invalid destination")]
-    #[test_case(Some(UUIDBuilder::new().build()), None, None, None, false; "fails for neither topic nor destination")]
+    #[test_case(Some(UUIDBuilder::new().build()), None, None, None, false; "fails for neither origin nor destination")]
     #[test_case(None, Some(origin()), Some(destination()), None, false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
