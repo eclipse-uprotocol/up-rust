@@ -47,7 +47,7 @@ impl UUIDBuilder {
     /// Creates a new builder for creating uProtocol UUIDs.
     ///
     /// The same builder instance can be used to create one or more UUIDs
-    /// by means of invoking [`UUIDBuilder::build_from_instance`].
+    /// by means of invoking [`UUIDBuilder::build_internal()`].
     ///
     /// # Note
     ///
@@ -59,13 +59,7 @@ impl UUIDBuilder {
         }
     }
 
-    /// Creates a new UUID for a given timestamp.
-    ///
-    /// # Note
-    ///
-    /// We use a compare-and-swap (CAS) technique to attempt to repeatedly build a fresh UUID
-    /// until we succeed. Benchmarks roughly twice as fast as using a Mutex.
-    ///
+    /// Creates a new UUID based on a particular instance of [`UUIDBuilder`]
     pub(crate) fn build_internal(&self) -> UUID {
         loop {
             let current_msb = self.msb.load(Ordering::SeqCst);
@@ -90,7 +84,7 @@ impl UUIDBuilder {
                     // do not expect any uEntity to emit more than
                     // 4095 messages/ms
                     // so we simply keep the current counter at MAX_COUNT
-                    new_msb = current_msb
+                    continue;
                 }
             } else {
                 // New timestamp, reset counter.
@@ -123,9 +117,9 @@ mod tests {
     async fn test_uuidbuilder_concurrency_safety_with_lsb_check() {
         let _ = env_logger::try_init();
 
-        // we get near to but do not cross over 4096 messages / ms
+        // create enough UUIDs / task that we're likely to run over the counter
         let num_tasks = 10; // Number of concurrent tasks
-        let uuids_per_task = 409; // Adjusted to ensure total does not exceed 4095 in a ms burst (10 * 409 = 4090 max UUIDs per ms)
+        let uuids_per_task = 500; // Adjusted to ensure total exceeds 4095 in a ms burst (10 * 409 = 4090 max UUIDs per ms)
 
         // Obtain a UUID before spawning tasks to determine the expected LSB and ensure consistent
         // across all threads / tasks
@@ -161,8 +155,6 @@ mod tests {
 
         let duration = end.duration_since(start);
 
-        info!("All tasks completed in {:?}.", duration);
-
         #[allow(clippy::mutable_key_type)]
         let mut all_uuids = HashSet::new();
         let mut duplicates = Vec::new();
@@ -172,14 +164,6 @@ mod tests {
                     duplicates.push((task_id, uuid));
                 }
             }
-        }
-
-        for (task_id, uuid) in &duplicates {
-            let msb = uuid.msb;
-            let timestamp = msb >> 16;
-            let counter = msb & MAX_COUNT;
-
-            error!("task_id: {task_id} timestamp: {timestamp} counter: {counter}");
         }
 
         // triggers if we have overrun the counter of 4095 messages / ms
