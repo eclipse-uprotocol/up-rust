@@ -18,10 +18,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::UUID;
 
-const BITMASK_CLEAR_VERSION: u64 = 0xffffffffffff0fff;
-const BITMASK_CLEAR_VARIANT: u64 = 0x3fffffffffffffff;
+pub(crate) const BITMASK_CLEAR_VERSION: u64 = 0xffff_ffff_ffff_0fff;
+const BITMASK_CLEAR_VARIANT: u64 = 0x3fff_ffff_ffff_ffff;
 
-const MAX_COUNT: u64 = 0xfff;
+pub(crate) const MAX_COUNT: u64 = 0xfff;
 
 /// A factory for creating UUIDs that can be used with uProtocol.
 ///
@@ -61,6 +61,8 @@ impl UUIDBuilder {
 
     /// Creates a new UUID based on a particular instance of [`UUIDBuilder`]
     pub(crate) fn build_internal(&self) -> UUID {
+        // We utilize a Compare-and-Swap (CAS) technique here to ensure that we always generate
+        // a new UUID safely in any concurrent context
         loop {
             let current_msb = self.msb.load(Ordering::SeqCst);
 
