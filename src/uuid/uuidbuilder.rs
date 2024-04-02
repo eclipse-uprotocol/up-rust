@@ -109,14 +109,10 @@ impl UUIDBuilder {
 mod tests {
     use super::*;
     use async_std::task;
-    use log::*;
     use std::collections::HashSet;
-    use std::time::Instant;
 
     #[async_std::test]
     async fn test_uuidbuilder_concurrency_safety_with_lsb_check() {
-        let _ = env_logger::try_init();
-
         // create enough UUIDs / task that we're likely to run over the counter
         let num_tasks = 10; // Number of concurrent tasks
         let uuids_per_task = 500; // Adjusted to ensure total exceeds 4095 in a ms burst (10 * 409 = 4090 max UUIDs per ms)
@@ -126,9 +122,6 @@ mod tests {
         let expected_lsb = UUIDBuilder::build().lsb;
 
         let mut tasks = Vec::new();
-
-        // Record the start time before any tasks are spawned
-        let start = Instant::now();
 
         for task_id in 0..num_tasks {
             let expected_lsb_clone = expected_lsb;
@@ -149,11 +142,6 @@ mod tests {
 
         // Await all tasks and collect their results
         let results = futures::future::join_all(tasks).await;
-
-        // Record the end time after all tasks are completed
-        let end = Instant::now();
-
-        let duration = end.duration_since(start);
 
         #[allow(clippy::mutable_key_type)]
         let mut all_uuids = HashSet::new();
