@@ -15,7 +15,7 @@ use std::{hash::Hash, str::FromStr};
 
 pub use crate::up_core_api::uuid::UUID;
 
-pub(crate) mod uuidbuilder;
+mod uuidbuilder;
 pub use uuidbuilder::UUIDBuilder;
 
 const BITMASK_VERSION: u64 = 0b1111 << 12;

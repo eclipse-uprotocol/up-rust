@@ -18,10 +18,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::UUID;
 
-pub(crate) const BITMASK_CLEAR_VERSION: u64 = 0xffff_ffff_ffff_0fff;
+const BITMASK_CLEAR_VERSION: u64 = 0xffff_ffff_ffff_0fff;
 const BITMASK_CLEAR_VARIANT: u64 = 0x3fff_ffff_ffff_ffff;
 
-pub(crate) const MAX_COUNT: u64 = 0xfff;
+const MAX_COUNT: u64 = 0xfff;
 
 /// A factory for creating UUIDs that can be used with uProtocol.
 ///
@@ -59,6 +59,23 @@ impl UUIDBuilder {
         }
     }
 
+    /// Creates a UUID n ms in the past.
+    ///
+    /// # Note
+    ///
+    /// For internal testing purposes only. For end-users, please use [`UUIDBuilder::build()`]
+    #[allow(dead_code)] // used for testing in other modules, but not picked up on so we disable the warning here
+    pub(crate) fn build_n_ms_in_past(n_ms_in_past: u64) -> UUID {
+        let mut uuid = UUIDBuilder::build();
+        let time = uuid.get_time().unwrap();
+        let counter = uuid.msb & MAX_COUNT;
+        let time_n_ms_in_past = time - n_ms_in_past;
+        let past_msb = ((time_n_ms_in_past << 16) | counter) & BITMASK_CLEAR_VERSION
+            | crate::uuid::VERSION_CUSTOM;
+        uuid.msb = past_msb;
+        uuid
+    }
+
     /// Creates a new UUID based on a particular instance of [`UUIDBuilder`]
     pub(crate) fn build_internal(&self) -> UUID {
         // We utilize a Compare-and-Swap (CAS) technique here to ensure that we always generate
@@ -86,6 +103,7 @@ impl UUIDBuilder {
                     // do not expect any uEntity to emit more than
                     // 4095 messages/ms
                     // so we simply keep the current counter at MAX_COUNT
+                    // and wait for the next millisecond to arrive
                     continue;
                 }
             } else {
