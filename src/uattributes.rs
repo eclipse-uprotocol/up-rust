@@ -71,10 +71,9 @@ impl UAttributes {
     ///
     /// ```rust
     /// use up_rust::{CallOptions, UAttributes, UMessageType, UPriority, UUIDBuilder, UUri};
-    ///
+
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let uuid_builder = UUIDBuilder::new();
-    /// let message_id = uuid_builder.build();
+    /// let message_id = UUIDBuilder::build();
     /// let method_to_invoke = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let options = CallOptions {

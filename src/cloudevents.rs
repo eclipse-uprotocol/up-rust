@@ -407,7 +407,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let uuid = UUIDBuilder::new().build();
+        let uuid = UUIDBuilder::build();
         let payload = UPayload {
             data: Some(crate::up_core_api::upayload::upayload::Data::Value(
                 Any::default().value,

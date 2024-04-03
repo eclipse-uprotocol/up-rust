@@ -193,6 +193,8 @@ impl UUID {
     }
 }
 
+impl Eq for UUID {}
+
 impl Hash for UUID {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         let bytes = (self.msb, self.lsb);
