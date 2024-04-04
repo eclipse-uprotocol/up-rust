@@ -26,7 +26,7 @@ use crate::UAttributesError;
 ///
 /// `UAttributesValidator` is a trait implemented by all validators for `UAttributes`. It provides functionality
 /// to help validate that a given `UAttributes` instance is correctly configured to define the Payload.
-pub trait UAttributesValidator {
+pub trait UAttributesValidator: Send {
     /// Checks if a given set of attributes complies with the rules specified for
     /// the type of message they describe.
     ///
