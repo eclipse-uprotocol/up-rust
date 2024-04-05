@@ -13,11 +13,21 @@
 
 pub use crate::up_core_api::uri::UEntity;
 use crate::uri::UUriError;
+use std::hash::{Hash, Hasher};
 
 const UENTITY_ID_LENGTH: usize = 16;
 const UENTITY_ID_VALID_BITMASK: u32 = 0xffff << UENTITY_ID_LENGTH;
 const UENTITY_MAJOR_VERSION_LENGTH: usize = 8;
 const UENTITY_MAJOR_VERSION_VALID_BITMASK: u32 = 0xffffff << UENTITY_MAJOR_VERSION_LENGTH;
+
+impl Hash for UEntity {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.version_major.hash(state);
+    }
+}
+
+impl Eq for UEntity {}
 
 impl UEntity {
     pub fn has_id(&self) -> bool {

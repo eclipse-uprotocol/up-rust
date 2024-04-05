@@ -12,6 +12,7 @@
  ********************************************************************************/
 
 use bytes::BufMut;
+use std::hash::{Hash, Hasher};
 
 pub use crate::up_core_api::uri::{uauthority::Number, UAuthority};
 use crate::uri::UUriError;
@@ -20,6 +21,26 @@ const REMOTE_IPV4_BYTES: usize = 4;
 const REMOTE_IPV6_BYTES: usize = 16;
 const REMOTE_ID_MINIMUM_BYTES: usize = 1;
 const REMOTE_ID_MAXIMUM_BYTES: usize = 255;
+
+impl Hash for UAuthority {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.number.hash(state);
+    }
+}
+
+impl Eq for UAuthority {}
+
+impl Hash for Number {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Number::Ip(ip) => ip.hash(state),
+            Number::Id(id) => id.hash(state),
+        }
+    }
+}
+
+impl Eq for Number {}
 
 /// uProtocol defines a [Micro-URI format](https://github.com/eclipse-uprotocol/up-spec/blob/main/basics/uri.adoc#42-micro-uris), which contains
 /// a type field for which addressing mode is used by a MicroUri. The `AddressType` type implements this definition.
