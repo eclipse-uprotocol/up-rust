@@ -130,7 +130,7 @@ pub trait UListener: 'static + Send + Sync {
 /// sending [`UMessage`][crate::UMessage] using the configured technology. For more information, please refer to
 /// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
 #[async_trait]
-pub trait UTransport {
+pub trait UTransport: Send + Sync {
     /// Sends a message using this transport's message exchange mechanism.
     ///
     /// # Arguments

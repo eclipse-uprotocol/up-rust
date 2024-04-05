@@ -23,7 +23,7 @@ pub type RpcClientResult = Result<UMessage, RpcMapperError>;
 /// The trait provides a clean contract for mapping a RPC requiest to a response. For more details please refer to the
 /// [RpcClient Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l2/README.adoc).
 #[async_trait]
-pub trait RpcClient {
+pub trait RpcClient: Send + Sync {
     /// Invokes a method on a remote service asynchronously.
     ///
     /// This function is an API for clients to send an RPC request and receive a response.
