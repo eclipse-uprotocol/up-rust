@@ -86,7 +86,7 @@ use crate::{UMessage, UStatus, UUri};
 /// }
 /// ```
 #[async_trait]
-pub trait UListener: 'static + Send + Sync {
+pub trait UListener: Send + Sync {
     /// Performs some action on receipt of a message
     ///
     /// # Parameters
