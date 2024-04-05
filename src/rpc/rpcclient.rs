@@ -18,10 +18,10 @@ use crate::{CallOptions, RpcMapperError, UMessage, UPayload, UUri};
 pub type RpcClientResult = Result<UMessage, RpcMapperError>;
 
 /// `RpcClient` is an interface used by code generators for uProtocol services defined in `.proto` files such as
-/// the core uProtocol services found in [uProtocol Core API](https://github.com/eclipse-uprotocol/uprotocol-core-api).
+/// the core uProtocol services found in [uProtocol Core API](https://github.com/eclipse-uprotocol/up-spec/tree/main/up-core-api).
 ///
 /// The trait provides a clean contract for mapping a RPC requiest to a response. For more details please refer to the
-/// [RpcClient Specifications](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l2/README.adoc).
+/// [RpcClient Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/rpcclient.adoc).
 #[async_trait]
 pub trait RpcClient: Send + Sync {
     /// Invokes a method on a remote service asynchronously.
