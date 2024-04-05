@@ -70,8 +70,7 @@ mod ustatus;
 pub use ustatus::{UCode, UStatus};
 
 mod utransport;
-pub use utransport::UTransport;
-
+pub use utransport::{ComparableListener, UListener, UTransport};
 mod uuid;
 pub use uuid::{UUIDBuilder, UUID};
 
@@ -95,6 +94,7 @@ pub use up_core_api::utwin;
 // cloudevent-proto, generated and augmented types
 #[cfg(feature = "cloudevents")]
 pub mod cloudevents;
+
 #[cfg(feature = "cloudevents")]
 mod proto_cloudevents {
     include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
