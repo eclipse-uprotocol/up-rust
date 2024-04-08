@@ -22,8 +22,7 @@ use crate::{UMessage, UStatus, UUri};
 ///
 /// Implementations of `UListener` contain the details for what should occur when a message is received
 ///
-/// For more information, please refer to
-/// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
+/// For more information, please refer to [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/README.adoc).
 ///
 /// # Examples
 ///
@@ -86,7 +85,7 @@ use crate::{UMessage, UStatus, UUri};
 /// }
 /// ```
 #[async_trait]
-pub trait UListener: 'static + Send + Sync {
+pub trait UListener: Send + Sync {
     /// Performs some action on receipt of a message
     ///
     /// # Parameters
@@ -128,9 +127,9 @@ pub trait UListener: 'static + Send + Sync {
 ///
 /// Implementations of [`UTransport`] contain the details for connecting to the underlying transport technology and
 /// sending [`UMessage`][crate::UMessage] using the configured technology. For more information, please refer to
-/// [uProtocol Specification](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/main/up-l1/README.adoc).
+/// [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/README.adoc).
 #[async_trait]
-pub trait UTransport {
+pub trait UTransport: Send + Sync {
     /// Sends a message using this transport's message exchange mechanism.
     ///
     /// # Arguments
