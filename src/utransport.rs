@@ -290,6 +290,10 @@ impl ComparableListener {
     pub fn new(listener: Arc<dyn UListener>) -> Self {
         Self { listener }
     }
+    /// Gets a clone of the wrapped reference to the listener.
+    pub fn into_inner(&self) -> Arc<dyn UListener> {
+        self.listener.clone()
+    }
 }
 
 /// Allows us to call the methods on the held `Arc<dyn UListener>` directly
