@@ -490,7 +490,6 @@ impl UCloudEventUtils {
 mod tests {
     use super::*;
 
-    use chrono::{offset, TimeZone, Utc};
     use protobuf::well_known_types::any::Any;
     use url::Url;
 
@@ -760,23 +759,18 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_creation_timestamp_from_cloud_event_uuidv8_id_when_uuidv8_id_is_valid() {
+    fn test_extract_creation_timestamp_from_cloud_event_succeeds() {
         let uuid = UUIDBuilder::build();
         let builder = build_base_cloud_event_for_test();
-        let cloud_event = builder.id(uuid).build().unwrap();
+        let cloud_event = builder.id(uuid.to_hyphenated_string()).build().unwrap();
 
         let maybe_creation_timestamp = UCloudEventUtils::get_creation_timestamp(&cloud_event);
         assert!(maybe_creation_timestamp.is_some());
 
         let creation_timestamp = maybe_creation_timestamp.unwrap();
-        let now = offset::Utc::now();
-
-        // Convert the creation_timestamp to a DateTime.
-        let creation_timestamp_datetime =
-            Utc.timestamp_millis_opt(creation_timestamp as i64).unwrap();
 
         // Verify the equality of the two timestamps at the seconds precision.
-        assert_eq!(creation_timestamp_datetime.timestamp(), now.timestamp());
+        assert_eq!(creation_timestamp, uuid.get_time().unwrap());
     }
 
     #[test]
