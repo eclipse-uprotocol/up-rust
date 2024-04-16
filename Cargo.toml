@@ -37,6 +37,7 @@ cloudevents = ["dep:cloudevents-sdk", "dep:serde", "dep:serde_json"]
 udiscovery = []
 usubscription = []
 utwin = []
+default = []
 
 [dependencies]
 async-trait = { version = "0.1" }

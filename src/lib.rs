@@ -83,13 +83,7 @@ mod up_core_api {
 // pub use up_core_api::file;
 // pub use up_core_api::uprotocol_options;
 
-// Types not used by up_rust, but re-exported to up_rust users, keeping them in their respective submodules
-#[cfg(feature = "udiscovery")]
-pub use up_core_api::udiscovery;
-#[cfg(feature = "usubscription")]
-pub use up_core_api::usubscription;
-#[cfg(feature = "utwin")]
-pub use up_core_api::utwin;
+pub mod core;
 
 // cloudevent-proto, generated and augmented types
 #[cfg(feature = "cloudevents")]
