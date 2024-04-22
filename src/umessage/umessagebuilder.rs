@@ -17,7 +17,7 @@ use protobuf::{Enum, EnumOrUnknown, Message};
 use crate::uattributes::{NotificationValidator, UAttributesError};
 use crate::{
     Data, PublishValidator, RequestValidator, ResponseValidator, UAttributes, UAttributesValidator,
-    UCode, UMessage, UMessageType, UPayload, UPayloadFormat, UPriority, UUri, UUID,
+    UCode, UMessage, UMessageType, UPayload, UPayloadFormat, UPriority, UUIDBuilder, UUri, UUID,
 };
 
 #[derive(Debug)]
@@ -107,13 +107,11 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
+    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
     /// let message = UMessageBuilder::publish(topic.clone())
-    ///                    .with_message_id(UUIDBuilder::build())
     ///                    .build_with_payload("closed".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
@@ -142,14 +140,12 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
+    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let origin = UUri::try_from("my-vehicle/cabin/1/dashcam#event")?;
     /// let destination = UUri::try_from("my-cloud/companion/1/alarm")?;
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
-    ///                    .with_message_id(UUIDBuilder::build())
     ///                    .build_with_payload("unexpected movement".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_NOTIFICATION.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
@@ -185,14 +181,12 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
+    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let method_to_invoke = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let message = UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
-    ///                    .with_message_id(UUIDBuilder::build())
     ///                    .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_REQUEST.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
@@ -232,14 +226,14 @@ impl UMessageBuilder {
     ///
     /// ```rust
     /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let request_id = UUIDBuilder::build();
+    /// // a service implementation would normally use
+    /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address.clone(), request_id.clone(), invoked_method.clone())
-    ///                    .with_message_id(UUIDBuilder::build())
     ///                    .build()?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
@@ -281,18 +275,16 @@ impl UMessageBuilder {
     ///
     /// ```rust
     /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let method_to_invoke = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let request_message_id = UUIDBuilder::build();
     /// let request_message = UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
-    ///                           .with_message_id(request_message_id.clone())
+    ///                           .with_message_id(request_message_id.clone()) // normally not needed, used only for asserts below
     ///                           .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     ///
     /// let response_message = UMessageBuilder::response_for_request(&request_message.attributes)
-    ///                           .with_message_id(UUIDBuilder::build())
     ///                           .with_priority(UPriority::UPRIORITY_CS5)
     ///                           .build()?;
     /// assert_eq!(response_message.attributes.type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
@@ -319,12 +311,11 @@ impl UMessageBuilder {
 
     /// Sets the message's identifier.
     ///
-    /// Every message must have an identifier and any of the build functions will return an error if no
-    /// identifier has been set.
+    /// Every message must have an identifier. If this function is not used, an identifier will be
+    /// generated and set on the message when one of the `build` functions is called on the
+    /// `UMessageBuilder`.
     ///
-    /// This function is particularly helpful in order to re-use a builder for creating multiple
-    /// messages consecutively based on the same attributes, differing in payload only as illustrated
-    /// in the examples.
+    /// It's more typical to _not_ use this function, but could have edge case uses.
     ///
     /// # Arguments
     ///
@@ -342,7 +333,6 @@ impl UMessageBuilder {
     ///
     /// ```rust
     /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
@@ -388,13 +378,11 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
+    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
     /// let message = UMessageBuilder::publish(topic)
-    ///                   .with_message_id(UUIDBuilder::build())
     ///                   .with_priority(UPriority::UPRIORITY_CS5)
     ///                   .build_with_payload("closed".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS5.into());
@@ -425,13 +413,14 @@ impl UMessageBuilder {
     ///
     /// ```rust
     /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
-    /// let message = UMessageBuilder::response(reply_to_address, UUIDBuilder::build(), invoked_method)
-    ///                     .with_message_id(UUIDBuilder::build())
+    /// let request_msg_id = UUIDBuilder::build();
+    /// // a service implementation would normally use
+    /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
+    /// let message = UMessageBuilder::response(reply_to_address, request_msg_id, invoked_method)
     ///                     .with_ttl(2000)
     ///                     .build()?;
     /// assert_eq!(message.attributes.ttl, Some(2000));
@@ -460,15 +449,13 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
+    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let method_to_invoke = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let token = String::from("this-is-my-token");
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
-    ///                     .with_message_id(UUIDBuilder::build())
     ///                     .with_token(token.clone())
     ///                     .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.token, Some(token));
@@ -499,14 +486,12 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UCode, UMessageBuilder, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
+    /// use up_rust::{UCode, UMessageBuilder, UPayloadFormat, UPriority, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let method_to_invoke = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
-    ///                     .with_message_id(UUIDBuilder::build())
     ///                     .with_permission_level(12)
     ///                     .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.permission_level, Some(12));
@@ -538,14 +523,15 @@ impl UMessageBuilder {
     /// ```rust
     /// use protobuf::{Enum, EnumOrUnknown};
     /// use up_rust::{UCode, UMessageBuilder, UPriority, UUIDBuilder, UUri};
-
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let status = UCode::OK.value();
-    /// let message = UMessageBuilder::response(reply_to_address, UUIDBuilder::build(), invoked_method)
-    ///                     .with_message_id(UUIDBuilder::build())
+    /// let request_msg_id = UUIDBuilder::build();
+    /// // a service implementation would normally use
+    /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
+    /// let message = UMessageBuilder::response(reply_to_address, request_msg_id, invoked_method)
     ///                     .with_comm_status(status)
     ///                     .build()?;
     /// assert_eq!(message.attributes.commstatus, Some(EnumOrUnknown::from_i32(status)));
@@ -571,15 +557,37 @@ impl UMessageBuilder {
     ///
     /// # Examples
     ///
+    /// ## Not setting `id` explicitly with [`UMessageBuilder::with_message_id()']
+    ///
+    /// The recommended way to use the `UMessageBuilder`.
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageBuilderError, UMessageType, UPriority, UUIDBuilder, UUri};
+    ///
+    /// let invoked_method = UUri::try_from("my-vehicle/cabin/1/rpc.doors").unwrap();
+    /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response").unwrap();
+    /// // a service implementation would normally use
+    /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
+    /// let result = UMessageBuilder::response(reply_to_address, UUIDBuilder::build(), invoked_method)
+    ///                     .build();
+    /// assert!(result.is_ok());
+    /// ```
+    ///
+    /// ## Setting `id` explicitly with [`UMessageBuilder::with_message_id()']
+    ///
+    /// Note that explicitly using [`UMessageBuilder::with_message_id()'] is not required as shown
+    /// above.
+    ///
     /// ```rust
     /// use up_rust::{UMessageBuilder, UMessageType, UPriority, UUIDBuilder, UUri};
-
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let lsb = UUIDBuilder::build().lsb;
     /// let invoked_method = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let message_id = UUIDBuilder::build();
+    /// // a service implementation would normally use
+    /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, UUIDBuilder::build(), invoked_method)
     ///                     .with_message_id(message_id.clone())
     ///                     .build()?;
@@ -588,24 +596,13 @@ impl UMessageBuilder {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// ## Missing Message ID
-    ///
-    /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageBuilderError, UMessageType, UPriority, UUIDBuilder, UUri};
-
-    ///
-    /// let invoked_method = UUri::try_from("my-vehicle/cabin/1/rpc.doors").unwrap();
-    /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response").unwrap();
-    /// let result = UMessageBuilder::response(reply_to_address, UUIDBuilder::build(), invoked_method)
-    ///                     .build();
-    /// assert!(result.is_err());
-    /// assert!(matches!(result.unwrap_err(), UMessageBuilderError::AttributesValidationError(msg)));
-    /// ```
-
     pub fn build(&self) -> Result<UMessage, UMessageBuilderError> {
+        let message_id = self
+            .message_id
+            .clone()
+            .map_or_else(|| Some(UUIDBuilder::build()), Some);
         let attributes = UAttributes {
-            id: self.message_id.clone().into(),
+            id: message_id.into(),
             type_: self.message_type.into(),
             source: self.source.clone().into(),
             sink: self.sink.clone().into(),
@@ -657,14 +654,11 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri};
-
+    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
-    /// let message_id = UUIDBuilder::build();
     /// let message = UMessageBuilder::publish(topic)
-    ///                    .with_message_id(message_id)
     ///                    .build_with_payload("locked".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert!(message.payload.is_some());
     /// # Ok(())
@@ -702,14 +696,14 @@ impl UMessageBuilder {
     /// ```rust
     /// use protobuf::{Enum, Message};
     /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPriority, UStatus, UUIDBuilder, UUri};
-
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
     /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
     /// let request_id = UUIDBuilder::build();
+    /// // a service implementation would normally use
+    /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
-    ///                    .with_message_id(UUIDBuilder::build())
     ///                    .with_comm_status(UCode::INVALID_ARGUMENT.value())
     ///                    .build_with_protobuf_payload(&UStatus::fail("failed to parse request"))?;
     /// assert!(message.payload.is_some());
