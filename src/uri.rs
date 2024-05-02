@@ -612,7 +612,7 @@ impl UUri {
             }
         }
         if let Some(entity) = long_uri_parsed.entity.as_ref() {
-            ue.name = entity.name.clone();
+            ue.name.clone_from(&entity.name);
         }
         if let Some(resource) = micro_uri_parsed.resource.as_ref() {
             ure.id = resource.id;
