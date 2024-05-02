@@ -211,11 +211,11 @@ pub trait UTransport: Send + Sync {
     /// #         todo!()
     /// #     }
     /// #
-    /// #     async fn register_listener(&mut self, _source: &UUri, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
+    /// #     async fn register_listener(&self, _source: &UUri, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
     /// #         Ok(())
     /// #     }
     /// #
-    /// #     async fn unregister_listener(&mut self, _source: &UUri, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
+    /// #     async fn unregister_listener(&self, _source: &UUri, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
     /// #         Ok(())
     /// #     }
     /// # }
@@ -251,7 +251,7 @@ pub trait UTransport: Send + Sync {
     ///     my_listener);
     /// ```
     async fn register_listener(
-        &mut self,
+        &self,
         source_filter: &UUri,
         sink_filter: Option<&UUri>,
         listener: Arc<dyn UListener>,
@@ -272,7 +272,7 @@ pub trait UTransport: Send + Sync {
     ///
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener(
-        &mut self,
+        &self,
         source_filter: &UUri,
         sink_filter: Option<&UUri>,
         listener: Arc<dyn UListener>,
@@ -348,15 +348,18 @@ mod tests {
     use async_trait::async_trait;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
+    use std::sync::Mutex;
 
     #[derive(Default)]
     struct UPClientFoo {
-        source_listeners: HashMap<UUri, HashSet<ComparableListener>>,
+        source_listeners: Mutex<HashMap<UUri, HashSet<ComparableListener>>>,
     }
 
     impl UPClientFoo {
         fn check_on_receive(&mut self, source: &UUri, umessage: &UMessage) -> Result<(), UStatus> {
             self.source_listeners
+                .lock()
+                .unwrap()
                 .get(source)
                 .ok_or_else(|| {
                     UStatus::fail_with_code(
@@ -399,17 +402,20 @@ mod tests {
         }
 
         async fn register_listener(
-            &mut self,
+            &self,
             source_filter: &UUri,
             _sink_filter: Option<&UUri>,
             listener: Arc<dyn UListener>,
         ) -> Result<(), UStatus> {
-            let listeners = self
-                .source_listeners
-                .entry(source_filter.to_owned())
-                .or_default();
             let identified_listener = ComparableListener::new(listener);
-            if listeners.insert(identified_listener) {
+            if self
+                .source_listeners
+                .lock()
+                .unwrap()
+                .entry(source_filter.to_owned())
+                .or_default()
+                .insert(identified_listener)
+            {
                 Ok(())
             } else {
                 Err(UStatus::fail_with_code(
@@ -420,12 +426,14 @@ mod tests {
         }
 
         async fn unregister_listener(
-            &mut self,
+            &self,
             source_filter: &UUri,
             _sink_filter: Option<&UUri>,
             listener: Arc<dyn UListener>,
         ) -> Result<(), UStatus> {
             self.source_listeners
+                .lock()
+                .unwrap()
                 .get_mut(source_filter)
                 .ok_or_else(|| {
                     UStatus::fail_with_code(
