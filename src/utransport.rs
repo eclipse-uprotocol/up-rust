@@ -153,21 +153,31 @@ pub trait UTransport: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `topic` - The topic to receive the message from.
+    /// * `source_filter` - The [source](`crate::UAttributes::source`) address pattern that the message to receive needs to match.
+    /// * `sink_filter` - The [sink](`crate::UAttributes::sink`) address pattern that the message to receive needs to match.
     ///
     /// # Errors
     ///
-    /// Returns an error if no message could be received. Possible reasons are that the topic does not exist
-    /// or that no message is available from the topic.
-    async fn receive(&self, topic: UUri) -> Result<UMessage, UStatus>;
+    /// Returns an error if no message could be received, e.g. because no message matches the given addresses.
+    async fn receive(
+        &self,
+        source: Option<&UUri>,
+        sink: Option<&UUri>,
+    ) -> Result<UMessage, UStatus>;
 
-    /// Registers a listener to be called for each message that is received on a given address.
+    /// Registers a listener to be called for Notification and RPC Request/Response messages destined to
+    /// a given address.
     ///
     /// # Arguments
     ///
-    /// * `address` - The (resolved) address to register the listener for.
-    /// * `listener` - The listener to invoke. Note that we do not take ownership to communicate
-    ///                that a caller should keep a copy to be able to call `unregister_listener()`
+    /// * `source_filter` - The [source](`crate::UAttributes::source`) address pattern that messages need to match,
+    ///                     or `None` to match all addresses.
+    /// * `sink_filter` - The [sink](`crate::UAttributes::sink`) address pattern that messages need to match,
+    ///                   or `None` to match all addresses.
+    /// * `listener` - The listener to invoke. The listener will be invoked for each message that matches the given
+    ///              source and sink filter patterns according to the rules defined by the
+    ///              [UUri specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/basics/uri.adoc).
+    ///              The listener can be unregistered again using [`UTransport::unregister_listener`].
     ///
     /// # Errors
     ///
@@ -180,7 +190,7 @@ pub trait UTransport: Send + Sync {
     /// ```
     /// use std::sync::Arc;
     /// use up_rust::UListener;
-    /// # use up_rust::{UMessage, UStatus, UTransport, UUri};
+    /// # use up_rust::{UMessage, UMessageType, UStatus, UTransport, UUri};
     /// # use async_trait::async_trait;
     /// #
     /// # pub struct MyTransport;
@@ -197,15 +207,15 @@ pub trait UTransport: Send + Sync {
     /// #         todo!()
     /// #     }
     /// #
-    /// #     async fn receive(&self, _topic: UUri) -> Result<UMessage, UStatus> {
+    /// #     async fn receive(&self, _source: Option<&UUri>, _sink: Option<&UUri>) -> Result<UMessage, UStatus> {
     /// #         todo!()
     /// #     }
     /// #
-    /// #     async fn register_listener(&self, _topic: UUri, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
+    /// #     async fn register_listener(&mut self, _source: Option<&UUri>, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
     /// #         Ok(())
     /// #     }
     /// #
-    /// #     async fn unregister_listener(&self, _topic: UUri, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
+    /// #     async fn unregister_listener(&mut self, _source: Option<&UUri>, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
     /// #         Ok(())
     /// #     }
     /// # }
@@ -230,38 +240,47 @@ pub trait UTransport: Send + Sync {
     /// #     }
     /// # }
     /// #
-    /// # let my_transport = MyTransport::new();
-    /// # let my_uuri = UUri::default();
+    /// # let mut my_transport = MyTransport::new();
+    /// # let source_uuri = UUri::default();
     ///
     /// // hang onto this listener...
-    /// let my_listener: Arc<dyn UListener> = Arc::new(MyListener::new());
-    /// // ...send a clone through when registering...
-    /// let register_result = my_transport.register_listener(my_uuri.clone(), my_listener.clone());
+    /// let my_listener = Arc::new(MyListener::new());
+    /// // ...use a clone for registering...
+    /// my_transport.register_listener(
+    ///     Some(&source_uuri),
+    ///     None,
+    ///     my_listener.clone());
     /// // ...and use the original we hung onto when unregistering
-    /// let unregister_result = my_transport.unregister_listener(my_uuri, my_listener);
+    /// my_transport.unregister_listener(
+    ///     Some(&source_uuri),
+    ///     None,
+    ///     my_listener);
     /// ```
     async fn register_listener(
-        &self,
-        topic: UUri,
+        &mut self,
+        source_filter: Option<&UUri>,
+        sink_filter: Option<&UUri>,
         listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus>;
 
-    /// Unregisters a listener for a given topic.
+    /// Unregisters a listener.
     ///
-    /// Messages arriving on this topic will no longer be processed by this listener.
+    /// The listener will no longer be called for any (matching) messages after this function has
+    /// returned successfully.
     ///
     /// # Arguments
     ///
-    /// * `topic` - Resolved topic uri where the listener was registered originally.
-    /// * `listener` - Identifier of the listener that should be unregistered. Here we take ownership
-    ///                to communicate that this listener is now finished.
+    /// * `source` - The source address pattern that the listener had been registered for.
+    /// * `sink` - The sink address pattern that the listener had been registered for.
+    /// * `listener` - The listener to unregister.
     ///
     /// # Errors
     ///
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener(
-        &self,
-        topic: UUri,
+        &mut self,
+        source_filter: Option<&UUri>,
+        sink_filter: Option<&UUri>,
         listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus>;
 }
@@ -331,51 +350,41 @@ mod tests {
     use crate::{Number, UAuthority, UCode, UMessage, UStatus, UTransport, UUri};
     use async_std::task;
     use async_trait::async_trait;
-    use std::collections::hash_map::Entry;
     use std::collections::{HashMap, HashSet};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
+    #[derive(Default)]
     struct UPClientFoo {
-        #[allow(clippy::type_complexity)]
-        listeners: Arc<Mutex<HashMap<UUri, HashSet<ComparableListener>>>>,
+        source_listeners: HashMap<UUri, HashSet<ComparableListener>>,
     }
 
     impl UPClientFoo {
-        pub fn new() -> Self {
-            Self {
-                listeners: Arc::new(Mutex::new(HashMap::new())),
-            }
-        }
-
-        pub fn check_on_receive(&self, uuri: &UUri, umessage: &UMessage) -> Result<(), UStatus> {
-            let mut topics_listeners = self.listeners.lock().unwrap();
-            let listeners = topics_listeners.entry(uuri.clone());
-            match listeners {
-                Entry::Vacant(_) => {
-                    return Err(UStatus::fail_with_code(
+        fn check_on_receive(&mut self, source: &UUri, umessage: &UMessage) -> Result<(), UStatus> {
+            self.source_listeners
+                .get(source)
+                .ok_or_else(|| {
+                    UStatus::fail_with_code(
                         UCode::NOT_FOUND,
-                        format!("No listeners registered for topic: {:?}", &uuri),
-                    ))
-                }
-                Entry::Occupied(mut e) => {
-                    let occupied = e.get_mut();
-
-                    if occupied.is_empty() {
-                        return Err(UStatus::fail_with_code(
+                        format!("No listeners registered for source address: {:?}", &source),
+                    )
+                })
+                .and_then(|listeners| {
+                    if listeners.is_empty() {
+                        Err(UStatus::fail_with_code(
                             UCode::NOT_FOUND,
-                            format!("No listeners registered for topic: {:?}", &uuri),
-                        ));
+                            format!("No listeners registered for topic: {:?}", &source),
+                        ))
+                    } else {
+                        for listener in listeners.iter() {
+                            let task_listener = listener.clone();
+                            let task_umessage = umessage.clone();
+                            task::spawn(
+                                async move { task_listener.on_receive(task_umessage).await },
+                            );
+                        }
+                        Ok(())
                     }
-
-                    for listener in occupied.iter() {
-                        let task_listener = listener.clone();
-                        let task_umessage = umessage.clone();
-                        task::spawn(async move { task_listener.on_receive(task_umessage).await });
-                    }
-                }
-            }
-
-            Ok(())
+                })
         }
     }
 
@@ -385,55 +394,77 @@ mod tests {
             todo!()
         }
 
-        async fn receive(&self, _topic: UUri) -> Result<UMessage, UStatus> {
+        async fn receive(
+            &self,
+            _source: Option<&UUri>,
+            _sink: Option<&UUri>,
+        ) -> Result<UMessage, UStatus> {
             todo!()
         }
 
         async fn register_listener(
-            &self,
-            topic: UUri,
+            &mut self,
+            source: Option<&UUri>,
+            _sink: Option<&UUri>,
             listener: Arc<dyn UListener>,
         ) -> Result<(), UStatus> {
-            let mut topics_listeners = self.listeners.lock().unwrap();
-            let listeners = topics_listeners.entry(topic).or_default();
-            let identified_listener = ComparableListener::new(listener);
-            let inserted = listeners.insert(identified_listener);
-
-            return match inserted {
-                true => Ok(()),
-                false => Err(UStatus::fail_with_code(
-                    UCode::ALREADY_EXISTS,
-                    "UUri + UListener pair already exists!",
-                )),
-            };
+            if let Some(source_address) = source {
+                let listeners = self
+                    .source_listeners
+                    .entry(source_address.to_owned())
+                    .or_default();
+                let identified_listener = ComparableListener::new(listener);
+                if listeners.insert(identified_listener) {
+                    Ok(())
+                } else {
+                    Err(UStatus::fail_with_code(
+                        UCode::ALREADY_EXISTS,
+                        "UUri + UListener pair already exists!",
+                    ))
+                }
+            } else {
+                Err(UStatus::fail_with_code(
+                    UCode::INVALID_ARGUMENT,
+                    "no source address",
+                ))
+            }
         }
 
         async fn unregister_listener(
-            &self,
-            topic: UUri,
+            &mut self,
+            source: Option<&UUri>,
+            _sink: Option<&UUri>,
             listener: Arc<dyn UListener>,
         ) -> Result<(), UStatus> {
-            let mut topics_listeners = self.listeners.lock().unwrap();
-            let listeners = topics_listeners.entry(topic.clone());
-            return match listeners {
-                Entry::Vacant(_) => Err(UStatus::fail_with_code(
-                    UCode::NOT_FOUND,
-                    format!("No listeners registered for topic: {:?}", &topic),
-                )),
-                Entry::Occupied(mut e) => {
-                    let occupied = e.get_mut();
-                    let identified_listener = ComparableListener::new(listener);
-                    let removed = occupied.remove(&identified_listener);
-
-                    match removed {
-                        true => Ok(()),
-                        false => Err(UStatus::fail_with_code(
+            if let Some(source_address) = source {
+                self.source_listeners
+                    .get_mut(source_address)
+                    .ok_or_else(|| {
+                        UStatus::fail_with_code(
                             UCode::NOT_FOUND,
-                            "UUri + UListener not found!",
-                        )),
-                    }
-                }
-            };
+                            format!(
+                                "No listeners registered for source address: {:?}",
+                                source_address
+                            ),
+                        )
+                    })
+                    .and_then(|listeners| {
+                        let identified_listener = ComparableListener::new(listener);
+                        if listeners.remove(&identified_listener) {
+                            Ok(())
+                        } else {
+                            Err(UStatus::fail_with_code(
+                                UCode::NOT_FOUND,
+                                "UUri + UListener not found!",
+                            ))
+                        }
+                    })
+            } else {
+                Err(UStatus::fail_with_code(
+                    UCode::INVALID_ARGUMENT,
+                    "no source address",
+                ))
+            }
         }
     }
 
@@ -480,11 +511,14 @@ mod tests {
 
     #[test]
     fn test_register_and_receive() {
-        let up_client_foo = UPClientFoo::new();
+        let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res =
-            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz.clone()));
+        let register_res = task::block_on(up_client_foo.register_listener(
+            Some(&uuri_1),
+            None,
+            listener_baz.clone(),
+        ));
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
@@ -494,11 +528,14 @@ mod tests {
 
     #[test]
     fn test_register_and_unregister() {
-        let up_client_foo = UPClientFoo::new();
+        let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res =
-            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz.clone()));
+        let register_res = task::block_on(up_client_foo.register_listener(
+            Some(&uuri_1),
+            None,
+            listener_baz.clone(),
+        ));
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
@@ -506,7 +543,7 @@ mod tests {
         assert_eq!(check_on_receive_res, Ok(()));
 
         let unregister_res =
-            task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz));
+            task::block_on(up_client_foo.unregister_listener(Some(&uuri_1), None, listener_baz));
         assert!(unregister_res.is_ok());
 
         let umessage = UMessage::default();
@@ -516,17 +553,23 @@ mod tests {
 
     #[test]
     fn test_register_multiple_listeners_on_one_uuri() {
-        let up_client_foo = UPClientFoo::new();
+        let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
         let listener_bar: Arc<dyn UListener> = Arc::new(ListenerBar);
 
-        let register_res =
-            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz.clone()));
+        let register_res = task::block_on(up_client_foo.register_listener(
+            Some(&uuri_1),
+            None,
+            listener_baz.clone(),
+        ));
         assert!(register_res.is_ok());
 
-        let register_res =
-            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_bar.clone()));
+        let register_res = task::block_on(up_client_foo.register_listener(
+            Some(&uuri_1),
+            None,
+            listener_bar.clone(),
+        ));
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
@@ -534,10 +577,10 @@ mod tests {
         assert_eq!(check_on_receive_res, Ok(()));
 
         let unregister_baz_res =
-            task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz));
+            task::block_on(up_client_foo.unregister_listener(Some(&uuri_1), None, listener_baz));
         assert!(unregister_baz_res.is_ok());
         let unregister_bar_res =
-            task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_bar));
+            task::block_on(up_client_foo.unregister_listener(Some(&uuri_1), None, listener_bar));
         assert!(unregister_bar_res.is_ok());
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
@@ -546,7 +589,7 @@ mod tests {
 
     #[test]
     fn test_if_no_listeners() {
-        let up_client_foo = UPClientFoo::new();
+        let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
 
         let umessage = UMessage::default();
@@ -557,36 +600,45 @@ mod tests {
 
     #[test]
     fn test_register_multiple_same_listeners_on_one_uuri() {
-        let up_client_foo = UPClientFoo::new();
+        let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
 
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res =
-            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz.clone()));
+        let register_res = task::block_on(up_client_foo.register_listener(
+            Some(&uuri_1),
+            None,
+            listener_baz.clone(),
+        ));
         assert!(register_res.is_ok());
 
-        let register_res =
-            task::block_on(up_client_foo.register_listener(uuri_1.clone(), listener_baz.clone()));
+        let register_res = task::block_on(up_client_foo.register_listener(
+            Some(&uuri_1),
+            None,
+            listener_baz.clone(),
+        ));
         assert!(register_res.is_err());
 
         let listener_baz_completely_different: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res = task::block_on(
-            up_client_foo
-                .register_listener(uuri_1.clone(), listener_baz_completely_different.clone()),
-        );
+        let register_res = task::block_on(up_client_foo.register_listener(
+            Some(&uuri_1),
+            None,
+            listener_baz_completely_different.clone(),
+        ));
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
-        let unregister_res = task::block_on(
-            up_client_foo.unregister_listener(uuri_1.clone(), listener_baz_completely_different),
-        );
+        let unregister_res = task::block_on(up_client_foo.unregister_listener(
+            Some(&uuri_1),
+            None,
+            listener_baz_completely_different,
+        ));
         assert!(unregister_res.is_ok());
 
         let unregister_baz_res =
-            task::block_on(up_client_foo.unregister_listener(uuri_1.clone(), listener_baz));
+            task::block_on(up_client_foo.unregister_listener(Some(&uuri_1), None, listener_baz));
         assert!(unregister_baz_res.is_ok());
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
