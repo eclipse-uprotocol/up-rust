@@ -88,6 +88,7 @@ jobs:
           components: clippy
       - name: Run cargo clippy
         run: |
+          cargo clippy --version
           cargo clippy --tests --examples
 
   docu:

@@ -11,30 +11,32 @@
 #  SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************/
 
-# Nightly-scheduled comprehensive test runs that would take too long for on-merge workflows
-# Note: running the coverage job would only make sense if we use that to upload coverage info to a public platform
+# Checks if the MSRV declared in Cargo.toml is correct.
 
-name: Nightly
+name: Check MSRV
 
 on:
-  schedule:
-    - cron: '0 3 * * *'
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
+env:
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  RUSTFLAGS: -Dwarnings
+  CARGO_TERM_COLOR: always
+
 jobs:
-  check-msrv:
-    uses: ./.github/workflows/verify_msrv.yaml
-
-  test-all-features:
-    uses: ./.github/workflows/test-featurematrix.yaml
-
-  x-build:
-    # The jury is still out on whether this actually adds any value, besides simply being possible...
-    uses: ./.github/workflows/x-build.yaml
-
-  coverage:
-    uses: ./.github/workflows/coverage.yaml
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@master
+      with: 
+        toolchain: ${{ env.RUST_TOOLCHAIN }}
+        components: msrv
+    - name: check MSRV
+      run: |
+        cargo msrv --verify
