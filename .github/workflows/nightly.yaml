@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   check-msrv:
-    uses: ./.github/workflows/verify_msrv.yaml
+    uses: ./.github/workflows/verify-msrv.yaml
 
   test-all-features:
     uses: ./.github/workflows/test-featurematrix.yaml
