@@ -49,15 +49,15 @@ use async_trait::async_trait;
 /// #             todo!()
 /// #         }
 /// #
-/// #         async fn receive(&self, topic: UUri) -> Result<UMessage, UStatus> {
+/// #         async fn receive(&self, source_filter: &UUri, sink_filter: Option<&UUri>) -> Result<UMessage, UStatus> {
 /// #             todo!()
 /// #         }
 /// #
-/// #         async fn register_listener(&self, topic: UUri, listener: Arc<dyn UListener>) -> Result<(), UStatus> {
+/// #         async fn register_listener(&self, source_filter: &UUri, sink_filter: Option<&UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus> {
 /// #             Ok(())
 /// #         }
 /// #
-/// #         async fn unregister_listener(&self, topic: UUri, listener: Arc<dyn UListener>) -> Result<(), UStatus> {
+/// #         async fn unregister_listener(&self, source_filter: &UUri, sink_filter: Option<&UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus> {
 /// #             Ok(())
 /// #         }
 /// #     }
@@ -213,7 +213,7 @@ use async_trait::async_trait;
 /// let subscription_response = usub.subscribe(subscription_request).await?;
 /// let success_code = subscription_response.status.code.enum_value_or(UCode::UNKNOWN);
 /// if success_code == UCode::OK {
-///     let register_success = up_client.register_listener(door_uuri.clone(), my_listener.clone()).await;
+///     let register_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await;
 /// } else {
 ///     match success_code {
 ///         UCode::NOT_FOUND => { /* handle topic not found */ }
@@ -227,7 +227,7 @@ use async_trait::async_trait;
 ///     ..Default::default()
 /// };
 /// let unsubscribe_result = usub.unsubscribe(unsubscribe_request).await?;
-/// let unregister_success = up_client.register_listener(door_uuri.clone(), my_listener.clone()).await;
+/// let unregister_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await;
 /// #
 /// # Ok(())
 /// # }
