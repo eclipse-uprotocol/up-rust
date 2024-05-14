@@ -31,6 +31,9 @@ on:
       test_results_url:
         description: "URL of the test results artifact"
         value: ${{ jobs.nextest.outputs.test_results_url }}
+      doctest_results_url:
+        description: "URL of the doctest results artifact"
+        value: ${{ jobs.doctest.outputs.test_results_url }}
   workflow_dispatch:
 
 concurrency:
@@ -148,4 +151,25 @@ jobs:
         with:
           name: test-results
           path: testresults--all-features.json
-          
+
+  doctest:
+    # Run doctests separately, as nextest doesn't yet (https://github.com/nextest-rs/nextest/issues/16)
+    outputs:
+      test_results_url: ${{ steps.doctest_results.outputs.artifact-url }}
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Run doc tests
+        run: |
+          RUSTC_BOOTSTRAP=1 cargo test --doc -- -Z unstable-options --format json --report-time > doctestresults--all-features.json
+      - name: Upload doctest results artifact
+        id: doctest_results
+        uses: actions/upload-artifact@v4
+        with:
+          name: doctest-results
+          path: doctestresults--all-features.json
