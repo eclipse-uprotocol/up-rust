@@ -33,7 +33,6 @@ rust-version = "1.72.1"
 version = "0.1.5"
 
 [features]
-cloudevents = ["dep:cloudevents-sdk", "dep:serde", "dep:serde_json"]
 udiscovery = []
 usubscription = []
 utwin = []
@@ -43,14 +42,11 @@ default = []
 async-trait = { version = "0.1" }
 bytes = { version = "1.5" }
 chrono = { version = "0.4.32" }
-cloudevents-sdk = { version = "0.7", optional = true }
 mediatype = "0.19"
 once_cell = { version = "1.19" }
 protobuf = { version = "3.3" }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
-serde = { version = "1.0", features = ["derive"], optional = true }
-serde_json = { version = "1.0", optional = true }
 url = { version = "2.5" }
 uuid = { version = "1.7", features = ["v8"] }
 
