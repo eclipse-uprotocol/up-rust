@@ -19,15 +19,6 @@ use std::path::PathBuf;
 const UPROTOCOL_BASE_URI: &str = "https://raw.githubusercontent.com/eclipse-uprotocol/uprotocol-core-api/uprotocol-core-api-1.5.7/uprotocol";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(feature = "cloudevents")]
-    get_and_build_protos(
-        &[
-            // cloudevent proto definitions
-            "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.proto", 
-        ],
-        "cloudevents",
-    )?;
-
     get_and_build_protos(
         &[
             // uProtocol-project proto definitions

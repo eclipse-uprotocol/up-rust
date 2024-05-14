@@ -34,7 +34,6 @@
 //!
 //! Some crate features are made optional, these include:
 //!
-//! * `cloudevents` feature, offering a way to represent uProtocol messages using the [cloudevents data model](https://cloudevents.io/)
 //! * `udiscovery` feature, which contains the generated protobuf stubs for [uProtocol Core API uDiscovery](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-l3/udiscovery/v3/README.adoc)
 //! * `usubscription` feature, which contains the generated protobuf stubs for [uProtocol Core API uSubscription](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-l3/usubscription/v3/README.adoc)
 //! * `utwin` feature, which contains the generated protobuf stubs for [uProtocol Core API uTwin](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-l3/utwin/v3/README.adoc)
@@ -84,13 +83,3 @@ mod up_core_api {
 // pub use up_core_api::uprotocol_options;
 
 pub mod core;
-
-// cloudevent-proto, generated and augmented types
-#[cfg(feature = "cloudevents")]
-pub mod cloudevents;
-
-#[cfg(feature = "cloudevents")]
-mod proto_cloudevents {
-    include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
-    pub(crate) use self::cloudevents::cloud_event::*; // re-export for crate use, remove triple-redundant names
-}

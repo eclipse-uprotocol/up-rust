@@ -16,10 +16,7 @@ __Note:__ the library uses non-stable features from the uuid crate, notably vers
 
 ### Optional features
 
-The up-rust crate contains some optional features, as per the crate documentation (refer to src/lib.rs). One of these features is the usage of protobuf message definitions from the cloudevents project. Specifically, with this feature enabled the build process downloads:
-
-- `cloudevents.proto` from the [CNCF CloudEvents specification project](https://github.com/cloudevents/spec/blob/main/cloudevents/formats/cloudevents.proto)
-
+The crate contains some optional features, as per the crate documentation (refer to src/lib.rs).
 To tell VSCode to just build all crate features automatically, place the following in `./vscode/settings.json`:
 
 ```json
