@@ -67,20 +67,23 @@ mod tests {
 
     use crate::{UAttributesError, UMessageType};
 
-    const PUBLISH_TYPE: &str = "pub.v1";
-    const REQUEST_TYPE: &str = "req.v1";
-    const RESPONSE_TYPE: &str = "res.v1";
+    const TYPE_PUBLISH: &str = "pub.v1";
+    const TYPE_NOTIFICATION: &str = "not.v1";
+    const TYPE_REQUEST: &str = "req.v1";
+    const TYPE_RESPONSE: &str = "res.v1";
 
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, PUBLISH_TYPE; "for PUBLISH")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, REQUEST_TYPE; "for REQUEST")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, RESPONSE_TYPE; "for RESPONSE")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, TYPE_PUBLISH; "for PUBLISH")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, TYPE_NOTIFICATION; "for NOTIFICATION")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, TYPE_REQUEST; "for REQUEST")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, TYPE_RESPONSE; "for RESPONSE")]
     fn test_to_cloudevent_type(message_type: UMessageType, expected_ce_name: &str) {
         assert_eq!(message_type.to_cloudevent_type(), expected_ce_name);
     }
 
-    #[test_case(PUBLISH_TYPE, Some(UMessageType::UMESSAGE_TYPE_PUBLISH); "succeeds for PUBLISH")]
-    #[test_case(REQUEST_TYPE, Some(UMessageType::UMESSAGE_TYPE_REQUEST); "succeeds for REQUEST")]
-    #[test_case(RESPONSE_TYPE, Some(UMessageType::UMESSAGE_TYPE_RESPONSE); "succeeds for RESPONSE")]
+    #[test_case(TYPE_PUBLISH, Some(UMessageType::UMESSAGE_TYPE_PUBLISH); "succeeds for PUBLISH")]
+    #[test_case(TYPE_NOTIFICATION, Some(UMessageType::UMESSAGE_TYPE_NOTIFICATION); "succeeds for NOTIFICATION")]
+    #[test_case(TYPE_REQUEST, Some(UMessageType::UMESSAGE_TYPE_REQUEST); "succeeds for REQUEST")]
+    #[test_case(TYPE_RESPONSE, Some(UMessageType::UMESSAGE_TYPE_RESPONSE); "succeeds for RESPONSE")]
     #[test_case("foo.bar", None; "fails for unknown type")]
     fn test_try_from_cloudevent_type(
         cloudevent_type: &str,
