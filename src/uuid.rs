@@ -16,6 +16,7 @@ use std::{hash::Hash, str::FromStr};
 pub use crate::up_core_api::uuid::UUID;
 
 mod uuidbuilder;
+use uuid_simd::{AsciiCase, Out};
 pub use uuidbuilder::UUIDBuilder;
 
 const BITMASK_VERSION: u64 = 0b1111 << 12;
@@ -45,26 +46,25 @@ impl std::fmt::Display for UuidConversionError {
 impl std::error::Error for UuidConversionError {}
 
 impl UUID {
-    /// Creates a new [`UUID`] from an existing [`uuid::Uuid`].
+    /// Creates a new UUID from a byte array.
+    ///
+    /// # Arguments
+    ///
+    /// `bytes` - the byte array
     ///
     /// # Returns
     ///
-    /// a [`UUID`] having the same bytes as the [`uuid::Uuid`].
+    /// a uProtocol [`UUID`] with the given timestamp, counter and random values.
     ///
     /// # Errors
     ///
-    /// Returns an error if the given UUID has an invalid version and/or variant identifier.
-    pub(crate) fn from_uuid(uuid: &uuid::Uuid) -> Result<Self, UuidConversionError> {
-        UUID::from_u64_pair(uuid.as_u64_pair().0, uuid.as_u64_pair().1)
-    }
-
-    /// Creates a new [`uuid::Uuid`] from this UUID.
-    ///
-    /// # Returns
-    ///
-    /// a [`uuid::Uuid`] having the same bytes as this UUID.
-    pub(crate) fn to_uuid(&self) -> uuid::Uuid {
-        uuid::Uuid::from_u64_pair(self.msb, self.lsb)
+    /// Returns an error if the given bytes contain an invalid version and/or variant identifier.
+    pub(crate) fn from_bytes(bytes: &[u8; 16]) -> Result<Self, UuidConversionError> {
+        let mut msb = [0_u8; 8];
+        let mut lsb = [0_u8; 8];
+        msb.copy_from_slice(&bytes[..8]);
+        lsb.copy_from_slice(&bytes[8..]);
+        Self::from_u64_pair(u64::from_be_bytes(msb), u64::from_be_bytes(lsb))
     }
 
     /// Creates a new UUID from a high/low value pair.
@@ -96,7 +96,8 @@ impl UUID {
     }
 
     /// Serializes this UUID to a hyphenated string as defined by
-    /// [RFC 4122, Section 3](https://www.rfc-editor.org/rfc/rfc4122.html#section-3).
+    /// [RFC 4122, Section 3](https://www.rfc-editor.org/rfc/rfc4122.html#section-3)
+    /// using lower case characters.
     ///
     /// # Examples
     ///
@@ -105,13 +106,19 @@ impl UUID {
     ///
     /// // timestamp = 1, ver = 0b1000
     /// let msb = 0x0000000000018000_u64;
-    /// // variant = 0b10, random = 0x0010101010101010
-    /// let lsb = 0x8010101010101010_u64;
+    /// // variant = 0b10, random = 0x0010101010101a1a
+    /// let lsb = 0x8010101010101a1a_u64;
     /// let uuid = UUID { msb, lsb, ..Default::default() };
-    /// assert_eq!(uuid.to_hyphenated_string(), "00000000-0001-8000-8010-101010101010");
+    /// assert_eq!(uuid.to_hyphenated_string(), "00000000-0001-8000-8010-101010101a1a");
     /// ```
     pub fn to_hyphenated_string(&self) -> String {
-        self.to_uuid().as_hyphenated().to_string()
+        let mut bytes = [0_u8; 16];
+        bytes[..8].clone_from_slice(self.msb.to_be_bytes().as_slice());
+        bytes[8..].clone_from_slice(self.lsb.to_be_bytes().as_slice());
+        let mut out_bytes = [0_u8; 36];
+        let out =
+            uuid_simd::format_hyphenated(&bytes, Out::from_mut(&mut out_bytes), AsciiCase::Lower);
+        String::from_utf8(out.to_vec()).unwrap()
     }
 
     fn is_custom_version(&self) -> bool {
@@ -236,12 +243,12 @@ impl FromStr for UUID {
     /// use up_rust::UUID;
     ///
     /// // parsing a valid uProtocol UUID succeeds
-    /// let parsing_attempt = "00000000-0001-8000-8010-101010101010".parse::<UUID>();
+    /// let parsing_attempt = "00000000-0001-8000-8010-101010101a1A".parse::<UUID>();
     /// assert!(parsing_attempt.is_ok());
     /// let uuid = parsing_attempt.unwrap();
     /// assert!(uuid.is_uprotocol_uuid());
     /// assert_eq!(uuid.msb, 0x0000000000018000_u64);
-    /// assert_eq!(uuid.lsb, 0x8010101010101010_u64);
+    /// assert_eq!(uuid.lsb, 0x8010101010101a1a_u64);
     ///
     /// // parsing an invalid UUID fails
     /// assert!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
@@ -249,9 +256,10 @@ impl FromStr for UUID {
     ///     .is_err());
     /// ```
     fn from_str(uuid_str: &str) -> Result<Self, Self::Err> {
-        uuid::Uuid::from_str(uuid_str)
+        let mut uuid = [0u8; 16];
+        uuid_simd::parse_hyphenated(uuid_str.as_bytes(), Out::from_mut(&mut uuid))
             .map_err(|err| UuidConversionError::new(err.to_string()))
-            .and_then(|uuid| UUID::from_uuid(&uuid))
+            .and_then(|bytes| UUID::from_bytes(bytes))
     }
 }
 
@@ -279,36 +287,16 @@ mod tests {
     }
 
     #[test]
-    fn test_from_uuid() {
-        // timestamp = 1, ver = 0b1000
-        let hi = 0x0000000000018000_u64;
-        // variant = 0b10
-        let lo = 0x8000000000000000_u64;
-        let other_uuid = uuid::Uuid::from_u64_pair(hi, lo);
-        let conversion_attempt = UUID::from_uuid(&other_uuid);
-        assert!(conversion_attempt.is_ok());
-        let uuid = conversion_attempt.unwrap();
-        assert_eq!((uuid.msb, uuid.lsb), other_uuid.as_u64_pair());
-
-        // timestamp = 1, (invalid) ver = 0b0000
-        let hi = 0x0000000000010000_u64;
-        // (invalid) variant= 0b00
-        let lo = 0x00000000000000ab_u64;
-        let other_uuid = uuid::Uuid::from_u64_pair(hi, lo);
-        assert!(UUID::from_uuid(&other_uuid).is_err());
-    }
-
-    #[test]
-    fn test_to_uuid() {
-        // timestamp = 1, ver = 0b1000
-        let msb = 0x0000000000018000_u64;
-        // variant = 0b10
-        let lsb = 0x8000000000000000_u64;
-        let conversion_attempt = UUID::from_u64_pair(msb, lsb);
+    fn test_from_bytes() {
+        // timestamp = 1, ver = 0b1000, variant = 0b10
+        let bytes: [u8; 16] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x80, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let conversion_attempt = UUID::from_bytes(&bytes);
         assert!(conversion_attempt.is_ok());
         let uuid = conversion_attempt.unwrap();
         assert!(uuid.is_uprotocol_uuid());
-        let other_uuid = uuid.to_uuid();
-        assert_eq!((uuid.msb, uuid.lsb), other_uuid.as_u64_pair());
+        assert_eq!(uuid.get_time(), Some(0x1_u64));
     }
 }
