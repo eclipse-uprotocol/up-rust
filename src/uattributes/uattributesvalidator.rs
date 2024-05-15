@@ -15,7 +15,7 @@ use std::time::SystemTime;
 
 use protobuf::Enum;
 
-use crate::{UAttributes, UMessageType, UPriority, UriValidator, UUID};
+use crate::{UAttributes, UMessageType, UPriority, UUri, UUID};
 
 use crate::UAttributesError;
 
@@ -113,19 +113,7 @@ pub trait UAttributesValidator: Send {
     /// # Errors
     ///
     /// If the [`UAttributes::source`] property does not contain a valid URI as required by the type of message, an error is returned.
-    ///
-    /// This default implementation returns an error if the [`UAttributes::source`] property does not contain a
-    /// valid URI according to [`UriValidator::validate`].
-    fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(source) = attributes.source.as_ref() {
-            UriValidator::validate(source)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()))
-        } else {
-            Err(UAttributesError::validation_error(
-                "Attributes must contain a source URI",
-            ))
-        }
-    }
+    fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError>;
 
     /// Verifies that a set of attributes contains a valid sink URI.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError>;
@@ -174,7 +162,7 @@ impl UAttributesValidators {
     /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
+    /// let topic = UUri::try_from("my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
     ///    id: Some(UUIDBuilder::build()).into(),
@@ -203,7 +191,7 @@ impl UAttributesValidators {
     /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
+    /// let topic = UUri::try_from("my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
     ///    id: Some(UUIDBuilder::build()).into(),
@@ -227,7 +215,7 @@ impl UAttributesValidators {
     /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let topic = UUri::try_from("my-vehicle/cabin/1/doors.driver_side#status")?;
+    /// let topic = UUri::try_from("my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
     ///    id: Some(UUIDBuilder::build()).into(),
@@ -288,7 +276,28 @@ impl UAttributesValidator for PublishValidator {
         }
     }
 
-    /// Verifies that attributes for a publish message contains a valid sink URI.
+    /// Verifies that attributes for a publish message contain a valid source URI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error
+    ///
+    /// * if the attributes do not contain a source URI, or
+    /// * if the source URI contains any wildcards, or
+    /// * if the source URI has a resource ID of 0.
+    fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if let Some(source) = attributes.source.as_ref() {
+            source.verify_event().map_err(|e| {
+                UAttributesError::validation_error(format!("Invalid source URI: {}", e))
+            })
+        } else {
+            Err(UAttributesError::validation_error(
+                "Attributes for a publish message must contain a source URI",
+            ))
+        }
+    }
+
+    /// Verifies that attributes for a publish message do not contain a sink URI.
     ///
     /// # Errors
     ///
@@ -296,7 +305,7 @@ impl UAttributesValidator for PublishValidator {
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if attributes.sink.as_ref().is_some() {
             Err(UAttributesError::validation_error(
-                "Attributes must not contain a sink URI in Publish Message",
+                "Attributes for a publish message must not contain a sink URI",
             ))
         } else {
             Ok(())
@@ -343,19 +352,56 @@ impl UAttributesValidator for NotificationValidator {
         }
     }
 
-    /// Verifies that attributes for a notification message contains a valid sink URI.
+    /// Verifies that attributes for a notification message contain a source URI.
     ///
     /// # Errors
     ///
-    /// If the [`UAttributes::sink`] property does not contain a valid URI according to
-    /// [`UriValidator::validate`], an error is returned.
-    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(sink) = attributes.sink.as_ref() {
-            UriValidator::validate(sink)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()))
+    /// Returns an error
+    ///
+    /// * if the attributes do not contain a source URI, or
+    /// * if the source URI is an RPC response URI, or
+    /// * if the source URI contains any wildcards.
+    fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if let Some(source) = attributes.source.as_ref() {
+            if source.is_rpc_response() {
+                Err(UAttributesError::validation_error(
+                    "Origin must not be an RPC response URI",
+                ))
+            } else {
+                source.verify_no_wildcards().map_err(|e| {
+                    UAttributesError::validation_error(format!("Invalid source URI: {}", e))
+                })
+            }
         } else {
             Err(UAttributesError::validation_error(
-                "Attributes must contain a sink URI",
+                "Attributes must contain a source URI",
+            ))
+        }
+    }
+
+    /// Verifies that attributes for a notification message contain a sink URI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error
+    ///
+    /// * if the attributes do not contain a sink URI, or
+    /// * if the sink URI is an RPC response URI, or
+    /// * if the sink URI contains any wildcards.
+    fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        if let Some(sink) = attributes.sink.as_ref() {
+            if sink.is_rpc_response() {
+                Err(UAttributesError::validation_error(
+                    "Destination must not be an RPC response URI",
+                ))
+            } else {
+                sink.verify_no_wildcards().map_err(|e| {
+                    UAttributesError::validation_error(format!("Invalid sink URI: {}", e))
+                })
+            }
+        } else {
+            Err(UAttributesError::validation_error(
+                "Attributes for a notification message must contain a sink URI",
             ))
         }
     }
@@ -427,12 +473,13 @@ impl UAttributesValidator for RequestValidator {
     ///
     /// # Errors
     ///
-    /// If the [`UAttributes::source`] property does not contain a valid reply-to-address according to
-    /// [`UriValidator::validate_rpc_response`], an error is returned.
+    /// Returns an error if the [`UAttributes::source`] property does not contain a valid reply-to-address according to
+    /// [`UUri::verify_rpc_response`].
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(source) = attributes.source.as_ref() {
-            UriValidator::validate_rpc_response(source)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()))
+            UUri::verify_rpc_response(source).map_err(|e| {
+                UAttributesError::validation_error(format!("Invalid source URI: {}", e))
+            })
         } else {
             Err(UAttributesError::validation_error("Attributes for a request message must contain a reply-to address in the source property"))
         }
@@ -442,12 +489,12 @@ impl UAttributesValidator for RequestValidator {
     ///
     /// # Errors
     ///
-    /// If the [`UAttributes::sink`] property does not contain a URI representing a method according to
-    /// [`UriValidator::validate_rpc_method`], an error is returned.
+    /// Returns an erro if the [`UAttributes::sink`] property does not contain a URI representing a method according to
+    /// [`UUri::verify_rpc_method`].
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(sink) = attributes.sink.as_ref() {
-            UriValidator::validate_rpc_method(sink)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()))
+            UUri::verify_rpc_method(sink)
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {}", e)))
         } else {
             Err(UAttributesError::validation_error("Attributes for a request message must contain a method-to-invoke in the sink property"))
         }
@@ -547,12 +594,13 @@ impl UAttributesValidator for ResponseValidator {
     ///  
     /// # Errors
     ///
-    /// If the [`UAttributes::source`] property does not contain a URI representing a method according to
-    /// [`UriValidator::validate_rpc_method`], an error is returned.
+    /// Returns an error if the [`UAttributes::source`] property does not contain a URI representing a method according to
+    /// [`UUri::verify_rpc_method`].
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(source) = attributes.source.as_ref() {
-            UriValidator::validate_rpc_method(source)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()))
+            UUri::verify_rpc_method(source).map_err(|e| {
+                UAttributesError::validation_error(format!("Invalid source URI: {}", e))
+            })
         } else {
             Err(UAttributesError::validation_error("Missing Source"))
         }
@@ -563,12 +611,12 @@ impl UAttributesValidator for ResponseValidator {
     ///
     /// # Errors
     ///
-    /// If the [`UAttributes::sink`] property does not contain a valid reply-to-address according to
-    /// [`UriValidator::validate_rpc_response`], an error is returned.
+    /// Returns an error if the [`UAttributes::sink`] property does not contain a valid reply-to-address according to
+    /// [`UUri::verify_rpc_response`].
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(sink) = &attributes.sink.as_ref() {
-            UriValidator::validate_rpc_response(sink)
-                .map_err(|e| UAttributesError::validation_error(e.to_string()))
+            UUri::verify_rpc_response(sink)
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {}", e)))
         } else {
             Err(UAttributesError::validation_error("Missing Sink"))
         }
@@ -581,9 +629,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        UAuthority, UCode, UEntity, UPriority, UResource, UResourceBuilder, UUIDBuilder, UUri, UUID,
-    };
+    use crate::{UCode, UPriority, UUIDBuilder, UUri, UUID};
 
     #[test]
     fn test_validate_type_fails_for_unknown_type_code() {
@@ -670,10 +716,10 @@ mod tests {
     }
 
     #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
-    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), Some(destination()), None, false; "fails for containing destination")]
+    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), Some(destination()), None, false; "fails for message containing destination")]
     #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
     #[test_case(Some(UUIDBuilder::build()), None, None, None, false; "fails for missing topic")]
-    #[test_case(Some(UUIDBuilder::build()), Some(UUri::default()), None, None, false; "fails for invalid topic")]
+    #[test_case(Some(UUIDBuilder::build()), Some(UUri { resource_id: 0x54, ..Default::default()}), None, None, false; "fails for invalid topic")]
     #[test_case(None, Some(publish_topic()), None, None, false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
@@ -796,7 +842,7 @@ mod tests {
         false;
         "fails for invalid message id")]
     #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), None, None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing reply-to-address")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(UUri::default()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(UUri { resource_id: 0x0001, ..Default::default()}), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid reply-to-address")]
     #[test_case(Some(UUIDBuilder::build()), None, Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing method-to-invoke")]
     #[test_case(Some(UUIDBuilder::build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid method-to-invoke")]
     #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, None, false; "fails for missing priority")]
@@ -865,7 +911,7 @@ mod tests {
         false;
         "fails for invalid message id")]
     #[test_case(Some(UUIDBuilder::build()), None, Some(method_to_invoke()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing reply-to-address")]
-    #[test_case(Some(UUIDBuilder::build()), Some(UUri::default()), Some(method_to_invoke()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUIDBuilder::build()), Some(UUri { resource_id: 0x0001, ..Default::default()}), Some(method_to_invoke()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
     #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), None, Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing invoked-method")]
     #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(UUri::default()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid invoked-method")]
     #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
@@ -934,110 +980,50 @@ mod tests {
 
     fn publish_topic() -> UUri {
         UUri {
-            authority: Some(UAuthority {
-                name: Some(String::from("vcu.someVin")),
-                ..Default::default()
-            })
-            .into(),
-            entity: Some(UEntity {
-                name: "cabin".to_string(),
-                version_major: Some(1),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                name: "door".to_string(),
-                instance: Some("driver_seat".to_string()),
-                message: Some("status".to_string()),
-                ..Default::default()
-            })
-            .into(),
+            authority_name: String::from("vcu.someVin"),
+            ue_id: 0x0000_5410,
+            ue_version_major: 0x01,
+            resource_id: 0xa010,
             ..Default::default()
         }
     }
 
     fn origin() -> UUri {
         UUri {
-            authority: Some(UAuthority {
-                name: Some(String::from("vcu.someVin")),
-                ..Default::default()
-            })
-            .into(),
-            entity: Some(UEntity {
-                name: "cabin".to_string(),
-                version_major: Some(1),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                name: "door".to_string(),
-                instance: Some("driver_seat".to_string()),
-                message: Some("status".to_string()),
-                ..Default::default()
-            })
-            .into(),
+            authority_name: String::from("vcu.someVin"),
+            ue_id: 0x0000_3c00,
+            ue_version_major: 0x02,
+            resource_id: 0x9a00,
             ..Default::default()
         }
     }
 
     fn destination() -> UUri {
         UUri {
-            authority: Some(UAuthority {
-                name: Some(String::from("vcu.someVin")),
-                ..Default::default()
-            })
-            .into(),
-            entity: Some(UEntity {
-                name: "dashboard".to_string(),
-                version_major: Some(1),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResource {
-                name: "tire_pressure".to_string(),
-                ..Default::default()
-            })
-            .into(),
+            authority_name: String::from("vcu.someVin"),
+            ue_id: 0x0000_3d07,
+            ue_version_major: 0x01,
+            resource_id: 0xa100,
             ..Default::default()
         }
     }
 
     fn reply_to_address() -> UUri {
         UUri {
-            authority: Some(UAuthority {
-                name: Some(String::from("vcu.someVin")),
-                ..Default::default()
-            })
-            .into(),
-            entity: Some(UEntity {
-                name: "consumer".to_string(),
-                version_major: Some(1),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResourceBuilder::for_rpc_response()).into(),
+            authority_name: String::from("vcu.someVin"),
+            ue_id: 0x0000_010b,
+            ue_version_major: 0x01,
+            resource_id: 0x0000,
             ..Default::default()
         }
     }
 
     fn method_to_invoke() -> UUri {
         UUri {
-            authority: Some(UAuthority {
-                name: Some(String::from("vcu.someVin")),
-                ..Default::default()
-            })
-            .into(),
-            entity: Some(UEntity {
-                name: "provider".to_string(),
-                version_major: Some(1),
-                ..Default::default()
-            })
-            .into(),
-            resource: Some(UResourceBuilder::for_rpc_request(
-                Some("echo".to_string()),
-                None,
-            ))
-            .into(),
+            authority_name: String::from("vcu.someVin"),
+            ue_id: 0x0000_03ae,
+            ue_version_major: 0x01,
+            resource_id: 0x00e2,
             ..Default::default()
         }
     }
