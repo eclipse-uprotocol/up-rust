@@ -13,7 +13,7 @@
 
 use async_trait::async_trait;
 
-use crate::{CallOptions, RpcMapperError, UMessage, UPayload, UUri};
+use crate::{RpcMapperError, UMessage, UPayload, UPriority, UUri};
 
 pub type RpcClientResult = Result<UMessage, RpcMapperError>;
 
@@ -35,7 +35,10 @@ pub trait RpcClient: Send + Sync {
     ///
     /// * `method` - The URI of the method to be invoked. For example, in long form: "/example.hello_world/1/rpc.SayHello".
     /// * `request` - The request message to be sent to the server.
-    /// * `options` - Call options for the RPC method invocation, as specified by `CallOptions`.
+    /// * `priority` - The priority to use for sending the request and corresponding response messages. Must be at least
+    ///                [`UPriority::UPRIORITY_CS4`], which is also the default if not specified explicitly.
+    /// * `ttl` - The request's time-to-live in milliseconds.
+    /// * `token` - The authorization token to use for TAP.
     ///
     /// # Returns
     ///
@@ -45,6 +48,8 @@ pub trait RpcClient: Send + Sync {
         &self,
         method: UUri,
         request: UPayload,
-        options: CallOptions,
+        priority: Option<UPriority>,
+        ttl: Option<u32>,
+        token: Option<String>,
     ) -> RpcClientResult;
 }

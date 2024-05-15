@@ -15,7 +15,7 @@ use std::{default::Default, fmt};
 
 use protobuf::{well_known_types::any::Any, MessageFull};
 
-use crate::{Data, RpcClientResult, UCode, UPayload, UPayloadFormat, UStatus};
+use crate::{RpcClientResult, UPayload, UPayloadFormat, UStatus};
 
 pub type RpcPayloadResult = Result<RpcPayload, RpcMapperError>;
 
@@ -87,7 +87,11 @@ impl RpcMapper {
                 "Payload is empty".to_string(),
             ));
         };
-
+        if payload.data.is_empty() {
+            return Err(RpcMapperError::InvalidPayload(
+                "Payload is empty".to_string(),
+            ));
+        }
         Any::try_from(payload)
             .map_err(|_e| {
                 RpcMapperError::UnknownType("Couldn't decode payload into Any".to_string())
@@ -133,25 +137,21 @@ impl RpcMapper {
                 "Payload is empty".to_string(),
             ));
         };
+        if payload.data.is_empty() {
+            return Err(RpcMapperError::InvalidPayload(
+                "Payload is empty".to_string(),
+            ));
+        }
         Any::try_from(payload)
             .map_err(|_e| {
                 RpcMapperError::UnknownType("Couldn't decode payload into Any".to_string())
             })
             .and_then(|any| {
                 match Self::unpack_any::<UStatus>(&any) {
-                    Ok(proto_status) => {
-                        // in this branch, we have successfully unpacked a protobuf-status from the (now consumed) payload
-                        match proto_status.get_code() {
-                            UCode::OK => Ok(RpcPayload {
-                                status: UStatus::ok(),
-                                payload: None,
-                            }),
-                            _ => Ok(RpcPayload {
-                                status: proto_status,
-                                payload: None,
-                            }),
-                        }
-                    }
+                    Ok(proto_status) => Ok(RpcPayload {
+                        status: proto_status,
+                        payload: None,
+                    }),
                     Err(_error) => {
                         // in this branch, we couldn't decode the payload into a protobuf-status, but there is something else there to pass on
                         UPayload::try_from(&any)
@@ -193,18 +193,11 @@ impl RpcMapper {
         let buf = data.write_to_bytes().map_err(|_e| {
             RpcMapperError::ProtobufError(String::from("failed to serialize payload to protobuf"))
         })?;
-        if let Ok(len) = i32::try_from(buf.len()) {
-            Ok(UPayload {
-                data: Some(Data::Value(buf)),
-                length: Some(len),
-                format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF.into(),
-                ..Default::default()
-            })
-        } else {
-            Err(RpcMapperError::InvalidPayload(
-                "Payload length too large for UPayload type".to_string(),
-            ))
-        }
+        Ok(UPayload {
+            data: buf,
+            format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF.into(),
+            ..Default::default()
+        })
     }
 
     /// Unpacks a given `UPayload` into a protobuf message.
@@ -307,7 +300,7 @@ mod tests {
     use bytes::{Buf, BufMut};
     use protobuf::MessageField;
 
-    use crate::UMessage;
+    use crate::{UCode, UMessage};
 
     fn build_status_response(code: UCode, msg: &str) -> RpcClientResult {
         let status: UStatus = UStatus::fail_with_code(code, msg);
@@ -323,7 +316,7 @@ mod tests {
 
     fn build_empty_payload_response() -> RpcClientResult {
         let payload = UPayload {
-            data: Some(Data::Value(vec![])),
+            data: vec![],
             ..Default::default()
         };
         let message = UMessage {
@@ -524,11 +517,6 @@ mod tests {
         let response = build_empty_payload_response();
         let result = RpcMapper::map_response::<UStatus>(response);
         assert!(result.is_err());
-        assert!(result
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("Couldn't decode payload into Any"));
     }
 
     #[test]
@@ -536,10 +524,5 @@ mod tests {
         let response = build_empty_payload_response();
         let result = RpcMapper::map_response_to_result(response);
         assert!(result.is_err());
-        assert!(result
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("Couldn't decode payload into Any"));
     }
 }

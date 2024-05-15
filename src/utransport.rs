@@ -44,9 +44,7 @@ use crate::{UMessage, UStatus, UUri};
 ///     async fn on_receive(&self, msg: UMessage) {
 ///         let mut inner_foo = self.inner_foo.lock().unwrap();
 ///         if let Some(payload) = msg.payload.as_ref() {
-///             if let Some(length) = payload.length.as_ref() {
-///                 *inner_foo = format!("latest message length: {length}");
-///             }
+///             *inner_foo = format!("latest message length: {}", payload.data.len());
 ///         }
 ///     }
 ///
@@ -343,7 +341,7 @@ impl Eq for ComparableListener {}
 mod tests {
     use crate::ComparableListener;
     use crate::UListener;
-    use crate::{Number, UAuthority, UCode, UMessage, UStatus, UTransport, UUri};
+    use crate::{UCode, UMessage, UStatus, UTransport, UUri};
     use async_std::task;
     use async_trait::async_trait;
     use std::collections::{HashMap, HashSet};
@@ -487,12 +485,7 @@ mod tests {
     fn uuri_factory(uuri_index: u8) -> UUri {
         match uuri_index {
             1 => UUri {
-                authority: Some(UAuthority {
-                    name: Some("uuri_1".to_string()),
-                    number: Some(Number::Ip(vec![192, 168, 1, 200])),
-                    ..Default::default()
-                })
-                .into(),
+                authority_name: "uuri_1".to_string(),
                 ..Default::default()
             },
             _ => UUri::default(),

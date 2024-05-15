@@ -49,21 +49,20 @@ pub use rpc::{RpcMapper, RpcMapperError};
 pub use rpc::{RpcPayload, RpcPayloadResult, RpcResult};
 
 mod uattributes;
-pub use uattributes::{CallOptions, UAttributes, UAttributesError, UMessageType, UPriority};
 pub use uattributes::{
     PublishValidator, RequestValidator, ResponseValidator, UAttributesValidator,
     UAttributesValidators,
 };
+pub use uattributes::{UAttributes, UAttributesError, UMessageType, UPriority};
 
 mod umessage;
 pub use umessage::{UMessage, UMessageBuilder, UMessageBuilderError};
 
 mod upayload;
-pub use upayload::{Data, UPayload, UPayloadError, UPayloadFormat};
+pub use upayload::{UPayload, UPayloadError, UPayloadFormat};
 
 mod uri;
-pub use uri::{AddressType, Number, UAuthority, UEntity, UResource, UResourceBuilder};
-pub use uri::{UUri, UUriError, UriValidator};
+pub use uri::{UUri, UUriError};
 
 mod ustatus;
 pub use ustatus::{UCode, UStatus};

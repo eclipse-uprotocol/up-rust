@@ -35,7 +35,7 @@ use async_trait::async_trait;
 /// ```
 /// # use async_trait::async_trait;
 /// # use std::future::Future;
-/// # use up_rust::{UMessage, Number, UAuthority, UEntity, UResource, UStatus, UUri, UListener};
+/// # use up_rust::{UMessage, UStatus, UUri, UListener};
 /// #
 /// # mod up_client_foo {
 /// #     use std::sync::Arc;
@@ -163,23 +163,12 @@ use async_trait::async_trait;
 /// # let my_uuri = Default::default();
 /// #
 /// # let door_uuri = UUri {
-/// #     authority: Some(UAuthority {
-/// #         name: Some("device_a".to_string()),
-/// #         number: Some(Number::Ip(vec![192, 168, 1, 200])),
-/// #         ..Default::default()
-/// #     }).into(),
-/// #     entity: Some(UEntity{
-/// #         name: "body_access".to_string(),
-/// #         id: Some(1),
-/// #         version_major: Some(1),
-/// #         ..Default::default()}).into(),
-/// #     resource: Some(UResource {
-/// #         name: "door".to_string(),
-/// #         instance: Some("open_status".to_string()),
-/// #         message: None,
-/// #         id: Some(2),
-/// #         ..Default::default()}).into(),
-/// #     ..Default::default()};
+/// #     authority_name: "device_a".to_string(),
+/// #     ue_id: 0x0000_0001,
+/// #     ue_version_major: 0x01,
+/// #     resource_id: 0x0002,
+/// #     ..Default::default()
+/// # };
 /// #
 /// # let my_listener = Arc::new(MyListener::new());
 /// #

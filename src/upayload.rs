@@ -14,7 +14,7 @@
 use mediatype::MediaType;
 use protobuf::{well_known_types::any::Any, EnumFull, Message};
 
-pub use crate::up_core_api::upayload::{upayload::Data, UPayload, UPayloadFormat};
+pub use crate::up_core_api::upayload::{UPayload, UPayloadFormat};
 
 #[derive(Debug)]
 pub enum UPayloadError {
@@ -126,17 +126,12 @@ impl TryFrom<&Any> for UPayload {
     type Error = UPayloadError;
 
     fn try_from(value: &Any) -> Result<Self, Self::Error> {
-        let buf = value
+        value
             .write_to_bytes()
-            .map_err(|_e| UPayloadError::serialization_error("Failed to serialize Any value"))?;
-        i32::try_from(buf.len())
-            .map(|len| UPayload {
-                data: Some(Data::Value(buf)),
-                length: Some(len),
+            .map_err(|_e| UPayloadError::serialization_error("Failed to serialize Any value"))
+            .map(|data| UPayload {
+                data,
                 ..Default::default()
-            })
-            .map_err(|_e| {
-                UPayloadError::serialization_error("Any object does not fit into UPayload")
             })
     }
 }
@@ -148,51 +143,18 @@ impl TryFrom<UPayload> for Any {
         match value.format.enum_value_or_default() {
             UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY
             | UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED => {
-                if let Some(bytes) = data_to_slice(&value) {
-                    if !bytes.is_empty() {
-                        return Any::parse_from_bytes(bytes).map_err(|e| {
-                            UPayloadError::serialization_error(format!(
-                                "UPayload does not contain Any: {}",
-                                e
-                            ))
-                        });
-                    }
-                }
-                Err(UPayloadError::serialization_error(
-                    "UPayload does not contain any data",
-                ))
+                Any::parse_from_bytes(value.data.as_slice()).map_err(|e| {
+                    UPayloadError::serialization_error(format!(
+                        "UPayload does not contain Any: {}",
+                        e
+                    ))
+                })
             }
             _ => Err(UPayloadError::serialization_error(
                 "UPayload has incompatible format",
             )),
         }
     }
-}
-
-fn data_to_slice(payload: &UPayload) -> Option<&[u8]> {
-    if let Some(data) = &payload.data {
-        match data {
-            Data::Reference(bytes) => {
-                if let Some(length) = payload.length {
-                    return Some(unsafe { read_memory(*bytes, length) });
-                }
-            }
-            Data::Value(bytes) => {
-                return Some(bytes.as_slice());
-            }
-        }
-    }
-    None
-}
-
-// Please no one use this...
-unsafe fn read_memory(_address: u64, _length: i32) -> &'static [u8] {
-    // Convert the raw address to a pointer
-    // let ptr = address as *const u8;
-    // Create a slice from the pointer and the length
-    // slice::from_raw_parts(ptr, length as usize)
-
-    todo!("This is not implemented yet")
 }
 
 #[cfg(test)]
@@ -259,8 +221,7 @@ mod tests {
         let data = Any::pack(&timestamp).unwrap().write_to_bytes().unwrap();
         let payload = UPayload {
             format: EnumOrUnknown::from_i32(format),
-            data: Some(Data::Value(data)),
-            length: None,
+            data,
             ..Default::default()
         };
 
@@ -278,8 +239,7 @@ mod tests {
     fn test_into_any_fails_for_empty_data() {
         let payload = UPayload {
             format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF.into(),
-            data: Some(Data::Value(vec![])),
-            length: None,
+            data: vec![],
             ..Default::default()
         };
 
@@ -297,9 +257,6 @@ mod tests {
             payload.format,
             UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED.into()
         );
-        assert_eq!(
-            payload.data.unwrap(),
-            Data::Value(any.write_to_bytes().unwrap())
-        );
+        assert_eq!(payload.data, any.write_to_bytes().unwrap());
     }
 }

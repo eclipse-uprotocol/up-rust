@@ -70,18 +70,15 @@ impl UAttributes {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{CallOptions, UAttributes, UMessageType, UPriority, UUIDBuilder, UUri};
+    /// use up_rust::{UAttributes, UMessageType, UPriority, UUIDBuilder, UUri};
 
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let message_id = UUIDBuilder::build();
-    /// let method_to_invoke = UUri::try_from("my-vehicle/cabin/1/rpc.doors")?;
-    /// let reply_to_address = UUri::try_from("my-cloud/dashboard/1/rpc.response")?;
-    /// let options = CallOptions {
-    ///     token: Some("my_token".to_string()),
-    ///     ttl: 5_000,
-    ///     ..Default::default()
-    /// };
-    /// let attributes = UAttributes::request(message_id.clone(), method_to_invoke.clone(), reply_to_address.clone(), options);
+    /// let method_to_invoke = UUri::try_from("my-vehicle/1004F3B/3/B42")?;
+    /// let reply_to_address = UUri::try_from("my-cloud/A/1/0")?;
+    /// let token = Some("my_token".to_string());
+    /// let ttl = Some(5_000);
+    /// let attributes = UAttributes::request(message_id.clone(), method_to_invoke.clone(), reply_to_address.clone(), None, token, ttl);
     /// assert_eq!(attributes.type_, UMessageType::UMESSAGE_TYPE_REQUEST.into());
     /// assert_eq!(attributes.id, Some(message_id).into());
     /// assert_eq!(attributes.priority, UPriority::UPRIORITY_CS4.into());
@@ -96,16 +93,18 @@ impl UAttributes {
         message_id: UUID,
         method: UUri,
         reply_to_address: UUri,
-        options: CallOptions,
+        priority: Option<UPriority>,
+        token: Option<String>,
+        ttl: Option<u32>,
     ) -> Self {
         Self {
             type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
             id: Some(message_id).into(),
-            priority: UPriority::UPRIORITY_CS4.into(),
+            priority: priority.unwrap_or(UPriority::UPRIORITY_CS4).into(),
             source: Some(reply_to_address).into(),
             sink: Some(method).into(),
-            ttl: Some(options.ttl),
-            token: options.token,
+            ttl,
+            token,
             ..Default::default()
         }
     }
