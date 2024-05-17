@@ -12,9 +12,7 @@
  ********************************************************************************/
 
 mod rpcclient;
-mod rpcmapper;
 mod rpcresult;
 
 pub use rpcclient::*;
-pub use rpcmapper::*;
 pub use rpcresult::*;

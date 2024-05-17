@@ -44,7 +44,7 @@ use crate::{UMessage, UStatus, UUri};
 ///     async fn on_receive(&self, msg: UMessage) {
 ///         let mut inner_foo = self.inner_foo.lock().unwrap();
 ///         if let Some(payload) = msg.payload.as_ref() {
-///             *inner_foo = format!("latest message length: {}", payload.data.len());
+///             *inner_foo = format!("latest message length: {}", payload.len());
 ///         }
 ///     }
 ///

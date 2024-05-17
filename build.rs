@@ -26,7 +26,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             format!("{}/uuid.proto", UPROTOCOL_BASE_URI).as_str(),
             format!("{}/uri.proto", UPROTOCOL_BASE_URI).as_str(),
             format!("{}/uattributes.proto", UPROTOCOL_BASE_URI).as_str(),
-            format!("{}/upayload.proto", UPROTOCOL_BASE_URI).as_str(),
             format!("{}/umessage.proto", UPROTOCOL_BASE_URI).as_str(),
             format!("{}/ustatus.proto", UPROTOCOL_BASE_URI).as_str(),
             // not used in the SDK yet, but for completeness sake
