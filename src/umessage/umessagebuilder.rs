@@ -12,47 +12,14 @@
  ********************************************************************************/
 
 use bytes::Bytes;
-use protobuf::{Enum, EnumOrUnknown, Message};
+use protobuf::{well_known_types::any::Any, Enum, EnumOrUnknown, Message, MessageFull};
 
-use crate::uattributes::{NotificationValidator, UAttributesError};
+use crate::uattributes::NotificationValidator;
 use crate::{
     PublishValidator, RequestValidator, ResponseValidator, UAttributes, UAttributesValidator,
-    UCode, UMessage, UMessageType, UPayload, UPayloadFormat, UPriority, UUIDBuilder, UUri, UUID,
+    UCode, UMessage, UMessageError, UMessageType, UPayloadFormat, UPriority, UUIDBuilder, UUri,
+    UUID,
 };
-
-#[derive(Debug)]
-pub enum UMessageBuilderError {
-    DataSerializationError(protobuf::Error),
-    AttributesValidationError(UAttributesError),
-}
-
-impl std::fmt::Display for UMessageBuilderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::DataSerializationError(e) => {
-                f.write_fmt(format_args!("Failed to serialize payload: {}", e))
-            }
-            Self::AttributesValidationError(e) => f.write_fmt(format_args!(
-                "Builder state is not consistent with message type: {}",
-                e
-            )),
-        }
-    }
-}
-
-impl std::error::Error for UMessageBuilderError {}
-
-impl From<UAttributesError> for UMessageBuilderError {
-    fn from(value: UAttributesError) -> Self {
-        Self::AttributesValidationError(value)
-    }
-}
-
-impl From<protobuf::Error> for UMessageBuilderError {
-    fn from(value: protobuf::Error) -> Self {
-        Self::DataSerializationError(value)
-    }
-}
 
 /// A builder for creating [`UMessage`]s.
 ///
@@ -553,7 +520,7 @@ impl UMessageBuilder {
     /// # Errors
     ///
     /// If the properties set on the builder do not represent a consistent set of [`UAttributes`],
-    /// a [`UMessageBuilderError::AttributesValidationError`] is returned.
+    /// a [`UMessageError::AttributesValidationError`] is returned.
     ///
     /// # Examples
     ///
@@ -562,7 +529,7 @@ impl UMessageBuilder {
     /// The recommended way to use the `UMessageBuilder`.
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageBuilderError, UMessageType, UPriority, UUIDBuilder, UUri};
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageError, UMessageType, UPriority, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("my-vehicle/4210/5/64AB")?;
@@ -599,7 +566,7 @@ impl UMessageBuilder {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn build(&self) -> Result<UMessage, UMessageBuilderError> {
+    pub fn build(&self) -> Result<UMessage, UMessageError> {
         let message_id = self
             .message_id
             .clone()
@@ -615,26 +582,16 @@ impl UMessageBuilder {
             permission_level: self.permission_level,
             commstatus: self.comm_status,
             reqid: self.request_id.clone().into(),
+            payload_format: self.payload_format.into(),
             ..Default::default()
         };
         self.validator
             .validate(&attributes)
-            .map_err(UMessageBuilderError::from)
-            .map(|_| {
-                let payload = self
-                    .payload
-                    .as_ref()
-                    .map(|bytes| bytes.to_vec())
-                    .map(|data| UPayload {
-                        format: self.payload_format.into(),
-                        data,
-                        ..Default::default()
-                    });
-                UMessage {
-                    attributes: Some(attributes).into(),
-                    payload: payload.into(),
-                    ..Default::default()
-                }
+            .map_err(UMessageError::from)
+            .map(|_| UMessage {
+                attributes: Some(attributes).into(),
+                payload: self.payload.as_ref().map(|bytes| bytes.to_vec()),
+                ..Default::default()
             })
     }
 
@@ -652,7 +609,7 @@ impl UMessageBuilder {
     /// # Errors
     ///
     /// If the properties set on the builder do not represent a consistent set of [`UAttributes`],
-    /// a [`UMessageBuilderError::AttributesValidationError`] is returned.
+    /// a [`UMessageError::AttributesValidationError`] is returned.
     ///
     /// # Examples
     ///
@@ -671,9 +628,10 @@ impl UMessageBuilder {
         &mut self,
         payload: Bytes,
         format: UPayloadFormat,
-    ) -> Result<UMessage, UMessageBuilderError> {
+    ) -> Result<UMessage, UMessageError> {
         self.payload = Some(payload);
         self.payload_format = format;
+
         self.build()
     }
 
@@ -682,23 +640,23 @@ impl UMessageBuilder {
     /// # Arguments
     ///
     /// * `payload` - The data to set as payload.
-    /// * `format` - The payload format.
     ///
     /// # Returns
     ///
-    /// A message ready to be sent using [`crate::UTransport::send`].
+    /// A message ready to be sent using [`crate::UTransport::send`]. The message will have
+    /// [`UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF`] set as its payload format.
     ///
     /// # Errors
     ///
-    /// If the given payload cannot be serialized into a byte array, a [`UMessageBuilderError::DataSerializationError`] is returned.
+    /// If the given payload cannot be serialized into a protobuf byte array, a [`UMessageError::DataSerializationError`] is returned.
     /// If the properties set on the builder do not represent a consistent set of [`UAttributes`],
-    /// a [`UMessageBuilderError::AttributesValidationError`] is returned.
+    /// a [`UMessageError::AttributesValidationError`] is returned.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use protobuf::{Enum, Message};
-    /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPriority, UStatus, UUIDBuilder, UUri};
+    /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("my-vehicle/4210/5/64AB")?;
@@ -710,20 +668,73 @@ impl UMessageBuilder {
     ///                    .with_comm_status(UCode::INVALID_ARGUMENT.value())
     ///                    .build_with_protobuf_payload(&UStatus::fail("failed to parse request"))?;
     /// assert!(message.payload.is_some());
+    /// assert_eq!(message.attributes.payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF);
     /// # Ok(())
     /// # }
     /// ```
     pub fn build_with_protobuf_payload<T: Message>(
         &mut self,
         payload: &T,
-    ) -> Result<UMessage, UMessageBuilderError> {
+    ) -> Result<UMessage, UMessageError> {
         payload
             .write_to_bytes()
-            .map_err(UMessageBuilderError::from)
+            .map_err(UMessageError::from)
             .and_then(|serialized_payload| {
                 self.build_with_payload(
                     serialized_payload.into(),
                     UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF,
+                )
+            })
+    }
+
+    /// Creates the message based on the builder's state and some payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - The data to set as payload.
+    ///
+    /// # Returns
+    ///
+    /// A message ready to be sent using [`crate::UTransport::send`]. The message will have
+    /// [`UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`] set as its payload format.
+    ///
+    /// # Errors
+    ///
+    /// If the given payload cannot be serialized into a protobuf byte array, a [`UMessageError::DataSerializationError`] is returned.
+    /// If the properties set on the builder do not represent a consistent set of [`UAttributes`],
+    /// a [`UMessageError::AttributesValidationError`] is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use protobuf::{Enum, Message};
+    /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUIDBuilder, UUri};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let invoked_method = UUri::try_from("my-vehicle/4210/5/64AB")?;
+    /// let reply_to_address = UUri::try_from("my-cloud/BA4C/1/0")?;
+    /// let request_id = UUIDBuilder::build();
+    /// // a service implementation would normally use
+    /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
+    /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
+    ///                    .with_comm_status(UCode::INVALID_ARGUMENT.value())
+    ///                    .build_with_wrapped_protobuf_payload(&UStatus::fail("failed to parse request"))?;
+    /// assert!(message.payload.is_some());
+    /// assert_eq!(message.attributes.payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn build_with_wrapped_protobuf_payload<T: MessageFull>(
+        &mut self,
+        payload: &T,
+    ) -> Result<UMessage, UMessageError> {
+        Any::pack(payload)
+            .map_err(UMessageError::DataSerializationError)
+            .and_then(|any| any.write_to_bytes().map_err(UMessageError::from))
+            .and_then(|serialized_payload| {
+                self.build_with_payload(
+                    serialized_payload.into(),
+                    UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
                 )
             })
     }

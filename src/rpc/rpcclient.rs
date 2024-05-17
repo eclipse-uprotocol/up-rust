@@ -13,9 +13,9 @@
 
 use async_trait::async_trait;
 
-use crate::{RpcMapperError, UMessage, UPayload, UPriority, UUri};
+use crate::{UMessage, UMessageError, UUri};
 
-pub type RpcClientResult = Result<UMessage, RpcMapperError>;
+pub type RpcClientResult = Result<UMessage, UMessageError>;
 
 /// `RpcClient` is an interface used by code generators for uProtocol services defined in `.proto` files such as
 /// the core uProtocol services found in [uProtocol Core API](https://github.com/eclipse-uprotocol/up-spec/tree/main/up-core-api).
@@ -35,21 +35,10 @@ pub trait RpcClient: Send + Sync {
     ///
     /// * `method` - The URI of the method to be invoked. For example, in long form: "/example.hello_world/1/rpc.SayHello".
     /// * `request` - The request message to be sent to the server.
-    /// * `priority` - The priority to use for sending the request and corresponding response messages. Must be at least
-    ///                [`UPriority::UPRIORITY_CS4`], which is also the default if not specified explicitly.
-    /// * `ttl` - The request's time-to-live in milliseconds.
-    /// * `token` - The authorization token to use for TAP.
     ///
     /// # Returns
     ///
     /// Returns a `RpcClientResult` which contains the response message.
     /// If the invocation fails, it contains a `UStatus` detailing the failure reason.
-    async fn invoke_method(
-        &self,
-        method: UUri,
-        request: UPayload,
-        priority: Option<UPriority>,
-        ttl: Option<u32>,
-        token: Option<String>,
-    ) -> RpcClientResult;
+    async fn invoke_method(&self, method: UUri, request: UMessage) -> RpcClientResult;
 }
