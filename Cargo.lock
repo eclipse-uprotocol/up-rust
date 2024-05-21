@@ -1144,6 +1144,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58678a64de2fced2bdec6bca052a6716a0efe692d6e3f53d1bda6a1def64cfc0"
 dependencies = [
+ "bytes",
  "once_cell",
  "protobuf-support",
  "thiserror",

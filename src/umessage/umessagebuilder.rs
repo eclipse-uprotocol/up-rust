@@ -79,7 +79,7 @@ impl UMessageBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic.clone())
-    ///                    .build_with_payload("closed".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                    .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
     /// assert_eq!(message.attributes.source, Some(topic).into());
@@ -113,7 +113,7 @@ impl UMessageBuilder {
     /// let origin = UUri::try_from("my-vehicle/4210/5/F20B")?;
     /// let destination = UUri::try_from("my-cloud/CCDD/2/75FD")?;
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
-    ///                    .build_with_payload("unexpected movement".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                    .build_with_payload("unexpected movement", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_NOTIFICATION.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
     /// assert_eq!(message.attributes.source, Some(origin).into());
@@ -154,7 +154,7 @@ impl UMessageBuilder {
     /// let method_to_invoke = UUri::try_from("my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("my-cloud/BA4C/1/0")?;
     /// let message = UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
-    ///                    .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                    .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_REQUEST.into());
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
     /// assert_eq!(message.attributes.source, Some(reply_to_address).into());
@@ -249,7 +249,7 @@ impl UMessageBuilder {
     /// let request_message_id = UUIDBuilder::build();
     /// let request_message = UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
     ///                           .with_message_id(request_message_id.clone()) // normally not needed, used only for asserts below
-    ///                           .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                           .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     ///
     /// let response_message = UMessageBuilder::response_for_request(&request_message.attributes)
     ///                           .with_priority(UPriority::UPRIORITY_CS5)
@@ -307,11 +307,11 @@ impl UMessageBuilder {
     /// builder.with_priority(UPriority::UPRIORITY_CS2);
     /// let message_one = builder
     ///                     .with_message_id(UUIDBuilder::build())
-    ///                     .build_with_payload("closed".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                     .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// let message_two = builder
     ///                     // use new message ID but retain all other attributes
     ///                     .with_message_id(UUIDBuilder::build())
-    ///                     .build_with_payload("open".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                     .build_with_payload("open", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_ne!(message_one.attributes.id, message_two.attributes.id);
     /// assert_eq!(message_one.attributes.source, message_two.attributes.source);
     /// assert_eq!(message_one.attributes.priority, UPriority::UPRIORITY_CS2.into());
@@ -351,7 +351,7 @@ impl UMessageBuilder {
     /// let topic = UUri::try_from("my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic)
     ///                   .with_priority(UPriority::UPRIORITY_CS5)
-    ///                   .build_with_payload("closed".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                   .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS5.into());
     /// # Ok(())
     /// # }
@@ -424,7 +424,7 @@ impl UMessageBuilder {
     /// let token = String::from("this-is-my-token");
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
     ///                     .with_token(token.clone())
-    ///                     .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                     .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.token, Some(token));
     /// # Ok(())
     /// # }
@@ -460,7 +460,7 @@ impl UMessageBuilder {
     /// let reply_to_address = UUri::try_from("my-cloud/BA4C/1/0")?;
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
     ///                     .with_permission_level(12)
-    ///                     .build_with_payload("lock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                     .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.permission_level, Some(12));
     /// # Ok(())
     /// # }
@@ -590,7 +590,7 @@ impl UMessageBuilder {
             .map_err(UMessageError::from)
             .map(|_| UMessage {
                 attributes: Some(attributes).into(),
-                payload: self.payload.as_ref().map(|bytes| bytes.to_vec()),
+                payload: self.payload.to_owned(),
                 ..Default::default()
             })
     }
@@ -619,17 +619,17 @@ impl UMessageBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic)
-    ///                    .build_with_payload("locked".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                    .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert!(message.payload.is_some());
     /// # Ok(())
     /// # }
     /// ```
-    pub fn build_with_payload(
+    pub fn build_with_payload<T: Into<Bytes>>(
         &mut self,
-        payload: Bytes,
+        payload: T,
         format: UPayloadFormat,
     ) -> Result<UMessage, UMessageError> {
-        self.payload = Some(payload);
+        self.payload = Some(payload.into());
         self.payload_format = format;
 
         self.build()
@@ -681,7 +681,7 @@ impl UMessageBuilder {
             .map_err(UMessageError::from)
             .and_then(|serialized_payload| {
                 self.build_with_payload(
-                    serialized_payload.into(),
+                    serialized_payload,
                     UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF,
                 )
             })
@@ -733,7 +733,7 @@ impl UMessageBuilder {
             .and_then(|any| any.write_to_bytes().map_err(UMessageError::from))
             .and_then(|serialized_payload| {
                 self.build_with_payload(
-                    serialized_payload.into(),
+                    serialized_payload,
                     UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
                 )
             })
@@ -824,11 +824,11 @@ mod tests {
         let mut builder = UMessageBuilder::publish(topic);
         let message_one = builder
             .with_message_id(UUIDBuilder::build())
-            .build_with_payload("locked".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
             .expect("should have been able to create message");
         let message_two = builder
             .with_message_id(UUIDBuilder::build())
-            .build_with_payload("unlocked".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .build_with_payload("unlocked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
             .expect("should have been able to create message");
         assert_eq!(message_one.attributes.type_, message_two.attributes.type_);
         assert_ne!(message_one.attributes.id, message_two.attributes.id);
@@ -844,7 +844,7 @@ mod tests {
             .with_message_id(message_id.clone())
             .with_priority(UPriority::UPRIORITY_CS2)
             .with_ttl(5000)
-            .build_with_payload("locked".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
             .expect("should have been able to create message");
         assert_eq!(message.attributes.id, Some(message_id).into());
         assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS2.into());
@@ -870,7 +870,7 @@ mod tests {
                 .with_permission_level(5)
                 .with_priority(UPriority::UPRIORITY_CS4)
                 .with_token(token.clone())
-                .build_with_payload("unlock".into(), UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+                .build_with_payload("unlock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
                 .expect("should have been able to create message");
 
         assert_eq!(message.attributes.id, Some(message_id).into());
