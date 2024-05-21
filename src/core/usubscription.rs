@@ -13,13 +13,22 @@
 
 pub use crate::up_core_api::usubscription::{
     subscription_status::State, EventDeliveryConfig, FetchSubscribersRequest,
-    FetchSubscriptionsRequest, FetchSubscriptionsResponse, NotificationsRequest,
-    SubscribeAttributes, SubscriberInfo, SubscriptionRequest, SubscriptionResponse,
-    SubscriptionStatus, UnsubscribeRequest, Update,
+    FetchSubscribersResponse, FetchSubscriptionsRequest, FetchSubscriptionsResponse,
+    NotificationsRequest, SubscribeAttributes, SubscriberInfo, Subscription, SubscriptionRequest,
+    SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest, Update,
 };
 
 use crate::UStatus;
 use async_trait::async_trait;
+use core::hash::{Hash, Hasher};
+
+impl Hash for SubscriberInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.uri.hash(state);
+    }
+}
+
+impl Eq for SubscriberInfo {}
 
 /// `USubscription` is the uP-L3 client interface to the uSubscription service.
 ///
@@ -74,9 +83,9 @@ use async_trait::async_trait;
 /// #     use protobuf::EnumOrUnknown;
 /// #     use up_rust::{UStatus, UCode,
 /// #         core::usubscription::{USubscription, FetchSubscribersRequest, FetchSubscriptionsRequest,
-/// #                               FetchSubscriptionsResponse, NotificationsRequest, SubscriptionRequest,
-/// #                               SubscriptionResponse, UnsubscribeRequest, SubscriptionStatus, State,
-/// #                               EventDeliveryConfig},
+/// #                               FetchSubscribersResponse, FetchSubscriptionsResponse, NotificationsRequest,
+/// #                               SubscriptionRequest, SubscriptionResponse, UnsubscribeRequest, SubscriptionStatus,
+/// #                               State, EventDeliveryConfig},
 /// #     };
 /// #
 /// #     pub struct USubscriptionFoo;
@@ -124,7 +133,7 @@ use async_trait::async_trait;
 /// #             todo!()
 /// #         }
 /// #
-/// #         async fn fetch_subscribers(&self, fetch_subscribers_request: FetchSubscribersRequest) -> Result<FetchSubscriptionsResponse, UStatus> {
+/// #         async fn fetch_subscribers(&self, fetch_subscribers_request: FetchSubscribersRequest) -> Result<FetchSubscribersResponse, UStatus> {
 /// #             todo!()
 /// #         }
 /// #     }
@@ -307,5 +316,5 @@ pub trait USubscription: Send + Sync {
     async fn fetch_subscribers(
         &self,
         fetch_subscribers_request: FetchSubscribersRequest,
-    ) -> Result<FetchSubscriptionsResponse, UStatus>;
+    ) -> Result<FetchSubscribersResponse, UStatus>;
 }
