@@ -21,6 +21,8 @@ use crate::{
     UUID,
 };
 
+const PRIORITY_DEFAULT: UPriority = UPriority::UPRIORITY_CS1;
+
 /// A builder for creating [`UMessage`]s.
 ///
 /// Messages are being used by a uEntity to inform other entities about the occurrence of events
@@ -51,7 +53,7 @@ impl Default for UMessageBuilder {
             payload: None,
             payload_format: UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED,
             permission_level: None,
-            priority: UPriority::UPRIORITY_CS1,
+            priority: UPriority::UPRIORITY_UNSPECIFIED,
             request_id: None,
             sink: None,
             source: None,
@@ -81,7 +83,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::publish(topic.clone())
     ///                    .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
+    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_UNSPECIFIED.into());
     /// assert_eq!(message.attributes.source, Some(topic).into());
     /// # Ok(())
     /// # }
@@ -115,7 +117,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
     ///                    .build_with_payload("unexpected movement", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_NOTIFICATION.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS1.into());
+    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_UNSPECIFIED.into());
     /// assert_eq!(message.attributes.source, Some(origin).into());
     /// assert_eq!(message.attributes.sink, Some(destination).into());
     /// # Ok(())
@@ -342,6 +344,10 @@ impl UMessageBuilder {
     ///
     /// The builder.
     ///
+    /// # Panics
+    ///
+    /// if the builder is used for creating an RPC message but the given priority is less than CS4.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -362,7 +368,14 @@ impl UMessageBuilder {
         {
             assert!(priority.value() >= UPriority::UPRIORITY_CS4.value())
         }
-        self.priority = priority;
+        if priority != PRIORITY_DEFAULT {
+            // only set priority explicitly if it differs from the default priority
+            self.priority = priority;
+        } else {
+            // in all other cases set to UNSPECIFIED which will result in the
+            // priority not being included in the serialized protobuf
+            self.priority = UPriority::UPRIORITY_UNSPECIFIED;
+        }
         self
     }
 
