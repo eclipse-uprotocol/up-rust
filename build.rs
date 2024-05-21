@@ -16,6 +16,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use protobuf_codegen::Customize;
+
 const UPROTOCOL_BASE_URI: &str =
     "https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-core-api/uprotocol";
 
@@ -72,6 +74,7 @@ fn get_and_build_protos(
         .protoc()
         // use vendored protoc instead of relying on user provided protobuf installation
         .protoc_path(&protoc_bin_vendored::protoc_bin_path().unwrap())
+        .customize(Customize::default().tokio_bytes(true))
         .include(proto_folder)
         .inputs(proto_files)
         .cargo_out_dir(output_folder)

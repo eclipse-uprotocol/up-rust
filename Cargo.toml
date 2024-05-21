@@ -44,7 +44,7 @@ bytes = { version = "1.5" }
 chrono = { version = "0.4.32" }
 mediatype = "0.19"
 once_cell = { version = "1.19" }
-protobuf = { version = "3.3" }
+protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
 url = { version = "2.5" }
