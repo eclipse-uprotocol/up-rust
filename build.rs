@@ -19,36 +19,46 @@ use std::path::PathBuf;
 use protobuf_codegen::Customize;
 
 const UPROTOCOL_BASE_URI: &str =
-    "https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-core-api/uprotocol";
+    "https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-core-api/uprotocol/";
+const UPROTOCOL_VERSION: &str = "v1/";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     get_and_build_protos(
         &[
             // uProtocol-project proto definitions
-            format!("{}/uuid.proto", UPROTOCOL_BASE_URI).as_str(),
-            format!("{}/uri.proto", UPROTOCOL_BASE_URI).as_str(),
-            format!("{}/uattributes.proto", UPROTOCOL_BASE_URI).as_str(),
-            format!("{}/umessage.proto", UPROTOCOL_BASE_URI).as_str(),
-            format!("{}/ustatus.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}uoptions.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}{}uuid.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
+            format!("{}{}uri.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
+            format!(
+                "{}{}uattributes.proto",
+                UPROTOCOL_BASE_URI, UPROTOCOL_VERSION
+            )
+            .as_str(),
+            format!("{}{}umessage.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
+            format!("{}{}ustatus.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
             // not used in the SDK yet, but for completeness sake
-            format!("{}/file.proto", UPROTOCOL_BASE_URI).as_str(),
-            format!("{}/uprotocol_options.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}{}file.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
             // optional up-core-api features
             #[cfg(feature = "udiscovery")]
-            format!("{}/core/udiscovery/v3/udiscovery.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}core/udiscovery/v3/udiscovery.proto", UPROTOCOL_BASE_URI).as_str(),
             #[cfg(feature = "usubscription")]
             format!(
-                "{}/core/usubscription/v3/usubscription.proto",
+                "{}core/usubscription/v3/usubscription.proto",
                 UPROTOCOL_BASE_URI
             )
             .as_str(),
             #[cfg(feature = "utwin")]
-            format!("{}/core/utwin/v2/utwin.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}core/utwin/v2/utwin.proto", UPROTOCOL_BASE_URI).as_str(),
         ],
         "uprotocol",
-    )?;
-
-    Ok(())
+    )
+    .map_err(|e| {
+        println!(
+            "failed to generate types from uProtocol proto3 definitions: {}",
+            e
+        );
+        e
+    })
 }
 
 // Fetch protobuf definitions from `url`, and build them with prost_build
@@ -61,8 +71,8 @@ fn get_and_build_protos(
     let mut proto_files = Vec::new();
 
     for url in urls {
-        // Extract filename from the URL
-        let filename = url.rsplit('/').next().unwrap_or_default();
+        // Extract relative filename from the URL
+        let filename = url.strip_prefix(UPROTOCOL_BASE_URI).unwrap_or_default();
         let dest_path = proto_folder.join(filename);
 
         // Download the .proto file
@@ -84,26 +94,22 @@ fn get_and_build_protos(
 }
 
 // Retrieves a file from `url` (from GitHub, for instance) and places it in the build directory (`OUT_DIR`) with the name
-// provided by `destination` parameter.
+// provided by `dest_path` parameter.
 fn download_and_write_file(
     url: &str,
     dest_path: &PathBuf,
 ) -> core::result::Result<(), Box<dyn std::error::Error>> {
     // Send a GET request to the URL
-    match reqwest::blocking::get(url) {
-        Ok(mut response) => {
+    reqwest::blocking::get(url)
+        .map_err(Box::from)
+        .and_then(|mut response| {
             if let Some(parent_path) = dest_path.parent() {
                 std::fs::create_dir_all(parent_path)?;
             }
             let mut out_file = fs::File::create(dest_path)?;
-
-            let result: Result<(), Box<dyn std::error::Error>> = response
+            response
                 .copy_to(&mut out_file)
                 .map(|_| ())
-                .map_err(|e| e.to_string().into());
-
-            result
-        }
-        Err(e) => Err(Box::from(e)),
-    }
+                .map_err(|e| e.to_string().into())
+        })
 }

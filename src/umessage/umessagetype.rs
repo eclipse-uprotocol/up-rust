@@ -15,7 +15,7 @@ use protobuf::EnumFull;
 
 use crate::uattributes::UAttributesError;
 pub use crate::up_core_api::uattributes::UMessageType;
-use crate::up_core_api::uprotocol_options::exts::ce_name;
+use crate::up_core_api::uoptions::exts::ce_name;
 
 impl UMessageType {
     /// Gets this message type's CloudEvent type name.
