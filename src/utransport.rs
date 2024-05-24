@@ -43,7 +43,7 @@ use crate::{UMessage, UStatus, UUri};
 /// impl UListener for FooListener {
 ///     async fn on_receive(&self, msg: UMessage) {
 ///         let mut inner_foo = self.inner_foo.lock().unwrap();
-///         if let Some(payload) = msg.payload.as_ref() {
+///         if let Some(payload) = msg.payload() {
 ///             *inner_foo = format!("latest message length: {}", payload.len());
 ///         }
 ///     }
@@ -68,7 +68,7 @@ use crate::{UMessage, UStatus, UUri};
 ///
 /// async fn send_to_jupiter(message_for_jupiter: UMessage) {
 ///     // send a message to Jupiter
-///     println!("Fly me to the moon... {message_for_jupiter}");
+///     println!("Fly me to the moon... {:?}", message_for_jupiter);
 /// }
 ///
 /// #[async_trait]
@@ -341,6 +341,7 @@ impl Eq for ComparableListener {}
 mod tests {
     use crate::ComparableListener;
     use crate::UListener;
+    use crate::UMessageBuilder;
     use crate::{UCode, UMessage, UStatus, UTransport, UUri};
     use async_std::task;
     use async_trait::async_trait;
@@ -492,6 +493,17 @@ mod tests {
         }
     }
 
+    fn publish_message() -> UMessage {
+        UMessageBuilder::publish(UUri {
+            ue_id: 0x0001,
+            ue_version_major: 0x01,
+            resource_id: 0xabcd,
+            ..Default::default()
+        })
+        .build()
+        .unwrap()
+    }
+
     #[test]
     fn test_register_and_receive() {
         let mut up_client_foo = UPClientFoo::default();
@@ -501,7 +513,7 @@ mod tests {
             task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_baz.clone()));
         assert!(register_res.is_ok());
 
-        let umessage = UMessage::default();
+        let umessage = publish_message();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
     }
@@ -515,7 +527,7 @@ mod tests {
             task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_baz.clone()));
         assert!(register_res.is_ok());
 
-        let umessage = UMessage::default();
+        let umessage = publish_message();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
@@ -523,7 +535,7 @@ mod tests {
             task::block_on(up_client_foo.unregister_listener(&uuri_1, None, listener_baz));
         assert!(unregister_res.is_ok());
 
-        let umessage = UMessage::default();
+        let umessage = publish_message();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert!(check_on_receive_res.is_err());
     }
@@ -543,7 +555,7 @@ mod tests {
             task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_bar.clone()));
         assert!(register_res.is_ok());
 
-        let umessage = UMessage::default();
+        let umessage = publish_message();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
@@ -563,7 +575,7 @@ mod tests {
         let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
 
-        let umessage = UMessage::default();
+        let umessage = publish_message();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
 
         assert!(check_on_receive_res.is_err());
@@ -591,7 +603,7 @@ mod tests {
         ));
         assert!(register_res.is_ok());
 
-        let umessage = UMessage::default();
+        let umessage = publish_message();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
