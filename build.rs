@@ -34,7 +34,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 UPROTOCOL_BASE_URI, UPROTOCOL_VERSION
             )
             .as_str(),
-            format!("{}{}umessage.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
             format!("{}{}ustatus.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
             // not used in the SDK yet, but for completeness sake
             format!("{}{}file.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),

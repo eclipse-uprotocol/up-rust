@@ -14,11 +14,10 @@
 mod umessagebuilder;
 mod umessagetype;
 
+use bytes::Bytes;
 pub use umessagebuilder::*;
 
-pub use crate::up_core_api::umessage::UMessage;
-
-use crate::{UAttributesError, UPayloadFormat};
+use crate::{UAttributes, UAttributesError, UPayloadFormat};
 use protobuf::{well_known_types::any::Any, Message};
 
 #[derive(Debug)]
@@ -63,7 +62,22 @@ impl From<&str> for UMessageError {
     }
 }
 
+/// A container for a message's attributes and payload.
+#[derive(Debug, Clone)]
+pub struct UMessage {
+    attributes: UAttributes,
+    payload: Option<Bytes>,
+}
+
 impl UMessage {
+    pub fn attributes(&self) -> &UAttributes {
+        &self.attributes
+    }
+
+    pub fn payload(&self) -> Option<&Bytes> {
+        self.payload.as_ref()
+    }
+
     /// Extracts the payload-contained protobuf message from a `UMessage`.
     ///
     /// This function is used to extract strongly-typed data from a `UMessage` object,

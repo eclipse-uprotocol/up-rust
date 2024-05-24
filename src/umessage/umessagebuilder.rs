@@ -39,8 +39,6 @@ pub struct UMessageBuilder {
     permission_level: Option<u32>,
     comm_status: Option<EnumOrUnknown<UCode>>,
     request_id: Option<UUID>,
-    payload: Option<Bytes>,
-    payload_format: UPayloadFormat,
 }
 
 impl Default for UMessageBuilder {
@@ -50,8 +48,6 @@ impl Default for UMessageBuilder {
             comm_status: None,
             message_type: UMessageType::UMESSAGE_TYPE_UNSPECIFIED,
             message_id: None,
-            payload: None,
-            payload_format: UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED,
             permission_level: None,
             priority: UPriority::UPRIORITY_UNSPECIFIED,
             request_id: None,
@@ -82,9 +78,9 @@ impl UMessageBuilder {
     /// let topic = UUri::try_from("my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic.clone())
     ///                    .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_UNSPECIFIED.into());
-    /// assert_eq!(message.attributes.source, Some(topic).into());
+    /// assert_eq!(message.attributes().type_, UMessageType::UMESSAGE_TYPE_PUBLISH.into());
+    /// assert_eq!(message.attributes().priority, UPriority::UPRIORITY_UNSPECIFIED.into());
+    /// assert_eq!(message.attributes().source, Some(topic).into());
     /// # Ok(())
     /// # }
     /// ```
@@ -116,10 +112,10 @@ impl UMessageBuilder {
     /// let destination = UUri::try_from("my-cloud/CCDD/2/75FD")?;
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
     ///                    .build_with_payload("unexpected movement", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_NOTIFICATION.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_UNSPECIFIED.into());
-    /// assert_eq!(message.attributes.source, Some(origin).into());
-    /// assert_eq!(message.attributes.sink, Some(destination).into());
+    /// assert_eq!(message.attributes().type_, UMessageType::UMESSAGE_TYPE_NOTIFICATION.into());
+    /// assert_eq!(message.attributes().priority, UPriority::UPRIORITY_UNSPECIFIED.into());
+    /// assert_eq!(message.attributes().source, Some(origin).into());
+    /// assert_eq!(message.attributes().sink, Some(destination).into());
     /// # Ok(())
     /// # }
     /// ```
@@ -157,11 +153,11 @@ impl UMessageBuilder {
     /// let reply_to_address = UUri::try_from("my-cloud/BA4C/1/0")?;
     /// let message = UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
     ///                    .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_REQUEST.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
-    /// assert_eq!(message.attributes.source, Some(reply_to_address).into());
-    /// assert_eq!(message.attributes.sink, Some(method_to_invoke).into());
-    /// assert_eq!(message.attributes.ttl, Some(5000));
+    /// assert_eq!(message.attributes().type_, UMessageType::UMESSAGE_TYPE_REQUEST.into());
+    /// assert_eq!(message.attributes().priority, UPriority::UPRIORITY_CS4.into());
+    /// assert_eq!(message.attributes().source, Some(reply_to_address).into());
+    /// assert_eq!(message.attributes().sink, Some(method_to_invoke).into());
+    /// assert_eq!(message.attributes().ttl, Some(5000));
     /// # Ok(())
     /// # }
     /// ```
@@ -204,11 +200,11 @@ impl UMessageBuilder {
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address.clone(), request_id.clone(), invoked_method.clone())
     ///                    .build()?;
-    /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS4.into());
-    /// assert_eq!(message.attributes.source, Some(invoked_method).into());
-    /// assert_eq!(message.attributes.sink, Some(reply_to_address).into());
-    /// assert_eq!(message.attributes.reqid, Some(request_id).into());
+    /// assert_eq!(message.attributes().type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
+    /// assert_eq!(message.attributes().priority, UPriority::UPRIORITY_CS4.into());
+    /// assert_eq!(message.attributes().source, Some(invoked_method).into());
+    /// assert_eq!(message.attributes().sink, Some(reply_to_address).into());
+    /// assert_eq!(message.attributes().reqid, Some(request_id).into());
     /// # Ok(())
     /// # }
     /// ```
@@ -253,14 +249,14 @@ impl UMessageBuilder {
     ///                           .with_message_id(request_message_id.clone()) // normally not needed, used only for asserts below
     ///                           .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     ///
-    /// let response_message = UMessageBuilder::response_for_request(&request_message.attributes)
+    /// let response_message = UMessageBuilder::response_for_request(request_message.attributes())
     ///                           .with_priority(UPriority::UPRIORITY_CS5)
     ///                           .build()?;
-    /// assert_eq!(response_message.attributes.type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
-    /// assert_eq!(response_message.attributes.priority, UPriority::UPRIORITY_CS5.into());
-    /// assert_eq!(response_message.attributes.source, Some(method_to_invoke).into());
-    /// assert_eq!(response_message.attributes.sink, Some(reply_to_address).into());
-    /// assert_eq!(response_message.attributes.reqid, Some(request_message_id).into());
+    /// assert_eq!(response_message.attributes().type_, UMessageType::UMESSAGE_TYPE_RESPONSE.into());
+    /// assert_eq!(response_message.attributes().priority, UPriority::UPRIORITY_CS5.into());
+    /// assert_eq!(response_message.attributes().source, Some(method_to_invoke).into());
+    /// assert_eq!(response_message.attributes().sink, Some(reply_to_address).into());
+    /// assert_eq!(response_message.attributes().reqid, Some(request_message_id).into());
     /// # Ok(())
     /// # }
     /// ```
@@ -314,10 +310,10 @@ impl UMessageBuilder {
     ///                     // use new message ID but retain all other attributes
     ///                     .with_message_id(UUIDBuilder::build())
     ///                     .build_with_payload("open", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_ne!(message_one.attributes.id, message_two.attributes.id);
-    /// assert_eq!(message_one.attributes.source, message_two.attributes.source);
-    /// assert_eq!(message_one.attributes.priority, UPriority::UPRIORITY_CS2.into());
-    /// assert_eq!(message_two.attributes.priority, UPriority::UPRIORITY_CS2.into());
+    /// assert_ne!(message_one.attributes().id, message_two.attributes().id);
+    /// assert_eq!(message_one.attributes().source, message_two.attributes().source);
+    /// assert_eq!(message_one.attributes().priority, UPriority::UPRIORITY_CS2.into());
+    /// assert_eq!(message_two.attributes().priority, UPriority::UPRIORITY_CS2.into());
     /// # Ok(())
     /// # }
     /// ```
@@ -358,7 +354,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::publish(topic)
     ///                   .with_priority(UPriority::UPRIORITY_CS5)
     ///                   .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.attributes.priority, UPriority::UPRIORITY_CS5.into());
+    /// assert_eq!(message.attributes().priority, UPriority::UPRIORITY_CS5.into());
     /// # Ok(())
     /// # }
     /// ```
@@ -403,7 +399,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::response(reply_to_address, request_msg_id, invoked_method)
     ///                     .with_ttl(2000)
     ///                     .build()?;
-    /// assert_eq!(message.attributes.ttl, Some(2000));
+    /// assert_eq!(message.attributes().ttl, Some(2000));
     /// # Ok(())
     /// # }
     /// ```
@@ -438,7 +434,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
     ///                     .with_token(token.clone())
     ///                     .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.attributes.token, Some(token));
+    /// assert_eq!(message.attributes().token, Some(token));
     /// # Ok(())
     /// # }
     /// ```
@@ -474,7 +470,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
     ///                     .with_permission_level(12)
     ///                     .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.attributes.permission_level, Some(12));
+    /// assert_eq!(message.attributes().permission_level, Some(12));
     /// # Ok(())
     /// # }
     /// ```
@@ -514,7 +510,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::response(reply_to_address, request_msg_id, invoked_method)
     ///                     .with_comm_status(status)
     ///                     .build()?;
-    /// assert_eq!(message.attributes.commstatus, Some(EnumOrUnknown::from_i32(status)));
+    /// assert_eq!(message.attributes().commstatus, Some(EnumOrUnknown::from_i32(status)));
     /// # Ok(())
     /// # }
     /// ```
@@ -522,6 +518,38 @@ impl UMessageBuilder {
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE);
         self.comm_status = Some(EnumOrUnknown::from_i32(comm_status));
         self
+    }
+
+    fn build_internal(
+        &self,
+        payload: Option<Bytes>,
+        format: Option<UPayloadFormat>,
+    ) -> Result<UMessage, UMessageError> {
+        let message_id = self
+            .message_id
+            .clone()
+            .map_or_else(|| Some(UUIDBuilder::build()), Some);
+        let attributes = UAttributes {
+            id: message_id.into(),
+            type_: self.message_type.into(),
+            source: self.source.clone().into(),
+            sink: self.sink.clone().into(),
+            priority: self.priority.into(),
+            ttl: self.ttl,
+            token: self.token.clone(),
+            permission_level: self.permission_level,
+            commstatus: self.comm_status,
+            reqid: self.request_id.clone().into(),
+            payload_format: format.unwrap_or_default().into(),
+            ..Default::default()
+        };
+        self.validator
+            .validate(&attributes)
+            .map_err(UMessageError::from)
+            .map(|_| UMessage {
+                attributes,
+                payload,
+            })
     }
 
     /// Creates the message based on the builder's state.
@@ -574,38 +602,13 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::response(reply_to_address, UUIDBuilder::build(), invoked_method)
     ///                     .with_message_id(message_id.clone())
     ///                     .build()?;
-    /// assert_eq!(message.attributes.id, Some(message_id).into());
-    /// # assert_eq!(message.attributes.id.clone().unwrap().lsb, lsb);
+    /// assert_eq!(message.attributes().id, Some(message_id).into());
+    /// # assert_eq!(message.attributes().id.clone().unwrap().lsb, lsb);
     /// # Ok(())
     /// # }
     /// ```
     pub fn build(&self) -> Result<UMessage, UMessageError> {
-        let message_id = self
-            .message_id
-            .clone()
-            .map_or_else(|| Some(UUIDBuilder::build()), Some);
-        let attributes = UAttributes {
-            id: message_id.into(),
-            type_: self.message_type.into(),
-            source: self.source.clone().into(),
-            sink: self.sink.clone().into(),
-            priority: self.priority.into(),
-            ttl: self.ttl,
-            token: self.token.clone(),
-            permission_level: self.permission_level,
-            commstatus: self.comm_status,
-            reqid: self.request_id.clone().into(),
-            payload_format: self.payload_format.into(),
-            ..Default::default()
-        };
-        self.validator
-            .validate(&attributes)
-            .map_err(UMessageError::from)
-            .map(|_| UMessage {
-                attributes: Some(attributes).into(),
-                payload: self.payload.to_owned(),
-                ..Default::default()
-            })
+        self.build_internal(None, None)
     }
 
     /// Creates the message based on the builder's state and some payload.
@@ -633,7 +636,7 @@ impl UMessageBuilder {
     /// let topic = UUri::try_from("my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic)
     ///                    .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert!(message.payload.is_some());
+    /// assert!(message.payload().is_some());
     /// # Ok(())
     /// # }
     /// ```
@@ -642,10 +645,7 @@ impl UMessageBuilder {
         payload: T,
         format: UPayloadFormat,
     ) -> Result<UMessage, UMessageError> {
-        self.payload = Some(payload.into());
-        self.payload_format = format;
-
-        self.build()
+        self.build_internal(Some(payload.into()), Some(format))
     }
 
     /// Creates the message based on the builder's state and some payload.
@@ -680,8 +680,8 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
     ///                    .with_comm_status(UCode::INVALID_ARGUMENT.value())
     ///                    .build_with_protobuf_payload(&UStatus::fail("failed to parse request"))?;
-    /// assert!(message.payload.is_some());
-    /// assert_eq!(message.attributes.payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF);
+    /// assert!(message.payload().is_some());
+    /// assert_eq!(message.attributes().payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF);
     /// # Ok(())
     /// # }
     /// ```
@@ -732,8 +732,8 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
     ///                    .with_comm_status(UCode::INVALID_ARGUMENT.value())
     ///                    .build_with_wrapped_protobuf_payload(&UStatus::fail("failed to parse request"))?;
-    /// assert!(message.payload.is_some());
-    /// assert_eq!(message.attributes.payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY);
+    /// assert!(message.payload().is_some());
+    /// assert_eq!(message.attributes().payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY);
     /// # Ok(())
     /// # }
     /// ```
