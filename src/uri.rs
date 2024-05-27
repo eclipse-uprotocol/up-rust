@@ -401,6 +401,25 @@ impl UUri {
         }
     }
 
+    /// Checks if this UUri represents a destination for a Notification.
+    ///
+    /// Returns `true` if resource ID is 0.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uri = UUri {
+    ///     resource_id: 0,
+    ///     ..Default::default()
+    /// };
+    /// assert!(uri.is_notification_destination());
+    /// ```
+    pub fn is_notification_destination(&self) -> bool {
+        self.resource_id == RESOURCE_ID_RESPONSE
+    }
+
     /// Checks if this UUri represents an RPC response address.
     ///
     /// Returns `true` if resource ID is 0.

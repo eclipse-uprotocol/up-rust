@@ -386,13 +386,13 @@ impl UAttributesValidator for NotificationValidator {
     /// Returns an error
     ///
     /// * if the attributes do not contain a sink URI, or
-    /// * if the sink URI is an RPC response URI, or
+    /// * if the sink URI's resource ID is != 0, or
     /// * if the sink URI contains any wildcards.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if let Some(sink) = attributes.sink.as_ref() {
-            if sink.is_rpc_response() {
+            if !sink.is_notification_destination() {
                 Err(UAttributesError::validation_error(
-                    "Destination must not be an RPC response URI",
+                    "Destination's resource ID must be 0",
                 ))
             } else {
                 sink.verify_no_wildcards().map_err(|e| {
@@ -773,7 +773,7 @@ mod tests {
     #[test_case(Some(UUIDBuilder::build()), Some(origin()), Some(destination()), Some(100), true; "succeeds for valid attributes")]
     #[test_case(Some(UUIDBuilder::build()), None, Some(destination()), None, false; "fails for missing origin")]
     #[test_case(Some(UUIDBuilder::build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid origin")]
-    #[test_case(Some(UUIDBuilder::build()), Some(origin()), Some(UUri::default()), None, false; "fails for invalid destination")]
+    #[test_case(Some(UUIDBuilder::build()), Some(origin()), Some(UUri { ue_id: 0xabcd, ue_version_major: 0x01, resource_id: 0x0011, ..Default::default() }), None, false; "fails for invalid destination")]
     #[test_case(Some(UUIDBuilder::build()), None, None, None, false; "fails for neither origin nor destination")]
     #[test_case(None, Some(origin()), Some(destination()), None, false; "fails for missing message ID")]
     #[test_case(
@@ -1003,7 +1003,7 @@ mod tests {
             authority_name: String::from("vcu.someVin"),
             ue_id: 0x0000_3d07,
             ue_version_major: 0x01,
-            resource_id: 0xa100,
+            resource_id: 0x0000,
             ..Default::default()
         }
     }

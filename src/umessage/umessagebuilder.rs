@@ -113,7 +113,7 @@ impl UMessageBuilder {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let origin = UUri::try_from("my-vehicle/4210/5/F20B")?;
-    /// let destination = UUri::try_from("my-cloud/CCDD/2/75FD")?;
+    /// let destination = UUri::try_from("my-cloud/CCDD/2/0")?;
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
     ///                    .build_with_payload("unexpected movement", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.attributes.type_, UMessageType::UMESSAGE_TYPE_NOTIFICATION.into());
