@@ -19,36 +19,31 @@ use std::path::PathBuf;
 use protobuf_codegen::Customize;
 
 const UPROTOCOL_BASE_URI: &str =
-    "https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-core-api/uprotocol/";
+    "https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-core-api/";
+const UPROTOCOL_FOLDER: &str = "uprotocol/";
 const UPROTOCOL_VERSION: &str = "v1/";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let uprotocol_uri = format!("{}{}", UPROTOCOL_BASE_URI, UPROTOCOL_FOLDER);
+    let uprotocol_uri_with_version = format!("{}{}", uprotocol_uri, UPROTOCOL_VERSION);
     get_and_build_protos(
         &[
             // uProtocol-project proto definitions
-            format!("{}uoptions.proto", UPROTOCOL_BASE_URI).as_str(),
-            format!("{}{}uuid.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
-            format!("{}{}uri.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
-            format!(
-                "{}{}uattributes.proto",
-                UPROTOCOL_BASE_URI, UPROTOCOL_VERSION
-            )
-            .as_str(),
-            format!("{}{}umessage.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
-            format!("{}{}ustatus.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
+            format!("{}uoptions.proto", uprotocol_uri).as_str(),
+            format!("{}uuid.proto", uprotocol_uri_with_version).as_str(),
+            format!("{}uri.proto", uprotocol_uri_with_version).as_str(),
+            format!("{}uattributes.proto", uprotocol_uri_with_version).as_str(),
+            format!("{}umessage.proto", uprotocol_uri_with_version).as_str(),
+            format!("{}ustatus.proto", uprotocol_uri_with_version).as_str(),
             // not used in the SDK yet, but for completeness sake
-            format!("{}{}file.proto", UPROTOCOL_BASE_URI, UPROTOCOL_VERSION).as_str(),
+            format!("{}file.proto", uprotocol_uri_with_version).as_str(),
             // optional up-core-api features
             #[cfg(feature = "udiscovery")]
-            format!("{}core/udiscovery/v3/udiscovery.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}core/udiscovery/v3/udiscovery.proto", uprotocol_uri).as_str(),
             #[cfg(feature = "usubscription")]
-            format!(
-                "{}core/usubscription/v3/usubscription.proto",
-                UPROTOCOL_BASE_URI
-            )
-            .as_str(),
+            format!("{}core/usubscription/v3/usubscription.proto", uprotocol_uri).as_str(),
             #[cfg(feature = "utwin")]
-            format!("{}core/utwin/v2/utwin.proto", UPROTOCOL_BASE_URI).as_str(),
+            format!("{}core/utwin/v2/utwin.proto", uprotocol_uri).as_str(),
         ],
         "uprotocol",
     )
