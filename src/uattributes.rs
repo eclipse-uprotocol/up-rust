@@ -74,8 +74,8 @@ impl UAttributes {
 
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let message_id = UUIDBuilder::build();
-    /// let method_to_invoke = UUri::try_from("my-vehicle/1004F3B/3/B42")?;
-    /// let reply_to_address = UUri::try_from("my-cloud/A/1/0")?;
+    /// let method_to_invoke = UUri::try_from("//my-vehicle/1004F3B/3/B42")?;
+    /// let reply_to_address = UUri::try_from("//my-cloud/A/1/0")?;
     /// let token = Some("my_token".to_string());
     /// let ttl = Some(5_000);
     /// let attributes = UAttributes::request(message_id.clone(), method_to_invoke.clone(), reply_to_address.clone(), None, token, ttl);
