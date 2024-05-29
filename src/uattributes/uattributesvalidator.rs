@@ -162,7 +162,7 @@ impl UAttributesValidators {
     /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let topic = UUri::try_from("my-vehicle/D45/23/A001")?;
+    /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
     ///    id: Some(UUIDBuilder::build()).into(),
@@ -191,7 +191,7 @@ impl UAttributesValidators {
     /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let topic = UUri::try_from("my-vehicle/D45/23/A001")?;
+    /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
     ///    id: Some(UUIDBuilder::build()).into(),
@@ -215,7 +215,7 @@ impl UAttributesValidators {
     /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let topic = UUri::try_from("my-vehicle/D45/23/A001")?;
+    /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
     ///    id: Some(UUIDBuilder::build()).into(),

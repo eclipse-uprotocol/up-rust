@@ -11,8 +11,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+// [impl->dsn~data-model-naming~1]
+// [impl->req~data-model-proto~1]
+
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
+
+use uriparse::URIReference;
 
 pub use crate::up_core_api::uri::UUri;
 
@@ -57,6 +62,7 @@ impl std::fmt::Display for UUriError {
 
 impl std::error::Error for UUriError {}
 
+// [impl->req~uri-serialization~1]
 impl From<&UUri> for String {
     /// Serializes a UUri to a URI string.
     ///
@@ -75,7 +81,11 @@ impl From<&UUri> for String {
 impl FromStr for UUri {
     type Err = UUriError;
 
-    /// Attempts to serialize a `String` into a `UUri`.
+    /// Attempts to parse a `String` into a `UUri`.
+    ///
+    /// As part of the parsing, the _authority_ of the URI is getting normalized. This means that all characters
+    /// are converted to lowercase, no bytes that are in the unreserved character set remain percent-encoded,
+    /// and all alphabetical characters in percent-encodings are converted to uppercase.
     ///
     /// # Arguments
     ///
@@ -102,86 +112,90 @@ impl FromStr for UUri {
     /// let uri_from = UUri::from_str("//VIN.vehicles/A8000/2/1A50").unwrap();
     /// assert_eq!(uri, uri_from);
     /// ````
+    // [impl->dsn~authority-name-length~1]
+    // [impl->dsn~uri-scheme~1]
+    // [impl->dsn~uri-host-only~1]
+    // [impl->dsn~uri-authority-mapping~1]
+    // [impl->dsn~uri-path-mapping~1]
+    // [impl->req~uri-serialization~1]
     fn from_str(uri: &str) -> Result<Self, Self::Err> {
         if uri.is_empty() {
             return Err(UUriError::serialization_error("URI is empty"));
         }
+        let parsed_uri = URIReference::try_from(uri)
+            .map_err(|e| UUriError::serialization_error(e.to_string()))?;
 
-        let uri_to_parse = uri.find(':').map_or_else(
-            || Ok(uri.replace('\\', "/")),
-            |_index| {
-                // strip leading scheme definition (`up`) up to and including `:`
-                uri.strip_prefix("up:")
-                    .ok_or(UUriError::serialization_error(
-                        "uProtocol URI must use 'up' scheme",
-                    ))
-                    .map(|s| s.to_string())
-                // if uri.starts_with("up:") {
-                //     // strip leading scheme definition (`up`) up to and including `:`
-                //     Ok(uri[3..].to_string())
-                // } else {
-                //     Err(UUriError::serialization_error(
-                //         "uProtocol URI must use 'up' scheme",
-                //     ))
-                // }
-            },
-        )?;
-        let is_local: bool = !uri_to_parse.starts_with("//");
-        let uri_parts = uri_to_parse.split('/').collect::<Vec<&str>>();
-
-        let mut authority_name: String = String::default();
-        #[allow(unused_assignments)]
-        let mut entity: String = String::default();
-        #[allow(unused_assignments)]
-        let mut version: String = String::default();
-        #[allow(unused_assignments)]
-        let mut resource: String = String::default();
-
-        if is_local {
-            if uri_parts.len() != 4 {
+        if let Some(scheme) = parsed_uri.scheme() {
+            if scheme.ne("up") {
                 return Err(UUriError::serialization_error(
-                    "Local URI must contain entity ID, entity version and resource ID",
+                    "uProtocol URI must use 'up' scheme",
                 ));
             }
-            entity = uri_parts[1].to_string();
-            version = uri_parts[2].to_string();
-            resource = uri_parts[3].to_string();
-        } else if uri_parts.len() != 6 {
-            return Err(UUriError::serialization_error(
-                "Remote URI must contain authority, entity ID, entity version and resource ID",
-            ));
-        } else if uri_parts[2].trim().is_empty() {
-            return Err(UUriError::serialization_error(
-                "Remote URI must contain non-empty authority",
-            ));
-        } else {
-            authority_name = uri_parts[2].to_string();
-            entity = uri_parts[3].to_string();
-            version = uri_parts[4].to_string();
-            resource = uri_parts[5].to_string();
         }
+        if parsed_uri.has_query() {
+            return Err(UUriError::serialization_error(
+                "uProtocol URI must not contain query",
+            ));
+        }
+        if parsed_uri.has_fragment() {
+            return Err(UUriError::serialization_error(
+                "uProtocol URI must not contain fragment",
+            ));
+        }
+        let authority_name = parsed_uri
+            .authority()
+            .map_or(Ok(String::default()), |auth| {
+                if auth.has_port() {
+                    Err(UUriError::serialization_error(
+                        "uProtocol URI's authority must not contain port",
+                    ))
+                } else if auth.has_username() || auth.has_password() {
+                    Err(UUriError::serialization_error(
+                        "uProtocol URI's authority must not contain userinfo",
+                    ))
+                } else {
+                    let auth_name = auth.host().to_string();
+                    if auth_name.len() <= 128 {
+                        Ok(auth_name)
+                    } else {
+                        Err(UUriError::serialization_error(
+                            "URI's authority name must not exceed 128 characters",
+                        ))
+                    }
+                }
+            })?;
+
+        let path_segments = parsed_uri.path().segments();
+        if path_segments.len() != 3 {
+            return Err(UUriError::serialization_error(
+                "uProtocol URI must contain entity ID, entity version and resource ID",
+            ));
+        }
+        let entity = path_segments[0].as_str();
         if entity.is_empty() {
             return Err(UUriError::serialization_error(
                 "URI must contain non-empty entity ID",
             ));
         }
+        let ue_id = u32::from_str_radix(entity, 16).map_err(|e| {
+            UUriError::serialization_error(format!("Cannot parse entity ID: {}", e))
+        })?;
+        let version = path_segments[1].as_str();
         if version.is_empty() {
             return Err(UUriError::serialization_error(
                 "URI must contain non-empty entity version",
             ));
         }
+        let ue_version_major = u8::from_str_radix(version, 16).map_err(|e| {
+            UUriError::serialization_error(format!("Cannot parse entity version: {}", e))
+        })?;
+        let resource = path_segments[2].as_str();
         if resource.is_empty() {
             return Err(UUriError::serialization_error(
                 "URI must contain non-empty resource ID",
             ));
         }
-        let ue_id = u32::from_str_radix(&entity, 16).map_err(|e| {
-            UUriError::serialization_error(format!("Cannot parse entity ID: {}", e))
-        })?;
-        let ue_version_major = u8::from_str_radix(&version, 16).map_err(|e| {
-            UUriError::serialization_error(format!("Cannot parse entity version: {}", e))
-        })?;
-        let resource_id = u16::from_str_radix(&resource, 16).map_err(|e| {
+        let resource_id = u16::from_str_radix(resource, 16).map_err(|e| {
             UUriError::serialization_error(format!("Cannot parse resource ID: {}", e))
         })?;
 
@@ -195,6 +209,7 @@ impl FromStr for UUri {
     }
 }
 
+// [impl->req~uri-serialization~1]
 impl TryFrom<String> for UUri {
     type Error = UUriError;
 
@@ -212,6 +227,7 @@ impl TryFrom<String> for UUri {
     }
 }
 
+// [impl->req~uri-serialization~1]
 impl TryFrom<&str> for UUri {
     type Error = UUriError;
 
@@ -515,29 +531,93 @@ impl UUri {
             self.verify_no_wildcards()
         }
     }
+
+    fn matches_authority(&self, candidate: &UUri) -> bool {
+        self.authority_name == WILDCARD_AUTHORITY || self.authority_name == candidate.authority_name
+    }
+
+    fn matches_entity_type(&self, candidate: &UUri) -> bool {
+        self.ue_id & WILDCARD_ENTITY_ID == WILDCARD_ENTITY_ID
+            || self.ue_id & WILDCARD_ENTITY_ID == candidate.ue_id & WILDCARD_ENTITY_ID
+    }
+
+    fn matches_entity_instance(&self, candidate: &UUri) -> bool {
+        self.ue_id & 0xFFFF_0000 == 0x0000_0000
+            || self.ue_id & 0xFFFF_0000 == candidate.ue_id & 0xFFFF_0000
+    }
+
+    fn matches_entity_version(&self, candidate: &UUri) -> bool {
+        self.ue_version_major == WILDCARD_ENTITY_VERSION
+            || self.ue_version_major == candidate.ue_version_major
+    }
+
+    fn matches_entity(&self, candidate: &UUri) -> bool {
+        self.matches_entity_type(candidate)
+            && self.matches_entity_instance(candidate)
+            && self.matches_entity_version(candidate)
+    }
+
+    fn matches_resource(&self, candidate: &UUri) -> bool {
+        self.resource_id == WILDCARD_RESOURCE_ID || self.resource_id == candidate.resource_id
+    }
+
+    /// Checks if a given candidate URI matches a pattern.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the candiadate matches the pattern represented by this UUri.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let pattern = UUri::try_from("//VIN/A14F/3/FFFF").unwrap();
+    /// let candidate = UUri::try_from("//VIN/A14F/3/B1D4").unwrap();
+    /// assert!(pattern.matches(&candidate));
+    /// ```
+    // [impl->dsn~pattern-matching~1]
+    pub fn matches(&self, candidate: &UUri) -> bool {
+        self.matches_authority(candidate)
+            && self.matches_entity(candidate)
+            && self.matches_resource(candidate)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use protobuf::Message;
     use test_case::test_case;
 
-    #[test_case(""; "fail for empty string")]
-    #[test_case("/"; "fail for no scheme and slash")]
-    #[test_case("up:/"; "fail for scheme and slash")]
-    #[test_case("//"; "fail for no scheme and double slash")]
-    #[test_case("up://"; "fail for scheme and double slash")]
-    #[test_case("custom://my-vehicle/8000/2/1"; "fail for unsupported scheme")]
-    #[test_case("///8000/2/1"; "fail for no scheme and missing authority")]
-    #[test_case("////2/1"; "fail for no scheme, missing authority and entity")]
-    #[test_case("/////1"; "fail for no scheme, missing authority, entity and version")]
-    fn test_try_from_string_fail(string: &str) {
+    // [utest->req~uri-serialization~1]
+    // [utest->dsn~uri-scheme~1]
+    // [utest->dsn~uri-host-only~1]
+    // [utest->dsn~uri-authority-mapping~1]
+    // [utest->dsn~uri-path-mapping~1]
+    #[test_case(""; "for empty string")]
+    #[test_case("/"; "for single slash")]
+    #[test_case("up:/"; "for scheme and single slash")]
+    #[test_case("//"; "for double slash")]
+    #[test_case("up://"; "for scheme and double slash")]
+    #[test_case("custom://my-vehicle/8000/2/1"; "for unsupported scheme")]
+    #[test_case("////2/1"; "for missing authority and entity")]
+    #[test_case("/////1"; "for missing authority, entity and version")]
+    #[test_case("up://MYVIN/1a23/1/a13?foo=bar"; "for URI with query")]
+    #[test_case("up://MYVIN/1a23/1/a13#foobar"; "for URI with fragement")]
+    #[test_case("up://MYVIN:1000/1a23/1/a13"; "for authority with port")]
+    #[test_case("up://user:pwd@MYVIN/1a23/1/a13"; "for authority with userinfo")]
+    fn test_from_string_fails(string: &str) {
         let parsing_result = UUri::from_str(string);
         assert!(parsing_result.is_err());
     }
 
-    #[test_case("up:/8000/1/2",
+    // [utest->req~uri-serialization~1]
+    // [utest->dsn~uri-scheme~1]
+    // [utest->dsn~uri-host-only~1]
+    // [utest->dsn~uri-authority-mapping~1]
+    // [utest->dsn~uri-path-mapping~1]
+    #[test_case("UP:/8000/1/2",
         UUri {
             authority_name: String::default(),
             ue_id: 0x0000_8000,
@@ -545,7 +625,7 @@ mod tests {
             resource_id: 0x0002,
             ..Default::default()
         };
-        "succeed for local service with version and resource")]
+        "for local service with version and resource")]
     #[test_case("/108000/1/2",
         UUri {
             authority_name: String::default(),
@@ -554,7 +634,7 @@ mod tests {
             resource_id: 0x0002,
             ..Default::default()
         };
-        "succeed for local service instance with version and resource")]
+        "for local service instance with version and resource")]
     #[test_case("/8000/1/0",
         UUri {
             authority_name: String::default(),
@@ -563,7 +643,7 @@ mod tests {
             resource_id: 0x0000,
             ..Default::default()
         };
-        "succeed for local rpc service response")]
+        "for local rpc service response")]
     #[test_case("up://VCU.MY_CAR_VIN/108000/1/2",
         UUri {
             authority_name: "VCU.MY_CAR_VIN".to_string(),
@@ -572,7 +652,7 @@ mod tests {
             resource_id: 0x0002,
             ..Default::default()
         };
-        "succeed for remote uri")]
+        "for remote uri")]
     #[test_case("//*/FFFF/FF/FFFF",
         UUri {
             authority_name: "*".to_string(),
@@ -581,8 +661,8 @@ mod tests {
             resource_id: 0xFFFF,
             ..Default::default()
         };
-        "succeed for remote uri with wildcards")]
-    fn test_try_from_success(uri: &str, expected_uuri: UUri) {
+        "for remote uri with wildcards")]
+    fn test_from_string_succeeds(uri: &str, expected_uuri: UUri) {
         let parsing_result = UUri::from_str(uri);
         if parsing_result.is_err() {
             println!("error: {}", parsing_result.as_ref().unwrap_err());
@@ -599,5 +679,66 @@ mod tests {
     fn test_verify_no_wildcards_fails(uri: &str) {
         let uuri = UUri::try_from(uri).expect("should have been able to deserialize URI");
         assert!(uuri.verify_no_wildcards().is_err());
+    }
+
+    // [utest->req~data-model-proto~1]
+    #[test]
+    fn test_protobuf_serialization() {
+        let uri = UUri {
+            authority_name: "MYVIN".to_string(),
+            ue_id: 0x0000_1a4f,
+            ue_version_major: 0x10,
+            resource_id: 0xb392,
+            ..Default::default()
+        };
+        let pb = uri.write_to_bytes().unwrap();
+        let deserialized_uri = UUri::parse_from_bytes(pb.as_slice()).unwrap();
+        assert_eq!(uri, deserialized_uri);
+    }
+
+    // [utest->dsn~authority-name-length~1]
+    #[test]
+    fn test_from_str_fails_for_authority_exceeding_max_length() {
+        let host_name = ['a'; 129];
+        let uri = format!("//{}/A100/1/6501", host_name.iter().collect::<String>());
+        assert!(UUri::from_str(&uri).is_err());
+
+        let host_name = ['a'; 126];
+        // add single percent encoded character
+        // this should result in a 129 character host
+        let uri = format!("//{}%42/A100/1/6501", host_name.iter().collect::<String>());
+        assert!(UUri::from_str(&uri).is_err());
+    }
+
+    // [utest->dsn~pattern-matching~1]
+    #[test_case("//authority/A410/3/1003", "//authority/A410/3/1003"; "for identical URIs")]
+    #[test_case("//*/A410/3/1003", "//authority/A410/3/1003"; "for pattern with wildcard authority")]
+    #[test_case("//*/A410/3/1003", "/A410/3/1003"; "for pattern with wildcard authority and local candidate URI")]
+    #[test_case("//authority/FFFF/3/1003", "//authority/A410/3/1003"; "for pattern with wildcard entity ID")]
+    #[test_case("//authority/A410/3/1003", "//authority/2A410/3/1003"; "for pattern with wildcard entity instance")]
+    #[test_case("//authority/A410/FF/1003", "//authority/A410/3/1003"; "for pattern with wildcard entity version")]
+    #[test_case("//authority/A410/3/FFFF", "//authority/A410/3/1003"; "for pattern with wildcard resource")]
+    fn test_matches_succeeds(pattern: &str, candidate: &str) {
+        let pattern_uri =
+            UUri::try_from(pattern).expect("should have been able to create pattern UUri");
+        let candidate_uri =
+            UUri::try_from(candidate).expect("should have been able to create candidate UUri");
+        assert!(pattern_uri.matches(&candidate_uri));
+    }
+
+    // [utest->dsn~pattern-matching~1]
+    #[test_case("//Authority/A410/3/1003", "//authority/A410/3/1003"; "for pattern with upper case authority")]
+    #[test_case("/A410/3/1003", "//authority/A410/3/1003"; "for local pattern and candidate URI with authority")]
+    #[test_case("//other/A410/3/1003", "//authority/A410/3/1003"; "for pattern with different authority")]
+    #[test_case("//authority/45/3/1003", "//authority/A410/3/1003"; "for pattern with different entity ID")]
+    #[test_case("//authority/30A410/3/1003", "//authority/2A410/3/1003"; "for pattern with different entity instance")]
+    #[test_case("//authority/A410/1/1003", "//authority/A410/3/1003"; "for pattern with different entity version")]
+    #[test_case("//authority/A410/3/ABCD", "//authority/A410/3/1003"; "for pattern with different resource")]
+    fn test_matches_fails(pattern: &str, candidate: &str) {
+        let pattern_uri =
+            UUri::try_from(pattern).expect("should have been able to create pattern UUri");
+        let candidate_uri =
+            UUri::try_from(candidate).expect("should have been able to create candidate UUri");
+        assert!(!pattern_uri.matches(&candidate_uri));
     }
 }

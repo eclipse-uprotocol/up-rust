@@ -47,7 +47,7 @@ once_cell = { version = "1.19" }
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
-url = { version = "2.5" }
+uriparse = { version = "0.6" }
 uuid-simd = { version = "0.8", default-features = false, features = [
     "std",
     "detect",
