@@ -95,7 +95,6 @@ impl Eq for SubscriberInfo {}
 /// #         async fn subscribe(&self, subscription_request: SubscriptionRequest) -> Result<SubscriptionResponse, UStatus> {
 /// #             let subscription_status = SubscriptionStatus {
 /// #                 state: EnumOrUnknown::from(State::SUBSCRIBED),
-/// #                 code: EnumOrUnknown::from(UCode::OK),
 /// #                 message: "Subscription success".to_string(),
 /// #                 ..Default::default()
 /// #             };
@@ -208,16 +207,8 @@ impl Eq for SubscriberInfo {}
 ///     ..Default::default()
 /// };
 ///
-/// let subscription_response = usub.subscribe(subscription_request).await?;
-/// let success_code = subscription_response.status.code.enum_value_or(UCode::UNKNOWN);
-/// if success_code == UCode::OK {
-///     let register_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await;
-/// } else {
-///     match success_code {
-///         UCode::NOT_FOUND => { /* handle topic not found */ }
-///         _ => { /* handle other error conditions */ }
-///     }
-/// }
+/// let _subscription_response = usub.subscribe(subscription_request).await?;
+/// let register_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await?;
 /// // sometime later when done with this topic
 /// let unsubscribe_request = UnsubscribeRequest {
 ///     topic: Some(door_uuri.clone()).into(),
@@ -225,7 +216,7 @@ impl Eq for SubscriberInfo {}
 ///     ..Default::default()
 /// };
 /// let unsubscribe_result = usub.unsubscribe(unsubscribe_request).await?;
-/// let unregister_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await;
+/// let unregister_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await?;
 /// #
 /// # Ok(())
 /// # }
