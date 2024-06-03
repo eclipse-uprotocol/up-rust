@@ -11,10 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use crate::up_core_api::uattributes::UPayloadFormat;
 use mediatype::MediaType;
-use protobuf::{well_known_types::any::Any, EnumFull, Message};
-
-pub use crate::up_core_api::upayload::{UPayload, UPayloadFormat};
+use protobuf::EnumFull;
 
 #[derive(Debug)]
 pub enum UPayloadError {
@@ -75,7 +74,7 @@ impl UPayloadFormat {
                 .find_map(|desc| {
                     let proto_desc = desc.proto();
 
-                    crate::up_core_api::uprotocol_options::exts::mime_type
+                    crate::up_core_api::uoptions::exts::mime_type
                         .get(proto_desc.options.get_or_default())
                         .and_then(|mime_type_option_value| {
                             if let Ok(enum_mime_type) = MediaType::parse(&mime_type_option_value) {
@@ -110,50 +109,7 @@ impl UPayloadFormat {
     pub fn to_media_type(self) -> Option<String> {
         let desc = self.descriptor();
         let desc_proto = desc.proto();
-        crate::up_core_api::uprotocol_options::exts::mime_type
-            .get(desc_proto.options.get_or_default())
-    }
-}
-
-impl TryFrom<Any> for UPayload {
-    type Error = UPayloadError;
-    fn try_from(value: Any) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
-}
-
-impl TryFrom<&Any> for UPayload {
-    type Error = UPayloadError;
-
-    fn try_from(value: &Any) -> Result<Self, Self::Error> {
-        value
-            .write_to_bytes()
-            .map_err(|_e| UPayloadError::serialization_error("Failed to serialize Any value"))
-            .map(|data| UPayload {
-                data,
-                ..Default::default()
-            })
-    }
-}
-
-impl TryFrom<UPayload> for Any {
-    type Error = UPayloadError;
-
-    fn try_from(value: UPayload) -> Result<Self, Self::Error> {
-        match value.format.enum_value_or_default() {
-            UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY
-            | UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED => {
-                Any::parse_from_bytes(value.data.as_slice()).map_err(|e| {
-                    UPayloadError::serialization_error(format!(
-                        "UPayload does not contain Any: {}",
-                        e
-                    ))
-                })
-            }
-            _ => Err(UPayloadError::serialization_error(
-                "UPayload has incompatible format",
-            )),
-        }
+        crate::up_core_api::uoptions::exts::mime_type.get(desc_proto.options.get_or_default())
     }
 }
 
@@ -162,9 +118,6 @@ mod tests {
     use super::*;
 
     use test_case::test_case;
-
-    use protobuf::well_known_types::{any::Any, timestamp::Timestamp};
-    use protobuf::EnumOrUnknown;
 
     #[test_case("application/json", Ok(UPayloadFormat::UPAYLOAD_FORMAT_JSON); "map from JSON")]
     #[test_case(
@@ -206,57 +159,5 @@ mod tests {
     #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED, None; "map UNSPECIFIED format to None")]
     fn test_to_media_type(format: UPayloadFormat, expected_media_type: Option<String>) {
         assert_eq!(format.to_media_type(), expected_media_type);
-    }
-
-    #[test_case(0, true; "UNSPECIFIED succeeds")]
-    #[test_case(1, true; "PROTOBUF_WRAPPED succeeds")]
-    #[test_case(2, false; "PROTOBUF fails")]
-    #[test_case(3, false; "JSON fails")]
-    #[test_case(4, false; "SOMEIP fails")]
-    #[test_case(5, false; "SOMEIP_TLV fails")]
-    #[test_case(6, false; "RAW fails")]
-    #[test_case(7, false; "TEXT fails")]
-    fn test_into_any_with_payload_format(format: i32, should_succeed: bool) {
-        let timestamp = Timestamp::default();
-        let data = Any::pack(&timestamp).unwrap().write_to_bytes().unwrap();
-        let payload = UPayload {
-            format: EnumOrUnknown::from_i32(format),
-            data,
-            ..Default::default()
-        };
-
-        let any = Any::try_from(payload);
-        assert_eq!(any.is_ok(), should_succeed);
-        if should_succeed {
-            assert_eq!(
-                any.unwrap().unpack::<Timestamp>().unwrap().unwrap(),
-                timestamp
-            );
-        }
-    }
-
-    #[test]
-    fn test_into_any_fails_for_empty_data() {
-        let payload = UPayload {
-            format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF.into(),
-            data: vec![],
-            ..Default::default()
-        };
-
-        let any = Any::try_from(payload);
-        assert!(any.is_err());
-    }
-
-    #[test]
-    fn test_from_any() {
-        let timestamp = Timestamp::default();
-        let any = Any::pack(&timestamp).unwrap();
-
-        let payload = UPayload::try_from(&any).unwrap();
-        assert_eq!(
-            payload.format,
-            UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED.into()
-        );
-        assert_eq!(payload.data, any.write_to_bytes().unwrap());
     }
 }
