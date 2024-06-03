@@ -14,6 +14,7 @@
 use crate::{UUri, UUID};
 
 mod uattributesvalidator;
+mod upayloadformat;
 mod upriority;
 
 pub use uattributesvalidator::*;
