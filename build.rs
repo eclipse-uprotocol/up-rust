@@ -34,6 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 UPROTOCOL_BASE_URI, UPROTOCOL_REL_PATH
             )
             .as_str(),
+            format!("{}{}v1/ucode.proto", UPROTOCOL_BASE_URI, UPROTOCOL_REL_PATH).as_str(),
             format!(
                 "{}{}v1/umessage.proto",
                 UPROTOCOL_BASE_URI, UPROTOCOL_REL_PATH
