@@ -13,7 +13,8 @@
 
 use std::error::Error;
 
-pub use crate::up_core_api::ustatus::{UCode, UStatus};
+pub use crate::up_core_api::ucode::UCode;
+pub use crate::up_core_api::ustatus::UStatus;
 
 impl UStatus {
     /// Creates a status representing a success.
