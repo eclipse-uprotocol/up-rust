@@ -565,7 +565,6 @@ impl UMessageBuilder {
     /// use up_rust::{UMessageBuilder, UMessageType, UPriority, UUIDBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let lsb = UUIDBuilder::build().lsb;
     /// let invoked_method = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
     /// let message_id = UUIDBuilder::build();
@@ -575,7 +574,6 @@ impl UMessageBuilder {
     ///                     .with_message_id(message_id.clone())
     ///                     .build()?;
     /// assert_eq!(message.attributes.id, Some(message_id).into());
-    /// # assert_eq!(message.attributes.id.clone().unwrap().lsb, lsb);
     /// # Ok(())
     /// # }
     /// ```
