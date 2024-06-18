@@ -16,9 +16,23 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::{UMessage, UStatus, UUri};
+use crate::{UCode, UMessage, UStatus, UUri};
 
-/// `UListener` is the uP-L1 interface that provides a means to create listeners which are registered to [`UTransport`]
+/// A factory for URIs representing this uEntity's resources.
+///
+/// Implementations may use arbitrary mechanisms to determine the information that
+/// is necessary for creating URIs, e.g. environment variables, configuration files etc.
+pub trait LocalUriProvider: Send + Sync {
+    /// Gets the _authority_ used for URIs representing this uEntity's resources.
+    fn get_authority(&self) -> String;
+    /// Gets a URI that represents a given resource of this uEntity.
+    fn get_resource(&self, resource_id: u16) -> UUri;
+    /// Gets the URI that represents the resource that this uEntity expects
+    /// RPC responses and notifications to be sent to.
+    fn get_source(&self) -> UUri;
+}
+
+/// A handler for processing uProtocol messages.
 ///
 /// Implementations of `UListener` contain the details for what should occur when a message is received
 ///
@@ -149,6 +163,8 @@ pub trait UTransport: Send + Sync {
 
     /// Receives a message from the transport.
     ///
+    /// This default implementation returns an error with [`UCode::UNIMPLEMENTED`].
+    ///
     /// # Arguments
     ///
     /// * `source_filter` - The [source](`crate::UAttributes::source`) address pattern that the message to receive needs to match.
@@ -160,14 +176,21 @@ pub trait UTransport: Send + Sync {
     /// Returns an error if no message could be received, e.g. because no message matches the given addresses.
     async fn receive(
         &self,
-        source_filter: &UUri,
-        sink_filter: Option<&UUri>,
-    ) -> Result<UMessage, UStatus>;
+        _source_filter: &UUri,
+        _sink_filter: Option<&UUri>,
+    ) -> Result<UMessage, UStatus> {
+        Err(UStatus::fail_with_code(
+            UCode::UNIMPLEMENTED,
+            "not implemented",
+        ))
+    }
 
     /// Registers a listener to be called for messages.
     ///
     /// The listener will be invoked for each message that matches the given source and sink filter patterns
     /// according to the rules defined by the [UUri specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/basics/uri.adoc).
+    ///
+    /// This default implementation returns an error with [`UCode::UNIMPLEMENTED`].
     ///
     /// # Arguments
     ///
@@ -250,15 +273,22 @@ pub trait UTransport: Send + Sync {
     /// ```
     async fn register_listener(
         &self,
-        source_filter: &UUri,
-        sink_filter: Option<&UUri>,
-        listener: Arc<dyn UListener>,
-    ) -> Result<(), UStatus>;
+        _source_filter: &UUri,
+        _sink_filter: Option<&UUri>,
+        _listener: Arc<dyn UListener>,
+    ) -> Result<(), UStatus> {
+        Err(UStatus::fail_with_code(
+            UCode::UNIMPLEMENTED,
+            "not implemented",
+        ))
+    }
 
     /// Unregisters a message listener.
     ///
     /// The listener will no longer be called for any (matching) messages after this function has
     /// returned successfully.
+    ///
+    /// This default implementation returns an error with [`UCode::UNIMPLEMENTED`].
     ///
     /// # Arguments
     ///
@@ -271,10 +301,15 @@ pub trait UTransport: Send + Sync {
     /// Returns an error if the listener could not be unregistered, for example if the given listener does not exist.
     async fn unregister_listener(
         &self,
-        source_filter: &UUri,
-        sink_filter: Option<&UUri>,
-        listener: Arc<dyn UListener>,
-    ) -> Result<(), UStatus>;
+        _source_filter: &UUri,
+        _sink_filter: Option<&UUri>,
+        _listener: Arc<dyn UListener>,
+    ) -> Result<(), UStatus> {
+        Err(UStatus::fail_with_code(
+            UCode::UNIMPLEMENTED,
+            "not implemented",
+        ))
+    }
 }
 
 /// A wrapper type that allows comparing [`UListener`]s to each other.

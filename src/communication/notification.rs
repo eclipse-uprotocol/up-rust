@@ -1,0 +1,101 @@
+/********************************************************************************
+ * Copyright (c) 2024 Contributors to the Eclipse Foundation
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information regarding copyright ownership.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Apache License Version 2.0 which is available at
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ ********************************************************************************/
+
+use std::{error::Error, fmt::Display, sync::Arc};
+
+use async_trait::async_trait;
+
+use crate::communication::RegistrationError;
+use crate::{UListener, UMessage, UStatus, UUri};
+
+/// An error indicating a problem with sending a notification to another uEntity.
+#[derive(Debug)]
+pub enum NotificationError {
+    /// Indicates that the given message cannot be sent because it is not a [valid Notification message](crate::NotificationValidator).
+    InvalidArgument(String),
+    /// Indicates an unspecific error that occurred at the Transport Layer while trying to send a notification.
+    NotifyError(UStatus),
+}
+
+impl Display for NotificationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NotificationError::InvalidArgument(s) => {
+                f.write_fmt(format_args!("invalid argument: {}", s))
+            }
+            NotificationError::NotifyError(s) => {
+                f.write_fmt(format_args!("failed to send notification: {}", s))
+            }
+        }
+    }
+}
+
+impl Error for NotificationError {}
+
+/// A client for sending Notification messages to a uEntity.
+///
+/// Please refer to the
+/// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
+#[async_trait]
+pub trait Notifier: Send + Sync {
+    /// Sends a notification to a uEntity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the given message is not a valid
+    /// [uProtocol Notification message](`crate::NotificationValidator`).
+    async fn notify(&self, notification: UMessage) -> Result<(), NotificationError>;
+}
+
+/// A client for listening to Notification messages sent to this uEntity.
+///
+/// Please refer to the
+/// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
+#[async_trait]
+pub trait NotificationListener: Send + Sync {
+    /// Starts listening to notifications that origin from uEntities matching a given pattern.
+    ///
+    /// More than one handler can be registered for the same pattern.
+    /// The same handler can be registered for multiple patterns.
+    ///
+    /// # Arguments
+    ///
+    /// * `origin_filter` - The pattern defining the origin addresses of interest.
+    /// * `listener` - The handler to invoke for each notification that has been sent from a uEntity
+    ///                [matching the given pattern](`crate::UUri::matches`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the listener cannot be registered.
+    async fn start_listening(
+        &self,
+        origin_filter: &UUri,
+        listener: Arc<dyn UListener>,
+    ) -> Result<(), RegistrationError>;
+
+    /// Unregisters a previously [registered handler](`Self::start_listening`) for listening to notifications.
+    ///
+    /// # Arguments
+    ///
+    /// * `origin_filter` - The pattern that the handler had been registered for.
+    /// * `listener` - The handler to unregister.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the listener cannot be unregistered.
+    async fn stop_listening(
+        &self,
+        origin_filter: &UUri,
+        listener: Arc<dyn UListener>,
+    ) -> Result<(), RegistrationError>;
+}

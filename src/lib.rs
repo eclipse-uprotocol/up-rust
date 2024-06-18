@@ -19,7 +19,7 @@
 //!
 //! ## Library contents
 //!
-//! * `rpc` module, which offers wrappers for dealing with uProtocol payload in the context of RPC method invocation
+//! * `communication` module, which defines uProtocol's Communication Layer API for publishing and subscribing to topics and invoking RPC methods.
 //! * `uattributes` module, with uProtocol message attribute types and validators
 //! * `umessage` module, which defines the uProtocol core message type and provides related convenience functionality
 //! * `upayload` module, which defines payload representation for uProtocol messages
@@ -43,13 +43,12 @@
 //! * [Eclipse-uProtocol Core API types](https://github.com/eclipse-uprotocol/up-core-api)
 
 // up_core_api types used and augmented by up_rust - symbols re-exported to toplevel, errors are module-specific
-mod rpc;
-pub use rpc::{RpcClient, RpcClientResult, RpcResult};
+pub mod communication;
 
 mod uattributes;
 pub use uattributes::{
-    PublishValidator, RequestValidator, ResponseValidator, UAttributesValidator,
-    UAttributesValidators,
+    NotificationValidator, PublishValidator, RequestValidator, ResponseValidator,
+    UAttributesValidator, UAttributesValidators,
 };
 pub use uattributes::{UAttributes, UAttributesError, UMessageType, UPayloadFormat, UPriority};
 
@@ -63,7 +62,7 @@ mod ustatus;
 pub use ustatus::{UCode, UStatus};
 
 mod utransport;
-pub use utransport::{ComparableListener, UListener, UTransport};
+pub use utransport::{ComparableListener, LocalUriProvider, UListener, UTransport};
 mod uuid;
 pub use uuid::{UUIDBuilder, UUID};
 
