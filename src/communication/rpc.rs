@@ -72,16 +72,44 @@ pub trait RpcClient: Send + Sync {
 /// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
 #[async_trait]
 pub trait RpcServer: Send + Sync {
+    /// Registers an endpoint for RPC requests.
+    ///
+    /// Note that only a single endpoint can be registered for a given resource ID.
+    /// However, the same request handler can be registered for multiple endpoints.
+    ///
+    /// # Arguments
+    ///
+    /// * `origin_filter` - A pattern defining origin addresses to accept requests from. If `None`, requests
+    ///                     will be accepted from all sources.
+    /// * `resource_id` - The (local) resource identifier to accept requests at.
+    /// * `request_handler` - The handler to invoke for each incoming request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the listener cannot be registered or if a listener has already been registered
+    /// for the given resource ID.
     async fn register_endpoint(
         &self,
-        source_filter: &UUri,
-        method: &UUri,
-        listener: Arc<dyn RpcClient>,
+        origin_filter: Option<&UUri>,
+        resource_id: u16,
+        request_handler: Arc<dyn RpcClient>,
     ) -> Result<(), RegistrationError>;
+
+    /// Unregisters a previously [registered endpoint](Self::register_endpoint).
+    ///
+    /// # Arguments
+    ///
+    /// * `origin_filter` - The origin pattern that the endpoint had been registered for.
+    /// * `resource_id` - The (local) resource identifier that the endpoint had been registered for.
+    /// * `request_handler` - The handler to unregister.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the listener cannot be unregistered.
     async fn unregister_endpoint(
         &self,
-        source_filter: &UUri,
-        method: &UUri,
-        listener: Arc<dyn RpcClient>,
+        origin_filter: Option<&UUri>,
+        resource_id: u16,
+        request_handler: Arc<dyn RpcClient>,
     ) -> Result<(), RegistrationError>;
 }
