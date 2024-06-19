@@ -26,10 +26,10 @@ pub trait LocalUriProvider: Send + Sync {
     /// Gets the _authority_ used for URIs representing this uEntity's resources.
     fn get_authority(&self) -> String;
     /// Gets a URI that represents a given resource of this uEntity.
-    fn get_resource(&self, resource_id: u16) -> UUri;
+    fn get_resource_uri(&self, resource_id: u16) -> UUri;
     /// Gets the URI that represents the resource that this uEntity expects
     /// RPC responses and notifications to be sent to.
-    fn get_source(&self) -> UUri;
+    fn get_source_uri(&self) -> UUri;
 }
 
 /// A handler for processing uProtocol messages.
