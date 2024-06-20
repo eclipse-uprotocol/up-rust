@@ -11,11 +11,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::{error::Error, fmt::Display};
-
+use bytes::Bytes;
 pub use notification::{NotificationError, NotificationListener, Notifier};
 pub use pubsub::{PubSubError, Publisher, Subscriber};
 pub use rpc::{RpcClient, RpcServer, ServiceInvocationError};
+use std::{error::Error, fmt::Display};
+
+use crate::{UPayloadFormat, UPriority};
 
 mod notification;
 mod pubsub;
@@ -51,3 +53,74 @@ impl Display for RegistrationError {
 }
 
 impl Error for RegistrationError {}
+
+const DEFAULT_TTL: u16 = 10_000; // 10 seconds
+
+/// General options that clients might want to specify when sending a uProtocol message.
+#[derive(Debug)]
+pub struct CallOptions {
+    ttl: u16,
+    token: Option<String>,
+    priority: Option<UPriority>,
+}
+
+impl Default for CallOptions {
+    /// Creates empty options with a TTL of 10s.
+    fn default() -> Self {
+        CallOptions {
+            ttl: DEFAULT_TTL,
+            token: None,
+            priority: None,
+        }
+    }
+}
+
+impl CallOptions {
+    pub fn with_ttl(&mut self, ttl: u16) -> &mut Self {
+        self.ttl = ttl;
+        self
+    }
+    pub fn ttl(&self) -> u16 {
+        self.ttl
+    }
+    pub fn with_token(&mut self, token: String) -> &mut Self {
+        self.token = Some(token);
+        self
+    }
+    pub fn token(&self) -> Option<String> {
+        self.token.clone()
+    }
+    pub fn with_priority(&mut self, priority: UPriority) -> &mut Self {
+        self.priority = Some(priority);
+        self
+    }
+    pub fn priority(&self) -> Option<UPriority> {
+        self.priority
+    }
+}
+
+/// A wrapper around (raw) message payload data and the corresponding payload format.
+#[derive(Clone)]
+pub struct UPayload {
+    payload_format: UPayloadFormat,
+    payload: Bytes,
+}
+
+impl UPayload {
+    pub fn new(payload: Bytes, payload_format: UPayloadFormat) -> Self {
+        UPayload {
+            payload_format,
+            payload,
+        }
+    }
+
+    pub fn payload_format(&self) -> UPayloadFormat {
+        self.payload_format
+    }
+    /// Gets the payload data.
+    ///
+    /// Note that this consumes the payload.
+    pub fn payload(self) -> Bytes {
+        self.payload
+    }
+}
