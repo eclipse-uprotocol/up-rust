@@ -159,13 +159,13 @@ impl UAttributesValidators {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-    ///    id: Some(UUIDBuilder::build()).into(),
+    ///    id: Some(UUID::build()).into(),
     ///    source: Some(topic).into(),
     ///    ..Default::default()
     /// };
@@ -188,13 +188,13 @@ impl UAttributesValidators {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-    ///    id: Some(UUIDBuilder::build()).into(),
+    ///    id: Some(UUID::build()).into(),
     ///    source: Some(topic).into(),
     ///    ..Default::default()
     /// };
@@ -212,13 +212,13 @@ impl UAttributesValidators {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUIDBuilder, UUri};
+    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let attributes = UAttributes {
     ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-    ///    id: Some(UUIDBuilder::build()).into(),
+    ///    id: Some(UUID::build()).into(),
     ///    source: Some(topic).into(),
     ///    ..Default::default()
     /// };
@@ -625,11 +625,30 @@ impl UAttributesValidator for ResponseValidator {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        ops::Sub,
+        time::{Duration, UNIX_EPOCH},
+    };
+
     use protobuf::EnumOrUnknown;
     use test_case::test_case;
 
     use super::*;
-    use crate::{UCode, UPriority, UUIDBuilder, UUri, UUID};
+    use crate::{UCode, UPriority, UUri, UUID};
+
+    /// Creates a UUID n ms in the past.
+    ///
+    /// # Note
+    ///
+    /// For internal testing purposes only. For end-users, please use [`UUID::build()`]
+    fn build_n_ms_in_past(n_ms_in_past: u64) -> UUID {
+        let duration_since_unix_epoch = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("current system time is set to a point in time before UNIX Epoch");
+        UUID::build_for_timestamp(
+            duration_since_unix_epoch.sub(Duration::from_millis(n_ms_in_past)),
+        )
+    }
 
     #[test]
     fn test_validate_type_fails_for_unknown_type_code() {
@@ -672,31 +691,31 @@ mod tests {
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, None, false; "for Publish message without ID nor TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, Some(0), false; "for Publish message without ID with TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, Some(500), false; "for Publish message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(UUIDBuilder::build_n_ms_in_past(1000)), None, false; "for Publish message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(0), false; "for Publish message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(500), true; "for Publish message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(2000), false; "for Publish message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), None, false; "for Publish message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), Some(0), false; "for Publish message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), Some(500), true; "for Publish message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Publish message with ID and non-expired TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, None, false; "for Notification message without ID nor TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(0), false; "for Notification message without ID with TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(500), false; "for Notification message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(UUIDBuilder::build_n_ms_in_past(1000)), None, false; "for Notification message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(0), false; "for Notification message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(500), true; "for Notification message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(2000), false; "for Notification message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), None, false; "for Notification message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), Some(0), false; "for Notification message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), Some(500), true; "for Notification message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Notification message with ID and non-expired TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, None, false; "for Request message without ID nor TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, Some(0), false; "for Request message without ID with TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, Some(500), false; "for Request message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(UUIDBuilder::build_n_ms_in_past(1000)), None, false; "for Request message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(0), false; "for Request message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(500), true; "for Request message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(2000), false; "for Request message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), None, false; "for Request message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), Some(0), false; "for Request message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), Some(500), true; "for Request message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Request message with ID and non-expired TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, None, false; "for Response message without ID nor TTL")]
     #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, Some(0), false; "for Response message without ID with TTL 0")]
     #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, Some(500), false; "for Response message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(UUIDBuilder::build_n_ms_in_past(1000)), None, false; "for Response message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(0), false; "for Response message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(500), true; "for Response message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(UUIDBuilder::build_n_ms_in_past(1000)), Some(2000), false; "for Response message with ID and non-expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), None, false; "for Response message with ID without TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), Some(0), false; "for Response message with ID and TTL 0")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), Some(500), true; "for Response message with ID and expired TTL")]
+    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Response message with ID and non-expired TTL")]
     fn test_is_expired(
         message_type: UMessageType,
         id: Option<UUID>,
@@ -715,11 +734,11 @@ mod tests {
         assert!(validator.is_expired(&attributes).is_err() == should_be_expired);
     }
 
-    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
-    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), Some(destination()), None, false; "fails for message containing destination")]
-    #[test_case(Some(UUIDBuilder::build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
-    #[test_case(Some(UUIDBuilder::build()), None, None, None, false; "fails for missing topic")]
-    #[test_case(Some(UUIDBuilder::build()), Some(UUri { resource_id: 0x54, ..Default::default()}), None, None, false; "fails for invalid topic")]
+    #[test_case(Some(UUID::build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
+    #[test_case(Some(UUID::build()), Some(publish_topic()), Some(destination()), None, false; "fails for message containing destination")]
+    #[test_case(Some(UUID::build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
+    #[test_case(Some(UUID::build()), None, None, None, false; "fails for missing topic")]
+    #[test_case(Some(UUID::build()), Some(UUri { resource_id: 0x54, ..Default::default()}), None, None, false; "fails for invalid topic")]
     #[test_case(None, Some(publish_topic()), None, None, false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
@@ -768,13 +787,13 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UUIDBuilder::build()), Some(origin()), None, None, false; "fails for missing destination")]
-    #[test_case(Some(UUIDBuilder::build()), Some(origin()), Some(destination()), None, true; "succeeds for both origin and destination")]
-    #[test_case(Some(UUIDBuilder::build()), Some(origin()), Some(destination()), Some(100), true; "succeeds for valid attributes")]
-    #[test_case(Some(UUIDBuilder::build()), None, Some(destination()), None, false; "fails for missing origin")]
-    #[test_case(Some(UUIDBuilder::build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid origin")]
-    #[test_case(Some(UUIDBuilder::build()), Some(origin()), Some(UUri { ue_id: 0xabcd, ue_version_major: 0x01, resource_id: 0x0011, ..Default::default() }), None, false; "fails for invalid destination")]
-    #[test_case(Some(UUIDBuilder::build()), None, None, None, false; "fails for neither origin nor destination")]
+    #[test_case(Some(UUID::build()), Some(origin()), None, None, false; "fails for missing destination")]
+    #[test_case(Some(UUID::build()), Some(origin()), Some(destination()), None, true; "succeeds for both origin and destination")]
+    #[test_case(Some(UUID::build()), Some(origin()), Some(destination()), Some(100), true; "succeeds for valid attributes")]
+    #[test_case(Some(UUID::build()), None, Some(destination()), None, false; "fails for missing origin")]
+    #[test_case(Some(UUID::build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid origin")]
+    #[test_case(Some(UUID::build()), Some(origin()), Some(UUri { ue_id: 0xabcd, ue_version_major: 0x01, resource_id: 0x0011, ..Default::default() }), None, false; "fails for invalid destination")]
+    #[test_case(Some(UUID::build()), None, None, None, false; "fails for neither origin nor destination")]
     #[test_case(None, Some(origin()), Some(destination()), None, false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
@@ -823,8 +842,8 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for mandatory attributes")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), true; "succeeds for valid attributes")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for mandatory attributes")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), true; "succeeds for valid attributes")]
     #[test_case(None, Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
@@ -841,15 +860,15 @@ mod tests {
         None,
         false;
         "fails for invalid message id")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), None, None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing reply-to-address")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(UUri { resource_id: 0x0001, ..Default::default()}), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid reply-to-address")]
-    #[test_case(Some(UUIDBuilder::build()), None, Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing method-to-invoke")]
-    #[test_case(Some(UUIDBuilder::build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid method-to-invoke")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, None, false; "fails for missing priority")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS3), None, false; "fails for invalid priority")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing ttl")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), Some(UPriority::UPRIORITY_CS4), None, false; "fails for ttl < 1")]
-    #[test_case(Some(UUIDBuilder::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for valid permission level")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), None, None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing reply-to-address")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(UUri { resource_id: 0x0001, ..Default::default()}), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUID::build()), None, Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing method-to-invoke")]
+    #[test_case(Some(UUID::build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid method-to-invoke")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, None, false; "fails for missing priority")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS3), None, false; "fails for invalid priority")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing ttl")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), Some(UPriority::UPRIORITY_CS4), None, false; "fails for ttl < 1")]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for valid permission level")]
     #[allow(clippy::too_many_arguments)]
     fn test_validate_attributes_for_rpc_request_message(
         id: Option<UUID>,
@@ -892,9 +911,9 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for mandatory attributes")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid attributes")]
-    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), false; "fails for missing message ID")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for mandatory attributes")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid attributes")]
+    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), false; "fails for missing message ID")]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -904,25 +923,25 @@ mod tests {
         }),
         Some(reply_to_address()),
         Some(method_to_invoke()),
-        Some(UUIDBuilder::build()),
+        Some(UUID::build()),
         None,
         None,
         Some(UPriority::UPRIORITY_CS4),
         false;
         "fails for invalid message id")]
-    #[test_case(Some(UUIDBuilder::build()), None, Some(method_to_invoke()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing reply-to-address")]
-    #[test_case(Some(UUIDBuilder::build()), Some(UUri { resource_id: 0x0001, ..Default::default()}), Some(method_to_invoke()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), None, Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing invoked-method")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(UUri::default()), Some(UUIDBuilder::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid invoked-method")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), Some(EnumOrUnknown::from_i32(-42)), None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid commstatus")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), None, Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl > 0)")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), None, Some(0), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl = 0")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), None, false; "fails for missing priority")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUIDBuilder::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS3), false; "fails for invalid priority")]
-    #[test_case(Some(UUIDBuilder::build()), Some(reply_to_address()), Some(method_to_invoke()), None, None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing request id")]
+    #[test_case(Some(UUID::build()), None, Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing reply-to-address")]
+    #[test_case(Some(UUID::build()), Some(UUri { resource_id: 0x0001, ..Default::default()}), Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), None, Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing invoked-method")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(UUri::default()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid invoked-method")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from_i32(-42)), None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid commstatus")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), None, Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl > 0)")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), None, Some(0), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl = 0")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), None, false; "fails for missing priority")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS3), false; "fails for invalid priority")]
+    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), None, None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing request id")]
     #[test_case(
-        Some(UUIDBuilder::build()),
+        Some(UUID::build()),
         Some(reply_to_address()),
         Some(method_to_invoke()),
         Some(UUID {

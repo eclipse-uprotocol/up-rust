@@ -11,13 +11,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use rand::RngCore;
+use std::time::{Duration, SystemTime};
 use std::{hash::Hash, str::FromStr};
 
 pub use crate::up_core_api::uuid::UUID;
 
-mod uuidbuilder;
 use uuid_simd::{AsciiCase, Out};
-pub use uuidbuilder::UUIDBuilder;
 
 const BITMASK_VERSION: u64 = 0b1111 << 12;
 const VERSION_7: u64 = 0b0111 << 12;
@@ -122,6 +122,45 @@ impl UUID {
             lsb,
             ..Default::default()
         })
+    }
+
+    pub(crate) fn build_for_timestamp(duration_since_unix_epoch: Duration) -> UUID {
+        let timestamp_millis = u64::try_from(duration_since_unix_epoch.as_millis())
+            .expect("system time is set to a time too far in the future");
+        // fill upper 48 bits with timestamp
+        let mut msb = (timestamp_millis << 16).to_be_bytes();
+        // fill remaining bits with random bits
+        rand::thread_rng().fill_bytes(&mut msb[6..]);
+        // set version (7)
+        msb[6] = msb[6] & 0b00001111 | 0b01110000;
+
+        let mut lsb = [0u8; 8];
+        // fill lsb with random bits
+        rand::thread_rng().fill_bytes(&mut lsb);
+        // set variant (RFC4122)
+        lsb[0] = lsb[0] & 0b00111111 | 0b10000000;
+        Self::from_bytes_unchecked(msb, lsb)
+    }
+
+    /// Creates a new UUID that can be used for uProtocol messages.
+    ///
+    /// # Panics
+    ///
+    /// if the system clock is set to an instant before the UNIX Epoch.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use up_rust::UUID;
+    ///
+    /// let uuid = UUID::build();
+    /// assert!(uuid.is_uprotocol_uuid());
+    /// ```
+    pub fn build() -> UUID {
+        let duration_since_unix_epoch = SystemTime::UNIX_EPOCH
+            .elapsed()
+            .expect("current system time is set to a point in time before UNIX Epoch");
+        Self::build_for_timestamp(duration_since_unix_epoch)
     }
 
     /// Serializes this UUID to a hyphenated string as defined by
@@ -286,6 +325,7 @@ impl FromStr for UUID {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]

@@ -71,10 +71,10 @@ impl UAttributes {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UMessageType, UPriority, UUIDBuilder, UUri};
+    /// use up_rust::{UAttributes, UMessageType, UPriority, UUID, UUri};
 
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let message_id = UUIDBuilder::build();
+    /// let message_id = UUID::build();
     /// let method_to_invoke = UUri::try_from("//my-vehicle/1004F3B/3/B42")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/A/1/0")?;
     /// let token = Some("my_token".to_string());
