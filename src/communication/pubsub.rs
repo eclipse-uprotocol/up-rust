@@ -16,7 +16,9 @@ use std::{error::Error, fmt::Display, sync::Arc};
 use async_trait::async_trait;
 
 use crate::communication::RegistrationError;
-use crate::{UListener, UMessage, UStatus, UUri};
+use crate::{UListener, UStatus, UUri};
+
+use super::{CallOptions, UPayload};
 
 /// An error indicating a problem with publishing a message to a topic.
 #[derive(Debug)]
@@ -30,7 +32,7 @@ pub enum PubSubError {
 impl Display for PubSubError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PubSubError::InvalidArgument(s) => f.write_fmt(format_args!("invalid argument: {}", s)),
+            PubSubError::InvalidArgument(s) => f.write_str(s.as_str()),
             PubSubError::PublishError(s) => {
                 f.write_fmt(format_args!("failed to publish message: {}", s))
             }
@@ -48,11 +50,21 @@ impl Error for PubSubError {}
 pub trait Publisher: Send + Sync {
     /// Publishes a message to a topic.
     ///
+    /// # Arguments
+    ///
+    /// * `resource_id` - The (local) resource ID of the topic to publish to.
+    /// * `call_options` - Options to include in the published message.
+    /// * `payload` - Payload to include in the published message.
+    ///
     /// # Errors
     ///
-    /// Returns an error if the given message is not a valid
-    /// [uProtocol Publish message](`crate::PublishValidator`).
-    async fn publish(&self, message: UMessage) -> Result<(), PubSubError>;
+    /// Returns an error if the message could not be published.
+    async fn publish(
+        &self,
+        resource_id: u16,
+        call_options: CallOptions,
+        payload: Option<UPayload>,
+    ) -> Result<(), PubSubError>;
 }
 
 /// A client for subscribing to topics.
