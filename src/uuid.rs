@@ -11,18 +11,26 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use rand::RngCore;
+use std::time::{Duration, SystemTime};
 use std::{hash::Hash, str::FromStr};
 
 pub use crate::up_core_api::uuid::UUID;
 
-mod uuidbuilder;
 use uuid_simd::{AsciiCase, Out};
-pub use uuidbuilder::UUIDBuilder;
 
 const BITMASK_VERSION: u64 = 0b1111 << 12;
-pub(crate) const VERSION_CUSTOM: u64 = 0b1000 << 12;
+const VERSION_7: u64 = 0b0111 << 12;
 const BITMASK_VARIANT: u64 = 0b11 << 62;
-pub(crate) const VARIANT_RFC4122: u64 = 0b10 << 62;
+const VARIANT_RFC4122: u64 = 0b10 << 62;
+
+fn is_correct_version(msb: u64) -> bool {
+    msb & BITMASK_VERSION == VERSION_7
+}
+
+fn is_correct_variant(lsb: u64) -> bool {
+    lsb & BITMASK_VARIANT == VARIANT_RFC4122
+}
 
 #[derive(Debug)]
 pub struct UuidConversionError {
@@ -54,7 +62,7 @@ impl UUID {
     ///
     /// # Returns
     ///
-    /// a uProtocol [`UUID`] with the given timestamp, counter and random values.
+    /// a uProtocol [`UUID`] with the given timestamp and random values.
     ///
     /// # Errors
     ///
@@ -69,6 +77,9 @@ impl UUID {
 
     /// Creates a new UUID from a high/low value pair.
     ///
+    /// NOTE: This function does *not* check if the given bytes represent a [valid uProtocol UUID](Self::is_uprotocol_uuid).
+    ///       It should therefore only be used in cases where the bytes passed in are known to be valid.
+    ///
     /// # Arguments
     ///
     /// `msb` - the most significant 8 bytes
@@ -76,16 +87,34 @@ impl UUID {
     ///
     /// # Returns
     ///
-    /// a uProtocol [`UUID`] with the given timestamp, counter and random values.
+    /// a uProtocol [`UUID`] with the given timestamp and random values.
+    pub(crate) fn from_bytes_unchecked(msb: [u8; 8], lsb: [u8; 8]) -> Self {
+        UUID {
+            msb: u64::from_be_bytes(msb),
+            lsb: u64::from_be_bytes(lsb),
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new UUID from a high/low value pair.
+    ///
+    /// # Arguments
+    ///
+    /// `msb` - the most significant 8 bytes
+    /// `lsb` - the least significant 8 bytes
+    ///
+    /// # Returns
+    ///
+    /// a uProtocol [`UUID`] with the given timestamp and random values.
     ///
     /// # Errors
     ///
     /// Returns an error if the given bytes contain an invalid version and/or variant identifier.
     pub(crate) fn from_u64_pair(msb: u64, lsb: u64) -> Result<Self, UuidConversionError> {
-        if msb & BITMASK_VERSION != VERSION_CUSTOM {
-            return Err(UuidConversionError::new("not a v8 UUID"));
+        if !is_correct_version(msb) {
+            return Err(UuidConversionError::new("not a v7 UUID"));
         }
-        if lsb & BITMASK_VARIANT != VARIANT_RFC4122 {
+        if !is_correct_variant(lsb) {
             return Err(UuidConversionError::new("not an RFC4122 UUID"));
         }
         Ok(UUID {
@@ -93,6 +122,45 @@ impl UUID {
             lsb,
             ..Default::default()
         })
+    }
+
+    pub(crate) fn build_for_timestamp(duration_since_unix_epoch: Duration) -> UUID {
+        let timestamp_millis = u64::try_from(duration_since_unix_epoch.as_millis())
+            .expect("system time is set to a time too far in the future");
+        // fill upper 48 bits with timestamp
+        let mut msb = (timestamp_millis << 16).to_be_bytes();
+        // fill remaining bits with random bits
+        rand::thread_rng().fill_bytes(&mut msb[6..]);
+        // set version (7)
+        msb[6] = msb[6] & 0b00001111 | 0b01110000;
+
+        let mut lsb = [0u8; 8];
+        // fill lsb with random bits
+        rand::thread_rng().fill_bytes(&mut lsb);
+        // set variant (RFC4122)
+        lsb[0] = lsb[0] & 0b00111111 | 0b10000000;
+        Self::from_bytes_unchecked(msb, lsb)
+    }
+
+    /// Creates a new UUID that can be used for uProtocol messages.
+    ///
+    /// # Panics
+    ///
+    /// if the system clock is set to an instant before the UNIX Epoch.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use up_rust::UUID;
+    ///
+    /// let uuid = UUID::build();
+    /// assert!(uuid.is_uprotocol_uuid());
+    /// ```
+    pub fn build() -> UUID {
+        let duration_since_unix_epoch = SystemTime::UNIX_EPOCH
+            .elapsed()
+            .expect("current system time is set to a point in time before UNIX Epoch");
+        Self::build_for_timestamp(duration_since_unix_epoch)
     }
 
     /// Serializes this UUID to a hyphenated string as defined by
@@ -104,12 +172,12 @@ impl UUID {
     /// ```rust
     /// use up_rust::UUID;
     ///
-    /// // timestamp = 1, ver = 0b1000
-    /// let msb = 0x0000000000018000_u64;
+    /// // timestamp = 1, ver = 0b0111
+    /// let msb = 0x0000000000017000_u64;
     /// // variant = 0b10, random = 0x0010101010101a1a
     /// let lsb = 0x8010101010101a1a_u64;
     /// let uuid = UUID { msb, lsb, ..Default::default() };
-    /// assert_eq!(uuid.to_hyphenated_string(), "00000000-0001-8000-8010-101010101a1a");
+    /// assert_eq!(uuid.to_hyphenated_string(), "00000000-0001-7000-8010-101010101a1a");
     /// ```
     pub fn to_hyphenated_string(&self) -> String {
         let mut bytes = [0_u8; 16];
@@ -119,14 +187,6 @@ impl UUID {
         let out =
             uuid_simd::format_hyphenated(&bytes, Out::from_mut(&mut out_bytes), AsciiCase::Lower);
         String::from_utf8(out.to_vec()).unwrap()
-    }
-
-    fn is_custom_version(&self) -> bool {
-        self.msb & BITMASK_VERSION == VERSION_CUSTOM
-    }
-
-    fn is_rfc_variant(&self) -> bool {
-        self.lsb & BITMASK_VARIANT == VARIANT_RFC4122
     }
 
     /// Returns the point in time that this UUID has been created at.
@@ -142,8 +202,8 @@ impl UUID {
     /// use up_rust::UUID;
     ///
     /// // timestamp = 0x018D548EA8E0 (Monday, 29 January 2024, 9:30:52 AM GMT)
-    /// // ver = 0b1000
-    /// let msb = 0x018D548EA8E08000u64;
+    /// // ver = 0b0111
+    /// let msb = 0x018D548EA8E07000u64;
     /// // variant = 0b10
     /// let lsb = 0x8000000000000000u64;
     /// let creation_time = UUID { msb, lsb, ..Default::default() }.get_time();
@@ -177,8 +237,8 @@ impl UUID {
     /// ```rust
     /// use up_rust::UUID;
     ///
-    /// // timestamp = 1, ver = 0b1000
-    /// let msb = 0x0000000000018000u64;
+    /// // timestamp = 1, ver = 0b0111
+    /// let msb = 0x0000000000017000u64;
     /// // variant = 0b10
     /// let lsb = 0x8000000000000000u64;
     /// assert!(UUID { msb, lsb, ..Default::default() }.is_uprotocol_uuid());
@@ -189,14 +249,14 @@ impl UUID {
     /// let lsb = 0x8000000000000000u64;
     /// assert!(!UUID { msb, lsb, ..Default::default() }.is_uprotocol_uuid());
     ///
-    /// // timestamp = 1, ver = 0b1000
-    /// let msb = 0x0000000000018000u64;
+    /// // timestamp = 1, ver = 0b0111
+    /// let msb = 0x0000000000017000u64;
     /// // (invalid) variant = 0b01
     /// let lsb = 0x4000000000000000u64;
     /// assert!(!UUID { msb, lsb, ..Default::default() }.is_uprotocol_uuid());
     /// ```
     pub fn is_uprotocol_uuid(&self) -> bool {
-        self.is_custom_version() && self.is_rfc_variant()
+        is_correct_version(self.msb) && is_correct_variant(self.lsb)
     }
 }
 
@@ -243,11 +303,11 @@ impl FromStr for UUID {
     /// use up_rust::UUID;
     ///
     /// // parsing a valid uProtocol UUID succeeds
-    /// let parsing_attempt = "00000000-0001-8000-8010-101010101a1A".parse::<UUID>();
+    /// let parsing_attempt = "00000000-0001-7000-8010-101010101a1A".parse::<UUID>();
     /// assert!(parsing_attempt.is_ok());
     /// let uuid = parsing_attempt.unwrap();
     /// assert!(uuid.is_uprotocol_uuid());
-    /// assert_eq!(uuid.msb, 0x0000000000018000_u64);
+    /// assert_eq!(uuid.msb, 0x0000000000017000_u64);
     /// assert_eq!(uuid.lsb, 0x8010101010101a1a_u64);
     ///
     /// // parsing an invalid UUID fails
@@ -265,12 +325,13 @@ impl FromStr for UUID {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
     fn test_from_u64_pair() {
-        // timestamp = 1, ver = 0b1000
-        let msb = 0x0000000000018000u64;
+        // timestamp = 1, ver = 0b0111
+        let msb = 0x0000000000017000u64;
         // variant = 0b10
         let lsb = 0x8000000000000000u64;
         let conversion_attempt = UUID::from_u64_pair(msb, lsb);
@@ -288,9 +349,9 @@ mod tests {
 
     #[test]
     fn test_from_bytes() {
-        // timestamp = 1, ver = 0b1000, variant = 0b10
+        // timestamp = 1, ver = 0b0111, variant = 0b10
         let bytes: [u8; 16] = [
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x80, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x70, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ];
         let conversion_attempt = UUID::from_bytes(&bytes);

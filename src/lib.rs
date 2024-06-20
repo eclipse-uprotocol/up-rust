@@ -64,7 +64,7 @@ pub use ustatus::{UCode, UStatus};
 mod utransport;
 pub use utransport::{ComparableListener, LocalUriProvider, UListener, UTransport};
 mod uuid;
-pub use uuid::{UUIDBuilder, UUID};
+pub use uuid::UUID;
 
 // protoc-generated stubs, see build.rs
 mod up_core_api {
