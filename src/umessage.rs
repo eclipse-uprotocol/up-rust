@@ -14,12 +14,14 @@
 mod umessagebuilder;
 mod umessagetype;
 
+use bytes::{Buf, Bytes};
+use protobuf::{well_known_types::any::Any, Message};
+
 pub use umessagebuilder::*;
 
 pub use crate::up_core_api::umessage::UMessage;
 
 use crate::{UAttributesError, UPayloadFormat};
-use protobuf::{well_known_types::any::Any, Message};
 
 #[derive(Debug)]
 pub enum UMessageError {
@@ -64,10 +66,10 @@ impl From<&str> for UMessageError {
 }
 
 impl UMessage {
-    /// Extracts the payload-contained protobuf message from a `UMessage`.
+    /// If `UMessage` payload is available, deserialize it as a protobuf `Message`.
     ///
     /// This function is used to extract strongly-typed data from a `UMessage` object,
-    /// taking into account `UMessage::UPayloadFormat` (will only succeed if payload format is
+    /// taking into account the payload format (will only succeed if payload format is
     /// `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF` or `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`)
     ///
     /// # Type Parameters
@@ -82,27 +84,41 @@ impl UMessage {
     ///
     /// * Err(`UMessageError`) if the unpacking process fails, for example if the payload could
     /// not be deserialized into the target type `T`.
-    pub fn extract_protobuf_payload<T: Message + Default>(&self) -> Result<T, UMessageError> {
-        if let Some(payload) = self.payload.as_ref() {
-            match self.attributes.payload_format.enum_value_or_default() {
-                UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF => {
-                    return T::parse_from_bytes(payload.as_ref())
-                        .map_err(UMessageError::DataSerializationError);
-                }
-                UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY => {
-                    return Any::parse_from_bytes(payload.as_ref())
-                        .map_err(UMessageError::DataSerializationError)
-                        .and_then(|any| {
-                            T::parse_from_bytes(any.value.as_slice())
-                                .map_err(UMessageError::DataSerializationError)
-                        });
-                }
-                _ => Err(UMessageError::from(
-                    "Unknown/invalid/unsupported payload format",
-                )),
-            }
+    pub fn extract_protobuf<T: Message + Default>(&self) -> Result<T, UMessageError> {
+        if let Some(payload) = &self.payload {
+            let payload_format = self.attributes.payload_format.enum_value_or_default();
+            deserialize_protobuf_bytes(payload, &payload_format)
         } else {
-            Err(UMessageError::from("Payload is empty"))
+            Err(UMessageError::PayloadError(
+                "No embedded payload".to_string(),
+            ))
         }
+    }
+}
+
+// Deserialize a proto-generated `Message`-type from payload `Bytes`, according to `UPayloadFormat`
+// Will only succeed if payload format is one of
+// - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF`
+// - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`
+pub(crate) fn deserialize_protobuf_bytes<T: Message + Default>(
+    payload: &Bytes,
+    payload_format: &UPayloadFormat,
+) -> Result<T, UMessageError> {
+    match payload_format {
+        UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF => {
+            return T::parse_from_bytes(payload.chunk())
+                .map_err(UMessageError::DataSerializationError);
+        }
+        UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY => {
+            return Any::parse_from_bytes(payload.chunk())
+                .map_err(UMessageError::DataSerializationError)
+                .and_then(|any| {
+                    T::parse_from_bytes(any.value.as_slice())
+                        .map_err(UMessageError::DataSerializationError)
+                });
+        }
+        _ => Err(UMessageError::from(
+            "Unknown/invalid/unsupported payload format",
+        )),
     }
 }

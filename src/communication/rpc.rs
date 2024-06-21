@@ -16,6 +16,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use protobuf::Message;
 
 use crate::communication::RegistrationError;
 use crate::{UCode, UStatus, UUri};
@@ -89,6 +90,51 @@ pub trait RpcClient: Send + Sync {
         call_options: CallOptions,
         payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError>;
+}
+
+impl dyn RpcClient {
+    /// Invokes a method on a service using and returning proto-generated `Message` objects.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The URI representing the method to invoke.
+    /// * `call_options` - Options to include in the request message.
+    /// * `proto_message` - The protobuf `Message` to include in the request message.
+    ///
+    /// # Returns
+    ///
+    /// The payload returned by the service operation as a protobuf `Message`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if invocation fails, the given arguments cannot be turned into a valid RPC Request message,
+    /// result protobuf deserialization fails, or result payload is empty.
+    pub async fn invoke_proto_method<T, R>(
+        &self,
+        method: UUri,
+        call_options: CallOptions,
+        proto_message: T,
+    ) -> Result<R, ServiceInvocationError>
+    where
+        T: Message,
+        R: Message,
+    {
+        let payload = UPayload::try_from_protobuf(proto_message)
+            .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
+
+        let result = self
+            .invoke_method(method, call_options, Some(payload))
+            .await?;
+
+        if let Some(result) = result {
+            UPayload::extract_protobuf::<R>(&result)
+                .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))
+        } else {
+            Err(ServiceInvocationError::InvalidArgument(
+                "No payload".to_string(),
+            ))
+        }
+    }
 }
 
 /// A handler for processing incoming RPC requests.

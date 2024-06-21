@@ -15,7 +15,7 @@ pub use crate::up_core_api::usubscription::{
     subscription_status::State, EventDeliveryConfig, FetchSubscribersRequest,
     FetchSubscribersResponse, FetchSubscriptionsRequest, FetchSubscriptionsResponse,
     NotificationsRequest, SubscribeAttributes, SubscriberInfo, Subscription, SubscriptionRequest,
-    SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest, Update,
+    SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest, UnsubscribeResponse, Update,
 };
 
 use crate::UStatus;
@@ -29,6 +29,17 @@ impl Hash for SubscriberInfo {
 }
 
 impl Eq for SubscriberInfo {}
+
+/// Check if `SubscriberInfo` is empty by comparing with `SubscriberInfo::default()` object.
+///
+/// # Returns
+///
+/// 'true' if `SubscriberInfo` is equal to `SubscriberInfo::default()`, `false` otherwise.
+impl SubscriberInfo {
+    pub fn is_empty(&self) -> bool {
+        self.eq(&SubscriberInfo::default())
+    }
+}
 
 /// `USubscription` is the uP-L3 client interface to the uSubscription service.
 ///

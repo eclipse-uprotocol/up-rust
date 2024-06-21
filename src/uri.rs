@@ -274,6 +274,15 @@ impl Hash for UUri {
 impl Eq for UUri {}
 
 impl UUri {
+    /// Check if `UUri` is empty by comparing with `UUri::default()` object.
+    ///
+    /// # Returns
+    ///
+    /// 'true' if `UUri` is equal to `UUri::default()`, `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.eq(&UUri::default())
+    }
+
     /// Serializes this UUri to a URI string.
     ///
     /// # Arguments
