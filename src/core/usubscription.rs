@@ -164,11 +164,6 @@ impl SubscriberInfo {
 /// #     async fn on_receive(&self, msg: UMessage) {
 /// #         todo!()
 /// #     }
-/// #
-/// #     async fn on_error(&self, err: UStatus) {
-/// #         todo!()
-/// #     }
-/// #
 /// # }
 /// #
 /// # impl MyListener {
