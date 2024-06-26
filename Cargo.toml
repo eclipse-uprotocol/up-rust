@@ -47,12 +47,17 @@ once_cell = { version = "1.19" }
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
+thiserror = { version = "1.0.52" }
 tokio = { version = "1.35", default-features = false, features = [
     "macros",
     "rt",
     "rt-multi-thread",
     "sync",
     "time",
+] }
+tracing = { version = "0.1.35", default-features = false, features = [
+    "log",
+    "std",
 ] }
 uriparse = { version = "0.6" }
 uuid-simd = { version = "0.8", default-features = false, features = [
@@ -66,6 +71,7 @@ protoc-bin-vendored = { version = "3.0" }
 reqwest = { version = "0.12", features = ["blocking"] }
 
 [dev-dependencies]
+mockall = "0.12.1"
 test-case = { version = "3.3" }
 
 [profile.release]

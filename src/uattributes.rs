@@ -56,6 +56,20 @@ impl std::fmt::Display for UAttributesError {
 impl std::error::Error for UAttributesError {}
 
 impl UAttributes {
+    /// Checks if these are the attributes for an RPC Request message.
+    pub fn is_request(&self) -> bool {
+        self.type_
+            .enum_value()
+            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_REQUEST)
+    }
+
+    /// Checks if these are the attributes for an RPC Response message.
+    pub fn is_response(&self) -> bool {
+        self.type_
+            .enum_value()
+            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_RESPONSE)
+    }
+
     /// Creates attributes representing an RPC request message.
     ///
     /// The message's priority will be set to [`UPriority::UPRIORITY_CS4`].
