@@ -502,26 +502,24 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use protobuf::{Enum, EnumOrUnknown};
     /// use up_rust::{UCode, UMessageBuilder, UPriority, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
-    /// let status = UCode::OK.value();
     /// let request_msg_id = UUID::build();
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_msg_id, invoked_method)
-    ///                     .with_comm_status(status)
+    ///                     .with_comm_status(UCode::OK)
     ///                     .build()?;
-    /// assert_eq!(message.attributes.commstatus, Some(EnumOrUnknown::from_i32(status)));
+    /// assert_eq!(message.attributes.commstatus, Some(UCode::OK.into()));
     /// # Ok(())
     /// # }
     /// ```
-    pub fn with_comm_status(&mut self, comm_status: i32) -> &mut UMessageBuilder {
+    pub fn with_comm_status(&mut self, comm_status: UCode) -> &mut UMessageBuilder {
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE);
-        self.comm_status = Some(EnumOrUnknown::from_i32(comm_status));
+        self.comm_status = Some(comm_status.into());
         self
     }
 
@@ -697,7 +695,6 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use protobuf::{Enum, Message};
     /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -707,7 +704,7 @@ impl UMessageBuilder {
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
-    ///                    .with_comm_status(UCode::INVALID_ARGUMENT.value())
+    ///                    .with_comm_status(UCode::INVALID_ARGUMENT)
     ///                    .build_with_protobuf_payload(&UStatus::fail("failed to parse request"))?;
     /// assert!(message.payload.is_some());
     /// assert_eq!(message.attributes.payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF);
@@ -749,7 +746,6 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use protobuf::{Enum, Message};
     /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -759,7 +755,7 @@ impl UMessageBuilder {
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
-    ///                    .with_comm_status(UCode::INVALID_ARGUMENT.value())
+    ///                    .with_comm_status(UCode::INVALID_ARGUMENT)
     ///                    .build_with_wrapped_protobuf_payload(&UStatus::fail("failed to parse request"))?;
     /// assert!(message.payload.is_some());
     /// assert_eq!(message.attributes.payload_format.enum_value().unwrap(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY);
@@ -807,12 +803,12 @@ mod tests {
     }
 
     #[test_case(Some(5), None, None; "with permission level")]
-    #[test_case(None, Some(5), None; "with commstatus")]
+    #[test_case(None, Some(UCode::NOT_FOUND), None; "with commstatus")]
     #[test_case(None, None, Some(String::from("my-token")); "with token")]
     #[should_panic]
     fn test_publish_message_builder_panics(
         perm_level: Option<u32>,
-        comm_status: Option<i32>,
+        comm_status: Option<UCode>,
         token: Option<String>,
     ) {
         let topic = UUri::try_from(TOPIC).expect("should have been able to create UUri");
@@ -844,9 +840,9 @@ mod tests {
         }
     }
 
-    #[test_case(Some(5), None; "for comm status")]
+    #[test_case(Some(UCode::NOT_FOUND), None; "for comm status")]
     #[should_panic]
-    fn test_request_message_builder_panics(comm_status: Option<i32>, perm_level: Option<u32>) {
+    fn test_request_message_builder_panics(comm_status: Option<UCode>, perm_level: Option<u32>) {
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
             .expect("should have been able to create destination UUri");
         let reply_to_address = UUri::try_from(REPLY_TO_ADDRESS)
@@ -944,7 +940,7 @@ mod tests {
                 .expect("should have been able to create message");
         let message = UMessageBuilder::response_for_request(&request_message.attributes)
             .with_message_id(response_message_id.clone())
-            .with_comm_status(UCode::DEADLINE_EXCEEDED.value())
+            .with_comm_status(UCode::DEADLINE_EXCEEDED)
             .with_ttl(4000)
             .build()
             .expect("should have been able to create message");
@@ -978,7 +974,7 @@ mod tests {
             method_to_invoke.clone(),
         )
         .with_message_id(message_id.clone())
-        .with_comm_status(UCode::DEADLINE_EXCEEDED.value())
+        .with_comm_status(UCode::DEADLINE_EXCEEDED)
         .with_priority(UPriority::UPRIORITY_CS5)
         .with_ttl(0)
         .build()
