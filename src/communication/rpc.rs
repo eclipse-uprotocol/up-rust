@@ -11,9 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::error::Error;
-use std::fmt::Display;
 use std::sync::Arc;
+use thiserror::Error;
 
 use async_trait::async_trait;
 use protobuf::Message;
@@ -23,45 +22,76 @@ use crate::{UCode, UStatus, UUri};
 
 use super::{CallOptions, UPayload};
 
-/// An error indicating a problem with publishing a message to a topic.
-#[derive(Debug)]
+/// An error indicating a problem with invoking a (remote) service operation.
+#[derive(Error, Debug)]
 pub enum ServiceInvocationError {
+    /// Indicates that the calling uE requested to add/create something that already exists.
+    #[error("entity already exists: {0}")]
+    AlreadyExists(String),
     /// Indicates that a request's time-to-live (TTL) has expired.
     ///
     /// Note that this only means that the reply to the request has not been received in time. The request
     /// may still have been processed by the (remote) service provider.
+    #[error("request timed out")]
     DeadlineExceeded,
-    /// Indicates that the request cannot be processed because some of its parameters are not as expected.
+    /// Indicates that the service provider is in a state that prevents it from handling the request.
+    #[error("failed precondition: {0}")]
+    FailedPrecondition(String),
+    /// Indicates that a serious but unspeciified internal error has occurred while sending/processing the request.
+    #[error("internal error: {0}")]
+    Internal(String),
+    /// Indicates that the request cannot be processed because some of its parameters are invalid, e.g. not properly formatted.
+    #[error("invalid argument: {0}")]
     InvalidArgument(String),
+    /// Indicates that the requested entity was not found.
+    #[error("no such entity: {0}")]
+    NotFound(String),
+    /// Indicates that the calling uE is authenticated but does not have the required authority to invoke the method.
+    #[error("permission denied: {0}")]
+    PermissionDenied(String),
+    /// Indicates that some of the resources required for processing the request have been exhausted, e.g. disk space, number of API calls.
+    #[error("resource exhausted: {0}")]
+    ResourceExhausted(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to publish a message.
+    #[error("unknown error: {0}")]
     RpcError(UStatus),
+    /// Indicates that the calling uE could not be authenticated properly.
+    #[error("unauthenticated")]
+    Unauthenticated,
+    /// Indicates that some of the resources required for processing the request are currently unavailable.
+    #[error("resource unavailable: {0}")]
+    Unavailable(String),
+    /// Indicates that part or all of the invoked operation has not been implemented yet.
+    #[error("unimplemented: {0}")]
+    Unimplemented(String),
 }
 
 impl From<UStatus> for ServiceInvocationError {
     fn from(value: UStatus) -> Self {
         match value.code.enum_value() {
+            Ok(UCode::ALREADY_EXISTS) => ServiceInvocationError::AlreadyExists(value.get_message()),
             Ok(UCode::DEADLINE_EXCEEDED) => ServiceInvocationError::DeadlineExceeded,
+            Ok(UCode::FAILED_PRECONDITION) => {
+                ServiceInvocationError::FailedPrecondition(value.get_message())
+            }
+            Ok(UCode::INTERNAL) => ServiceInvocationError::Internal(value.get_message()),
             Ok(UCode::INVALID_ARGUMENT) => {
                 ServiceInvocationError::InvalidArgument(value.get_message())
             }
+            Ok(UCode::NOT_FOUND) => ServiceInvocationError::NotFound(value.get_message()),
+            Ok(UCode::PERMISSION_DENIED) => {
+                ServiceInvocationError::PermissionDenied(value.get_message())
+            }
+            Ok(UCode::RESOURCE_EXHAUSTED) => {
+                ServiceInvocationError::ResourceExhausted(value.get_message())
+            }
+            Ok(UCode::UNAUTHENTICATED) => ServiceInvocationError::Unauthenticated,
+            Ok(UCode::UNAVAILABLE) => ServiceInvocationError::Unavailable(value.get_message()),
+            Ok(UCode::UNIMPLEMENTED) => ServiceInvocationError::Unimplemented(value.get_message()),
             _ => ServiceInvocationError::RpcError(value),
         }
     }
 }
-
-impl Display for ServiceInvocationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ServiceInvocationError::DeadlineExceeded => f.write_str("request timed out"),
-            ServiceInvocationError::InvalidArgument(s) => f.write_str(s.as_str()),
-            ServiceInvocationError::RpcError(s) => {
-                f.write_fmt(format_args!("failed to send invoke method: {}", s))
-            }
-        }
-    }
-}
-
-impl Error for ServiceInvocationError {}
 
 /// A client for invoking RPC methods.
 ///

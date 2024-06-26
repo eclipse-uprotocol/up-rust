@@ -283,6 +283,17 @@ impl UUri {
         self.eq(&UUri::default())
     }
 
+    /// Gets a URI that consists of wildcards only and therefore matches any URI.
+    pub fn any() -> Self {
+        UUri {
+            authority_name: WILDCARD_AUTHORITY.to_string(),
+            ue_id: WILDCARD_ENTITY_ID,
+            ue_version_major: WILDCARD_ENTITY_VERSION,
+            resource_id: WILDCARD_RESOURCE_ID,
+            ..Default::default()
+        }
+    }
+
     /// Serializes this UUri to a URI string.
     ///
     /// # Arguments

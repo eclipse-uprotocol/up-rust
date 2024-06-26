@@ -66,6 +66,16 @@ impl From<&str> for UMessageError {
 }
 
 impl UMessage {
+    /// Checks if this is an RPC Request message.
+    pub fn is_request(&self) -> bool {
+        self.attributes.get_or_default().is_request()
+    }
+
+    /// Checks if this is an RPC Response message.
+    pub fn is_response(&self) -> bool {
+        self.attributes.get_or_default().is_response()
+    }
+
     /// If `UMessage` payload is available, deserialize it as a protobuf `Message`.
     ///
     /// This function is used to extract strongly-typed data from a `UMessage` object,

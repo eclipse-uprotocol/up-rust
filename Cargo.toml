@@ -47,6 +47,7 @@ once_cell = { version = "1.19" }
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
+thiserror = { version = "1.0.52" }
 tokio = { version = "1.35", default-features = false, features = [
     "macros",
     "rt",
@@ -66,6 +67,7 @@ protoc-bin-vendored = { version = "3.0" }
 reqwest = { version = "0.12", features = ["blocking"] }
 
 [dev-dependencies]
+mockall = "0.12.1"
 test-case = { version = "3.3" }
 
 [profile.release]

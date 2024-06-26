@@ -16,6 +16,7 @@ pub use notification::{NotificationError, NotificationListener, Notifier};
 use protobuf::Message;
 pub use pubsub::{PubSubError, Publisher, Subscriber};
 pub use rpc::{RpcClient, RpcServer, ServiceInvocationError};
+pub use rpc_impl::InMemoryRpcClient;
 use std::{error::Error, fmt::Display};
 
 use crate::{
@@ -26,6 +27,7 @@ use crate::{
 mod notification;
 mod pubsub;
 mod rpc;
+mod rpc_impl;
 
 /// An error indicating a problem with registering or unregistering a message listener.
 #[derive(Debug)]
