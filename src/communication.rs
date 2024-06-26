@@ -20,7 +20,7 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     umessage::{self, UMessageError},
-    UPayloadFormat, UPriority,
+    UPayloadFormat, UPriority, UUID,
 };
 
 mod notification;
@@ -64,8 +64,10 @@ const DEFAULT_TTL: u32 = 10_000; // 10 seconds
 #[derive(Debug)]
 pub struct CallOptions {
     ttl: u32,
+    message_id: Option<UUID>,
     token: Option<String>,
     priority: Option<UPriority>,
+    traceparent: Option<String>,
 }
 
 impl Default for CallOptions {
@@ -73,37 +75,47 @@ impl Default for CallOptions {
     fn default() -> Self {
         CallOptions {
             ttl: DEFAULT_TTL,
+            message_id: None,
             token: None,
             priority: None,
+            traceparent: None,
         }
     }
 }
 
 impl CallOptions {
-    /// Creates a new `CallOption`` with the desired ttl value.
+    /// Creates new call options.
     ///
     /// # Arguments
     ///
-    /// * `ttl` - The time-to-live parameter.
-    /// * `token` - Optional token.
-    /// * `priority` - Optional priority.
+    /// * `ttl` - The message's time-to-live in milliseconds.
+    /// * `message_id` - The identifier to use for the message or `None` to use a generated identifier.
+    /// * `token` - The token to use for authenticating to infrastructure and service endpoints.
+    /// * `priority` - The message's priority or `None` to use the default priority.
     ///
     /// # Returns
     ///
     /// `CallOption` with specified ttl value, token and priority parameters.
-    pub fn new(ttl: u32, token: Option<String>, priority: Option<UPriority>) -> Self {
+    pub fn new(
+        ttl: u32,
+        message_id: Option<UUID>,
+        token: Option<String>,
+        priority: Option<UPriority>,
+    ) -> Self {
         CallOptions {
             ttl,
+            message_id,
             token,
             priority,
+            traceparent: None,
         }
     }
 
-    /// Sets `CallOption` ttl value.
+    /// Sets the message's time-to-live.
     ///
     /// # Arguments
     ///
-    /// * `ttl` - The time-to-live parameter.
+    /// * `ttl` - The time-to-live in milliseconds.
     ///
     /// # Returns
     ///
@@ -113,43 +125,44 @@ impl CallOptions {
         self
     }
 
-    /// Returns `CallOption` ttl value.
-    ///
-    /// # Returns
-    ///
-    /// ttl value of `CallOption`.
+    /// Gets the message's time-to-live in milliseconds.
     pub fn ttl(&self) -> u32 {
         self.ttl
     }
 
-    /// Sets `CallOption` token value.
+    /// Sets the identifier to use for the message.
     ///
-    /// # Arguments
+    /// # Returns
     ///
-    /// * `token` - The token parameter.
+    /// `CallOption` with specified reqid value.
+    pub fn with_message_id(&mut self, message_id: UUID) -> &mut Self {
+        self.message_id = Some(message_id);
+        self
+    }
+
+    /// Gets the identifier to use for the message.
+    pub fn message_id(&self) -> Option<UUID> {
+        self.message_id.clone()
+    }
+
+    /// Sets the token to use for authenticating to infrastructure and service endpoints.
     ///
     /// # Returns
     ///
     /// `CallOption` with specified token value.
-    pub fn with_token(&mut self, token: String) -> &mut Self {
-        self.token = Some(token);
+    pub fn with_token<T: Into<String>>(&mut self, token: T) -> &mut Self {
+        self.token = Some(token.into());
         self
     }
 
-    /// Returns `CallOption` token value.
-    ///
-    /// # Returns
-    ///
-    /// token value of `CallOption`.
+    /// Gets the token to use for authenticating to infrastructure and service endpoints.
     pub fn token(&self) -> Option<String> {
         self.token.clone()
     }
 
-    /// Sets `CallOption` priority value.
+    /// Sets the message's priority.
     ///
-    /// # Arguments
-    ///
-    /// * `priority` - The priority parameter.
+    /// If not set explicitly, the default priority for RPC calls will be used.
     ///
     /// # Returns
     ///
@@ -159,13 +172,29 @@ impl CallOptions {
         self
     }
 
-    /// Returns `CallOption` priority value.
+    /// Gets the message's priority.
+    pub fn priority(&self) -> Option<UPriority> {
+        self.priority
+    }
+
+    /// Sets the W3C Trace Context that the message is part of.
+    ///
+    /// # Arguments
+    ///
+    /// * `traceparent` - The [traceparent](https://w3c.github.io/trace-context/#traceparent-header) value identifying the trace context.
     ///
     /// # Returns
     ///
-    /// priority value of `CallOption`.
-    pub fn priority(&self) -> Option<UPriority> {
-        self.priority
+    /// `CallOption` with specified priority value.
+    pub fn with_traceparent<T: Into<String>>(&mut self, traceparent: T) -> &mut Self {
+        self.traceparent = Some(traceparent.into());
+        self
+    }
+
+    /// Gets the [traceparent](https://w3c.github.io/trace-context/#traceparent-header) value identifying the trace context that
+    /// the message is part of.
+    pub fn traceparent(&self) -> Option<String> {
+        self.traceparent.clone()
     }
 }
 
@@ -184,17 +213,13 @@ impl UPayload {
         }
     }
 
-    /// Creates a new UPayload from a protobuf `Message`, will set payload
-    /// type to `UPayload::UPAYLOAD_FORMAT_PROTOBUF`.
+    /// Creates a new UPayload from a protobuf message.
     ///
-    /// # Arguments
+    /// The resulting payload will have `UPayloadType::UPAYLOAD_FORMAT_PROTOBUF`.
     ///
-    /// * `message` - The protobuf `Message` to wrap in UPayload.
+    /// # Errors
     ///
-    /// # Returns
-    ///
-    /// `UPayload` serialized from `Message` with as `UPayloadType::UPAYLOAD_FORMAT_PROTOBUF` payload,
-    /// `UMessageError::DataSerializationError` in case the conversion failed.
+    /// Returns an error if the given message cannot be serialized to bytes.
     pub fn try_from_protobuf<M>(message: M) -> Result<Self, UMessageError>
     where
         M: Message,
