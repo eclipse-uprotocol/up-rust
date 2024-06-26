@@ -27,28 +27,28 @@ const PRIORITY_DEFAULT: UPriority = UPriority::UPRIORITY_CS1;
 /// Messages are being used by a uEntity to inform other entities about the occurrence of events
 /// and/or to invoke service operations provided by other entities.
 pub struct UMessageBuilder {
-    validator: Box<dyn UAttributesValidator>,
-    message_type: UMessageType,
-    message_id: Option<UUID>,
-    source: Option<UUri>,
-    sink: Option<UUri>,
-    priority: UPriority,
-    ttl: Option<u32>,
-    token: Option<String>,
-    permission_level: Option<u32>,
     comm_status: Option<EnumOrUnknown<UCode>>,
-    request_id: Option<UUID>,
+    message_id: Option<UUID>,
+    message_type: UMessageType,
     payload: Option<Bytes>,
     payload_format: UPayloadFormat,
+    permission_level: Option<u32>,
+    priority: UPriority,
+    request_id: Option<UUID>,
+    sink: Option<UUri>,
+    source: Option<UUri>,
+    token: Option<String>,
+    traceparent: Option<String>,
+    ttl: Option<u32>,
+    validator: Box<dyn UAttributesValidator>,
 }
 
 impl Default for UMessageBuilder {
     fn default() -> Self {
         UMessageBuilder {
-            validator: Box::new(PublishValidator),
             comm_status: None,
-            message_type: UMessageType::UMESSAGE_TYPE_UNSPECIFIED,
             message_id: None,
+            message_type: UMessageType::UMESSAGE_TYPE_UNSPECIFIED,
             payload: None,
             payload_format: UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED,
             permission_level: None,
@@ -57,7 +57,9 @@ impl Default for UMessageBuilder {
             sink: None,
             source: None,
             token: None,
+            traceparent: None,
             ttl: None,
+            validator: Box::new(PublishValidator),
         }
     }
 }
@@ -441,9 +443,9 @@ impl UMessageBuilder {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn with_token(&mut self, token: String) -> &mut UMessageBuilder {
+    pub fn with_token<T: Into<String>>(&mut self, token: T) -> &mut UMessageBuilder {
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST);
-        self.token = Some(token);
+        self.token = Some(token.into());
         self
     }
 
@@ -523,6 +525,35 @@ impl UMessageBuilder {
         self
     }
 
+    /// Sets the identifier of the W3C Trace Context to convey in the message.
+    ///
+    /// # Arguments
+    ///
+    /// * `traceparent` - The identifier.
+    ///
+    /// # Returns
+    ///
+    /// The builder.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UUri};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let topic = UUri::try_from("//my-vehicle/4210/1/B24D")?;
+    /// let traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    /// let message = UMessageBuilder::publish(topic.clone())
+    ///                    .with_traceparent(traceparent)
+    ///                    .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    /// assert_eq!(message.attributes.traceparent, Some(traceparent.to_string()));
+    /// # Ok(())
+    /// # }
+    pub fn with_traceparent<T: Into<String>>(&mut self, traceparent: T) -> &mut UMessageBuilder {
+        self.traceparent = Some(traceparent.into());
+        self
+    }
+
     /// Creates the message based on the builder's state.
     ///
     /// # Returns
@@ -582,17 +613,18 @@ impl UMessageBuilder {
             .clone()
             .map_or_else(|| Some(UUID::build()), Some);
         let attributes = UAttributes {
-            id: message_id.into(),
-            type_: self.message_type.into(),
-            source: self.source.clone().into(),
-            sink: self.sink.clone().into(),
-            priority: self.priority.into(),
-            ttl: self.ttl,
-            token: self.token.clone(),
-            permission_level: self.permission_level,
             commstatus: self.comm_status,
-            reqid: self.request_id.clone().into(),
+            id: message_id.into(),
             payload_format: self.payload_format.into(),
+            permission_level: self.permission_level,
+            priority: self.priority.into(),
+            reqid: self.request_id.clone().into(),
+            sink: self.sink.clone().into(),
+            source: self.source.clone().into(),
+            token: self.token.clone(),
+            traceparent: self.traceparent.clone(),
+            ttl: self.ttl,
+            type_: self.message_type.into(),
             ..Default::default()
         };
         self.validator
