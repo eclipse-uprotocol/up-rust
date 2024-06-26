@@ -47,6 +47,13 @@ once_cell = { version = "1.19" }
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
 regex = { version = "1.10" }
+tokio = { version = "1.35", default-features = false, features = [
+    "macros",
+    "rt",
+    "rt-multi-thread",
+    "sync",
+    "time",
+] }
 uriparse = { version = "0.6" }
 uuid-simd = { version = "0.8", default-features = false, features = [
     "std",
@@ -59,8 +66,6 @@ protoc-bin-vendored = { version = "3.0" }
 reqwest = { version = "0.12", features = ["blocking"] }
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
-futures = { version = "0.3.30" }
 test-case = { version = "3.3" }
 
 [profile.release]

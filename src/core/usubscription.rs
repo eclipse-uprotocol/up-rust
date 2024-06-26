@@ -172,7 +172,7 @@ impl SubscriberInfo {
 /// #     }
 /// # }
 /// #
-/// # #[async_std::main]
+/// # #[tokio::main]
 /// # pub async fn main() -> Result<(), UStatus> {
 /// #
 /// # let my_uuri = Default::default();
