@@ -61,10 +61,6 @@ pub trait LocalUriProvider: Send + Sync {
 ///             *inner_foo = format!("latest message length: {}", payload.len());
 ///         }
 ///     }
-///
-///     async fn on_error(&self, err: UStatus) {
-///         println!("uh oh, we got an error: {err:?}");
-///     }
 /// }
 /// ```
 ///
@@ -90,10 +86,6 @@ pub trait LocalUriProvider: Send + Sync {
 ///     async fn on_receive(&self, msg: UMessage) {
 ///         task::spawn(send_to_jupiter(msg));
 ///     }
-///
-///     async fn on_error(&self, err: UStatus) {
-///         println!("unable to send to jupiter :( {err:?}");
-///     }
 /// }
 /// ```
 #[async_trait]
@@ -115,24 +107,6 @@ pub trait UListener: Send + Sync {
     /// Because `on_receive()` is async you may choose to either `.await` it in the current context
     /// or spawn it onto a new task and await there to allow current context to immediately continue.
     async fn on_receive(&self, msg: UMessage);
-
-    /// Performs some action on receipt of an error.
-    ///
-    /// # Parameters
-    ///
-    /// * `err` - The error as `UStatus`
-    ///
-    /// # Note for `UListener` implementers
-    ///
-    /// `on_error()` is expected to return almost immediately. If it does not, it could potentially
-    /// block further message receipt. For long-running operations consider passing off received
-    /// error to a different async function to handle it and returning.
-    ///
-    /// # Note for `UTransport` implementers
-    ///
-    /// Because `on_error()` is async you may choose to either `.await` it in the current context
-    /// or spawn it onto a new task and await there to allow current context to immediately continue.
-    async fn on_error(&self, err: UStatus);
 }
 
 /// [`UTransport`] is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
@@ -247,10 +221,6 @@ pub trait UTransport: Send + Sync {
     /// # #[async_trait]
     /// # impl UListener for MyListener {
     /// #     async fn on_receive(&self, msg: UMessage) {
-    /// #         todo!()
-    /// #     }
-    /// #
-    /// #     async fn on_error(&self, err: UStatus) {
     /// #         todo!()
     /// #     }
     /// # }
@@ -498,10 +468,6 @@ mod tests {
         async fn on_receive(&self, msg: UMessage) {
             println!("Printing msg from ListenerBaz! received: {:?}", msg);
         }
-
-        async fn on_error(&self, err: UStatus) {
-            println!("Printing err from ListenerBaz! received {:?}", err)
-        }
     }
 
     #[derive(Clone, Debug)]
@@ -510,10 +476,6 @@ mod tests {
     impl UListener for ListenerBar {
         async fn on_receive(&self, msg: UMessage) {
             println!("Printing msg from ListenerBar! received: {:?}", msg);
-        }
-
-        async fn on_error(&self, err: UStatus) {
-            println!("Printing err from ListenerBar! received: {:?}", err);
         }
     }
 
