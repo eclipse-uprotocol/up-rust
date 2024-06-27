@@ -14,8 +14,9 @@
 pub use crate::up_core_api::usubscription::{
     subscription_status::State, EventDeliveryConfig, FetchSubscribersRequest,
     FetchSubscribersResponse, FetchSubscriptionsRequest, FetchSubscriptionsResponse,
-    NotificationsRequest, SubscribeAttributes, SubscriberInfo, Subscription, SubscriptionRequest,
-    SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest, UnsubscribeResponse, Update,
+    NotificationsRequest, NotificationsResponse, SubscribeAttributes, SubscriberInfo, Subscription,
+    SubscriptionRequest, SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest,
+    UnsubscribeResponse, Update,
 };
 
 use crate::UStatus;
