@@ -213,13 +213,14 @@ impl RpcClient for InMemoryRpcClient {
                 self.response_listener.remove_pending_request(&message_id);
                 e
             })?;
-        match tokio::time::timeout(Duration::from_millis(call_options.ttl() as u64), receiver).await
+
+        if let Ok(Ok(response_message)) =
+            tokio::time::timeout(Duration::from_millis(call_options.ttl() as u64), receiver).await
         {
-            Ok(Ok(response_message)) => handle_response_message(response_message),
-            _ => {
-                self.response_listener.remove_pending_request(&message_id);
-                Err(ServiceInvocationError::DeadlineExceeded)
-            }
+            handle_response_message(response_message)
+        } else {
+            self.response_listener.remove_pending_request(&message_id);
+            Err(ServiceInvocationError::DeadlineExceeded)
         }
     }
 }
@@ -421,7 +422,7 @@ mod tests {
                 Ok(())
             },
         );
-        // and a remote service oration that returns an error
+        // and a remote service operation that returns an error
         mock_transport
             .expect_do_send()
             .returning(move |request_message| {
@@ -460,11 +461,11 @@ mod tests {
         let mut mock_transport = MockTransport::default();
         mock_transport
             .expect_do_register_listener()
-            .returning(move |_source_filter, _sink_filter, _listener| Ok(()));
+            .returning(|_source_filter, _sink_filter, _listener| Ok(()));
         // and a remote service operation that does not return a response
         mock_transport
             .expect_do_send()
-            .returning(move |_request_message| Ok(()));
+            .returning(|_request_message| Ok(()));
 
         let client = InMemoryRpcClient::new(Arc::new(mock_transport), new_uri_provider())
             .await
