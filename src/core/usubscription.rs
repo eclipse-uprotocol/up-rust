@@ -164,11 +164,6 @@ impl SubscriberInfo {
 /// #     async fn on_receive(&self, msg: UMessage) {
 /// #         todo!()
 /// #     }
-/// #
-/// #     async fn on_error(&self, err: UStatus) {
-/// #         todo!()
-/// #     }
-/// #
 /// # }
 /// #
 /// # impl MyListener {
@@ -177,7 +172,7 @@ impl SubscriberInfo {
 /// #     }
 /// # }
 /// #
-/// # #[async_std::main]
+/// # #[tokio::main]
 /// # pub async fn main() -> Result<(), UStatus> {
 /// #
 /// # let my_uuri = Default::default();

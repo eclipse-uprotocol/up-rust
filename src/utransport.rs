@@ -61,10 +61,6 @@ pub trait LocalUriProvider: Send + Sync {
 ///             *inner_foo = format!("latest message length: {}", payload.len());
 ///         }
 ///     }
-///
-///     async fn on_error(&self, err: UStatus) {
-///         println!("uh oh, we got an error: {err:?}");
-///     }
 /// }
 /// ```
 ///
@@ -74,7 +70,7 @@ pub trait LocalUriProvider: Send + Sync {
 /// use up_rust::{UListener, UMessage, UStatus};
 ///
 /// use async_trait::async_trait;
-/// use async_std::task;
+/// use tokio::task;
 /// use std::sync::{Arc, Mutex};
 ///
 /// #[derive(Clone)]
@@ -88,11 +84,7 @@ pub trait LocalUriProvider: Send + Sync {
 /// #[async_trait]
 /// impl UListener for LongTaskListener {
 ///     async fn on_receive(&self, msg: UMessage) {
-///         task::spawn(send_to_jupiter(msg));
-///     }
-///
-///     async fn on_error(&self, err: UStatus) {
-///         println!("unable to send to jupiter :( {err:?}");
+///         tokio::spawn(send_to_jupiter(msg));
 ///     }
 /// }
 /// ```
@@ -115,24 +107,6 @@ pub trait UListener: Send + Sync {
     /// Because `on_receive()` is async you may choose to either `.await` it in the current context
     /// or spawn it onto a new task and await there to allow current context to immediately continue.
     async fn on_receive(&self, msg: UMessage);
-
-    /// Performs some action on receipt of an error.
-    ///
-    /// # Parameters
-    ///
-    /// * `err` - The error as `UStatus`
-    ///
-    /// # Note for `UListener` implementers
-    ///
-    /// `on_error()` is expected to return almost immediately. If it does not, it could potentially
-    /// block further message receipt. For long-running operations consider passing off received
-    /// error to a different async function to handle it and returning.
-    ///
-    /// # Note for `UTransport` implementers
-    ///
-    /// Because `on_error()` is async you may choose to either `.await` it in the current context
-    /// or spawn it onto a new task and await there to allow current context to immediately continue.
-    async fn on_error(&self, err: UStatus);
 }
 
 /// [`UTransport`] is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
@@ -247,10 +221,6 @@ pub trait UTransport: Send + Sync {
     /// # #[async_trait]
     /// # impl UListener for MyListener {
     /// #     async fn on_receive(&self, msg: UMessage) {
-    /// #         todo!()
-    /// #     }
-    /// #
-    /// #     async fn on_error(&self, err: UStatus) {
     /// #         todo!()
     /// #     }
     /// # }
@@ -377,7 +347,6 @@ mod tests {
     use crate::ComparableListener;
     use crate::UListener;
     use crate::{UCode, UMessage, UStatus, UTransport, UUri};
-    use async_std::task;
     use async_trait::async_trait;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
@@ -410,7 +379,7 @@ mod tests {
                         for listener in listeners.iter() {
                             let task_listener = listener.clone();
                             let task_umessage = umessage.clone();
-                            task::spawn(
+                            tokio::spawn(
                                 async move { task_listener.on_receive(task_umessage).await },
                             );
                         }
@@ -498,10 +467,6 @@ mod tests {
         async fn on_receive(&self, msg: UMessage) {
             println!("Printing msg from ListenerBaz! received: {:?}", msg);
         }
-
-        async fn on_error(&self, err: UStatus) {
-            println!("Printing err from ListenerBaz! received {:?}", err)
-        }
     }
 
     #[derive(Clone, Debug)]
@@ -510,10 +475,6 @@ mod tests {
     impl UListener for ListenerBar {
         async fn on_receive(&self, msg: UMessage) {
             println!("Printing msg from ListenerBar! received: {:?}", msg);
-        }
-
-        async fn on_error(&self, err: UStatus) {
-            println!("Printing err from ListenerBar! received: {:?}", err);
         }
     }
 
@@ -527,13 +488,14 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_register_and_receive() {
+    #[tokio::test]
+    async fn test_register_and_receive() {
         let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res =
-            task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_baz.clone()));
+        let register_res = up_client_foo
+            .register_listener(&uuri_1, None, listener_baz.clone())
+            .await;
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
@@ -541,21 +503,23 @@ mod tests {
         assert_eq!(check_on_receive_res, Ok(()));
     }
 
-    #[test]
-    fn test_register_and_unregister() {
+    #[tokio::test]
+    async fn test_register_and_unregister() {
         let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res =
-            task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_baz.clone()));
+        let register_res = up_client_foo
+            .register_listener(&uuri_1, None, listener_baz.clone())
+            .await;
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
-        let unregister_res =
-            task::block_on(up_client_foo.unregister_listener(&uuri_1, None, listener_baz));
+        let unregister_res = up_client_foo
+            .unregister_listener(&uuri_1, None, listener_baz)
+            .await;
         assert!(unregister_res.is_ok());
 
         let umessage = UMessage::default();
@@ -563,30 +527,34 @@ mod tests {
         assert!(check_on_receive_res.is_err());
     }
 
-    #[test]
-    fn test_register_multiple_listeners_on_one_uuri() {
+    #[tokio::test]
+    async fn test_register_multiple_listeners_on_one_uuri() {
         let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
         let listener_bar: Arc<dyn UListener> = Arc::new(ListenerBar);
 
-        let register_res =
-            task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_baz.clone()));
+        let register_res = up_client_foo
+            .register_listener(&uuri_1, None, listener_baz.clone())
+            .await;
         assert!(register_res.is_ok());
 
-        let register_res =
-            task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_bar.clone()));
+        let register_res = up_client_foo
+            .register_listener(&uuri_1, None, listener_bar.clone())
+            .await;
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
-        let unregister_baz_res =
-            task::block_on(up_client_foo.unregister_listener(&uuri_1, None, listener_baz));
+        let unregister_baz_res = up_client_foo
+            .unregister_listener(&uuri_1, None, listener_baz)
+            .await;
         assert!(unregister_baz_res.is_ok());
-        let unregister_bar_res =
-            task::block_on(up_client_foo.unregister_listener(&uuri_1, None, listener_bar));
+        let unregister_bar_res = up_client_foo
+            .unregister_listener(&uuri_1, None, listener_bar)
+            .await;
         assert!(unregister_bar_res.is_ok());
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
@@ -604,41 +572,40 @@ mod tests {
         assert!(check_on_receive_res.is_err());
     }
 
-    #[test]
-    fn test_register_multiple_same_listeners_on_one_uuri() {
+    #[tokio::test]
+    async fn test_register_multiple_same_listeners_on_one_uuri() {
         let mut up_client_foo = UPClientFoo::default();
         let uuri_1 = uuri_factory(1);
 
         let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res =
-            task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_baz.clone()));
+        let register_res = up_client_foo
+            .register_listener(&uuri_1, None, listener_baz.clone())
+            .await;
         assert!(register_res.is_ok());
 
-        let register_res =
-            task::block_on(up_client_foo.register_listener(&uuri_1, None, listener_baz.clone()));
+        let register_res = up_client_foo
+            .register_listener(&uuri_1, None, listener_baz.clone())
+            .await;
         assert!(register_res.is_err());
 
         let listener_baz_completely_different: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res = task::block_on(up_client_foo.register_listener(
-            &uuri_1,
-            None,
-            listener_baz_completely_different.clone(),
-        ));
+        let register_res = up_client_foo
+            .register_listener(&uuri_1, None, listener_baz_completely_different.clone())
+            .await;
         assert!(register_res.is_ok());
 
         let umessage = UMessage::default();
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert_eq!(check_on_receive_res, Ok(()));
 
-        let unregister_res = task::block_on(up_client_foo.unregister_listener(
-            &uuri_1,
-            None,
-            listener_baz_completely_different,
-        ));
+        let unregister_res = up_client_foo
+            .unregister_listener(&uuri_1, None, listener_baz_completely_different)
+            .await;
         assert!(unregister_res.is_ok());
 
-        let unregister_baz_res =
-            task::block_on(up_client_foo.unregister_listener(&uuri_1, None, listener_baz));
+        let unregister_baz_res = up_client_foo
+            .unregister_listener(&uuri_1, None, listener_baz)
+            .await;
         assert!(unregister_baz_res.is_ok());
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);

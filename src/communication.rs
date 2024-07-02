@@ -12,6 +12,7 @@
  ********************************************************************************/
 
 use bytes::Bytes;
+pub use in_memory_rpc_client::InMemoryRpcClient;
 pub use notification::{NotificationError, NotificationListener, Notifier};
 use protobuf::Message;
 pub use pubsub::{PubSubError, Publisher, Subscriber};
@@ -23,6 +24,7 @@ use crate::{
     UPayloadFormat, UPriority, UUID,
 };
 
+mod in_memory_rpc_client;
 mod notification;
 mod pubsub;
 mod rpc;
