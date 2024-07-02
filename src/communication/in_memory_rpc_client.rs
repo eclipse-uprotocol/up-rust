@@ -18,38 +18,40 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::oneshot::{Receiver, Sender};
+use tracing::{debug, info};
 
 use crate::{
-    LocalUriProvider, UCode, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri, UUID,
+    LocalUriProvider, UCode, UListener, UMessage, UMessageBuilder, UMessageType, UStatus,
+    UTransport, UUri, UUID,
 };
 
 use super::{CallOptions, RpcClient, ServiceInvocationError, UPayload};
 
 fn handle_response_message(response: UMessage) -> Result<Option<UPayload>, ServiceInvocationError> {
-    if let Some(attribs) = response.attributes.as_ref() {
-        match attribs.commstatus.map(|v| v.enum_value_or_default()) {
-            Some(UCode::OK) | None => {
-                // successful invocation
-                response.payload.map_or(Ok(None), |payload| {
-                    Ok(Some(UPayload::new(
-                        payload,
-                        attribs.payload_format.enum_value_or_default(),
-                    )))
-                })
-            }
-            Some(code) => {
-                // try to extract UStatus from response payload
-                let status = response.extract_protobuf().unwrap_or_else(|_e| {
-                    UStatus::fail_with_code(code, "failed to invoke service operation")
-                });
-                Err(ServiceInvocationError::from(status))
-            }
-        }
-    } else {
-        Err(ServiceInvocationError::RpcError(UStatus::fail_with_code(
+    let Some(attribs) = response.attributes.as_ref() else {
+        return Err(ServiceInvocationError::RpcError(UStatus::fail_with_code(
             UCode::INTERNAL,
             "response message does not contain attributes",
-        )))
+        )));
+    };
+
+    match attribs.commstatus.map(|v| v.enum_value_or_default()) {
+        Some(UCode::OK) | None => {
+            // successful invocation
+            response.payload.map_or(Ok(None), |payload| {
+                Ok(Some(UPayload::new(
+                    payload,
+                    attribs.payload_format.enum_value_or_default(),
+                )))
+            })
+        }
+        Some(code) => {
+            // try to extract UStatus from response payload
+            let status = response.extract_protobuf().unwrap_or_else(|_e| {
+                UStatus::fail_with_code(code, "failed to invoke service operation")
+            });
+            Err(ServiceInvocationError::from(status))
+        }
     }
 }
 
@@ -63,32 +65,45 @@ impl ResponseListener {
         &self,
         reqid: UUID,
     ) -> Result<Receiver<UMessage>, ServiceInvocationError> {
-        if let Ok(mut pending_requests) = self.pending_requests.lock() {
-            if let Entry::Vacant(entry) = pending_requests.entry(reqid) {
-                let (tx, rx) = tokio::sync::oneshot::channel();
-                entry.insert(tx);
-                Ok(rx)
-            } else {
-                Err(ServiceInvocationError::AlreadyExists(
-                    "RPC request with given ID already pending".to_string(),
-                ))
-            }
+        let Ok(mut pending_requests) = self.pending_requests.lock() else {
+            return Err(ServiceInvocationError::Internal(
+                "failed to add response handler".to_string(),
+            ));
+        };
+
+        if let Entry::Vacant(entry) = pending_requests.entry(reqid) {
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            entry.insert(tx);
+            Ok(rx)
         } else {
-            Err(ServiceInvocationError::RpcError(UStatus::fail_with_code(
-                UCode::INTERNAL,
-                "failed to add response handler",
-            )))
+            Err(ServiceInvocationError::AlreadyExists(
+                "RPC request with given ID already pending".to_string(),
+            ))
         }
     }
 
     fn handle_response(&self, reqid: &UUID, response_message: UMessage) {
-        if let Ok(mut pending_requests) = self.pending_requests.lock() {
-            if let Some(sender) = pending_requests.remove(reqid) {
-                let _ = sender.send(response_message);
-            } else {
-                // we seem to have received a duplicate of the response message,
-                // ignoring it
+        let Ok(mut pending_requests) = self.pending_requests.lock() else {
+            info!(
+                request_id = reqid.to_hyphenated_string(),
+                "failed to process response message, cannot acquire lock for pending requests map"
+            );
+            return;
+        };
+        if let Some(sender) = pending_requests.remove(reqid) {
+            if let Err(_e) = sender.send(response_message) {
+                // channel seems to be closed already
+                debug!(
+                    request_id = reqid.to_hyphenated_string(),
+                    "failed to deliver response message, channel already closed"
+                );
             }
+        } else {
+            // we seem to have received a duplicate of the response message, ignoring it ...
+            debug!(
+                request_id = reqid.to_hyphenated_string(),
+                "ignoring response message for unknown request"
+            );
         }
     }
 
@@ -111,14 +126,27 @@ impl ResponseListener {
 #[async_trait]
 impl UListener for ResponseListener {
     async fn on_receive(&self, msg: UMessage) {
-        if msg.is_response() {
-            if let Some(reqid) = msg
-                .attributes
-                .as_ref()
-                .and_then(|attribs| attribs.reqid.clone().into_option())
-            {
-                self.handle_response(&reqid, msg);
-            }
+        let message_type = msg
+            .attributes
+            .get_or_default()
+            .type_
+            .enum_value_or_default();
+        if message_type != UMessageType::UMESSAGE_TYPE_RESPONSE {
+            debug!(
+                message_type = message_type.to_cloudevent_type(),
+                "service provider replied with message that is not an RPC Response"
+            );
+            return;
+        }
+
+        if let Some(reqid) = msg
+            .attributes
+            .as_ref()
+            .and_then(|attribs| attribs.reqid.clone().into_option())
+        {
+            self.handle_response(&reqid, msg);
+        } else {
+            debug!("ignoring malformed response message not containing request ID");
         }
     }
 }

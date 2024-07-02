@@ -55,6 +55,10 @@ tokio = { version = "1.35", default-features = false, features = [
     "sync",
     "time",
 ] }
+tracing = { version = "0.1.35", default-features = false, features = [
+    "log",
+    "std",
+] }
 uriparse = { version = "0.6" }
 uuid-simd = { version = "0.8", default-features = false, features = [
     "std",
