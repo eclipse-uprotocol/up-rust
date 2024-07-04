@@ -220,9 +220,6 @@ impl RpcClient for InMemoryRpcClient {
         if let Some(priority) = call_options.priority() {
             builder.with_priority(priority);
         }
-        if let Some(traceparent) = call_options.traceparent() {
-            builder.with_traceparent(traceparent);
-        }
         let rpc_request_message = if let Some(pl) = payload {
             let format = pl.payload_format();
             builder.build_with_payload(pl.payload(), format)
@@ -348,8 +345,8 @@ mod tests {
 
         // WHEN invoking a remote service operation
         let message_id = UUID::build();
-        let mut call_options = CallOptions::default();
-        call_options.with_message_id(message_id.clone());
+        let call_options =
+            CallOptions::for_rpc_request(5_000, Some(message_id.clone()), None, None);
         let response = client
             .invoke_method(service_method_uri(), call_options, None)
             .await;
@@ -362,14 +359,12 @@ mod tests {
     #[tokio::test]
     async fn test_invoke_method_succeeds() {
         let message_id = UUID::build();
-        let traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
-        let mut call_options = CallOptions::default();
-        call_options
-            .with_message_id(message_id.clone())
-            .with_priority(crate::UPriority::UPRIORITY_CS6)
-            .with_ttl(5_000)
-            .with_token("my_token")
-            .with_traceparent(traceparent);
+        let call_options = CallOptions::for_rpc_request(
+            5_000,
+            Some(message_id.clone()),
+            Some("my_token".to_string()),
+            Some(crate::UPriority::UPRIORITY_CS6),
+        );
 
         // GIVEN an RPC client
         let listener_ref: Arc<Mutex<Option<Arc<dyn UListener>>>> = Arc::new(Mutex::new(None));
@@ -395,7 +390,6 @@ mod tests {
                             && attribs.priority.value() == UPriority::UPRIORITY_CS6.value()
                             && attribs.ttl == Some(5_000)
                             && attribs.token == Some("my_token".to_string())
-                            && attribs.traceparent == Some(traceparent.to_string())
                     })
             })
             .returning(move |request_message| {
@@ -472,10 +466,10 @@ mod tests {
 
         // WHEN invoking the remote service operation
         let message_id = UUID::build();
-        let mut call_options = CallOptions::default();
-        call_options.with_message_id(message_id.clone());
+        let call_options =
+            CallOptions::for_rpc_request(5_000, Some(message_id.clone()), None, None);
         let response = client
-            .invoke_method(service_method_uri(), CallOptions::default(), None)
+            .invoke_method(service_method_uri(), call_options, None)
             .await;
 
         // THEN the invocation has failed with the error returned from the service
@@ -501,9 +495,7 @@ mod tests {
 
         // WHEN invoking the remote service operation
         let message_id = UUID::build();
-        let mut call_options = CallOptions::default();
-        call_options.with_ttl(20);
-        call_options.with_message_id(message_id.clone());
+        let call_options = CallOptions::for_rpc_request(20, Some(message_id.clone()), None, None);
         let response = client
             .invoke_method(service_method_uri(), call_options, None)
             .await;
