@@ -14,8 +14,8 @@
 mod umessagebuilder;
 mod umessagetype;
 
-use bytes::{Buf, Bytes};
-use protobuf::{well_known_types::any::Any, Message};
+use bytes::Bytes;
+use protobuf::{well_known_types::any::Any, Message, MessageFull};
 
 pub use umessagebuilder::*;
 
@@ -94,7 +94,7 @@ impl UMessage {
     ///
     /// * Err(`UMessageError`) if the unpacking process fails, for example if the payload could
     /// not be deserialized into the target type `T`.
-    pub fn extract_protobuf<T: Message + Default>(&self) -> Result<T, UMessageError> {
+    pub fn extract_protobuf<T: MessageFull + Default>(&self) -> Result<T, UMessageError> {
         if let Some(payload) = &self.payload {
             let payload_format = self.attributes.payload_format.enum_value_or_default();
             deserialize_protobuf_bytes(payload, &payload_format)
@@ -106,29 +106,67 @@ impl UMessage {
     }
 }
 
-// Deserialize a proto-generated `Message`-type from payload `Bytes`, according to `UPayloadFormat`
-// Will only succeed if payload format is one of
-// - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF`
-// - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`
-pub(crate) fn deserialize_protobuf_bytes<T: Message + Default>(
+/// Deserializes a protobuf message from a byte array.
+///
+/// Will only succeed if payload format is one of
+/// - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF`
+/// - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`
+pub(crate) fn deserialize_protobuf_bytes<T: MessageFull + Default>(
     payload: &Bytes,
     payload_format: &UPayloadFormat,
 ) -> Result<T, UMessageError> {
     match payload_format {
         UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF => {
-            return T::parse_from_bytes(payload.chunk())
-                .map_err(UMessageError::DataSerializationError);
+            T::parse_from_tokio_bytes(payload).map_err(UMessageError::DataSerializationError)
         }
         UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY => {
-            return Any::parse_from_bytes(payload.chunk())
+            Any::parse_from_tokio_bytes(payload)
                 .map_err(UMessageError::DataSerializationError)
-                .and_then(|any| {
-                    T::parse_from_bytes(any.value.as_slice())
-                        .map_err(UMessageError::DataSerializationError)
-                });
+                .and_then(|any| match any.unpack() {
+                    Ok(Some(v)) => Ok(v),
+                    Ok(None) => Err(UMessageError::PayloadError(
+                        "cannot deserialize payload, message type mismatch".to_string(),
+                    )),
+                    Err(e) => Err(UMessageError::DataSerializationError(e)),
+                })
         }
         _ => Err(UMessageError::from(
             "Unknown/invalid/unsupported payload format",
         )),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use protobuf::well_known_types::{any::Any, wrappers::StringValue};
+
+    use crate::UStatus;
+
+    use super::*;
+
+    #[test]
+    fn test_deserialize_protobuf_bytes_succeeds() {
+        let mut data = StringValue::new();
+        data.value = "hello world".to_string();
+        let any = Any::pack(&data).unwrap();
+        let buf: Bytes = any.write_to_bytes().unwrap().into();
+        let result = deserialize_protobuf_bytes::<StringValue>(
+            &buf,
+            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
+        );
+        assert!(result.is_ok_and(|v| v.value == *"hello world"));
+    }
+
+    #[test]
+    fn test_deserialize_protobuf_bytes_fails_for_payload_type_mismatch() {
+        let mut data = StringValue::new();
+        data.value = "hello world".to_string();
+        let any = Any::pack(&data).unwrap();
+        let buf: Bytes = any.write_to_bytes().unwrap().into();
+        let result = deserialize_protobuf_bytes::<UStatus>(
+            &buf,
+            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
+        );
+        assert!(result.is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
     }
 }
