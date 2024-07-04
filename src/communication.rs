@@ -60,8 +60,6 @@ impl Display for RegistrationError {
 
 impl Error for RegistrationError {}
 
-const DEFAULT_TTL: u32 = 10_000; // 10 seconds
-
 /// General options that clients might want to specify when sending a uProtocol message.
 #[derive(Debug)]
 pub struct CallOptions {
@@ -69,36 +67,35 @@ pub struct CallOptions {
     message_id: Option<UUID>,
     token: Option<String>,
     priority: Option<UPriority>,
-    traceparent: Option<String>,
-}
-
-impl Default for CallOptions {
-    /// Creates empty options with a TTL of 10s.
-    fn default() -> Self {
-        CallOptions {
-            ttl: DEFAULT_TTL,
-            message_id: None,
-            token: None,
-            priority: None,
-            traceparent: None,
-        }
-    }
 }
 
 impl CallOptions {
-    /// Creates new call options.
+    /// Creates new call options for an RPC Request.
     ///
     /// # Arguments
     ///
     /// * `ttl` - The message's time-to-live in milliseconds.
     /// * `message_id` - The identifier to use for the message or `None` to use a generated identifier.
     /// * `token` - The token to use for authenticating to infrastructure and service endpoints.
-    /// * `priority` - The message's priority or `None` to use the default priority.
+    /// * `priority` - The message's priority or `None` to use the default priority for RPC Requests.
     ///
     /// # Returns
     ///
-    /// `CallOption` with specified ttl value, token and priority parameters.
-    pub fn new(
+    /// Options suitable for invoking an RPC method.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UPriority, UUID, communication::CallOptions};
+    ///
+    /// let uuid = UUID::new();
+    /// let options = CallOptions::for_rpc_request(15_000, Some(uuid.clone()), Some("token".to_string()), Some(UPriority::UPRIORITY_CS2));
+    /// assert_eq!(options.ttl(), 15_000);
+    /// assert_eq!(options.message_id(), Some(uuid));
+    /// assert_eq!(options.token(), Some("token".to_string()));
+    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS2));
+    /// ```
+    pub fn for_rpc_request(
         ttl: u32,
         message_id: Option<UUID>,
         token: Option<String>,
@@ -109,22 +106,7 @@ impl CallOptions {
             message_id,
             token,
             priority,
-            traceparent: None,
         }
-    }
-
-    /// Sets the message's time-to-live.
-    ///
-    /// # Arguments
-    ///
-    /// * `ttl` - The time-to-live in milliseconds.
-    ///
-    /// # Returns
-    ///
-    /// `CallOption` with specified ttl value.
-    pub fn with_ttl(&mut self, ttl: u32) -> &mut Self {
-        self.ttl = ttl;
-        self
     }
 
     /// Gets the message's time-to-live in milliseconds.
@@ -132,29 +114,9 @@ impl CallOptions {
         self.ttl
     }
 
-    /// Sets the identifier to use for the message.
-    ///
-    /// # Returns
-    ///
-    /// `CallOption` with specified reqid value.
-    pub fn with_message_id(&mut self, message_id: UUID) -> &mut Self {
-        self.message_id = Some(message_id);
-        self
-    }
-
     /// Gets the identifier to use for the message.
     pub fn message_id(&self) -> Option<UUID> {
         self.message_id.clone()
-    }
-
-    /// Sets the token to use for authenticating to infrastructure and service endpoints.
-    ///
-    /// # Returns
-    ///
-    /// `CallOption` with specified token value.
-    pub fn with_token<T: Into<String>>(&mut self, token: T) -> &mut Self {
-        self.token = Some(token.into());
-        self
     }
 
     /// Gets the token to use for authenticating to infrastructure and service endpoints.
@@ -162,41 +124,9 @@ impl CallOptions {
         self.token.clone()
     }
 
-    /// Sets the message's priority.
-    ///
-    /// If not set explicitly, the default priority for RPC calls will be used.
-    ///
-    /// # Returns
-    ///
-    /// `CallOption` with specified priority value.
-    pub fn with_priority(&mut self, priority: UPriority) -> &mut Self {
-        self.priority = Some(priority);
-        self
-    }
-
     /// Gets the message's priority.
     pub fn priority(&self) -> Option<UPriority> {
         self.priority
-    }
-
-    /// Sets the W3C Trace Context that the message is part of.
-    ///
-    /// # Arguments
-    ///
-    /// * `traceparent` - The [traceparent](https://w3c.github.io/trace-context/#traceparent-header) value identifying the trace context.
-    ///
-    /// # Returns
-    ///
-    /// `CallOption` with specified priority value.
-    pub fn with_traceparent<T: Into<String>>(&mut self, traceparent: T) -> &mut Self {
-        self.traceparent = Some(traceparent.into());
-        self
-    }
-
-    /// Gets the [traceparent](https://w3c.github.io/trace-context/#traceparent-header) value identifying the trace context that
-    /// the message is part of.
-    pub fn traceparent(&self) -> Option<String> {
-        self.traceparent.clone()
     }
 }
 
