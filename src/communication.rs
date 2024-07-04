@@ -21,7 +21,7 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     umessage::{self, UMessageError},
-    UPayloadFormat, UPriority, UUID,
+    UCode, UPayloadFormat, UPriority, UStatus, UUID,
 };
 
 mod in_memory_rpc_client;
@@ -40,6 +40,8 @@ pub enum RegistrationError {
     /// Indicates that the underlying Transport Layer implementation does not support registration and
     /// notification of message handlers.
     PushDeliveryMethodNotSupported,
+    /// Indicates a generic error.
+    Unknown(UStatus),
 }
 
 impl Display for RegistrationError {
@@ -54,11 +56,26 @@ impl Display for RegistrationError {
             RegistrationError::PushDeliveryMethodNotSupported => f.write_str(
                 "the underlying transport implementation does not support the push delivery method",
             ),
+            RegistrationError::Unknown(status) => f.write_fmt(format_args!(
+                "error un-/registering listener: {}",
+                status.get_message()
+            )),
         }
     }
 }
 
 impl Error for RegistrationError {}
+
+impl From<UStatus> for RegistrationError {
+    fn from(value: UStatus) -> Self {
+        match value.code.enum_value() {
+            Ok(UCode::NOT_FOUND) => RegistrationError::NoSuchListener,
+            Ok(UCode::RESOURCE_EXHAUSTED) => RegistrationError::MaxListenersExceeded,
+            Ok(UCode::UNIMPLEMENTED) => RegistrationError::PushDeliveryMethodNotSupported,
+            _ => RegistrationError::Unknown(value),
+        }
+    }
+}
 
 /// General options that clients might want to specify when sending a uProtocol message.
 #[derive(Debug)]

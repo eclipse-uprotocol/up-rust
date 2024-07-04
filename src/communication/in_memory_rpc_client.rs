@@ -25,7 +25,7 @@ use crate::{
     UTransport, UUri, UUID,
 };
 
-use super::{CallOptions, RpcClient, ServiceInvocationError, UPayload};
+use super::{CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload};
 
 fn handle_response_message(response: UMessage) -> Result<Option<UPayload>, ServiceInvocationError> {
     let Some(attribs) = response.attributes.as_ref() else {
@@ -173,7 +173,7 @@ impl InMemoryRpcClient {
     pub async fn new(
         transport: Arc<dyn UTransport>,
         uri_provider: Arc<dyn LocalUriProvider>,
-    ) -> Result<Self, UStatus> {
+    ) -> Result<Self, RegistrationError> {
         let response_listener = Arc::new(ResponseListener {
             pending_requests: Mutex::new(HashMap::new()),
         });
@@ -183,7 +183,8 @@ impl InMemoryRpcClient {
                 Some(&uri_provider.get_source_uri()),
                 response_listener.clone(),
             )
-            .await?;
+            .await
+            .map_err(RegistrationError::from)?;
 
         Ok(InMemoryRpcClient {
             transport,
@@ -320,6 +321,31 @@ mod tests {
             resource_id: 0x1000,
             ..Default::default()
         }
+    }
+
+    #[tokio::test]
+    async fn test_registration_of_response_listener_fails() {
+        // GIVEN a transport
+        let mut mock_transport = MockTransport::default();
+        // with the maximum number of listeners already registered
+        mock_transport
+            .expect_do_register_listener()
+            .once()
+            .returning(|_source_filter, _sink_filter, _listener| {
+                Err(UStatus::fail_with_code(
+                    UCode::RESOURCE_EXHAUSTED,
+                    "max number of listeners exceeded",
+                ))
+            });
+
+        // WHEN trying to create an RpcClient for the transport
+        let creation_attempt =
+            InMemoryRpcClient::new(Arc::new(mock_transport), new_uri_provider()).await;
+
+        // THEN the attempt fails with a MaxListenersExceeded error
+        assert!(
+            creation_attempt.is_err_and(|e| matches!(e, RegistrationError::MaxListenersExceeded))
+        );
     }
 
     #[tokio::test]
