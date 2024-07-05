@@ -17,12 +17,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use protobuf::Message;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
-    LocalUriProvider, UAttributes, UAttributesError, UAttributesValidators, UCode, UListener,
-    UMessage, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UTransport, UUri,
+    communication::build_message, LocalUriProvider, UAttributes, UAttributesError,
+    UAttributesValidators, UCode, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri,
 };
 
 use super::{RegistrationError, RequestHandler, RpcServer, ServiceInvocationError, UPayload};
@@ -33,19 +32,7 @@ struct RequestListener {
 }
 
 impl RequestListener {
-    async fn process_valid_request(&self, request_message: UMessage) {
-        let Some(resource_id) = request_message
-            .attributes
-            .as_ref()
-            .and_then(|attribs| attribs.sink.as_ref())
-            .and_then(|uri| u16::try_from(uri.resource_id).ok())
-        else {
-            // the conversion cannot fail because the UListener has already verified that the
-            // request message is indeed a valid uProtocol RPC Request with a proper sink
-            // URI representing a method (having a 16 bit resource ID).
-            return;
-        };
-
+    async fn process_valid_request(&self, resource_id: u16, request_message: UMessage) {
         let transport_clone = self.transport.clone();
         let request_handler_clone = self.request_handler.clone();
 
@@ -77,7 +64,7 @@ impl RequestListener {
         )
         .await
         .map_err(|_e| {
-            debug!(ttl = request_timeout, "request handler timed out");
+            info!(ttl = request_timeout, "request handler timed out");
             ServiceInvocationError::DeadlineExceeded
         })
         .and_then(|v| v);
@@ -87,12 +74,7 @@ impl RequestListener {
                 let mut builder = UMessageBuilder::response_for_request(
                     request_message.attributes.get_or_default(),
                 );
-                if let Some(payload) = response_payload {
-                    let format = payload.payload_format();
-                    builder.build_with_payload(payload.payload(), format)
-                } else {
-                    builder.build()
-                }
+                build_message(&mut builder, response_payload)
             }
             Err(e) => {
                 let error = UStatus::from(e);
@@ -105,21 +87,24 @@ impl RequestListener {
         match response {
             Ok(response_message) => {
                 if let Err(e) = transport_clone.send(response_message).await {
-                    debug!(ucode = e.code.value(), "failed to send response message");
+                    info!(ucode = e.code.value(), "failed to send response message");
                 }
             }
             Err(e) => {
-                debug!("failed to create response message: {}", e);
+                info!("failed to create response message: {}", e);
             }
         }
     }
 
-    async fn process_invalid_request(&self, validation_error: UAttributesError, msg: UMessage) {
+    async fn process_invalid_request(
+        &self,
+        validation_error: UAttributesError,
+        request_attributes: &UAttributes,
+    ) {
         // all we need is a valid source address and a message ID to be able to send back an error message
         let (Some(id), Some(source_address)) = (
-            msg.attributes.get_or_default().id.to_owned().into_option(),
-            msg.attributes
-                .get_or_default()
+            request_attributes.id.to_owned().into_option(),
+            request_attributes
                 .source
                 .to_owned()
                 .into_option()
@@ -133,29 +118,19 @@ impl RequestListener {
 
         let response_payload =
             UStatus::fail_with_code(UCode::INVALID_ARGUMENT, validation_error.to_string());
-        let response_attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_RESPONSE.into(),
-            id: Some(crate::UUID::build()).into(),
-            reqid: Some(id).into(),
-            commstatus: Some(response_payload.get_code().into()),
-            sink: Some(source_address).into(),
-            source: msg.attributes.get_or_default().sink.clone(),
-            priority: UPriority::UPRIORITY_CS4.into(),
-            payload_format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF.into(),
-            ..Default::default()
-        };
-
-        let Ok(response_message) = response_payload.write_to_bytes().map(|buf| UMessage {
-            attributes: Some(response_attributes).into(),
-            payload: Some(buf.into()),
-            ..Default::default()
-        }) else {
-            debug!("failed to create error message");
+        let Ok(response_message) = UMessageBuilder::response(
+            source_address,
+            id,
+            request_attributes.sink.get_or_default().to_owned(),
+        )
+        .with_comm_status(response_payload.get_code())
+        .build_with_protobuf_payload(&response_payload) else {
+            info!("failed to create error message");
             return;
         };
 
         if let Err(e) = self.transport.send(response_message).await {
-            debug!(ucode = e.code.value(), "failed to send error response");
+            info!(ucode = e.code.value(), "failed to send error response");
         }
     }
 }
@@ -170,9 +145,14 @@ impl UListener for RequestListener {
 
         let validator = UAttributesValidators::Request.validator();
         if let Err(e) = validator.validate(attributes) {
-            self.process_invalid_request(e, msg).await;
-        } else {
-            self.process_valid_request(msg).await;
+            self.process_invalid_request(e, attributes).await;
+        } else if let Some(resource_id) = attributes
+            .sink
+            .as_ref()
+            .and_then(|uri| u16::try_from(uri.resource_id).ok())
+        {
+            // the conversion cannot fail because request message validation has succeeded
+            self.process_valid_request(resource_id, msg).await;
         }
     }
 }
