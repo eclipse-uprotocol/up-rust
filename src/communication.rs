@@ -21,7 +21,7 @@ use std::{error::Error, fmt::Display};
 
 use crate::{
     umessage::{self, UMessageError},
-    UCode, UPayloadFormat, UPriority, UStatus, UUID,
+    UCode, UMessage, UMessageBuilder, UPayloadFormat, UPriority, UStatus, UUID,
 };
 
 mod in_memory_rpc_client;
@@ -218,5 +218,18 @@ impl UPayload {
     /// not be deserialized into the target type `T`.
     pub fn extract_protobuf<T: Message + Default>(&self) -> Result<T, UMessageError> {
         umessage::deserialize_protobuf_bytes(&self.payload, &self.payload_format)
+    }
+}
+
+/// Creates a message with given payload from a builder.
+pub(crate) fn build_message(
+    message_builder: &mut UMessageBuilder,
+    payload: Option<UPayload>,
+) -> Result<UMessage, UMessageError> {
+    if let Some(pl) = payload {
+        let format = pl.payload_format();
+        message_builder.build_with_payload(pl.payload, format)
+    } else {
+        message_builder.build()
     }
 }
