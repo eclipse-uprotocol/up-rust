@@ -294,6 +294,28 @@ impl UUri {
         }
     }
 
+    /// Check if an `UUri` is remote, by comparing authority fields.
+    ///
+    /// # Returns
+    ///
+    /// 'true' if other_uri has a different authority than `Self`, `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::str::FromStr;
+    /// use up_rust::UUri;
+    ///
+    /// let authority_a = UUri::from_str("up://Authority.A/100A/1/0").unwrap();
+    /// let authority_b = UUri::from_str("up://Authority.B/200B/2/20").unwrap();
+    /// assert!(authority_a.is_remote_authority(&authority_b));
+    /// ````
+    pub fn is_remote_authority(&self, other_uri: &UUri) -> bool {
+        self.authority_name != WILDCARD_AUTHORITY
+            && other_uri.authority_name != WILDCARD_AUTHORITY
+            && self.authority_name != other_uri.authority_name
+    }
+
     /// Serializes this UUri to a URI string.
     ///
     /// # Arguments

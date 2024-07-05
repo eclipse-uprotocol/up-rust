@@ -12,11 +12,11 @@
  ********************************************************************************/
 
 pub use crate::up_core_api::usubscription::{
-    subscription_status::State, EventDeliveryConfig, FetchSubscribersRequest,
-    FetchSubscribersResponse, FetchSubscriptionsRequest, FetchSubscriptionsResponse,
-    NotificationsRequest, NotificationsResponse, SubscribeAttributes, SubscriberInfo, Subscription,
-    SubscriptionRequest, SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest,
-    UnsubscribeResponse, Update,
+    fetch_subscriptions_request::Request, subscription_status::State, EventDeliveryConfig,
+    FetchSubscribersRequest, FetchSubscribersResponse, FetchSubscriptionsRequest,
+    FetchSubscriptionsResponse, NotificationsRequest, NotificationsResponse, SubscribeAttributes,
+    SubscriberInfo, Subscription, SubscriptionRequest, SubscriptionResponse, SubscriptionStatus,
+    UnsubscribeRequest, UnsubscribeResponse, Update,
 };
 
 use crate::UStatus;
@@ -39,6 +39,33 @@ impl Eq for SubscriberInfo {}
 impl SubscriberInfo {
     pub fn is_empty(&self) -> bool {
         self.eq(&SubscriberInfo::default())
+    }
+}
+
+impl SubscriptionResponse {
+    /// Checks if this `SubscriptionResponse` is in a specific state (`usubscription::State``).
+    ///
+    /// Returns `true` if SubscriptionReponse contains a valied SusbcriptionStatus, which has a
+    /// state property that is equal to state passed as argument.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::core::usubscription::{SubscriptionResponse, SubscriptionStatus, State};
+    ///
+    /// let subscription_response = SubscriptionResponse {
+    ///     status: Some(SubscriptionStatus {
+    ///         state: State::SUBSCRIBED.into(),
+    ///         ..Default::default()
+    ///         }).into(),
+    ///     ..Default::default()
+    /// };
+    /// assert!(subscription_response.is_state(State::SUBSCRIBED));
+    /// ```
+    pub fn is_state(&self, state: State) -> bool {
+        self.status
+            .as_ref()
+            .is_some_and(|ss| ss.state.enum_value().is_ok_and(|s| s.eq(&state)))
     }
 }
 
