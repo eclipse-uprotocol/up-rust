@@ -25,7 +25,9 @@ use crate::{
     UTransport, UUri, UUID,
 };
 
-use super::{CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload};
+use super::{
+    build_message, CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload,
+};
 
 fn handle_response_message(response: UMessage) -> Result<Option<UPayload>, ServiceInvocationError> {
     let Some(attribs) = response.attributes.as_ref() else {
@@ -221,13 +223,8 @@ impl RpcClient for InMemoryRpcClient {
         if let Some(priority) = call_options.priority() {
             builder.with_priority(priority);
         }
-        let rpc_request_message = if let Some(pl) = payload {
-            let format = pl.payload_format();
-            builder.build_with_payload(pl.payload(), format)
-        } else {
-            builder.build()
-        }
-        .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
+        let rpc_request_message = build_message(&mut builder, payload)
+            .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
 
         let receiver = self
             .response_listener
