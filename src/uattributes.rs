@@ -70,6 +70,13 @@ impl UAttributes {
             .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_RESPONSE)
     }
 
+    /// Checks if these are the attributes for a Notification message.
+    pub fn is_notification(&self) -> bool {
+        self.type_
+            .enum_value()
+            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_NOTIFICATION)
+    }
+
     /// Creates attributes representing an RPC request message.
     ///
     /// The message's priority will be set to [`UPriority::UPRIORITY_CS4`].
