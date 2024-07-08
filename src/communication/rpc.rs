@@ -15,7 +15,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use async_trait::async_trait;
-use protobuf::Message;
+use protobuf::MessageFull;
 
 use crate::communication::RegistrationError;
 use crate::{UCode, UStatus, UUri};
@@ -93,6 +93,43 @@ impl From<UStatus> for ServiceInvocationError {
     }
 }
 
+impl From<ServiceInvocationError> for UStatus {
+    fn from(value: ServiceInvocationError) -> Self {
+        match value {
+            ServiceInvocationError::AlreadyExists(msg) => {
+                UStatus::fail_with_code(UCode::ALREADY_EXISTS, msg)
+            }
+            ServiceInvocationError::DeadlineExceeded => {
+                UStatus::fail_with_code(UCode::DEADLINE_EXCEEDED, "request timed out")
+            }
+            ServiceInvocationError::FailedPrecondition(msg) => {
+                UStatus::fail_with_code(UCode::FAILED_PRECONDITION, msg)
+            }
+            ServiceInvocationError::Internal(msg) => UStatus::fail_with_code(UCode::INTERNAL, msg),
+            ServiceInvocationError::InvalidArgument(msg) => {
+                UStatus::fail_with_code(UCode::INVALID_ARGUMENT, msg)
+            }
+            ServiceInvocationError::NotFound(msg) => UStatus::fail_with_code(UCode::NOT_FOUND, msg),
+            ServiceInvocationError::PermissionDenied(msg) => {
+                UStatus::fail_with_code(UCode::PERMISSION_DENIED, msg)
+            }
+            ServiceInvocationError::ResourceExhausted(msg) => {
+                UStatus::fail_with_code(UCode::RESOURCE_EXHAUSTED, msg)
+            }
+            ServiceInvocationError::Unauthenticated => {
+                UStatus::fail_with_code(UCode::UNAUTHENTICATED, "client must authenticate")
+            }
+            ServiceInvocationError::Unavailable(msg) => {
+                UStatus::fail_with_code(UCode::UNAVAILABLE, msg)
+            }
+            ServiceInvocationError::Unimplemented(msg) => {
+                UStatus::fail_with_code(UCode::UNIMPLEMENTED, msg)
+            }
+            _ => UStatus::fail_with_code(UCode::UNKNOWN, "unknown"),
+        }
+    }
+}
+
 /// A client for invoking RPC methods.
 ///
 /// Please refer to the
@@ -146,8 +183,8 @@ impl dyn RpcClient {
         proto_message: T,
     ) -> Result<R, ServiceInvocationError>
     where
-        T: Message,
-        R: Message,
+        T: MessageFull,
+        R: MessageFull,
     {
         let payload = UPayload::try_from_protobuf(proto_message)
             .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
@@ -173,10 +210,14 @@ impl dyn RpcClient {
 pub trait RequestHandler: Send + Sync {
     /// Invokes a method with given input parameters.
     ///
+    /// Implementations MUST NOT block the calling thread. Long running
+    /// computations should be performed on a separate worker thread, yielding
+    /// on the calling thread.
+    ///
     /// # Arguments
     ///
     /// * `resource_id` - The resource identifier of the method to invoke.
-    /// * `payload` - The raw payload that contains the input data for the method.
+    /// * `request_payload` - The raw payload that contains the input data for the method.
     ///
     /// # Returns
     ///
@@ -188,7 +229,7 @@ pub trait RequestHandler: Send + Sync {
     async fn invoke_method(
         &self,
         resource_id: u16,
-        payload: UPayload,
+        request_payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError>;
 }
 

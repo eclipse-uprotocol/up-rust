@@ -274,13 +274,20 @@ impl Hash for UUri {
 impl Eq for UUri {}
 
 impl UUri {
-    /// Check if `UUri` is empty by comparing with `UUri::default()` object.
-    ///
-    /// # Returns
-    ///
-    /// 'true' if `UUri` is equal to `UUri::default()`, `false` otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.eq(&UUri::default())
+    /// Creates a new UUri from its parts.
+    pub fn from_parts<A: Into<String>>(
+        authority: A,
+        entity_id: u32,
+        entity_version: u8,
+        resource_id: u16,
+    ) -> Self {
+        UUri {
+            authority_name: authority.into(),
+            ue_id: entity_id,
+            ue_version_major: entity_version as u32,
+            resource_id: resource_id as u32,
+            ..Default::default()
+        }
     }
 
     /// Gets a URI that consists of wildcards only and therefore matches any URI.
@@ -292,6 +299,15 @@ impl UUri {
             resource_id: WILDCARD_RESOURCE_ID,
             ..Default::default()
         }
+    }
+
+    /// Checks if this URI is empty.
+    ///
+    /// # Returns
+    ///
+    /// 'true' if this URI is equal to `UUri::default()`, `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.eq(&UUri::default())
     }
 
     /// Check if an `UUri` is remote, by comparing authority fields.
