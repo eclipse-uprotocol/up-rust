@@ -21,13 +21,13 @@ use uriparse::URIReference;
 
 pub use crate::up_core_api::uri::UUri;
 
-const WILDCARD_AUTHORITY: &str = "*";
-const WILDCARD_ENTITY_ID: u32 = 0x0000_FFFF;
-const WILDCARD_ENTITY_VERSION: u32 = 0x0000_00FF;
-const WILDCARD_RESOURCE_ID: u32 = 0x0000_FFFF;
+pub const WILDCARD_AUTHORITY: &str = "*";
+pub const WILDCARD_ENTITY_ID: u32 = 0x0000_FFFF;
+pub const WILDCARD_ENTITY_VERSION: u32 = 0x0000_00FF;
+pub const WILDCARD_RESOURCE_ID: u32 = 0x0000_FFFF;
 
-const RESOURCE_ID_RESPONSE: u32 = 0;
-const RESOURCE_ID_MIN_EVENT: u32 = 0x8000;
+pub const RESOURCE_ID_RESPONSE: u32 = 0;
+pub const RESOURCE_ID_MIN_EVENT: u32 = 0x8000;
 
 #[derive(Debug)]
 pub enum UUriError {
