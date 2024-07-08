@@ -63,36 +63,28 @@ pub trait Notifier: Send + Sync {
     /// [uProtocol Notification message](`crate::NotificationValidator`).
     async fn notify(
         &self,
-        resource_id: &UUri,
+        resource_id: u16,
         destination: &UUri,
         call_options: CallOptions,
         payload: Option<UPayload>,
     ) -> Result<(), NotificationError>;
-}
 
-/// A client for listening to Notification messages sent to this uEntity.
-///
-/// Please refer to the
-/// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
-#[async_trait]
-pub trait NotificationListener: Send + Sync {
-    /// Starts listening to notifications that origin from uEntities matching a given pattern.
+    /// Starts listening to a notification topic.
     ///
-    /// More than one handler can be registered for the same pattern.
-    /// The same handler can be registered for multiple patterns.
+    /// More than one handler can be registered for the same topic.
+    /// The same handler can be registered for multiple topics.
     ///
     /// # Arguments
     ///
-    /// * `origin_filter` - The pattern defining the origin addresses of interest.
-    /// * `listener` - The handler to invoke for each notification that has been sent from a uEntity
-    ///                [matching the given pattern](`crate::UUri::matches`).
+    /// * `topic` - The topic to listen to. The topic must not contain any wildcards.
+    /// * `listener` - The handler to invoke for each notification that has been sent on the topic.
     ///
     /// # Errors
     ///
     /// Returns an error if the listener cannot be registered.
     async fn start_listening(
         &self,
-        origin_filter: &UUri,
+        topic: &UUri,
         listener: Arc<dyn UListener>,
     ) -> Result<(), RegistrationError>;
 
@@ -100,7 +92,7 @@ pub trait NotificationListener: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `origin_filter` - The pattern that the handler had been registered for.
+    /// * `topic` - The topic that the handler had been registered for.
     /// * `listener` - The handler to unregister.
     ///
     /// # Errors
@@ -108,7 +100,7 @@ pub trait NotificationListener: Send + Sync {
     /// Returns an error if the listener cannot be unregistered.
     async fn stop_listening(
         &self,
-        origin_filter: &UUri,
+        topic: &UUri,
         listener: Arc<dyn UListener>,
     ) -> Result<(), RegistrationError>;
 }

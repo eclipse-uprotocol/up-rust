@@ -76,6 +76,11 @@ impl UMessage {
         self.attributes.get_or_default().is_response()
     }
 
+    /// Checks if this is a Notification message.
+    pub fn is_notification(&self) -> bool {
+        self.attributes.get_or_default().is_notification()
+    }
+
     /// If `UMessage` payload is available, deserialize it as a protobuf `Message`.
     ///
     /// This function is used to extract strongly-typed data from a `UMessage` object,

@@ -12,9 +12,10 @@
  ********************************************************************************/
 
 use bytes::Bytes;
+pub use default_notifier::SimpleNotifier;
 pub use in_memory_rpc_client::InMemoryRpcClient;
 pub use in_memory_rpc_server::InMemoryRpcServer;
-pub use notification::{NotificationError, NotificationListener, Notifier};
+pub use notification::{NotificationError, Notifier};
 use protobuf::{well_known_types::any::Any, Message, MessageFull};
 pub use pubsub::{PubSubError, Publisher, Subscriber};
 pub use rpc::{RequestHandler, RpcClient, RpcServer, ServiceInvocationError};
@@ -25,6 +26,7 @@ use crate::{
     UCode, UMessage, UMessageBuilder, UPayloadFormat, UPriority, UStatus, UUID,
 };
 
+mod default_notifier;
 mod in_memory_rpc_client;
 mod in_memory_rpc_server;
 mod notification;
@@ -114,11 +116,11 @@ impl CallOptions {
     /// use up_rust::{UPriority, UUID, communication::CallOptions};
     ///
     /// let uuid = UUID::new();
-    /// let options = CallOptions::for_rpc_request(15_000, Some(uuid.clone()), Some("token".to_string()), Some(UPriority::UPRIORITY_CS2));
+    /// let options = CallOptions::for_rpc_request(15_000, Some(uuid.clone()), Some("token".to_string()), Some(UPriority::UPRIORITY_CS6));
     /// assert_eq!(options.ttl(), 15_000);
     /// assert_eq!(options.message_id(), Some(uuid));
     /// assert_eq!(options.token(), Some("token".to_string()));
-    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS2));
+    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS6));
     /// ```
     pub fn for_rpc_request(
         ttl: u32,
@@ -130,6 +132,42 @@ impl CallOptions {
             ttl,
             message_id,
             token,
+            priority,
+        }
+    }
+
+    /// Creates new call options for a Notification message.
+    ///
+    /// # Arguments
+    ///
+    /// * `ttl` - The message's time-to-live in milliseconds.
+    /// * `message_id` - The identifier to use for the message or `None` to use a generated identifier.
+    /// * `priority` - The message's priority or `None` to use the default priority for Notifications.
+    ///
+    /// # Returns
+    ///
+    /// Options suitable for sending a Notification.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UPriority, UUID, communication::CallOptions};
+    ///
+    /// let uuid = UUID::new();
+    /// let options = CallOptions::for_notification(Some(15_000), Some(uuid.clone()), Some(UPriority::UPRIORITY_CS2));
+    /// assert_eq!(options.ttl(), 15_000);
+    /// assert_eq!(options.message_id(), Some(uuid));
+    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS2));
+    /// ```
+    pub fn for_notification(
+        ttl: Option<u32>,
+        message_id: Option<UUID>,
+        priority: Option<UPriority>,
+    ) -> Self {
+        CallOptions {
+            ttl: ttl.unwrap_or(0),
+            message_id,
+            token: None,
             priority,
         }
     }
@@ -257,6 +295,25 @@ impl UPayload {
     /// ```
     pub fn extract_protobuf<T: MessageFull + Default>(&self) -> Result<T, UMessageError> {
         umessage::deserialize_protobuf_bytes(&self.payload, &self.payload_format)
+    }
+}
+
+/// Moves all common call options into the given message builder.
+///
+/// In particular, the following options are moved:
+/// * ttl
+/// * message ID
+/// * priority
+pub(crate) fn apply_common_options(
+    call_options: CallOptions,
+    message_builder: &mut UMessageBuilder,
+) {
+    message_builder.with_ttl(call_options.ttl);
+    if let Some(v) = call_options.message_id {
+        message_builder.with_message_id(v);
+    }
+    if let Some(v) = call_options.priority {
+        message_builder.with_priority(v);
     }
 }
 
