@@ -60,36 +60,28 @@ impl Notifier for SimpleNotifier {
 
     async fn start_listening(
         &self,
-        origin_filter: &UUri,
+        topic: &UUri,
         listener: Arc<dyn UListener>,
     ) -> Result<(), RegistrationError> {
-        origin_filter
+        topic
             .verify_no_wildcards()
             .map_err(|e| RegistrationError::InvalidFilter(e.to_string()))?;
         self.transport
-            .register_listener(
-                origin_filter,
-                Some(&self.uri_provider.get_source_uri()),
-                listener,
-            )
+            .register_listener(topic, Some(&self.uri_provider.get_source_uri()), listener)
             .await
             .map_err(RegistrationError::from)
     }
 
     async fn stop_listening(
         &self,
-        origin_filter: &UUri,
+        topic: &UUri,
         listener: Arc<dyn UListener>,
     ) -> Result<(), RegistrationError> {
-        origin_filter
+        topic
             .verify_no_wildcards()
             .map_err(|e| RegistrationError::InvalidFilter(e.to_string()))?;
         self.transport
-            .unregister_listener(
-                origin_filter,
-                Some(&self.uri_provider.get_source_uri()),
-                listener,
-            )
+            .unregister_listener(topic, Some(&self.uri_provider.get_source_uri()), listener)
             .await
             .map_err(RegistrationError::from)
     }
