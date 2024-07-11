@@ -344,8 +344,8 @@ mod tests {
     }
 
     #[test_case(None, 0x4A10; "for empty origin filter")]
-    #[test_case(Some(UUri::from_parts("authority", 0xBF1A, 0x01, 0x0000)), 0x4A10; "for specific origin filter")]
-    #[test_case(Some(UUri::from_parts("*", 0xFFFF, 0x01, 0x0000)), 0x7091; "for wildcard origin filter")]
+    #[test_case(Some(UUri::try_from_parts("authority", 0xBF1A, 0x01, 0x0000).unwrap()), 0x4A10; "for specific origin filter")]
+    #[test_case(Some(UUri::try_from_parts("*", 0xFFFF, 0x01, 0x0000).unwrap()), 0x7091; "for wildcard origin filter")]
     #[tokio::test]
     async fn test_register_endpoint_succeeds(origin_filter: Option<UUri>, resource_id: u16) {
         // GIVEN an RpcServer for a transport
@@ -390,7 +390,7 @@ mod tests {
 
     #[test_case(None, 0x0000; "for resource ID 0")]
     #[test_case(None, 0x8000; "for resource ID out of range")]
-    #[test_case(Some(UUri::from_parts("*", 0xFFFF, 0xFF, 0x0001)), 0x4A10; "for source filter with invalid resource ID")]
+    #[test_case(Some(UUri::try_from_parts("*", 0xFFFF, 0xFF, 0x0001).unwrap()), 0x4A10; "for source filter with invalid resource ID")]
     #[tokio::test]
     async fn test_register_endpoint_fails(origin_filter: Option<UUri>, resource_id: u16) {
         // GIVEN an RpcServer for a transport
