@@ -61,7 +61,7 @@ impl Display for RegistrationError {
 impl Error for RegistrationError {}
 
 /// General options that clients might want to specify when sending a uProtocol message.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct CallOptions {
     ttl: u32,
     message_id: Option<UUID>,
@@ -131,7 +131,7 @@ impl CallOptions {
 }
 
 /// A wrapper around (raw) message payload data and the corresponding payload format.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct UPayload {
     payload_format: UPayloadFormat,
     payload: Bytes,
