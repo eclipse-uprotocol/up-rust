@@ -18,16 +18,6 @@ This program and the accompanying materials are made available under the terms o
 
 SPDX-License-Identifier: Apache-2.0
 
-## Third-party Content
-
-The following are libraries that uProtocol project uses:
-
-- <http://protobuf.dev>
-
-Specifically, during build the Rust SDK currently downloads the following protobuf definitions from these projects (all licensed under Apache-2.0):
-
-- `status.proto` from [Google APIs](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto).
-
 ## NOTE
 
 Please refer to Cargo.toml for more information of library dependencies
