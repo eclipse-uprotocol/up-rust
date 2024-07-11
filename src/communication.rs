@@ -194,7 +194,7 @@ impl CallOptions {
 }
 
 /// A wrapper around (raw) message payload data and the corresponding payload format.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct UPayload {
     payload_format: UPayloadFormat,
     payload: Bytes,
