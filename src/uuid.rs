@@ -110,6 +110,7 @@ impl UUID {
     /// # Errors
     ///
     /// Returns an error if the given bytes contain an invalid version and/or variant identifier.
+    // [impl->dsn~uuid-spec~1]
     pub(crate) fn from_u64_pair(msb: u64, lsb: u64) -> Result<Self, UuidConversionError> {
         if !is_correct_version(msb) {
             return Err(UuidConversionError::new("not a v7 UUID"));
@@ -124,6 +125,7 @@ impl UUID {
         })
     }
 
+    // [impl->dsn~uuid-spec~1]
     pub(crate) fn build_for_timestamp(duration_since_unix_epoch: Duration) -> UUID {
         let timestamp_millis = u64::try_from(duration_since_unix_epoch.as_millis())
             .expect("system time is set to a time too far in the future");
@@ -156,6 +158,8 @@ impl UUID {
     /// let uuid = UUID::build();
     /// assert!(uuid.is_uprotocol_uuid());
     /// ```
+    // [impl->dsn~uuid-spec~1]
+    // [utest->dsn~uuid-spec~1]
     pub fn build() -> UUID {
         let duration_since_unix_epoch = SystemTime::UNIX_EPOCH
             .elapsed()
@@ -216,6 +220,8 @@ impl UUID {
     /// let creation_time = UUID { msb, lsb, ..Default::default() }.get_time();
     /// assert!(creation_time.is_none());
     /// ```
+    // [impl->dsn~uuid-spec~1]
+    // [utest->dsn~uuid-spec~1]
     pub fn get_time(&self) -> Option<u64> {
         if self.is_uprotocol_uuid() {
             // the timstamp is contained in the 48 most significant bits
@@ -255,6 +261,8 @@ impl UUID {
     /// let lsb = 0x4000000000000000u64;
     /// assert!(!UUID { msb, lsb, ..Default::default() }.is_uprotocol_uuid());
     /// ```
+    // [impl->dsn~uuid-spec~1]
+    // [utest->dsn~uuid-spec~1]
     pub fn is_uprotocol_uuid(&self) -> bool {
         is_correct_version(self.msb) && is_correct_variant(self.lsb)
     }
@@ -326,8 +334,11 @@ impl FromStr for UUID {
 #[cfg(test)]
 mod tests {
 
+    use protobuf::Message;
+
     use super::*;
 
+    // [utest->dsn~uuid-spec~1]
     #[test]
     fn test_from_u64_pair() {
         // timestamp = 1, ver = 0b0111
@@ -347,6 +358,7 @@ mod tests {
         assert!(UUID::from_u64_pair(msb, lsb).is_err());
     }
 
+    // [utest->dsn~uuid-spec~1]
     #[test]
     fn test_from_bytes() {
         // timestamp = 1, ver = 0b0111, variant = 0b10
@@ -359,5 +371,14 @@ mod tests {
         let uuid = conversion_attempt.unwrap();
         assert!(uuid.is_uprotocol_uuid());
         assert_eq!(uuid.get_time(), Some(0x1_u64));
+    }
+
+    // [utest->req~uuid-proto~1]
+    #[test]
+    fn test_protobuf_serialization() {
+        let uuid = UUID::build();
+        let bytes = uuid.write_to_bytes().unwrap();
+        let deserialized_uuid = UUID::parse_from_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(uuid, deserialized_uuid);
     }
 }
