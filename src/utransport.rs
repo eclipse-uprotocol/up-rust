@@ -11,10 +11,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use async_trait::async_trait;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
+
+use async_trait::async_trait;
+#[cfg(test)]
+use mockall::automock;
 
 use crate::{UCode, UMessage, UStatus, UUri};
 
@@ -22,6 +25,7 @@ use crate::{UCode, UMessage, UStatus, UUri};
 ///
 /// Implementations may use arbitrary mechanisms to determine the information that
 /// is necessary for creating URIs, e.g. environment variables, configuration files etc.
+#[cfg_attr(test, automock)]
 pub trait LocalUriProvider: Send + Sync {
     /// Gets the _authority_ used for URIs representing this uEntity's resources.
     fn get_authority(&self) -> String;
@@ -88,6 +92,7 @@ pub trait LocalUriProvider: Send + Sync {
 ///     }
 /// }
 /// ```
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait UListener: Send + Sync {
     /// Performs some action on receipt of a message.
@@ -279,6 +284,45 @@ pub trait UTransport: Send + Sync {
             UCode::UNIMPLEMENTED,
             "not implemented",
         ))
+    }
+}
+
+#[cfg(test)]
+mockall::mock! {
+    /// This extra struct is necessary in order to comply with mockall's requirements regarding the parameter lifetimes
+    /// see https://github.com/asomers/mockall/issues/571
+    pub Transport {
+        pub async fn do_send(&self, message: UMessage) -> Result<(), UStatus>;
+        pub async fn do_register_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
+        pub async fn do_unregister_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+/// This delegates the invocation of the UTransport functions to the mocked functions of the Transport struct.
+/// see https://github.com/asomers/mockall/issues/571
+impl UTransport for MockTransport {
+    async fn send(&self, message: UMessage) -> Result<(), UStatus> {
+        self.do_send(message).await
+    }
+    async fn register_listener(
+        &self,
+        source_filter: &UUri,
+        sink_filter: Option<&UUri>,
+        listener: Arc<dyn UListener>,
+    ) -> Result<(), UStatus> {
+        self.do_register_listener(source_filter, sink_filter, listener)
+            .await
+    }
+    async fn unregister_listener(
+        &self,
+        source_filter: &UUri,
+        sink_filter: Option<&UUri>,
+        listener: Arc<dyn UListener>,
+    ) -> Result<(), UStatus> {
+        self.do_unregister_listener(source_filter, sink_filter, listener)
+            .await
     }
 }
 

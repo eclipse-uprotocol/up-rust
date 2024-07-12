@@ -92,63 +92,15 @@ mod test {
 
     use super::*;
 
-    use mockall::mock;
     use protobuf::well_known_types::wrappers::StringValue;
 
-    use crate::{UCode, UMessage, UPriority, UStatus, UUri, UUID};
-
-    mock! {
-        pub NotificationListener {}
-        #[async_trait]
-        impl UListener for NotificationListener {
-            async fn on_receive(&self, message: UMessage);
-        }
-    }
-
-    mock! {
-        pub UriLocator {}
-        impl LocalUriProvider for UriLocator {
-            fn get_authority(&self) -> String;
-            fn get_resource_uri(&self, resource_id: u16) -> UUri;
-            fn get_source_uri(&self) -> UUri;
-        }
-    }
-
-    mock! {
-        pub Transport {
-            async fn do_send(&self, message: UMessage) -> Result<(), UStatus>;
-            async fn do_register_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
-            async fn do_unregister_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
-        }
-    }
-
-    #[async_trait]
-    impl UTransport for MockTransport {
-        async fn send(&self, message: UMessage) -> Result<(), UStatus> {
-            self.do_send(message).await
-        }
-        async fn register_listener(
-            &self,
-            source_filter: &UUri,
-            sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            self.do_register_listener(source_filter, sink_filter, listener)
-                .await
-        }
-        async fn unregister_listener(
-            &self,
-            source_filter: &UUri,
-            sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            self.do_unregister_listener(source_filter, sink_filter, listener)
-                .await
-        }
-    }
+    use crate::{
+        utransport::{MockLocalUriProvider, MockTransport, MockUListener},
+        UCode, UPriority, UStatus, UUri, UUID,
+    };
 
     fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
-        let mut mock_uri_locator = MockUriLocator::new();
+        let mut mock_uri_locator = MockLocalUriProvider::new();
         mock_uri_locator
             .expect_get_resource_uri()
             .returning(|resource_id| UUri {
@@ -174,7 +126,7 @@ mod test {
         let notifier = SimpleNotifier::new(Arc::new(transport), uri_provider);
 
         let invalid_topic = UUri::try_from("up://my-vin/A15B/1/FFFF").unwrap();
-        let mut listener = MockNotificationListener::new();
+        let mut listener = MockUListener::new();
         listener.expect_on_receive().never();
         let wrapped_listener = Arc::new(listener);
 
@@ -206,7 +158,7 @@ mod test {
             .return_const(Ok(()));
         let notifier = SimpleNotifier::new(Arc::new(transport), uri_provider);
 
-        let mut listener = MockNotificationListener::new();
+        let mut listener = MockUListener::new();
         listener.expect_on_receive().never();
         let result = notifier.start_listening(&topic, Arc::new(listener)).await;
         assert!(result.is_ok());
@@ -229,7 +181,7 @@ mod test {
             .return_const(Ok(()));
         let notifier = SimpleNotifier::new(Arc::new(transport), uri_provider);
 
-        let mut listener = MockNotificationListener::new();
+        let mut listener = MockUListener::new();
         listener.expect_on_receive().never();
         let result = notifier.stop_listening(&topic, Arc::new(listener)).await;
         assert!(result.is_ok());

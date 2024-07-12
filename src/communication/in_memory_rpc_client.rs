@@ -253,55 +253,15 @@ mod tests {
 
     use super::*;
 
-    use mockall::mock;
     use protobuf::{well_known_types::wrappers::StringValue, Enum};
 
-    use crate::{UMessageBuilder, UPriority, UUri};
-
-    mock! {
-        pub UriLocator {}
-        impl LocalUriProvider for UriLocator {
-            fn get_authority(&self) -> String;
-            fn get_resource_uri(&self, resource_id: u16) -> UUri;
-            fn get_source_uri(&self) -> UUri;
-        }
-    }
-
-    mock! {
-        pub Transport {
-            async fn do_send(&self, message: UMessage) -> Result<(), UStatus>;
-            async fn do_register_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
-            async fn do_unregister_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
-        }
-    }
-
-    #[async_trait]
-    impl UTransport for MockTransport {
-        async fn send(&self, message: UMessage) -> Result<(), UStatus> {
-            self.do_send(message).await
-        }
-        async fn register_listener(
-            &self,
-            source_filter: &UUri,
-            sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            self.do_register_listener(source_filter, sink_filter, listener)
-                .await
-        }
-        async fn unregister_listener(
-            &self,
-            source_filter: &UUri,
-            sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            self.do_unregister_listener(source_filter, sink_filter, listener)
-                .await
-        }
-    }
+    use crate::{
+        utransport::{MockLocalUriProvider, MockTransport},
+        UMessageBuilder, UPriority, UUri,
+    };
 
     fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
-        let mut mock_uri_locator = MockUriLocator::new();
+        let mut mock_uri_locator = MockLocalUriProvider::new();
         mock_uri_locator.expect_get_source_uri().returning(|| UUri {
             ue_id: 0x0005,
             ue_version_major: 0x02,
@@ -389,16 +349,15 @@ mod tests {
             Some(crate::UPriority::UPRIORITY_CS6),
         );
 
-        // GIVEN an RPC client
-        let listener_ref: Arc<Mutex<Option<Arc<dyn UListener>>>> = Arc::new(Mutex::new(None));
-        let response_listener = listener_ref.clone();
+        let (captured_listener_tx, captured_listener_rx) = std::sync::mpsc::channel();
 
+        // GIVEN an RPC client
         let mut mock_transport = MockTransport::default();
         mock_transport.expect_do_register_listener().returning(
             move |_source_filter, _sink_filter, listener| {
-                let mut v = listener_ref.lock().unwrap();
-                *v = Some(listener);
-                Ok(())
+                captured_listener_tx
+                    .send(listener)
+                    .map_err(|_e| UStatus::fail("cannot capture listener"))
             },
         );
         let expected_message_id = message_id.clone();
@@ -427,8 +386,8 @@ mod tests {
                 )
                 .build_with_protobuf_payload(&response_payload)
                 .unwrap();
-                let cloned_listener = response_listener.lock().unwrap().take().unwrap().clone();
-                tokio::spawn(async move { cloned_listener.on_receive(response_message).await });
+                let captured_listener = captured_listener_rx.recv().unwrap().to_owned();
+                tokio::spawn(async move { captured_listener.on_receive(response_message).await });
                 Ok(())
             });
 
@@ -455,16 +414,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_invoke_method_fails_with_remote_error() {
-        // GIVEN an RPC client
-        let listener_ref: Arc<Mutex<Option<Arc<dyn UListener>>>> = Arc::new(Mutex::new(None));
-        let response_listener = listener_ref.clone();
+        let (captured_listener_tx, captured_listener_rx) = std::sync::mpsc::channel();
 
+        // GIVEN an RPC client
         let mut mock_transport = MockTransport::default();
         mock_transport.expect_do_register_listener().returning(
             move |_source_filter, _sink_filter, listener| {
-                let mut v = listener_ref.lock().unwrap();
-                *v = Some(listener);
-                Ok(())
+                captured_listener_tx
+                    .send(listener)
+                    .map_err(|_e| UStatus::fail("cannot capture listener"))
             },
         );
         // and a remote service operation that returns an error
@@ -478,8 +436,8 @@ mod tests {
                 .with_comm_status(UCode::NOT_FOUND)
                 .build_with_protobuf_payload(&error)
                 .unwrap();
-                let cloned_listener = response_listener.lock().unwrap().take().unwrap().clone();
-                tokio::spawn(async move { cloned_listener.on_receive(response_message).await });
+                let captured_listener = captured_listener_rx.recv().unwrap().to_owned();
+                tokio::spawn(async move { captured_listener.on_receive(response_message).await });
                 Ok(())
             });
 

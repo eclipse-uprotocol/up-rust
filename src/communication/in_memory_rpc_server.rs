@@ -269,69 +269,18 @@ mod tests {
 
     use super::*;
 
-    use mockall::mock;
     use protobuf::well_known_types::wrappers::StringValue;
     use test_case::test_case;
     use tokio::sync::Notify;
 
-    use crate::{UAttributes, UMessageType, UPriority, UUri, UUID};
-
-    mock! {
-        pub Handler {}
-        #[async_trait]
-        impl RequestHandler for Handler {
-            async fn invoke_method(
-                &self,
-                resource_id: u16,
-                request_payload: Option<UPayload>,
-            ) -> Result<Option<UPayload>, ServiceInvocationError>;
-        }
-    }
-
-    mock! {
-        pub UriProvider {}
-        impl LocalUriProvider for UriProvider {
-            fn get_authority(&self) -> String;
-            fn get_resource_uri(&self, resource_id: u16) -> UUri;
-            fn get_source_uri(&self) -> UUri;
-        }
-    }
-
-    mock! {
-        pub Transport {
-            async fn do_send(&self, message: UMessage) -> Result<(), UStatus>;
-            async fn do_register_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
-            async fn do_unregister_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
-        }
-    }
-
-    #[async_trait]
-    impl UTransport for MockTransport {
-        async fn send(&self, message: UMessage) -> Result<(), UStatus> {
-            self.do_send(message).await
-        }
-        async fn register_listener(
-            &self,
-            source_filter: &UUri,
-            sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            self.do_register_listener(source_filter, sink_filter, listener)
-                .await
-        }
-        async fn unregister_listener(
-            &self,
-            source_filter: &UUri,
-            sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            self.do_unregister_listener(source_filter, sink_filter, listener)
-                .await
-        }
-    }
+    use crate::{
+        communication::rpc::MockRequestHandler,
+        utransport::{MockLocalUriProvider, MockTransport},
+        UAttributes, UMessageType, UPriority, UUri, UUID,
+    };
 
     fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
-        let mut mock_uri_provider = MockUriProvider::new();
+        let mut mock_uri_provider = MockLocalUriProvider::new();
         mock_uri_provider
             .expect_get_resource_uri()
             .returning(|resource_id| UUri {
@@ -349,7 +298,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_endpoint_succeeds(origin_filter: Option<UUri>, resource_id: u16) {
         // GIVEN an RpcServer for a transport
-        let request_handler = Arc::new(MockHandler::new());
+        let request_handler = Arc::new(MockRequestHandler::new());
         let mut transport = MockTransport::new();
         let uri_provider = new_uri_provider();
         let expected_source_filter = origin_filter.clone().unwrap_or(UUri::any());
@@ -394,7 +343,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_endpoint_fails(origin_filter: Option<UUri>, resource_id: u16) {
         // GIVEN an RpcServer for a transport
-        let request_handler = Arc::new(MockHandler::new());
+        let request_handler = Arc::new(MockRequestHandler::new());
         let mut transport = MockTransport::new();
         let uri_provider = new_uri_provider();
         transport.expect_do_register_listener().never();
@@ -420,7 +369,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_endpoint_fails_for_duplicate_endpoint() {
         // GIVEN an RpcServer for a transport
-        let request_handler = Arc::new(MockHandler::new());
+        let request_handler = Arc::new(MockRequestHandler::new());
         let mut transport = MockTransport::new();
         let uri_provider = new_uri_provider();
         transport
@@ -448,7 +397,7 @@ mod tests {
     #[tokio::test]
     async fn test_unregister_endpoint_fails_for_non_existing_endpoint() {
         // GIVEN an RpcServer for a transport
-        let request_handler = Arc::new(MockHandler::new());
+        let request_handler = Arc::new(MockRequestHandler::new());
         let mut transport = MockTransport::new();
         let uri_provider = new_uri_provider();
         transport.expect_do_unregister_listener().never();
@@ -468,7 +417,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_listener_returns_response_for_invalid_request() {
         // GIVEN an RpcServer for a transport
-        let mut request_handler = MockHandler::new();
+        let mut request_handler = MockRequestHandler::new();
         let mut transport = MockTransport::new();
         let notify = Arc::new(Notify::new());
         let notify_clone = notify.clone();
@@ -542,7 +491,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_listener_ignores_invalid_request() {
         // GIVEN an RpcServer for a transport
-        let mut request_handler = MockHandler::new();
+        let mut request_handler = MockRequestHandler::new();
         request_handler.expect_invoke_method().never();
         let mut transport = MockTransport::new();
         transport.expect_do_send().never();
@@ -584,7 +533,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_request_listener_invokes_operation_successfully() {
-        let mut request_handler = MockHandler::new();
+        let mut request_handler = MockRequestHandler::new();
         let mut transport = MockTransport::new();
         let notify = Arc::new(Notify::new());
         let notify_clone = notify.clone();
@@ -657,7 +606,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_request_listener_invokes_operation_erroneously() {
-        let mut request_handler = MockHandler::new();
+        let mut request_handler = MockRequestHandler::new();
         let mut transport = MockTransport::new();
         let notify = Arc::new(Notify::new());
         let notify_clone = notify.clone();
