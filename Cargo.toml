@@ -33,10 +33,11 @@ rust-version = "1.74.1"
 version = "0.1.5"
 
 [features]
+default = ["communication"]
+communication = ["usubscription"]
 udiscovery = []
 usubscription = []
 utwin = []
-default = []
 
 [dependencies]
 async-trait = { version = "0.1" }

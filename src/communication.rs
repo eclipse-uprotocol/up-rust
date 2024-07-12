@@ -12,14 +12,17 @@
  ********************************************************************************/
 
 use bytes::Bytes;
+use protobuf::{well_known_types::any::Any, Message, MessageFull};
+use std::{error::Error, fmt::Display};
+
 pub use default_notifier::SimpleNotifier;
 pub use in_memory_rpc_client::InMemoryRpcClient;
 pub use in_memory_rpc_server::InMemoryRpcServer;
 pub use notification::{NotificationError, Notifier};
-use protobuf::{well_known_types::any::Any, Message, MessageFull};
 pub use pubsub::{PubSubError, Publisher, Subscriber};
 pub use rpc::{RequestHandler, RpcClient, RpcServer, ServiceInvocationError};
-use std::{error::Error, fmt::Display};
+#[cfg(feature = "usubscription")]
+pub use usubscription_client::RpcClientUSubscription;
 
 use crate::{
     umessage::{self, UMessageError},
@@ -32,6 +35,8 @@ mod in_memory_rpc_server;
 mod notification;
 mod pubsub;
 mod rpc;
+#[cfg(feature = "usubscription")]
+mod usubscription_client;
 
 /// An error indicating a problem with registering or unregistering a message listener.
 #[derive(Debug)]
