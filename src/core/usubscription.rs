@@ -11,6 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use async_trait::async_trait;
+use core::hash::{Hash, Hasher};
+#[cfg(test)]
+use mockall::automock;
+
 pub use crate::up_core_api::usubscription::{
     fetch_subscriptions_request::Request, subscription_status::State, EventDeliveryConfig,
     FetchSubscribersRequest, FetchSubscribersResponse, FetchSubscriptionsRequest,
@@ -19,9 +24,7 @@ pub use crate::up_core_api::usubscription::{
     UnsubscribeRequest, UnsubscribeResponse, Update,
 };
 
-use crate::UStatus;
-use async_trait::async_trait;
-use core::hash::{Hash, Hasher};
+use crate::{UStatus, UUri};
 
 impl Hash for SubscriberInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -67,6 +70,43 @@ impl SubscriptionResponse {
             .as_ref()
             .is_some_and(|ss| ss.state.enum_value().is_ok_and(|s| s.eq(&state)))
     }
+}
+
+/// The uEntity (type) identifier of the uSubscription service.
+pub const USUBSCRIPTION_TYPE_ID: u32 = 0x0000_0000;
+/// The (latest) major version of the uSubscription service.
+pub const USUBSCRIPTION_VERSION_MAJOR: u8 = 0x03;
+/// The resource identifier of uSubscription's _subscribe_ operation.
+pub const RESOURCE_ID_SUBSCRIBE: u16 = 0x0001;
+/// The resource identifier of uSubscription's _unsubscribe_ operation.
+pub const RESOURCE_ID_UNSUBSCRIBE: u16 = 0x0002;
+/// The resource identifier of uSubscription's _fetch subscriptions_ operation.
+pub const RESOURCE_ID_FETCH_SUBSCRIPTIONS: u16 = 0x0003;
+/// The resource identifier of uSubscription's _register for notifications_ operation.
+pub const RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS: u16 = 0x0006;
+/// The resource identifier of uSubscription's _unregister for notifications_ operation.
+pub const RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS: u16 = 0x0007;
+/// The resource identifier of uSubscription's _fetch subscribers_ operation.
+pub const RESOURCE_ID_FETCH_SUBSCRIBERS: u16 = 0x0008;
+
+/// Gets a UUri referring to one of the local uSubscription service's resources.
+///
+/// # Examples
+///
+/// ```rust
+/// use up_rust::core::usubscription;
+///
+/// let uuri = usubscription::usubscription_uri(usubscription::RESOURCE_ID_SUBSCRIBE);
+/// assert_eq!(uuri.resource_id, 0x0001);
+/// ```
+pub fn usubscription_uri(resource_id: u16) -> UUri {
+    UUri::try_from_parts(
+        "",
+        USUBSCRIPTION_TYPE_ID,
+        USUBSCRIPTION_VERSION_MAJOR,
+        resource_id,
+    )
+    .unwrap()
 }
 
 /// `USubscription` is the uP-L3 client interface to the uSubscription service.
@@ -258,6 +298,7 @@ impl SubscriptionResponse {
 ///
 /// For more information, please refer to the [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l3/usubscription/v3/README.adoc)
 /// and [uProtocol APIs](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-core-api/uprotocol/core/usubscription/v3/usubscription.proto)
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait USubscription: Send + Sync {
     /// Subscribe to a topic, using a [`SubscriptionRequest`]
