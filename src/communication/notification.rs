@@ -14,6 +14,8 @@
 use std::{error::Error, fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
+#[cfg(test)]
+use mockall::automock;
 
 use crate::communication::RegistrationError;
 use crate::{UListener, UStatus, UUri};
@@ -46,6 +48,7 @@ impl Error for NotificationError {}
 ///
 /// Please refer to the
 /// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait Notifier: Send + Sync {
     /// Sends a notification to a uEntity.

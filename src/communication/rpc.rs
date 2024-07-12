@@ -15,6 +15,8 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use async_trait::async_trait;
+#[cfg(test)]
+use mockall::automock;
 use protobuf::MessageFull;
 
 use crate::communication::RegistrationError;
@@ -23,7 +25,7 @@ use crate::{UCode, UStatus, UUri};
 use super::{CallOptions, UPayload};
 
 /// An error indicating a problem with invoking a (remote) service operation.
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum ServiceInvocationError {
     /// Indicates that the calling uE requested to add/create something that already exists.
     #[error("entity already exists: {0}")]
@@ -134,6 +136,7 @@ impl From<ServiceInvocationError> for UStatus {
 ///
 /// Please refer to the
 /// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait RpcClient: Send + Sync {
     /// Invokes a method on a service.
@@ -206,6 +209,7 @@ impl dyn RpcClient {
 
 /// A handler for processing incoming RPC requests.
 ///
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait RequestHandler: Send + Sync {
     /// Invokes a method with given input parameters.
