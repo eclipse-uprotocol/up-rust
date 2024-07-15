@@ -56,6 +56,25 @@ impl std::fmt::Display for UAttributesError {
 impl std::error::Error for UAttributesError {}
 
 impl UAttributes {
+    /// Checks if these are the attributes for a Publish message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(attribs.is_publish());
+    /// ```
+    pub fn is_publish(&self) -> bool {
+        self.type_
+            .enum_value()
+            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_PUBLISH)
+    }
+
     /// Checks if these are the attributes for an RPC Request message.
     pub fn is_request(&self) -> bool {
         self.type_

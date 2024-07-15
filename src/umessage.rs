@@ -66,6 +66,29 @@ impl From<&str> for UMessageError {
 }
 
 impl UMessage {
+    /// Checks if this is a Publish message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+    ///   ..Default::default()
+    /// };
+    /// let msg = UMessage {
+    ///   attributes: Some(attribs).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(msg.is_publish());
+    /// ```
+    pub fn is_publish(&self) -> bool {
+        self.attributes
+            .as_ref()
+            .map_or(false, |attribs| attribs.is_publish())
+    }
+
     /// Checks if this is an RPC Request message.
     pub fn is_request(&self) -> bool {
         self.attributes.get_or_default().is_request()

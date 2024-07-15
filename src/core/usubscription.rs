@@ -89,6 +89,9 @@ pub const RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS: u16 = 0x0007;
 /// The resource identifier of uSubscription's _fetch subscribers_ operation.
 pub const RESOURCE_ID_FETCH_SUBSCRIBERS: u16 = 0x0008;
 
+/// The resource identifier of uSubscription's _subscription change_ topic.
+pub const RESOURCE_ID_SUBSCRIPTION_CHANGE: u16 = 0x8000;
+
 /// Gets a UUri referring to one of the local uSubscription service's resources.
 ///
 /// # Examples
