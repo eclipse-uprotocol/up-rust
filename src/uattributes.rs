@@ -76,6 +76,18 @@ impl UAttributes {
     }
 
     /// Checks if these are the attributes for an RPC Request message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(attribs.is_request());
+    /// ```
     pub fn is_request(&self) -> bool {
         self.type_
             .enum_value()
@@ -83,6 +95,18 @@ impl UAttributes {
     }
 
     /// Checks if these are the attributes for an RPC Response message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_RESPONSE.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(attribs.is_response());
+    /// ```
     pub fn is_response(&self) -> bool {
         self.type_
             .enum_value()
@@ -90,6 +114,18 @@ impl UAttributes {
     }
 
     /// Checks if these are the attributes for a Notification message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(attribs.is_notification());
+    /// ```
     pub fn is_notification(&self) -> bool {
         self.type_
             .enum_value()

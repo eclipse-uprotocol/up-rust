@@ -90,18 +90,72 @@ impl UMessage {
     }
 
     /// Checks if this is an RPC Request message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
+    ///   ..Default::default()
+    /// };
+    /// let msg = UMessage {
+    ///   attributes: Some(attribs).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(msg.is_request());
+    /// ```
     pub fn is_request(&self) -> bool {
-        self.attributes.get_or_default().is_request()
+        self.attributes
+            .as_ref()
+            .map_or(false, |attribs| attribs.is_request())
     }
 
     /// Checks if this is an RPC Response message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_RESPONSE.into(),
+    ///   ..Default::default()
+    /// };
+    /// let msg = UMessage {
+    ///   attributes: Some(attribs).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(msg.is_response());
+    /// ```
     pub fn is_response(&self) -> bool {
-        self.attributes.get_or_default().is_response()
+        self.attributes
+            .as_ref()
+            .map_or(false, |attribs| attribs.is_response())
     }
 
     /// Checks if this is a Notification message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
+    ///   ..Default::default()
+    /// };
+    /// let msg = UMessage {
+    ///   attributes: Some(attribs).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert!(msg.is_notification());
+    /// ```
     pub fn is_notification(&self) -> bool {
-        self.attributes.get_or_default().is_notification()
+        self.attributes
+            .as_ref()
+            .map_or(false, |attribs| attribs.is_notification())
     }
 
     /// If `UMessage` payload is available, deserialize it as a protobuf `Message`.
