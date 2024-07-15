@@ -14,8 +14,11 @@
 use std::{error::Error, fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
+#[cfg(test)]
+use mockall::automock;
 
 use crate::communication::RegistrationError;
+use crate::core::usubscription::SubscriptionStatus;
 use crate::{UListener, UStatus, UUri};
 
 use super::{CallOptions, UPayload};
@@ -67,45 +70,60 @@ pub trait Publisher: Send + Sync {
     ) -> Result<(), PubSubError>;
 }
 
+#[cfg_attr(test, automock)]
+pub trait SubscriptionChangeHandler: Send + Sync {
+    /// Invoked for each update to the subscription status for a given topic.
+    ///
+    /// Implementations must not block the current thread.
+    ///
+    /// # Arguments
+    ///
+    /// * `topic` - The topic for which the subscription status has changed.
+    /// * `status` - The new status of the subscription.
+    fn on_subscription_change(&self, topic: UUri, new_status: SubscriptionStatus);
+}
+
 /// A client for subscribing to topics.
 ///
 /// Please refer to the
 /// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
 #[async_trait]
 pub trait Subscriber: Send + Sync {
-    /// Registers a handler to invoke for messages that have been published to topics matching a given pattern.
+    /// Registers a handler to invoke for messages that have been published to a given topic.
     ///
-    /// More than one handler can be registered for the same pattern.
-    /// The same handler can be registered for multiple patterns.
+    /// More than one handler can be registered for the same topic.
+    /// The same handler can be registered for multiple topics.
     ///
     /// # Arguments
     ///
-    /// * `topic_filter` - The pattern defining the topics of interest.
-    /// * `listener` - The handler to invoke for each message that has been published to a topic
-    ///                [matching the given pattern](`crate::UUri::matches`).
+    /// * `topic` - The topic to subscribe to. The topic must not contain any wildcards.
+    /// * `handler` - The handler to invoke for each message that has been published to the topic.
+    /// * `subscription_change_handler` - A handler to invoke for any subscription state changes for
+    ///                                   the given topic.
     ///
     /// # Errors
     ///
     /// Returns an error if the listener cannot be registered.
     async fn subscribe(
         &self,
-        topic_filter: &UUri,
-        listener: Arc<dyn UListener>,
+        topic: &UUri,
+        handler: Arc<dyn UListener>,
+        subscription_change_handler: Option<Arc<dyn SubscriptionChangeHandler>>,
     ) -> Result<(), RegistrationError>;
 
     /// Unregisters a previously [registered handler](`Self::subscribe`).
     ///
     /// # Arguments
     ///
-    /// * `topic_filter` - The UUri pattern that the handler had been registered for.
-    /// * `listener` - The handler to unregister.
+    /// * `topic` - The topic that the handler had been registered for.
+    /// * `handler` - The handler to unregister.
     ///
     /// # Errors
     ///
     /// Returns an error if the listener cannot be unregistered.
     async fn unsubscribe(
         &self,
-        topic_filter: &UUri,
-        listener: Arc<dyn UListener>,
+        topic: &UUri,
+        handler: Arc<dyn UListener>,
     ) -> Result<(), RegistrationError>;
 }

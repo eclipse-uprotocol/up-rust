@@ -16,9 +16,12 @@ use protobuf::{well_known_types::any::Any, Message, MessageFull};
 use std::{error::Error, fmt::Display};
 
 pub use default_notifier::SimpleNotifier;
+#[cfg(feature = "usubscription")]
+pub use default_pubsub::{InMemorySubscriber, SimplePublisher};
 pub use in_memory_rpc_client::InMemoryRpcClient;
 pub use in_memory_rpc_server::InMemoryRpcServer;
 pub use notification::{NotificationError, Notifier};
+#[cfg(feature = "usubscription")]
 pub use pubsub::{PubSubError, Publisher, Subscriber};
 pub use rpc::{RequestHandler, RpcClient, RpcServer, ServiceInvocationError};
 #[cfg(feature = "usubscription")]
@@ -30,17 +33,21 @@ use crate::{
 };
 
 mod default_notifier;
+mod default_pubsub;
 mod in_memory_rpc_client;
 mod in_memory_rpc_server;
 mod notification;
+#[cfg(feature = "usubscription")]
 mod pubsub;
 mod rpc;
 #[cfg(feature = "usubscription")]
 mod usubscription_client;
 
 /// An error indicating a problem with registering or unregistering a message listener.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RegistrationError {
+    /// Indicates that a listener for a given address already exists.
+    AlreadyExists,
     /// Indicates that the maximum number of listeners supported by the Transport Layer implementation
     /// has already been registered.
     MaxListenersExceeded,
@@ -58,6 +65,9 @@ pub enum RegistrationError {
 impl Display for RegistrationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            RegistrationError::AlreadyExists => {
+                f.write_str("a listener for the given filter criteria already exists")
+            }
             RegistrationError::MaxListenersExceeded => {
                 f.write_str("maximum number of listeners has been reached")
             }
@@ -83,6 +93,7 @@ impl Error for RegistrationError {}
 impl From<UStatus> for RegistrationError {
     fn from(value: UStatus) -> Self {
         match value.code.enum_value() {
+            Ok(UCode::ALREADY_EXISTS) => RegistrationError::AlreadyExists,
             Ok(UCode::NOT_FOUND) => RegistrationError::NoSuchListener,
             Ok(UCode::RESOURCE_EXHAUSTED) => RegistrationError::MaxListenersExceeded,
             Ok(UCode::UNIMPLEMENTED) => RegistrationError::PushDeliveryMethodNotSupported,
@@ -165,6 +176,42 @@ impl CallOptions {
     /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS2));
     /// ```
     pub fn for_notification(
+        ttl: Option<u32>,
+        message_id: Option<UUID>,
+        priority: Option<UPriority>,
+    ) -> Self {
+        CallOptions {
+            ttl: ttl.unwrap_or(0),
+            message_id,
+            token: None,
+            priority,
+        }
+    }
+
+    /// Creates new call options for a Publish message.
+    ///
+    /// # Arguments
+    ///
+    /// * `ttl` - The message's time-to-live in milliseconds or `None` if the message should not expire at all.
+    /// * `message_id` - The identifier to use for the message or `None` to use a generated identifier.
+    /// * `priority` - The message's priority or `None` to use the default priority for Publish messages.
+    ///
+    /// # Returns
+    ///
+    /// Options suitable for sending a Publish message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{UPriority, UUID, communication::CallOptions};
+    ///
+    /// let uuid = UUID::new();
+    /// let options = CallOptions::for_publish(Some(15_000), Some(uuid.clone()), Some(UPriority::UPRIORITY_CS2));
+    /// assert_eq!(options.ttl(), 15_000);
+    /// assert_eq!(options.message_id(), Some(uuid));
+    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS2));
+    /// ```
+    pub fn for_publish(
         ttl: Option<u32>,
         message_id: Option<UUID>,
         priority: Option<UPriority>,
