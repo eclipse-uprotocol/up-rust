@@ -240,7 +240,15 @@ pub struct InMemorySubscriber {
 }
 
 impl InMemorySubscriber {
-    /// Creates a new client for a given transport
+    /// Creates a new Subscriber for a given transport.
+    ///
+    /// The subscriber keeps track of subscription change handlers in memory only.
+    /// This function uses the given transport to create an [`RpcClientUSubscription`] and a [`SimpleNotifier`]
+    /// and then delegate to [`Self::for_clients`] to create the Subscriber.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Notifier cannot register a listener for notifications from the USubscription service.
     pub async fn new(
         transport: Arc<dyn UTransport>,
         uri_provider: Arc<dyn LocalUriProvider>,
@@ -253,7 +261,20 @@ impl InMemorySubscriber {
         Self::for_clients(transport, uri_provider, usubscription_client, notifier).await
     }
 
-    /// Creates a new client for given clients
+    /// Creates a new Subscriber for given clients.
+    ///
+    /// This function uses the given transport to register event listeners for subscribed topics.
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - The transport to register event listeners for subscribed topics on.
+    /// * `uri-provider` - The service to use for creating topic addresses.
+    /// * `usubscription` - The client to use for interacting with the (local) USubscription service.
+    /// * `notifier` - The client to use for registering the listener for subscription updates from USubscription.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Notifier cannot register a listener for notifications from the USubscription service.
     pub async fn for_clients(
         transport: Arc<dyn UTransport>,
         uri_provider: Arc<dyn LocalUriProvider>,
@@ -281,6 +302,13 @@ impl InMemorySubscriber {
         })
     }
 
+    /// Stops this client.
+    ///
+    /// Clears all internal state and unregisters the listener for subscription updates from the USubscription service.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the listener could not be unregistered. In this case the internal state remains intact.
     pub async fn stop(&self) -> Result<(), RegistrationError> {
         self.notifier
             .stop_listening(
