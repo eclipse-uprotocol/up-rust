@@ -11,6 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -354,6 +355,16 @@ impl ComparableListener {
     pub fn into_inner(&self) -> Arc<dyn UListener> {
         self.listener.clone()
     }
+
+    /// Allows us to get the pointer address of this `ComparableListener` on the heap
+    fn pointer_address(&self) -> usize {
+        // Obtain the raw pointer from the Arc
+        let ptr = Arc::as_ptr(&self.listener);
+        // Cast the fat pointer to a raw thin pointer to ()
+        let thin_ptr = ptr as *const ();
+        // Convert the thin pointer to a usize
+        thin_ptr as usize
+    }
 }
 
 impl Deref for ComparableListener {
@@ -387,6 +398,12 @@ impl PartialEq for ComparableListener {
 
 impl Eq for ComparableListener {}
 
+impl Debug for ComparableListener {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ComparableListener: {}", self.pointer_address())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ComparableListener;
@@ -396,6 +413,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
     use std::sync::Mutex;
+    use std::thread;
 
     #[derive(Default)]
     struct UPClientFoo {
@@ -655,5 +673,27 @@ mod tests {
 
         let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
         assert!(check_on_receive_res.is_err());
+    }
+
+    #[test]
+    fn test_comparable_listener_pointer_address() {
+        let bar = Arc::new(ListenerBar);
+        let comp_listener = ComparableListener::new(bar);
+        println!("comp_listener: {:?}", comp_listener);
+
+        let comp_listener_thread = comp_listener.clone();
+        let handle = thread::spawn(move || {
+            println!("comp_listener_thread: {:?}", comp_listener_thread);
+
+            comp_listener_thread.pointer_address()
+        });
+
+        let comp_listener_address_other_thread = handle.join().unwrap();
+        let comp_listener_address_this_thread = comp_listener.pointer_address();
+
+        assert_eq!(
+            comp_listener_address_this_thread,
+            comp_listener_address_other_thread
+        );
     }
 }
