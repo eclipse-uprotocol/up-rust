@@ -238,10 +238,11 @@ pub trait RequestHandler: Send + Sync {
     ) -> Result<Option<UPayload>, ServiceInvocationError>;
 }
 
-/// A server for exposing RPC endpoints.
+/// A server for exposing Remote Procedure Call (RPC) endpoints.
 ///
 /// Please refer to the
-/// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
+/// [Communication Layer API specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc)
+/// for details.
 #[async_trait]
 pub trait RpcServer {
     /// Registers an endpoint for RPC requests.
