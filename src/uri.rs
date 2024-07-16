@@ -21,13 +21,13 @@ use uriparse::{Authority, URIReference};
 
 pub use crate::up_core_api::uri::UUri;
 
-pub const WILDCARD_AUTHORITY: &str = "*";
-pub const WILDCARD_ENTITY_ID: u32 = 0x0000_FFFF;
-pub const WILDCARD_ENTITY_VERSION: u32 = 0x0000_00FF;
-pub const WILDCARD_RESOURCE_ID: u32 = 0x0000_FFFF;
+pub(crate) const WILDCARD_AUTHORITY: &str = "*";
+pub(crate) const WILDCARD_ENTITY_ID: u32 = 0x0000_FFFF;
+pub(crate) const WILDCARD_ENTITY_VERSION: u32 = 0x0000_00FF;
+pub(crate) const WILDCARD_RESOURCE_ID: u32 = 0x0000_FFFF;
 
-pub const RESOURCE_ID_RESPONSE: u32 = 0;
-pub const RESOURCE_ID_MIN_EVENT: u32 = 0x8000;
+pub(crate) const RESOURCE_ID_RESPONSE: u32 = 0;
+pub(crate) const RESOURCE_ID_MIN_EVENT: u32 = 0x8000;
 
 #[derive(Debug)]
 pub enum UUriError {
@@ -274,6 +274,49 @@ impl Hash for UUri {
 impl Eq for UUri {}
 
 impl UUri {
+    /// Serializes this UUri to a URI string.
+    ///
+    /// # Arguments
+    ///
+    /// * `include_scheme` - Indicates whether to include the uProtocol scheme (`up`) in the URI.
+    ///
+    /// # Returns
+    ///
+    /// The URI as defined by the [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri {
+    ///     authority_name: String::from("VIN.vehicles"),
+    ///     ue_id: 0x0000_800A,
+    ///     ue_version_major: 0x02,
+    ///     resource_id: 0x0000_1a50,
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let uri_string = uuri.to_uri(true);
+    /// assert_eq!(uri_string, "up://VIN.vehicles/800A/2/1A50");
+    /// ````
+    pub fn to_uri(&self, include_scheme: bool) -> String {
+        let mut output = String::default();
+        if include_scheme {
+            output.push_str("up:");
+        }
+        if !self.authority_name.is_empty() {
+            output.push_str("//");
+            output.push_str(&self.authority_name);
+        }
+        let uri = format!(
+            "/{:X}/{:X}/{:X}",
+            self.ue_id, self.ue_version_major, self.resource_id
+        );
+        output.push_str(&uri);
+        output
+    }
+
     /// Creates a new UUri from its parts.
     ///
     /// # Errors
@@ -368,47 +411,74 @@ impl UUri {
             && self.authority_name != other_uri.authority_name
     }
 
-    /// Serializes this UUri to a URI string.
-    ///
-    /// # Arguments
-    ///
-    /// * `include_scheme` - Indicates whether to include the uProtocol scheme (`up`) in the URI.
-    ///
-    /// # Returns
-    ///
-    /// The URI as defined by the [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec).
+    /// Checks if this UUri has an empty authority name.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uuri = UUri {
-    ///     authority_name: String::from("VIN.vehicles"),
-    ///     ue_id: 0x0000_800A,
-    ///     ue_version_major: 0x02,
-    ///     resource_id: 0x0000_1a50,
-    ///     ..Default::default()
-    /// };
+    /// let uuri = UUri::try_from_parts("", 0x9b3a, 0x01, 0x145b).unwrap();
+    /// assert!(uuri.has_empty_authority());
+    /// ```
+    pub fn has_empty_authority(&self) -> bool {
+        self.authority_name.is_empty()
+    }
+
+    /// Checks if this UUri has a wildcard authority name.
     ///
-    /// let uri_string = uuri.to_uri(true);
-    /// assert_eq!(uri_string, "up://VIN.vehicles/800A/2/1A50");
-    /// ````
-    pub fn to_uri(&self, include_scheme: bool) -> String {
-        let mut output = String::default();
-        if include_scheme {
-            output.push_str("up:");
-        }
-        if !self.authority_name.is_empty() {
-            output.push_str("//");
-            output.push_str(&self.authority_name);
-        }
-        let uri = format!(
-            "/{:X}/{:X}/{:X}",
-            self.ue_id, self.ue_version_major, self.resource_id
-        );
-        output.push_str(&uri);
-        output
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri::try_from_parts("*", 0x9b3a, 0x01, 0x145b).unwrap();
+    /// assert!(uuri.has_wildcard_authority());
+    /// ```
+    pub fn has_wildcard_authority(&self) -> bool {
+        self.authority_name == WILDCARD_AUTHORITY
+    }
+
+    /// Checks if this UUri has a wildcard entity identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri::try_from_parts("vin", 0xFFFF, 0x01, 0x145b).unwrap();
+    /// assert!(uuri.has_wildcard_entity_id());
+    /// ```
+    pub fn has_wildcard_entity_id(&self) -> bool {
+        self.ue_id & WILDCARD_ENTITY_ID == WILDCARD_ENTITY_ID
+    }
+
+    /// Checks if this UUri has a wildcard major version.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri::try_from_parts("vin", 0x9b3a, 0xFF, 0x145b).unwrap();
+    /// assert!(uuri.has_wildcard_version());
+    /// ```
+    pub fn has_wildcard_version(&self) -> bool {
+        self.ue_version_major == WILDCARD_ENTITY_VERSION
+    }
+
+    /// Checks if this UUri has a wildcard entity identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri::try_from_parts("vin", 0x9b3a, 0x01, 0xFFFF).unwrap();
+    /// assert!(uuri.has_wildcard_resource_id());
+    /// ```
+    pub fn has_wildcard_resource_id(&self) -> bool {
+        self.resource_id == WILDCARD_RESOURCE_ID
     }
 
     /// Verifies that this UUri does not contain any wildcards.
@@ -432,22 +502,22 @@ impl UUri {
     /// assert!(uri.verify_no_wildcards().is_ok());
     /// ```
     pub fn verify_no_wildcards(&self) -> Result<(), UUriError> {
-        if self.authority_name == WILDCARD_AUTHORITY {
+        if self.has_wildcard_authority() {
             Err(UUriError::validation_error(format!(
                 "Authority must not contain wildcard character [{}]",
                 WILDCARD_AUTHORITY
             )))
-        } else if self.ue_id & WILDCARD_ENTITY_ID == WILDCARD_ENTITY_ID {
+        } else if self.has_wildcard_entity_id() {
             Err(UUriError::validation_error(format!(
                 "Entity ID must not be set to wildcard value [{:#X}]",
                 WILDCARD_ENTITY_ID
             )))
-        } else if self.ue_version_major == WILDCARD_ENTITY_VERSION {
+        } else if self.has_wildcard_version() {
             Err(UUriError::validation_error(format!(
                 "Entity version must not be set to wildcard value [{:#X}]",
                 WILDCARD_ENTITY_VERSION
             )))
-        } else if self.resource_id == WILDCARD_RESOURCE_ID {
+        } else if self.has_wildcard_resource_id() {
             Err(UUriError::validation_error(format!(
                 "Resource ID must not be set to wildcard value [{:#X}]",
                 WILDCARD_RESOURCE_ID
