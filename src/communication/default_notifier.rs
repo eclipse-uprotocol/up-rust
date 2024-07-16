@@ -22,12 +22,20 @@ use super::{
     RegistrationError, UPayload,
 };
 
+/// A [`Notifier`] that uses the uProtocol Transport Layer API to send and receive
+/// notifications to/from (other) uEntities.
 pub struct SimpleNotifier {
     transport: Arc<dyn UTransport>,
     uri_provider: Arc<dyn LocalUriProvider>,
 }
 
 impl SimpleNotifier {
+    /// Creates a new Notifier for a given transport.
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - The uProtocol Transport Layer implementation to use for sending and receiving notification messages.
+    /// * `uri_provider` - The helper for creating URIs that represent local resources.
     pub fn new(transport: Arc<dyn UTransport>, uri_provider: Arc<dyn LocalUriProvider>) -> Self {
         SimpleNotifier {
             transport,
@@ -276,6 +284,7 @@ mod test {
         let notifier = SimpleNotifier::new(Arc::new(transport), uri_provider);
 
         let options = CallOptions::for_notification(None, None, None);
+        // resource ID of origin address must not be 0
         let result = notifier.notify(0x0000, &destination, options, None).await;
         assert!(result.is_err_and(|e| matches!(e, NotificationError::InvalidArgument(_))));
     }
