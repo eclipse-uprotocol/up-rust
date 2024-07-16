@@ -132,10 +132,11 @@ impl From<ServiceInvocationError> for UStatus {
     }
 }
 
-/// A client for invoking RPC methods.
+/// A client for performing Remote Procedure Calls (RPC) on (other) uEntities.
 ///
 /// Please refer to the
-/// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
+/// [Communication Layer API specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc)
+/// for details.
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait RpcClient: Send + Sync {

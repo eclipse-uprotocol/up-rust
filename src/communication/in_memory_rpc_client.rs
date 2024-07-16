@@ -153,7 +153,19 @@ impl UListener for ResponseListener {
     }
 }
 
-/// An ['RpcClient'] which keeps all information about pending requests in memory.
+/// An [`RpcClient`] which keeps all information about pending requests in memory.
+///
+/// The client requires an implementations of [`UTransport`] for sending RPC Request messages
+/// to the service implementation and receiving its RPC Response messages.
+///
+/// During [startup](`Self::new`) the client registers a generic [`UListener`] with the transport
+/// for receiving all kinds of messages with a _sink_ address matching the client. The listener
+/// maintains an in-memory mapping of (pending) request IDs to response message handlers.
+///
+/// When an [`RPC call`](Self::invoke_method) is made, an RPC Request message is sent to the service
+/// implementation and a response handler is created and registered with the listener.
+/// When an RPC Response message arrives from the service, the corresponding handler is being looked
+/// up and invoked.
 pub struct InMemoryRpcClient {
     transport: Arc<dyn UTransport>,
     uri_provider: Arc<dyn LocalUriProvider>,
