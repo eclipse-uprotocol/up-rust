@@ -157,6 +157,15 @@ impl UListener for RequestListener {
     }
 }
 
+/// An [`RpcServer`] which keeps all information about registered endpoints in memory.
+///
+/// The server requires an implementations of [`UTransport`] for receiving RPC Request messages
+/// from clients and sending back RPC Response messages.
+///
+/// For each [endpoint being registered](`Self::register_endpoint`), a [`UListener`] is created for
+/// the given request handler and registered with the underlying transport. The listener is also
+/// mapped to the endpoint's method resource ID in order to prevent registration of multiple
+/// request handlers for the same method.
 pub struct InMemoryRpcServer {
     transport: Arc<dyn UTransport>,
     uri_provider: Arc<dyn LocalUriProvider>,
