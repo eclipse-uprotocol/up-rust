@@ -181,10 +181,7 @@ impl UListener for SubscriptionChangeListener {
     }
 }
 
-/// A client for publishing events to topics.
-///
-/// The client requires an implementations of [`UTransport`] for sending the messages created
-/// for the events.
+/// A [`Publisher`] that uses the uProtocol Transport Layer API for publishing events to topics.
 pub struct SimplePublisher {
     transport: Arc<dyn UTransport>,
     uri_provider: Arc<dyn LocalUriProvider>,
@@ -229,8 +226,21 @@ impl Publisher for SimplePublisher {
     }
 }
 
-/// A client for subscribing to topics.
+/// A [`Subscriber`] which keeps all information about registered susbcription change handlers in memory.
 ///
+/// The subscriber requires a (client) implementation of [`USubscription`] in order to inform the local
+/// USubscription service about newly subscribed and unsubscribed topics. It also needs a [`Notifier`]
+/// for receiving notifications about subscription status updates from the local USubscription service.
+/// Finally, it needs a [`UTransport`] for receiving events that have been published to subscribed topics.
+///
+/// During [startup](`Self::for_clients`) the subscriber uses the Notifier to register a generic [`UListener`]
+/// for receiving notifications from the USubscription service. The listener maintains an in-memory mapping
+/// of subscribed topics to corresponding subscription change handlers.
+///
+/// When a client [`subscribes to a topic`](Self::subscribe), the local USubscription service is informed
+/// about the new subscription and a (client provided) subscription change handler is registered with the
+/// listener. When a subscription change notification arrives from the USubscription service, the corresponding
+/// handler is being looked up and invoked.
 pub struct InMemorySubscriber {
     transport: Arc<dyn UTransport>,
     uri_provider: Arc<dyn LocalUriProvider>,
@@ -263,11 +273,9 @@ impl InMemorySubscriber {
 
     /// Creates a new Subscriber for given clients.
     ///
-    /// This function uses the given transport to register event listeners for subscribed topics.
-    ///
     /// # Arguments
     ///
-    /// * `transport` - The transport to register event listeners for subscribed topics on.
+    /// * `transport` - The transport to use for registering the event listeners for subscribed topics.
     /// * `uri-provider` - The service to use for creating topic addresses.
     /// * `usubscription` - The client to use for interacting with the (local) USubscription service.
     /// * `notifier` - The client to use for registering the listener for subscription updates from USubscription.
