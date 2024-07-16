@@ -29,11 +29,19 @@ use crate::{
 
 use super::{CallOptions, RpcClient};
 
+/// A [`USubscription`] client implementation for invoking operations of a local USubscription service.
+///
+/// The client requires an [`RpcClient`] for performing the remote procedure calls.
 pub struct RpcClientUSubscription {
     rpc_client: Arc<dyn RpcClient>,
 }
 
 impl RpcClientUSubscription {
+    /// Creates a new Notifier for a given transport.
+    ///
+    /// # Arguments
+    ///
+    /// * `rpc_client` - The client to use for performing the remote procedure calls on the USubscription service.
     pub fn new(rpc_client: Arc<dyn RpcClient>) -> Self {
         RpcClientUSubscription { rpc_client }
     }
