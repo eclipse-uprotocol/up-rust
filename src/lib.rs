@@ -59,7 +59,10 @@ mod umessage;
 pub use umessage::{UMessage, UMessageBuilder, UMessageError};
 
 mod uri;
-pub use uri::{UUri, UUriError};
+pub use uri::{
+    UUri, UUriError, RESOURCE_ID_MIN_EVENT, RESOURCE_ID_RESPONSE, WILDCARD_AUTHORITY,
+    WILDCARD_ENTITY_ID, WILDCARD_ENTITY_VERSION, WILDCARD_RESOURCE_ID,
+};
 
 mod ustatus;
 pub use ustatus::{UCode, UStatus};
