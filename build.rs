@@ -27,7 +27,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[
             // uProtocol-project proto definitions
             format!("{}{}uoptions.proto", UPROTOCOL_BASE_URI, UPROTOCOL_REL_PATH).as_str(),
+            // [impl->req~uuid-proto~1]
             format!("{}{}v1/uuid.proto", UPROTOCOL_BASE_URI, UPROTOCOL_REL_PATH).as_str(),
+            // [impl->req~uri-data-model-proto~1]
             format!("{}{}v1/uri.proto", UPROTOCOL_BASE_URI, UPROTOCOL_REL_PATH).as_str(),
             format!(
                 "{}{}v1/uattributes.proto",
