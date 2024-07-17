@@ -42,12 +42,9 @@ utwin = []
 [dependencies]
 async-trait = { version = "0.1" }
 bytes = { version = "1.5" }
-chrono = { version = "0.4.32" }
 mediatype = "0.19"
-once_cell = { version = "1.19" }
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
-regex = { version = "1.10" }
 thiserror = { version = "1.0.52" }
 tokio = { version = "1.35", default-features = false, features = [
     "macros",
