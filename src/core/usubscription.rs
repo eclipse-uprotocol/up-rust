@@ -34,11 +34,11 @@ impl Hash for SubscriberInfo {
 
 impl Eq for SubscriberInfo {}
 
-/// Check if `SubscriberInfo` is empty by comparing with `SubscriberInfo::default()` object.
+/// Checks if a given [`SubscriberInfo`] contains any information.
 ///
 /// # Returns
 ///
-/// 'true' if `SubscriberInfo` is equal to `SubscriberInfo::default()`, `false` otherwise.
+/// `true` if the given instance is equal to [`SubscriberInfo::default`], `false` otherwise.
 impl SubscriberInfo {
     pub fn is_empty(&self) -> bool {
         self.eq(&SubscriberInfo::default())
@@ -112,195 +112,10 @@ pub fn usubscription_uri(resource_id: u16) -> UUri {
     .unwrap()
 }
 
-/// `USubscription` is the uP-L3 client interface to the uSubscription service.
+/// The uProtocol Application Layer client interface to the uSubscription service.
 ///
-/// A client would use a concrete implementation of `USubscription` typically to subscribe to
-/// a topic of interest and then unsubscribe when finished.
-///
-/// Implementations of `USubscription` can be transport-specific to allow for flexibility and optimizations.
-///
-/// # Examples
-///
-/// ## Typical usage
-///
-/// ```
-/// # use async_trait::async_trait;
-/// # use std::future::Future;
-/// # use up_rust::{UMessage, UStatus, UUri, UListener};
-/// #
-/// # mod up_client_foo {
-/// #     use std::sync::Arc;
-/// #     use up_rust::{UTransport, UListener, UStatus, UMessage, UUri};
-/// #     use async_trait::async_trait;
-/// #     pub struct UPClientFoo;
-/// #
-/// #     #[async_trait]
-/// #     impl UTransport for UPClientFoo {
-/// #         async fn send(&self, message: UMessage) -> Result<(), UStatus> {
-/// #             todo!()
-/// #         }
-/// #
-/// #         async fn receive(&self, source_filter: &UUri, sink_filter: Option<&UUri>) -> Result<UMessage, UStatus> {
-/// #             todo!()
-/// #         }
-/// #
-/// #         async fn register_listener(&self, source_filter: &UUri, sink_filter: Option<&UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus> {
-/// #             Ok(())
-/// #         }
-/// #
-/// #         async fn unregister_listener(&self, source_filter: &UUri, sink_filter: Option<&UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus> {
-/// #             Ok(())
-/// #         }
-/// #     }
-/// #
-/// #     impl UPClientFoo {
-/// #         pub fn new() -> Self {
-/// #             Self
-/// #         }
-/// #     }
-/// # }
-/// #
-/// # mod usubscription_foo {
-/// #     use async_trait::async_trait;
-/// #     use protobuf::EnumOrUnknown;
-/// #     use up_rust::{UStatus, UCode,
-/// #         core::usubscription::{USubscription, FetchSubscribersRequest, FetchSubscriptionsRequest,
-/// #                               FetchSubscribersResponse, FetchSubscriptionsResponse, NotificationsRequest,
-/// #                               SubscriptionRequest, SubscriptionResponse, UnsubscribeRequest, SubscriptionStatus,
-/// #                               State, EventDeliveryConfig},
-/// #     };
-/// #
-/// #     pub struct USubscriptionFoo;
-/// #
-/// #     #[async_trait]
-/// #     impl USubscription for USubscriptionFoo {
-/// #         async fn subscribe(&self, subscription_request: SubscriptionRequest) -> Result<SubscriptionResponse, UStatus> {
-/// #             let subscription_status = SubscriptionStatus {
-/// #                 state: EnumOrUnknown::from(State::SUBSCRIBED),
-/// #                 message: "Subscription success".to_string(),
-/// #                 ..Default::default()
-/// #             };
-/// #
-/// #             let event_delivery_config = EventDeliveryConfig {
-/// #                 id: "SUBSCRIPTION_TOPIC".to_string(),
-/// #                 type_: "Foo/Vehicle/EventHubs".to_string(),
-/// #                 attributes: Default::default(),
-/// #                 ..Default::default()
-/// #             };
-/// #
-/// #             let subscription_response = SubscriptionResponse {
-/// #                 status: Some(subscription_status).into(),
-/// #                 config: Default::default(),
-/// #                 topic: Default::default(),
-/// #                 ..Default::default()
-/// #             };
-/// #
-/// #             Ok(subscription_response)
-/// #         }
-/// #
-/// #         async fn unsubscribe(&self, unsubscribe_request: UnsubscribeRequest) -> Result<(), UStatus> {
-/// #             Ok(())
-/// #         }
-/// #
-/// #         async fn fetch_subscriptions(&self, fetch_subscriptions_request: FetchSubscriptionsRequest) -> Result<FetchSubscriptionsResponse, UStatus> {
-/// #             todo!()
-/// #         }
-/// #
-/// #         async fn register_for_notifications(&self, notifications_request: NotificationsRequest) -> Result<(), UStatus> {
-/// #             todo!()
-/// #         }
-/// #
-/// #         async fn unregister_for_notifications(&self, notifications_request: NotificationsRequest) -> Result<(), UStatus> {
-/// #             todo!()
-/// #         }
-/// #
-/// #         async fn fetch_subscribers(&self, fetch_subscribers_request: FetchSubscribersRequest) -> Result<FetchSubscribersResponse, UStatus> {
-/// #             todo!()
-/// #         }
-/// #     }
-/// #
-/// #     impl USubscriptionFoo {
-/// #         pub fn new() -> Self {
-/// #             Self
-/// #         }
-/// #     }
-/// # }
-/// #
-/// # #[derive(Clone)]
-/// # pub struct MyListener;
-/// #
-/// # #[async_trait]
-/// # impl UListener for MyListener {
-/// #     async fn on_receive(&self, msg: UMessage) {
-/// #         todo!()
-/// #     }
-/// # }
-/// #
-/// # impl MyListener {
-/// #     pub fn new() -> Self {
-/// #         Self
-/// #     }
-/// # }
-/// #
-/// # #[tokio::main]
-/// # pub async fn main() -> Result<(), UStatus> {
-/// #
-/// # let my_uuri = Default::default();
-/// #
-/// # let door_uuri = UUri {
-/// #     authority_name: "device_a".to_string(),
-/// #     ue_id: 0x0000_0001,
-/// #     ue_version_major: 0x01,
-/// #     resource_id: 0x0002,
-/// #     ..Default::default()
-/// # };
-/// #
-/// # let my_listener = Arc::new(MyListener::new());
-/// #
-/// # let up_client = up_client_foo::UPClientFoo::new();
-/// #
-/// use std::sync::Arc;
-/// use up_rust::{UCode, UTransport,
-///     core::usubscription::{USubscription, UnsubscribeRequest, SubscribeAttributes,
-///                           SubscriberInfo, SubscriptionRequest, SubscriptionResponse},
-/// };
-///
-/// let usub = usubscription_foo::USubscriptionFoo::new();
-///
-/// let subscriber_info = SubscriberInfo {
-///     uri: my_uuri,
-///     ..Default::default()
-/// };
-///
-/// let subscribe_attributes = SubscribeAttributes {
-///     sample_period_ms: Some(5000), // we want to hear about this every 5 seconds
-///     ..Default::default()
-/// };
-///
-/// let subscription_request = SubscriptionRequest {
-///     topic: Some(door_uuri.clone()).into(),
-///     subscriber: Some(subscriber_info.clone()).into(),
-///     attributes: Some(subscribe_attributes).into(),
-///     ..Default::default()
-/// };
-///
-/// let _subscription_response = usub.subscribe(subscription_request).await?;
-/// let register_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await?;
-/// // sometime later when done with this topic
-/// let unsubscribe_request = UnsubscribeRequest {
-///     topic: Some(door_uuri.clone()).into(),
-///     subscriber: Some(subscriber_info.clone()).into(),
-///     ..Default::default()
-/// };
-/// let unsubscribe_result = usub.unsubscribe(unsubscribe_request).await?;
-/// let unregister_success = up_client.register_listener(&door_uuri, None, my_listener.clone()).await?;
-/// #
-/// # Ok(())
-/// # }
-/// ```
-///
-/// For more information, please refer to the [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l3/usubscription/v3/README.adoc)
-/// and [uProtocol APIs](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-core-api/uprotocol/core/usubscription/v3/usubscription.proto)
+/// Please refer to the [uSubscription service specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l3/usubscription/v3/README.adoc)
+/// for details.
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait USubscription: Send + Sync {
