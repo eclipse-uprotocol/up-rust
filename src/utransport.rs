@@ -679,14 +679,9 @@ mod tests {
     fn test_comparable_listener_pointer_address() {
         let bar = Arc::new(ListenerBar);
         let comp_listener = ComparableListener::new(bar);
-        println!("comp_listener: {:?}", comp_listener);
 
         let comp_listener_thread = comp_listener.clone();
-        let handle = thread::spawn(move || {
-            println!("comp_listener_thread: {:?}", comp_listener_thread);
-
-            comp_listener_thread.pointer_address()
-        });
+        let handle = thread::spawn(move || comp_listener_thread.pointer_address());
 
         let comp_listener_address_other_thread = handle.join().unwrap();
         let comp_listener_address_this_thread = comp_listener.pointer_address();
@@ -695,5 +690,13 @@ mod tests {
             comp_listener_address_this_thread,
             comp_listener_address_other_thread
         );
+    }
+
+    #[test]
+    fn test_comparable_listener_debug_outputs() {
+        let bar = Arc::new(ListenerBar);
+        let comp_listener = ComparableListener::new(bar);
+        let debug_output = format!("{comp_listener:?}");
+        assert!(!debug_output.is_empty());
     }
 }
