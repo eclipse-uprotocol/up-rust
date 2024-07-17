@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use protobuf_codegen::Customize;
 
 const UPROTOCOL_BASE_URI: &str =
-    "https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/main/up-core-api/";
+    "https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/v1.6.0-alpha.2/up-core-api/";
 const UPROTOCOL_REL_PATH: &str = "uprotocol/";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
