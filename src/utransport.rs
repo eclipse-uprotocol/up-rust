@@ -39,60 +39,10 @@ pub trait LocalUriProvider: Send + Sync {
 
 /// A handler for processing uProtocol messages.
 ///
-/// Implementations of `UListener` contain the details for what should occur when a message is received
+/// Implementations contain the details for what should occur when a message is received.
 ///
-/// For more information, please refer to [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/README.adoc).
-///
-/// # Examples
-///
-/// ## Simple example
-///
-/// ```
-/// use up_rust::{UListener, UMessage, UStatus};
-///
-/// use async_trait::async_trait;
-/// use std::sync::{Arc, Mutex};
-///
-/// #[derive(Clone)]
-/// struct FooListener {
-///     inner_foo: Arc<Mutex<String>>
-/// }
-///
-/// #[async_trait]
-/// impl UListener for FooListener {
-///     async fn on_receive(&self, msg: UMessage) {
-///         let mut inner_foo = self.inner_foo.lock().unwrap();
-///         if let Some(payload) = msg.payload.as_ref() {
-///             *inner_foo = format!("latest message length: {}", payload.len());
-///         }
-///     }
-/// }
-/// ```
-///
-/// ## Long-running function needed when message received
-///
-/// ```
-/// use up_rust::{UListener, UMessage, UStatus};
-///
-/// use async_trait::async_trait;
-/// use tokio::task;
-/// use std::sync::{Arc, Mutex};
-///
-/// #[derive(Clone)]
-/// struct LongTaskListener;
-///
-/// async fn send_to_jupiter(message_for_jupiter: UMessage) {
-///     // send a message to Jupiter
-///     println!("Fly me to the moon... {message_for_jupiter}");
-/// }
-///
-/// #[async_trait]
-/// impl UListener for LongTaskListener {
-///     async fn on_receive(&self, msg: UMessage) {
-///         tokio::spawn(send_to_jupiter(msg));
-///     }
-/// }
-/// ```
+/// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/README.adoc)
+/// for details.
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait UListener: Send + Sync {
@@ -100,26 +50,24 @@ pub trait UListener: Send + Sync {
     ///
     /// # Parameters
     ///
-    /// * `msg` - The message
+    /// * `msg` - The message to process.
     ///
-    /// # Note for `UListener` implementers
+    /// # Implementation hints
     ///
-    /// `on_receive()` is expected to return almost immediately. If it does not, it could potentially
-    /// block further message receipt. For long-running operations consider passing off received
-    /// data to a different async function to handle it and returning.
-    ///
-    /// # Note for `UTransport` implementers
-    ///
-    /// Because `on_receive()` is async you may choose to either `.await` it in the current context
-    /// or spawn it onto a new task and await there to allow current context to immediately continue.
+    /// This function is expected to return almost immediately. If it does not, it could potentially
+    /// block processing of succeeding messages. Long-running operations for processing a message should
+    /// therefore be run on a separate thread.
     async fn on_receive(&self, msg: UMessage);
 }
 
-/// [`UTransport`] is the uP-L1 interface that provides a common API for uE developers to send and receive messages.
+/// The uProtocol Transport Layer interface that provides a common API for uEntity developers to send and
+/// receive messages.
 ///
-/// Implementations of [`UTransport`] contain the details for connecting to the underlying transport technology and
-/// sending [`UMessage`][crate::UMessage] using the configured technology. For more information, please refer to
-/// [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/README.adoc).
+/// Implementations contain the details for connecting to the underlying transport technology and
+/// sending [`UMessage`]s using the configured technology.
+///
+/// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l1/README.adoc)
+/// for details.
 // [impl->req~up-language-transport-api~1]
 #[async_trait]
 pub trait UTransport: Send + Sync {
@@ -127,15 +75,9 @@ pub trait UTransport: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `message` - The message to send. The `type`, `source` and`sink` properties of the [`crate::UAttributes`] contained
-    ///   in the message determine the addressing semantics:
-    ///   * `source` - The origin of the message being sent. The address must be resolved. The semantics of the address
-    ///     depends on the value of the given [attributes' type](crate::UAttributes::type_) property .
-    ///     * For a [`PUBLISH`](crate::UMessageType::UMESSAGE_TYPE_PUBLISH) message, this is the topic that the message should be published to,
-    ///     * for a [`REQUEST`](crate::UMessageType::UMESSAGE_TYPE_REQUEST) message, this is the *reply-to* address that the sender expects to receive the response at, and
-    ///     * for a [`RESPONSE`](crate::UMessageType::UMESSAGE_TYPE_RESPONSE) message, this identifies the method that has been invoked.
-    ///   * `sink` - For a `notification`, an RPC `request` or RPC `response` message, the (resolved) address that the message
-    ///     should be sent to.
+    /// * `message` - The message to send. The `type`, `source` and `sink` properties of the
+    ///   [UAttributes](https://github.com/eclipse-uprotocol/up-spec/blob/main/basics/uattributes.adoc) contained
+    ///   in the message determine the addressing semantics.
     ///
     /// # Errors
     ///
@@ -148,8 +90,8 @@ pub trait UTransport: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `source_filter` - The [source](`crate::UAttributes::source`) address pattern that the message to receive needs to match.
-    /// * `sink_filter` - The [sink](`crate::UAttributes::sink`) address pattern that the message to receive needs to match,
+    /// * `source_filter` - The _source_ address pattern that the message to receive needs to match.
+    /// * `sink_filter` - The _sink_ address pattern that the message to receive needs to match,
     ///                   or `None` to indicate that the message must not contain any sink address.
     ///
     /// # Errors
@@ -175,8 +117,8 @@ pub trait UTransport: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `source_filter` - The [source](`crate::UAttributes::source`) address pattern that messages need to match.
-    /// * `sink_filter` - The [sink](`crate::UAttributes::sink`) address pattern that messages need to match,
+    /// * `source_filter` - The _source_ address pattern that messages need to match.
+    /// * `sink_filter` - The _sink_ address pattern that messages need to match,
     ///                   or `None` to match messages that do not contain any sink address.
     /// * `listener` - The listener to invoke.
     ///                The listener can be unregistered again using [`UTransport::unregister_listener`].
@@ -184,70 +126,6 @@ pub trait UTransport: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the listener could not be registered.
-    ///
-    /// # Examples
-    ///
-    /// ## Registering a listener
-    ///
-    /// ```
-    /// use std::sync::Arc;
-    /// use up_rust::UListener;
-    /// # use up_rust::{UMessage, UStatus, UTransport, UUri};
-    /// # use async_trait::async_trait;
-    /// #
-    /// # pub struct MyTransport;
-    /// #
-    /// # impl MyTransport {
-    /// #     pub fn new()->Self {
-    /// #         Self
-    /// #     }
-    /// # }
-    /// #
-    /// # #[async_trait]
-    /// # impl UTransport for MyTransport {
-    /// #     async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
-    /// #         todo!()
-    /// #     }
-    /// #
-    /// #     async fn receive(&self, _source: &UUri, _sink: Option<&UUri>) -> Result<UMessage, UStatus> {
-    /// #         todo!()
-    /// #     }
-    /// #
-    /// #     async fn register_listener(&self, _source: &UUri, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
-    /// #         Ok(())
-    /// #     }
-    /// #
-    /// #     async fn unregister_listener(&self, _source: &UUri, _sink: Option<&UUri>, _listener: Arc<dyn UListener>) -> Result<(), UStatus> {
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # #[derive(Default)]
-    /// # pub struct MyListener;
-    /// #
-    /// # #[async_trait]
-    /// # impl UListener for MyListener {
-    /// #     async fn on_receive(&self, msg: UMessage) {
-    /// #         todo!()
-    /// #     }
-    /// # }
-    /// #
-    /// # let mut my_transport = MyTransport::new();
-    /// # let source_uuri = UUri::default();
-    ///
-    /// // hang onto this listener...
-    /// let my_listener = Arc::new(MyListener::default());
-    /// // ...use a clone for registering...
-    /// my_transport.register_listener(
-    ///     &source_uuri,
-    ///     None,
-    ///     my_listener.clone());
-    /// // ...and use the original we hung onto when unregistering
-    /// my_transport.unregister_listener(
-    ///     &source_uuri,
-    ///     None,
-    ///     my_listener);
-    /// ```
     async fn register_listener(
         &self,
         _source_filter: &UUri,
@@ -269,8 +147,8 @@ pub trait UTransport: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `source_filter` - The source address pattern that the listener had been registered for.
-    /// * `sink_filter` - The sink address pattern that the listener had been registered for.
+    /// * `source_filter` - The _source_ address pattern that the listener had been registered for.
+    /// * `sink_filter` - The _sink_ address pattern that the listener had been registered for.
     /// * `listener` - The listener to unregister.
     ///
     /// # Errors
@@ -406,282 +284,97 @@ impl Debug for ComparableListener {
 
 #[cfg(test)]
 mod tests {
-    use crate::ComparableListener;
-    use crate::UListener;
-    use crate::{UCode, UMessage, UStatus, UTransport, UUri};
-    use async_trait::async_trait;
-    use std::collections::{HashMap, HashSet};
-    use std::sync::Arc;
-    use std::sync::Mutex;
-    use std::thread;
+    use crate::{ComparableListener, UListener, UMessage};
+    use std::{
+        hash::{DefaultHasher, Hash, Hasher},
+        ops::Deref,
+        sync::Arc,
+    };
 
-    #[derive(Default)]
-    struct UPClientFoo {
-        source_listeners: Mutex<HashMap<UUri, HashSet<ComparableListener>>>,
-    }
+    use super::MockUListener;
 
-    impl UPClientFoo {
-        fn check_on_receive(&mut self, source: &UUri, umessage: &UMessage) -> Result<(), UStatus> {
-            self.source_listeners
-                .lock()
-                .unwrap()
-                .get(source)
-                .ok_or_else(|| {
-                    UStatus::fail_with_code(
-                        UCode::NOT_FOUND,
-                        format!("No listeners registered for source address: {:?}", &source),
-                    )
-                })
-                .and_then(|listeners| {
-                    if listeners.is_empty() {
-                        Err(UStatus::fail_with_code(
-                            UCode::NOT_FOUND,
-                            format!("No listeners registered for topic: {:?}", &source),
-                        ))
-                    } else {
-                        for listener in listeners.iter() {
-                            let task_listener = listener.clone();
-                            let task_umessage = umessage.clone();
-                            tokio::spawn(
-                                async move { task_listener.on_receive(task_umessage).await },
-                            );
-                        }
-                        Ok(())
-                    }
-                })
-        }
-    }
-
-    #[async_trait]
-    impl UTransport for UPClientFoo {
-        async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
-            todo!()
-        }
-
-        async fn receive(
-            &self,
-            _source_filter: &UUri,
-            _sink_filter: Option<&UUri>,
-        ) -> Result<UMessage, UStatus> {
-            todo!()
-        }
-
-        async fn register_listener(
-            &self,
-            source_filter: &UUri,
-            _sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            let identified_listener = ComparableListener::new(listener);
-            if self
-                .source_listeners
-                .lock()
-                .unwrap()
-                .entry(source_filter.to_owned())
-                .or_default()
-                .insert(identified_listener)
-            {
-                Ok(())
-            } else {
-                Err(UStatus::fail_with_code(
-                    UCode::ALREADY_EXISTS,
-                    "UUri + UListener pair already exists!",
-                ))
-            }
-        }
-
-        async fn unregister_listener(
-            &self,
-            source_filter: &UUri,
-            _sink_filter: Option<&UUri>,
-            listener: Arc<dyn UListener>,
-        ) -> Result<(), UStatus> {
-            self.source_listeners
-                .lock()
-                .unwrap()
-                .get_mut(source_filter)
-                .ok_or_else(|| {
-                    UStatus::fail_with_code(
-                        UCode::NOT_FOUND,
-                        format!(
-                            "No listeners registered for source address: {:?}",
-                            source_filter
-                        ),
-                    )
-                })
-                .and_then(|listeners| {
-                    let identified_listener = ComparableListener::new(listener);
-                    if listeners.remove(&identified_listener) {
-                        Ok(())
-                    } else {
-                        Err(UStatus::fail_with_code(
-                            UCode::NOT_FOUND,
-                            "UUri + UListener not found!",
-                        ))
-                    }
-                })
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    struct ListenerBaz;
-    #[async_trait]
-    impl UListener for ListenerBaz {
-        async fn on_receive(&self, msg: UMessage) {
-            println!("Printing msg from ListenerBaz! received: {:?}", msg);
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    struct ListenerBar;
-    #[async_trait]
-    impl UListener for ListenerBar {
-        async fn on_receive(&self, msg: UMessage) {
-            println!("Printing msg from ListenerBar! received: {:?}", msg);
-        }
-    }
-
-    fn uuri_factory(uuri_index: u8) -> UUri {
-        match uuri_index {
-            1 => UUri {
-                authority_name: "uuri_1".to_string(),
-                ..Default::default()
-            },
-            _ => UUri::default(),
-        }
+    #[tokio::test]
+    async fn test_deref_returns_wrapped_listener() {
+        let mut mock_listener = MockUListener::new();
+        mock_listener.expect_on_receive().once().return_const(());
+        let listener_one = Arc::new(mock_listener);
+        let comparable_listener_one = ComparableListener::new(listener_one);
+        comparable_listener_one
+            .deref()
+            .on_receive(UMessage::default())
+            .await;
     }
 
     #[tokio::test]
-    async fn test_register_and_receive() {
-        let mut up_client_foo = UPClientFoo::default();
-        let uuri_1 = uuri_factory(1);
-        let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res = up_client_foo
-            .register_listener(&uuri_1, None, listener_baz.clone())
+    async fn test_to_inner_returns_reference_to_wrapped_listener() {
+        let mut mock_listener = MockUListener::new();
+        mock_listener.expect_on_receive().once().return_const(());
+        let listener_one = Arc::new(mock_listener);
+        let comparable_listener_one = ComparableListener::new(listener_one);
+        comparable_listener_one
+            .into_inner()
+            .on_receive(UMessage::default())
             .await;
-        assert!(register_res.is_ok());
-
-        let umessage = UMessage::default();
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-        assert_eq!(check_on_receive_res, Ok(()));
     }
 
     #[tokio::test]
-    async fn test_register_and_unregister() {
-        let mut up_client_foo = UPClientFoo::default();
-        let uuri_1 = uuri_factory(1);
-        let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res = up_client_foo
-            .register_listener(&uuri_1, None, listener_baz.clone())
-            .await;
-        assert!(register_res.is_ok());
+    async fn test_eq_and_hash_are_consistent_for_comparable_listeners_wrapping_same_listener() {
+        let mut mock_listener = MockUListener::new();
+        mock_listener.expect_on_receive().times(2).return_const(());
+        let listener_one = Arc::new(mock_listener);
+        let listener_two = listener_one.clone();
+        listener_one.on_receive(UMessage::default()).await;
+        listener_two.on_receive(UMessage::default()).await;
+        let comparable_listener_one = ComparableListener::new(listener_one);
+        let comparable_listener_two = ComparableListener::new(listener_two);
+        assert!(&comparable_listener_one.eq(&comparable_listener_two));
 
-        let umessage = UMessage::default();
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-        assert_eq!(check_on_receive_res, Ok(()));
-
-        let unregister_res = up_client_foo
-            .unregister_listener(&uuri_1, None, listener_baz)
-            .await;
-        assert!(unregister_res.is_ok());
-
-        let umessage = UMessage::default();
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-        assert!(check_on_receive_res.is_err());
+        let mut hasher = DefaultHasher::new();
+        comparable_listener_one.hash(&mut hasher);
+        let hash_one = hasher.finish();
+        let mut hasher = DefaultHasher::new();
+        comparable_listener_two.hash(&mut hasher);
+        let hash_two = hasher.finish();
+        assert_eq!(hash_one, hash_two);
     }
 
     #[tokio::test]
-    async fn test_register_multiple_listeners_on_one_uuri() {
-        let mut up_client_foo = UPClientFoo::default();
-        let uuri_1 = uuri_factory(1);
-        let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let listener_bar: Arc<dyn UListener> = Arc::new(ListenerBar);
+    async fn test_eq_and_hash_are_consistent_for_comparable_listeners_wrapping_different_listeners()
+    {
+        let mut mock_listener_one = MockUListener::new();
+        mock_listener_one
+            .expect_on_receive()
+            .once()
+            .return_const(());
+        let listener_one = Arc::new(mock_listener_one);
+        let mut mock_listener_two = MockUListener::new();
+        mock_listener_two
+            .expect_on_receive()
+            .once()
+            .return_const(());
+        let listener_two = Arc::new(mock_listener_two);
+        listener_one.on_receive(UMessage::default()).await;
+        listener_two.on_receive(UMessage::default()).await;
+        let comparable_listener_one = ComparableListener::new(listener_one);
+        let comparable_listener_two = ComparableListener::new(listener_two);
+        assert!(!&comparable_listener_one.eq(&comparable_listener_two));
 
-        let register_res = up_client_foo
-            .register_listener(&uuri_1, None, listener_baz.clone())
-            .await;
-        assert!(register_res.is_ok());
-
-        let register_res = up_client_foo
-            .register_listener(&uuri_1, None, listener_bar.clone())
-            .await;
-        assert!(register_res.is_ok());
-
-        let umessage = UMessage::default();
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-        assert_eq!(check_on_receive_res, Ok(()));
-
-        let unregister_baz_res = up_client_foo
-            .unregister_listener(&uuri_1, None, listener_baz)
-            .await;
-        assert!(unregister_baz_res.is_ok());
-        let unregister_bar_res = up_client_foo
-            .unregister_listener(&uuri_1, None, listener_bar)
-            .await;
-        assert!(unregister_bar_res.is_ok());
-
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-        assert!(check_on_receive_res.is_err());
-    }
-
-    #[test]
-    fn test_if_no_listeners() {
-        let mut up_client_foo = UPClientFoo::default();
-        let uuri_1 = uuri_factory(1);
-
-        let umessage = UMessage::default();
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-
-        assert!(check_on_receive_res.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_register_multiple_same_listeners_on_one_uuri() {
-        let mut up_client_foo = UPClientFoo::default();
-        let uuri_1 = uuri_factory(1);
-
-        let listener_baz: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res = up_client_foo
-            .register_listener(&uuri_1, None, listener_baz.clone())
-            .await;
-        assert!(register_res.is_ok());
-
-        let register_res = up_client_foo
-            .register_listener(&uuri_1, None, listener_baz.clone())
-            .await;
-        assert!(register_res.is_err());
-
-        let listener_baz_completely_different: Arc<dyn UListener> = Arc::new(ListenerBaz);
-        let register_res = up_client_foo
-            .register_listener(&uuri_1, None, listener_baz_completely_different.clone())
-            .await;
-        assert!(register_res.is_ok());
-
-        let umessage = UMessage::default();
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-        assert_eq!(check_on_receive_res, Ok(()));
-
-        let unregister_res = up_client_foo
-            .unregister_listener(&uuri_1, None, listener_baz_completely_different)
-            .await;
-        assert!(unregister_res.is_ok());
-
-        let unregister_baz_res = up_client_foo
-            .unregister_listener(&uuri_1, None, listener_baz)
-            .await;
-        assert!(unregister_baz_res.is_ok());
-
-        let check_on_receive_res = up_client_foo.check_on_receive(&uuri_1, &umessage);
-        assert!(check_on_receive_res.is_err());
+        let mut hasher = DefaultHasher::new();
+        comparable_listener_one.hash(&mut hasher);
+        let hash_one = hasher.finish();
+        let mut hasher = DefaultHasher::new();
+        comparable_listener_two.hash(&mut hasher);
+        let hash_two = hasher.finish();
+        assert_ne!(hash_one, hash_two);
     }
 
     #[test]
     fn test_comparable_listener_pointer_address() {
-        let bar = Arc::new(ListenerBar);
+        let bar = Arc::new(MockUListener::new());
         let comp_listener = ComparableListener::new(bar);
 
         let comp_listener_thread = comp_listener.clone();
-        let handle = thread::spawn(move || comp_listener_thread.pointer_address());
+        let handle = std::thread::spawn(move || comp_listener_thread.pointer_address());
 
         let comp_listener_address_other_thread = handle.join().unwrap();
         let comp_listener_address_this_thread = comp_listener.pointer_address();
@@ -694,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_comparable_listener_debug_outputs() {
-        let bar = Arc::new(ListenerBar);
+        let bar = Arc::new(MockUListener::new());
         let comp_listener = ComparableListener::new(bar);
         let debug_output = format!("{comp_listener:?}");
         assert!(!debug_output.is_empty());
