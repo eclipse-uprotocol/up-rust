@@ -30,10 +30,10 @@ exclude = [
 keywords = ["uProtocol", "SDK", "communication"]
 license = "Apache-2.0"
 name = "up-rust"
-readme = "README.adoc"
+readme = "README.md"
 repository = "https://github.com/eclipse-uprotocol/up-rust"
 rust-version = "1.74.1"
-version = "0.1.0"
+version = "0.1.1"
 
 [features]
 default = ["communication"]
