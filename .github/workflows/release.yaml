@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: readme
-          path: README.md
+          path: README.adoc
         
       - name: Collect quality artifacts
         uses: anotherdaniel/quevee@v0.2.0
@@ -133,7 +133,7 @@ jobs:
         id: upload_readme
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: README.md
+          file: README.adoc
           tag: ${{ github.ref }}
 
       - name: Gets latest created release info
