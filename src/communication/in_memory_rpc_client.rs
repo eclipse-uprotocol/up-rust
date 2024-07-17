@@ -18,6 +18,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::oneshot::{Receiver, Sender};
+use tokio::time::timeout;
 use tracing::{debug, info};
 
 use crate::{
@@ -250,7 +251,7 @@ impl RpcClient for InMemoryRpcClient {
             })?;
 
         if let Ok(Ok(response_message)) =
-            tokio::time::timeout(Duration::from_millis(call_options.ttl() as u64), receiver).await
+            timeout(Duration::from_millis(call_options.ttl() as u64), receiver).await
         {
             handle_response_message(response_message)
         } else {

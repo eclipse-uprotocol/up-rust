@@ -34,7 +34,7 @@ version = "0.1.5"
 
 [features]
 default = ["communication"]
-communication = ["usubscription"]
+communication = ["usubscription", "dep:thiserror", "tokio/sync", "tokio/time"]
 udiscovery = []
 usubscription = []
 utwin = []
@@ -45,14 +45,8 @@ bytes = { version = "1.5" }
 mediatype = "0.19"
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
-thiserror = { version = "1.0.52" }
-tokio = { version = "1.35", default-features = false, features = [
-    "macros",
-    "rt",
-    "rt-multi-thread",
-    "sync",
-    "time",
-] }
+thiserror = { version = "1.0.52", optional = true }
+tokio = { version = "1.35", default-features = false, optional = true }
 tracing = { version = "0.1.35", default-features = false, features = [
     "log",
     "std",
@@ -71,6 +65,12 @@ reqwest = { version = "0.12", features = ["blocking"] }
 [dev-dependencies]
 mockall = "0.12.1"
 test-case = { version = "3.3" }
+tokio = { version = "1.35", default-features = false, features = [
+    "macros",
+    "rt",
+    "sync",
+    "time",
+] }
 
 [profile.release]
 opt-level = 3
