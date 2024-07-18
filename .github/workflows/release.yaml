@@ -46,6 +46,8 @@ jobs:
       - licenses
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
       - name: Upload README
         id: upload_readme
@@ -81,6 +83,8 @@ jobs:
     permissions: write-all
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
       # License report - we later need the download_url output of the upload step
       - name: Download license report
@@ -166,9 +170,11 @@ jobs:
     needs:
       - tag_release_artifacts
     env: 
-      CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+      CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
       - if: env.CRATES_TOKEN == ''
         run: cargo publish --all-features --dry-run

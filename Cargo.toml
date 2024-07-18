@@ -16,16 +16,15 @@ categories = ["api-bindings"]
 description = "The Eclipse uProtocol Rust Language Library"
 documentation = "https://github.com/eclipse-uprotocol/up-spec"
 edition = "2021"
-exclude = [
-    "tests/*",
-    "tools/*",
-    ".devcontainer/*",
-    ".vscode/*",
-    ".github/*",
-    ".gitignore",
-    "about.hbs",
-    "about.toml",
-    "deny.toml",
+include = [
+    "/src/*",
+    "/up-spec/up-core-api/uprotocol/*",
+    "/build.rs",
+    "/Cargo.toml",
+    "/CONTRIBUTING.md",
+    "/LICENSE",
+    "/NOTICE.md",
+    "/README.md",
 ]
 keywords = ["uProtocol", "SDK", "communication"]
 license = "Apache-2.0"
@@ -63,7 +62,6 @@ uuid-simd = { version = "0.8", default-features = false, features = [
 [build-dependencies]
 protobuf-codegen = { version = "3.3" }
 protoc-bin-vendored = { version = "3.0" }
-reqwest = { version = "0.12", features = ["blocking"] }
 
 [dev-dependencies]
 mockall = "0.12.1"
