@@ -38,6 +38,8 @@ jobs:
       test_coverage_url: ${{ steps.test_coverage_html.outputs.artifact-url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
       - uses: dtolnay/rust-toolchain@master
         with: 

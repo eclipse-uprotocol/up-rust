@@ -50,6 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: "recursive"
     - uses: dtolnay/rust-toolchain@master
       with: 
         toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -62,6 +64,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: "recursive"
     - uses: dtolnay/rust-toolchain@master
       with: 
         toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -73,6 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -85,6 +91,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -100,12 +108,14 @@ jobs:
       RUSTDOCFLAGS: -Dwarnings
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Run rustdoc
         run: |
-          cargo doc --no-deps
+          cargo doc --no-deps --all-features
 
   feature-check:
     # Comprehensive check on dependencies for all feature flag combinations, excluding development dependencies
@@ -113,6 +123,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -134,6 +146,8 @@ jobs:
         feature-flags: ["", "--no-default-features", "--all-features"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -161,6 +175,8 @@ jobs:
       RUSTDOCFLAGS: -Dwarnings
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
