@@ -14,7 +14,6 @@
 [package]
 categories = ["api-bindings"]
 description = "The Eclipse uProtocol Rust Language Library"
-documentation = "https://github.com/eclipse-uprotocol/up-spec"
 edition = "2021"
 include = [
     "/src/*",
@@ -77,3 +76,6 @@ tokio = { version = "1.35", default-features = false, features = [
 opt-level = 3
 lto = "fat"
 codegen-units = 1
+
+[package.metadata.docs.rs]
+all-features = true
