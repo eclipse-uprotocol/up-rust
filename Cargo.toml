@@ -20,9 +20,6 @@ include = [
     "/up-spec/up-core-api/uprotocol/*",
     "/build.rs",
     "/Cargo.toml",
-    "/CONTRIBUTING.md",
-    "/LICENSE",
-    "/NOTICE.md",
     "/README.md",
 ]
 keywords = ["uProtocol", "SDK", "communication"]
