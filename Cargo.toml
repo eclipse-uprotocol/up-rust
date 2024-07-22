@@ -36,6 +36,7 @@ communication = ["usubscription", "dep:thiserror", "tokio/sync", "tokio/time"]
 udiscovery = []
 usubscription = []
 utwin = []
+util = ["tokio/sync"]
 
 [dependencies]
 async-trait = { version = "0.1" }
@@ -65,6 +66,7 @@ test-case = { version = "3.3" }
 tokio = { version = "1.35", default-features = false, features = [
     "macros",
     "rt",
+    "rt-multi-thread",
     "sync",
     "time",
 ] }
@@ -76,3 +78,15 @@ codegen-units = 1
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[example]]
+name = "simple_notify"
+required-features = ["util"]
+
+[[example]]
+name = "simple_publish"
+required-features = ["util"]
+
+[[example]]
+name = "simple_rpc"
+required-features = ["util"]
