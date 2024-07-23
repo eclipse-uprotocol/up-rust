@@ -57,7 +57,7 @@ impl RequestListener {
         debug!(ttl = request_timeout, id = %request_id, "processing RPC request");
 
         let invocation_result_future =
-            request_handler_clone.invoke_method(resource_id, request_payload);
+            request_handler_clone.handle_request(resource_id, request_payload);
         let outcome = tokio::time::timeout(
             Duration::from_millis(request_timeout as u64),
             invocation_result_future,
@@ -433,7 +433,7 @@ mod tests {
         let message_id = UUID::build();
         let request_id = message_id.clone();
 
-        request_handler.expect_invoke_method().never();
+        request_handler.expect_handle_request().never();
         transport
             .expect_do_send()
             .once()
@@ -501,7 +501,7 @@ mod tests {
     async fn test_request_listener_ignores_invalid_request() {
         // GIVEN an RpcServer for a transport
         let mut request_handler = MockRequestHandler::new();
-        request_handler.expect_invoke_method().never();
+        request_handler.expect_handle_request().never();
         let mut transport = MockTransport::new();
         transport.expect_do_send().never();
 
@@ -554,7 +554,7 @@ mod tests {
         let message_id_clone = message_id.clone();
 
         request_handler
-            .expect_invoke_method()
+            .expect_handle_request()
             .once()
             .withf(|resource_id, request_payload| {
                 if let Some(pl) = request_payload {
@@ -623,7 +623,7 @@ mod tests {
         let message_id_clone = message_id.clone();
 
         request_handler
-            .expect_invoke_method()
+            .expect_handle_request()
             .once()
             .withf(|resource_id, _request_payload| *resource_id == 0x7000_u16)
             .returning(|_resource_id, _request_payload| {
@@ -681,7 +681,7 @@ mod tests {
         struct NonRespondingHandler;
         #[async_trait]
         impl RequestHandler for NonRespondingHandler {
-            async fn invoke_method(
+            async fn handle_request(
                 &self,
                 resource_id: u16,
                 _request_payload: Option<UPayload>,

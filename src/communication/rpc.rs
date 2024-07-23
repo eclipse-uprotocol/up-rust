@@ -213,7 +213,7 @@ impl dyn RpcClient {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait RequestHandler: Send + Sync {
-    /// Invokes a method with given input parameters.
+    /// Handles a request to invoke a method with given input parameters.
     ///
     /// Implementations MUST NOT block the calling thread. Long running
     /// computations should be performed on a separate worker thread, yielding
@@ -230,8 +230,8 @@ pub trait RequestHandler: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns an error if the method request could not be processed successfully.
-    async fn invoke_method(
+    /// Returns an error if the request could not be processed successfully.
+    async fn handle_request(
         &self,
         resource_id: u16,
         request_payload: Option<UPayload>,

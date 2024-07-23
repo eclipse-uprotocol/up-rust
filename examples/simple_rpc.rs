@@ -31,7 +31,7 @@ struct EchoOperation {}
 
 #[async_trait::async_trait]
 impl RequestHandler for EchoOperation {
-    async fn invoke_method(
+    async fn handle_request(
         &self,
         _resource_id: u16,
         request_payload: Option<UPayload>,
