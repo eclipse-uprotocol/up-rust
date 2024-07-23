@@ -46,6 +46,7 @@ For user convenience, all of these modules export their types on up_rust top-lev
   implementations. Enabled by default.
 * `utwin` enables support for types required to interact with [uTwin service](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/v1.6.0-alpha.2/up-l3/utwin/v3/README.adoc)
   implementations.
+* `util` provides some useful helper structs. In particular, provides a local, in-memory UTransport for exchanging messages within a single process. This transport is also used by the examples illustrating usage of the Communication Layer API.
 
 ## References
 
@@ -56,6 +57,8 @@ For user convenience, all of these modules export their types on up_rust top-lev
 // up_core_api types used and augmented by up_rust - symbols re-exported to toplevel, errors are module-specific
 #[cfg(feature = "communication")]
 pub mod communication;
+#[cfg(feature = "util")]
+pub mod local_transport;
 mod uattributes;
 pub use uattributes::{
     NotificationValidator, PublishValidator, RequestValidator, ResponseValidator,
