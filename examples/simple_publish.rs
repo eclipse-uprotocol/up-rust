@@ -37,13 +37,16 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transport = Arc::new(LocalTransport::new("my-vehicle", 0xa34b, 0x01));
     let uri_provider: Arc<dyn LocalUriProvider> = transport.clone();
     let publisher = SimplePublisher::new(transport.clone(), uri_provider.clone());
+    let listener = Arc::new(ConsolePrinter {});
+
     transport
         .register_listener(
             &uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID),
             None,
-            Arc::new(ConsolePrinter {}),
+            listener.clone(),
         )
         .await?;
+
     let value = StringValue {
         value: "Hello".to_string(),
         ..Default::default()
@@ -56,5 +59,14 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(payload),
         )
         .await?;
+
+    transport
+        .unregister_listener(
+            &uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID),
+            None,
+            listener,
+        )
+        .await?;
+
     Ok(())
 }

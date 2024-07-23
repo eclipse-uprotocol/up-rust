@@ -34,15 +34,14 @@ impl UListener for ConsolePrinter {
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const ORIGIN_RESOURCE_ID: u16 = 0xd100;
+
     let transport = Arc::new(LocalTransport::new("my-vehicle", 0xa34b, 0x01));
     let uri_provider: Arc<dyn LocalUriProvider> = transport.clone();
     let notifier = SimpleNotifier::new(transport.clone(), uri_provider.clone());
-    notifier
-        .start_listening(
-            &uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID),
-            Arc::new(ConsolePrinter {}),
-        )
-        .await?;
+    let topic = uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID);
+    let listener = Arc::new(ConsolePrinter {});
+
+    notifier.start_listening(&topic, listener.clone()).await?;
 
     let value = StringValue {
         value: "Hello".to_string(),
@@ -57,5 +56,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(payload),
         )
         .await?;
+
+    notifier.stop_listening(&topic, listener).await?;
     Ok(())
 }

@@ -55,9 +55,10 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // create the RpcServer using the local transport
     let rpc_server = InMemoryRpcServer::new(transport.clone(), uri_provider.clone());
     // and register an endpoint for the service operation
-    let echo_op = EchoOperation {};
+    let echo_op = Arc::new(EchoOperation {});
+
     rpc_server
-        .register_endpoint(None, METHOD_RESOURCE_ID, Arc::new(echo_op))
+        .register_endpoint(None, METHOD_RESOURCE_ID, echo_op.clone())
         .await?;
 
     // now create an RpcClient attached to the same local transport
@@ -98,5 +99,11 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => panic!("expected service to return response message"),
     }
+
+    // and finally unregister the endpoint
+    rpc_server
+        .unregister_endpoint(None, METHOD_RESOURCE_ID, echo_op)
+        .await?;
+
     Ok(())
 }
