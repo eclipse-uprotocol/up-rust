@@ -81,12 +81,12 @@ all-features = true
 
 [[example]]
 name = "simple_notify"
-required-features = ["util"]
+required-features = ["communication", "util"]
 
 [[example]]
 name = "simple_publish"
-required-features = ["util"]
+required-features = ["communication", "util"]
 
 [[example]]
 name = "simple_rpc"
-required-features = ["util"]
+required-features = ["communication", "util"]
