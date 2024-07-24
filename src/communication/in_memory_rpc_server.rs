@@ -229,7 +229,9 @@ impl RpcServer for InMemoryRpcServer {
             });
             self.transport
                 .register_listener(
-                    origin_filter.unwrap_or(&UUri::any()),
+                    origin_filter.unwrap_or(&UUri::any_with_resource_id(
+                        crate::uri::RESOURCE_ID_RESPONSE,
+                    )),
                     Some(&sink_filter),
                     listener.clone(),
                 )
@@ -258,7 +260,9 @@ impl RpcServer for InMemoryRpcServer {
             let listener = entry.get().to_owned();
             self.transport
                 .unregister_listener(
-                    origin_filter.unwrap_or(&UUri::any()),
+                    origin_filter.unwrap_or(&UUri::any_with_resource_id(
+                        crate::uri::RESOURCE_ID_RESPONSE,
+                    )),
                     Some(&sink_filter),
                     listener,
                 )
@@ -310,7 +314,9 @@ mod tests {
         let request_handler = Arc::new(MockRequestHandler::new());
         let mut transport = MockTransport::new();
         let uri_provider = new_uri_provider();
-        let expected_source_filter = origin_filter.clone().unwrap_or(UUri::any());
+        let expected_source_filter = origin_filter
+            .clone()
+            .unwrap_or(UUri::any_with_resource_id(0));
         let param_check = move |source_filter: &UUri,
                                 sink_filter: &Option<&UUri>,
                                 _listener: &Arc<dyn UListener>| {

@@ -371,11 +371,16 @@ impl UUri {
 
     /// Gets a URI that consists of wildcards only and therefore matches any URI.
     pub fn any() -> Self {
+        Self::any_with_resource_id(WILDCARD_RESOURCE_ID)
+    }
+
+    /// Gets a URI that consists of wildcards and the specific resource ID.
+    pub fn any_with_resource_id(resource_id: u32) -> Self {
         UUri {
             authority_name: WILDCARD_AUTHORITY.to_string(),
             ue_id: WILDCARD_ENTITY_ID,
             ue_version_major: WILDCARD_ENTITY_VERSION,
-            resource_id: WILDCARD_RESOURCE_ID,
+            resource_id,
             ..Default::default()
         }
     }
