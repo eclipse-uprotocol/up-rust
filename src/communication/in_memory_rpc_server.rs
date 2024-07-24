@@ -229,7 +229,9 @@ impl RpcServer for InMemoryRpcServer {
             });
             self.transport
                 .register_listener(
-                    origin_filter.unwrap_or(&UUri::any_with_resource_id(0)),
+                    origin_filter.unwrap_or(&UUri::any_with_resource_id(
+                        crate::uri::RESOURCE_ID_RESPONSE,
+                    )),
                     Some(&sink_filter),
                     listener.clone(),
                 )
@@ -258,7 +260,9 @@ impl RpcServer for InMemoryRpcServer {
             let listener = entry.get().to_owned();
             self.transport
                 .unregister_listener(
-                    origin_filter.unwrap_or(&UUri::any_with_resource_id(0)),
+                    origin_filter.unwrap_or(&UUri::any_with_resource_id(
+                        crate::uri::RESOURCE_ID_RESPONSE,
+                    )),
                     Some(&sink_filter),
                     listener,
                 )
