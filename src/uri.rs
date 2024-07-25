@@ -389,7 +389,8 @@ impl UUri {
         self.eq(&UUri::default())
     }
 
-    /// Check if an `UUri` is remote, by comparing authority fields.
+    /// Check if an `UUri` is remote, by comparing authority fields. UUris with empty authority are
+    /// considered to be local.
     ///
     /// # Returns
     ///
@@ -406,7 +407,8 @@ impl UUri {
     /// assert!(authority_a.is_remote_authority(&authority_b));
     /// ````
     pub fn is_remote_authority(&self, other_uri: &UUri) -> bool {
-        self.authority_name != WILDCARD_AUTHORITY
+        !self.authority_name.is_empty()
+            && self.authority_name != WILDCARD_AUTHORITY
             && other_uri.authority_name != WILDCARD_AUTHORITY
             && self.authority_name != other_uri.authority_name
     }
