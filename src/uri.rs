@@ -405,6 +405,9 @@ impl UUri {
     /// let authority_a = UUri::from_str("up://Authority.A/100A/1/0").unwrap();
     /// let authority_b = UUri::from_str("up://Authority.B/200B/2/20").unwrap();
     /// assert!(authority_a.is_remote_authority(&authority_b));
+    ///
+    /// let authority_local = UUri::from_str("up:///100A/1/0").unwrap();
+    /// assert!(!authority_local.is_remote_authority(&authority_b));
     /// ````
     pub fn is_remote_authority(&self, other_uri: &UUri) -> bool {
         !self.authority_name.is_empty()
