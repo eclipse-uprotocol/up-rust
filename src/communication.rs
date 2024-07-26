@@ -329,7 +329,7 @@ impl UPayload {
     /// # Errors
     ///
     /// * Err(`UMessageError`) if the unpacking process fails, for example if the payload could
-    /// not be deserialized into the target type `T`.
+    ///   not be deserialized into the target type `T`.
     ///
     ///
     /// # Examples
