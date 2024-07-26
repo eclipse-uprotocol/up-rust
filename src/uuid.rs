@@ -302,7 +302,7 @@ impl FromStr for UUID {
     ///
     /// Returns an error
     /// * if the given string does not represent a UUID as defined by
-    /// [RFC 4122, Section 3](https://www.rfc-editor.org/rfc/rfc4122.html#section-3), or
+    ///   [RFC 4122, Section 3](https://www.rfc-editor.org/rfc/rfc4122.html#section-3), or
     /// * if the bytes encoded in the string contain an invalid version and/or variant identifier.
     ///
     /// # Examples

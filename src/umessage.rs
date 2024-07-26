@@ -175,7 +175,7 @@ impl UMessage {
     /// # Errors
     ///
     /// * Err(`UMessageError`) if the unpacking process fails, for example if the payload could
-    /// not be deserialized into the target type `T`.
+    ///   not be deserialized into the target type `T`.
     pub fn extract_protobuf<T: MessageFull + Default>(&self) -> Result<T, UMessageError> {
         if let Some(payload) = &self.payload {
             let payload_format = self.attributes.payload_format.enum_value_or_default();
