@@ -410,7 +410,7 @@ impl UUri {
     /// assert!(!authority_local.is_remote_authority(&authority_a));
     ///
     /// let authority_wildcard = UUri::from_str("up://*/100A/1/0").unwrap();
-    /// assert!(!authority_local.is_remote_authority(&authority_a));
+    /// assert!(!authority_wildcard.is_remote_authority(&authority_a));
     /// assert!(!authority_a.is_remote_authority(&authority_wildcard));
     /// assert!(!authority_wildcard.is_remote_authority(&authority_wildcard));
     /// ````
