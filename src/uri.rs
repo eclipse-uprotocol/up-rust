@@ -73,6 +73,23 @@ impl From<&UUri> for String {
     /// # Returns
     ///
     /// The output of [`UUri::to_uri`] without inlcuding the uProtocol scheme.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri {
+    ///     authority_name: String::from("VIN.vehicles"),
+    ///     ue_id: 0x0000_800A,
+    ///     ue_version_major: 0x02,
+    ///     resource_id: 0x0000_1a50,
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let uri_string = String::from(&uuri);
+    /// assert_eq!(uri_string, "//VIN.vehicles/800A/2/1A50");
+    /// ````
     fn from(uri: &UUri) -> Self {
         UUri::to_uri(uri, false)
     }
@@ -222,6 +239,23 @@ impl TryFrom<String> for UUri {
     /// # Returns
     ///
     /// A `Result` containing either the `UUri` representation of the URI or a `SerializationError`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uri = UUri {
+    ///     authority_name: "".to_string(),
+    ///     ue_id: 0x001A_8000,
+    ///     ue_version_major: 0x02,
+    ///     resource_id: 0x0000_1a50,
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let uri_from = UUri::try_from("/1A8000/2/1A50".to_string()).unwrap();
+    /// assert_eq!(uri, uri_from);
+    /// ````
     fn try_from(uri: String) -> Result<Self, Self::Error> {
         UUri::from_str(uri.as_str())
     }
@@ -328,7 +362,7 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// assert!(UUri::try_from_parts("vin", 0x5a6b, 0x01, 0x0001).is_ok());
+    /// assert!(UUri::try_from_parts("vin", 0x0000_5a6b, 0x01, 0x0001).is_ok());
     /// ```
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
@@ -390,6 +424,16 @@ impl UUri {
     /// # Returns
     ///
     /// 'true' if this URI is equal to `UUri::default()`, `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri::try_from_parts("MYVIN", 0xa13b, 0x01, 0x7f4e).unwrap();
+    /// assert!(!uuri.is_empty());
+    /// assert!(UUri::default().is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.eq(&UUri::default())
     }
@@ -786,6 +830,13 @@ mod tests {
     #[test_case("up://MYVIN/1A23/1/a13#foobar"; "for URI with fragement")]
     #[test_case("up://MYVIN:1000/1A23/1/A13"; "for authority with port")]
     #[test_case("up://user:pwd@MYVIN/1A23/1/A13"; "for authority with userinfo")]
+    #[test_case("5up://MYVIN/55A1/1/1"; "for invalid scheme")]
+    #[test_case("up://MY#VIN/55A1/1/1"; "for invalid authority")]
+    #[test_case("up://MYVIN/55T1/1/1"; "for non-hex entity ID")]
+    #[test_case("up://MYVIN/55A1//1"; "for empty version")]
+    #[test_case("up://MYVIN/55A1/T/1"; "for non-hex version")]
+    #[test_case("up://MYVIN/55A1/1/"; "for empty resource ID")]
+    #[test_case("up://MYVIN/55A1/1/1T"; "for non-hex resource ID")]
     fn test_from_string_fails(string: &str) {
         let parsing_result = UUri::from_str(string);
         assert!(parsing_result.is_err());
@@ -903,9 +954,10 @@ mod tests {
     }
 
     // [utest->dsn~uri-host-only~2]
-    #[test_case("MYVIN:1000"; "for authority with port")]
-    #[test_case("user:pwd@MYVIN"; "for authority with userinfo")]
-    fn test_try_from_parts_fails(authority: &str) {
+    #[test_case("MYVIN:1000"; "with port")]
+    #[test_case("user:pwd@MYVIN"; "with userinfo")]
+    #[test_case("MY%VIN"; "with reserved character")]
+    fn test_try_from_parts_fails_for_invalid_authority(authority: &str) {
         assert!(UUri::try_from_parts(authority, 0xa100, 0x01, 0x6501).is_err());
     }
 

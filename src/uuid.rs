@@ -322,6 +322,11 @@ impl FromStr for UUID {
     /// assert!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
     ///     .parse::<UUID>()
     ///     .is_err());
+    ///
+    /// // parsing a string that is not a UUID fails
+    /// assert!("this-is-not-a-UUID"
+    ///     .parse::<UUID>()
+    ///     .is_err());
     /// ```
     fn from_str(uuid_str: &str) -> Result<Self, Self::Err> {
         let mut uuid = [0u8; 16];
@@ -342,9 +347,9 @@ mod tests {
     #[test]
     fn test_from_u64_pair() {
         // timestamp = 1, ver = 0b0111
-        let msb = 0x0000000000017000u64;
+        let msb = 0x0000000000017000_u64;
         // variant = 0b10
-        let lsb = 0x8000000000000000u64;
+        let lsb = 0x8000000000000000_u64;
         let conversion_attempt = UUID::from_u64_pair(msb, lsb);
         assert!(conversion_attempt.is_ok());
         let uuid = conversion_attempt.unwrap();
@@ -352,9 +357,15 @@ mod tests {
         assert_eq!(uuid.get_time(), Some(0x1_u64));
 
         // timestamp = 1, (invalid) ver = 0b0000
-        let msb = 0x0000000000010000u64;
+        let msb = 0x0000000000010000_u64;
+        // variant= 0b10
+        let lsb = 0x80000000000000ab_u64;
+        assert!(UUID::from_u64_pair(msb, lsb).is_err());
+
+        // timestamp = 1, ver = 0b0111
+        let msb = 0x0000000000017000_u64;
         // (invalid) variant= 0b00
-        let lsb = 0x00000000000000abu64;
+        let lsb = 0x00000000000000ab_u64;
         assert!(UUID::from_u64_pair(msb, lsb).is_err());
     }
 
@@ -371,6 +382,22 @@ mod tests {
         let uuid = conversion_attempt.unwrap();
         assert!(uuid.is_uprotocol_uuid());
         assert_eq!(uuid.get_time(), Some(0x1_u64));
+    }
+
+    #[test]
+    fn test_into_string() {
+        // timestamp = 1, ver = 0b0111
+        let msb = 0x0000000000017000_u64;
+        // variant = 0b10, random = 0x0010101010101a1a
+        let lsb = 0x8010101010101a1a_u64;
+        let uuid = UUID {
+            msb,
+            lsb,
+            ..Default::default()
+        };
+
+        assert_eq!(String::from(&uuid), "00000000-0001-7000-8010-101010101a1a");
+        assert_eq!(String::from(uuid), "00000000-0001-7000-8010-101010101a1a");
     }
 
     // [utest->req~uuid-proto~1]

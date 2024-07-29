@@ -291,7 +291,7 @@ mod tests {
         sync::Arc,
     };
 
-    use super::MockUListener;
+    use super::*;
 
     #[tokio::test]
     async fn test_deref_returns_wrapped_listener() {
@@ -366,6 +366,33 @@ mod tests {
         comparable_listener_two.hash(&mut hasher);
         let hash_two = hasher.finish();
         assert_ne!(hash_one, hash_two);
+    }
+
+    #[tokio::test]
+    async fn test_utransport_default_implementations() {
+        struct EmptyTransport {}
+        #[async_trait::async_trait]
+        impl UTransport for EmptyTransport {
+            async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
+                todo!()
+            }
+        }
+
+        let transport = EmptyTransport {};
+        let listener = Arc::new(MockUListener::new());
+
+        assert!(transport
+            .receive(&UUri::any(), None)
+            .await
+            .is_err_and(|e| e.get_code() == UCode::UNIMPLEMENTED));
+        assert!(transport
+            .register_listener(&UUri::any(), None, listener.clone())
+            .await
+            .is_err_and(|e| e.get_code() == UCode::UNIMPLEMENTED));
+        assert!(transport
+            .unregister_listener(&UUri::any(), None, listener)
+            .await
+            .is_err_and(|e| e.get_code() == UCode::UNIMPLEMENTED));
     }
 
     #[test]
