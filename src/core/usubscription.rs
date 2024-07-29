@@ -27,6 +27,35 @@ pub use crate::up_core_api::usubscription::{
 use crate::{UStatus, UUri};
 
 impl Hash for SubscriberInfo {
+    /// Creates a hash value based on the URI property.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::hash::{DefaultHasher, Hash, Hasher};
+    /// use up_rust::UUri;
+    /// use up_rust::core::usubscription::SubscriberInfo;
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// let info = SubscriberInfo {
+    ///     uri: Some(UUri::try_from_parts("", 0x1000, 0x01, 0x9a00).unwrap()).into(),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// info.hash(&mut hasher);
+    /// let hash_one = hasher.finish();
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// let info = SubscriberInfo {
+    ///     uri: Some(UUri::try_from_parts("", 0x1000, 0x02, 0xf100).unwrap()).into(),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// info.hash(&mut hasher);
+    /// let hash_two = hasher.finish();
+    ///
+    /// assert_ne!(hash_one, hash_two);
+    /// ```
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.uri.hash(state);
     }
@@ -39,6 +68,19 @@ impl Eq for SubscriberInfo {}
 /// # Returns
 ///
 /// `true` if the given instance is equal to [`SubscriberInfo::default`], `false` otherwise.
+///
+/// # Examples
+///
+/// ```rust
+/// use up_rust::UUri;
+/// use up_rust::core::usubscription::SubscriberInfo;
+///
+/// let mut info = SubscriberInfo::default();
+/// assert!(info.is_empty());
+///
+/// info.uri = Some(UUri::try_from_parts("", 0x1000, 0x01, 0x9a00).unwrap()).into();
+/// assert!(!info.is_empty());
+/// ```
 impl SubscriberInfo {
     pub fn is_empty(&self) -> bool {
         self.eq(&SubscriberInfo::default())

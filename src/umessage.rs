@@ -220,9 +220,11 @@ pub(crate) fn deserialize_protobuf_bytes<T: MessageFull + Default>(
 
 #[cfg(test)]
 mod test {
-    use protobuf::well_known_types::{any::Any, wrappers::StringValue};
+    use std::io;
 
-    use crate::UStatus;
+    use protobuf::well_known_types::{any::Any, duration::Duration, wrappers::StringValue};
+
+    use crate::{UAttributes, UStatus};
 
     use super::*;
 
@@ -230,11 +232,18 @@ mod test {
     fn test_deserialize_protobuf_bytes_succeeds() {
         let mut data = StringValue::new();
         data.value = "hello world".to_string();
-        let any = Any::pack(&data).unwrap();
+        let any = Any::pack(&data.clone()).unwrap();
         let buf: Bytes = any.write_to_bytes().unwrap().into();
+
         let result = deserialize_protobuf_bytes::<StringValue>(
             &buf,
             &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
+        );
+        assert!(result.is_ok_and(|v| v.value == *"hello world"));
+
+        let result = deserialize_protobuf_bytes::<StringValue>(
+            &data.write_to_bytes().unwrap().into(),
+            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF,
         );
         assert!(result.is_ok_and(|v| v.value == *"hello world"));
     }
@@ -250,5 +259,93 @@ mod test {
             &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
         );
         assert!(result.is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
+    }
+
+    #[test]
+    fn test_deserialize_protobuf_bytes_fails_for_unsupported_format() {
+        let result = deserialize_protobuf_bytes::<UStatus>(
+            &"hello".into(),
+            &UPayloadFormat::UPAYLOAD_FORMAT_TEXT,
+        );
+        assert!(result.is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
+    }
+
+    #[test]
+    fn test_deserialize_protobuf_bytes_fails_for_invalid_encoding() {
+        let any = Any {
+            type_url: "type.googleapis.com/google.protobuf.Duration".to_string(),
+            value: vec![0x0A],
+            ..Default::default()
+        };
+        let buf = any.write_to_bytes().unwrap();
+        let result = deserialize_protobuf_bytes::<Duration>(
+            &buf.into(),
+            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
+        );
+        assert!(result.is_err_and(|e| matches!(e, UMessageError::DataSerializationError(_))))
+    }
+
+    #[test]
+    fn extract_payload_succeeds() {
+        let payload = StringValue {
+            value: "hello".to_string(),
+            ..Default::default()
+        };
+        let buf = Any::pack(&payload)
+            .and_then(|a| a.write_to_bytes())
+            .unwrap();
+        let msg = UMessage {
+            attributes: Some(UAttributes {
+                payload_format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY.into(),
+                ..Default::default()
+            })
+            .into(),
+            payload: Some(buf.into()),
+            ..Default::default()
+        };
+        assert!(msg
+            .extract_protobuf::<StringValue>()
+            .is_ok_and(|v| v.value == *"hello"));
+    }
+
+    #[test]
+    fn extract_payload_fails_for_no_payload() {
+        let msg = UMessage {
+            attributes: Some(UAttributes {
+                payload_format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY.into(),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        };
+        assert!(msg
+            .extract_protobuf::<StringValue>()
+            .is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
+    }
+
+    #[test]
+    fn test_from_attributes_error() {
+        let attributes_error = UAttributesError::validation_error("failed to validate");
+        let message_error = UMessageError::from(attributes_error);
+        assert!(matches!(
+            message_error,
+            UMessageError::AttributesValidationError(UAttributesError::ValidationError(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_protobuf_error() {
+        let protobuf_error = protobuf::Error::from(io::Error::last_os_error());
+        let message_error = UMessageError::from(protobuf_error);
+        assert!(matches!(
+            message_error,
+            UMessageError::DataSerializationError(_)
+        ));
+    }
+
+    #[test]
+    fn test_from_error_msg() {
+        let message_error = UMessageError::from("an error occurred");
+        assert!(matches!(message_error, UMessageError::PayloadError(_)));
     }
 }

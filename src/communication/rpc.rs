@@ -170,7 +170,7 @@ impl dyn RpcClient {
     ///
     /// * `method` - The URI representing the method to invoke.
     /// * `call_options` - Options to include in the request message.
-    /// * `proto_message` - The protobuf `Message` to include in the request message.
+    /// * `request_message` - The protobuf `Message` to include in the request message.
     ///
     /// # Returns
     ///
@@ -184,13 +184,13 @@ impl dyn RpcClient {
         &self,
         method: UUri,
         call_options: CallOptions,
-        proto_message: T,
+        request_message: T,
     ) -> Result<R, ServiceInvocationError>
     where
         T: MessageFull,
         R: MessageFull,
     {
-        let payload = UPayload::try_from_protobuf(proto_message)
+        let payload = UPayload::try_from_protobuf(request_message)
             .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
 
         let result = self
@@ -285,4 +285,59 @@ pub trait RpcServer {
         resource_id: u16,
         request_handler: Arc<dyn RequestHandler>,
     ) -> Result<(), RegistrationError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use protobuf::well_known_types::wrappers::StringValue;
+
+    use crate::{communication::CallOptions, UUri};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_invoke_proto_method_fails_for_unexpected_return_type() {
+        let mut rpc_client = MockRpcClient::new();
+        rpc_client
+            .expect_invoke_method()
+            .once()
+            .returning(|_method, _options, _payload| {
+                let error = UStatus::fail_with_code(UCode::INTERNAL, "internal error");
+                let response_payload = UPayload::try_from_protobuf(error).unwrap();
+                Ok(Some(response_payload))
+            });
+        let client: Arc<dyn RpcClient> = Arc::new(rpc_client);
+        let mut request = StringValue::new();
+        request.value = "hello".to_string();
+        let result = client
+            .invoke_proto_method::<StringValue, StringValue>(
+                UUri::try_from_parts("", 0x1000, 0x01, 0x0001).unwrap(),
+                CallOptions::for_rpc_request(5_000, None, None, None),
+                request,
+            )
+            .await;
+        assert!(result.is_err_and(|e| matches!(e, ServiceInvocationError::InvalidArgument(_))));
+    }
+
+    #[tokio::test]
+    async fn test_invoke_proto_method_fails_for_missing_response_payload() {
+        let mut rpc_client = MockRpcClient::new();
+        rpc_client
+            .expect_invoke_method()
+            .once()
+            .return_const(Ok(None));
+        let client: Arc<dyn RpcClient> = Arc::new(rpc_client);
+        let mut request = StringValue::new();
+        request.value = "hello".to_string();
+        let result = client
+            .invoke_proto_method::<StringValue, StringValue>(
+                UUri::try_from_parts("", 0x1000, 0x01, 0x0001).unwrap(),
+                CallOptions::for_rpc_request(5_000, None, None, None),
+                request,
+            )
+            .await;
+        assert!(result.is_err_and(|e| matches!(e, ServiceInvocationError::InvalidArgument(_))));
+    }
 }
