@@ -17,6 +17,7 @@ description = "The Eclipse uProtocol Rust Language Library"
 edition = "2021"
 include = [
     "/src/*",
+    "/examples/*",
     "/up-spec/up-core-api/uprotocol/*",
     "/build.rs",
     "/Cargo.toml",
@@ -28,7 +29,7 @@ name = "up-rust"
 readme = "README.md"
 repository = "https://github.com/eclipse-uprotocol/up-rust"
 rust-version = "1.74.1"
-version = "0.1.4"
+version = "0.1.5"
 
 [features]
 default = ["communication"]
@@ -40,7 +41,7 @@ util = ["tokio/sync"]
 
 [dependencies]
 async-trait = { version = "0.1" }
-bytes = { version = "1.5" }
+bytes = { version = "1.6.1" }
 mediatype = "0.19"
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = { version = "0.8" }
