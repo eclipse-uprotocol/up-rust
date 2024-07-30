@@ -1,11 +1,11 @@
 # Eclipse uProtocol Rust library
 
-This is the [uProtocol v1.6.0-alpha.2 Language Library](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/v1.6.0-alpha.2/languages.adoc) for the Rust programming language.
+This is the [uProtocol v1.6.0-alpha.3 Language Library](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/v1.6.0-alpha.3/languages.adoc) for the Rust programming language.
 
 The crate can be used to
 
-* implement uEntities that communicate with each other using the uProtocol [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.2/up-l2/api.adoc) over one of the supported transport protocols.
-* implement support for an additional transport protocol by means of implementing the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.2/up-l1/README.adoc).
+* implement uEntities that communicate with each other using the uProtocol [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.3/up-l2/api.adoc) over one of the supported transport protocols.
+* implement support for an additional transport protocol by means of implementing the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.3/up-l1/README.adoc).
 
 ## Using the Crate
 <!--
