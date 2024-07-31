@@ -61,6 +61,7 @@ uuid-simd = { version = "0.8", default-features = false, features = [
 protobuf-codegen = { version = "3.3" }
 protoc-bin-vendored = { version = "3.0" }
 
+
 [dev-dependencies]
 mockall = "0.12.1"
 test-case = { version = "3.3" }
