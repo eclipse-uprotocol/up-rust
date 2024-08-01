@@ -28,10 +28,11 @@ This is implemented in [`nightly.yaml`](nightly.yaml)
 
 In addition to the main workflows described above, there exist a number of modules that are used by these main workflows. They can also be run standalone, and are intendet to make composing the capabilities of our main workflows simpler. These are:
 
-- `coverage.yaml` - collects test code coverage, and can optionally upload the results to codecov.io
+- [`coverage.yaml`](coverage.yaml) - collects test code coverage, and can optionally upload the results to codecov.io
   - Will publish coverage data to CodeCov if `${{ secrets.CODECOV_TOKEN }}` is set
   - outputs: download URL for the workflow-generated coverage info file
-- `license-report.yaml` - create a license report for `up-rust` and all its dependencies in html format
+- [`license-report.yaml`](license-report.yaml) - create a license report for `up-rust` and all its dependencies in html format
   - outputs: download URL for the workflow-generated license report
-- `test-featurematrix.yaml` - Test all feature combinations on a range of OS platforms
-- `x-build.yaml` - Run release builds on multiple architecture targets
+- [`test-featurematrix.yaml`](test-featurematrix.yaml) - Test all feature combinations on a range of OS platforms
+- [`verify-msrv.yaml`](verify-msrv.yaml) - checks if the MSRV ('Minimum Supported Rust Version) declared in Cargo.toml is correct
+- [`x-build.yaml`](x-build.yaml) - Run release builds on multiple architecture targets

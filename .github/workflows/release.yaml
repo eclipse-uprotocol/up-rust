@@ -30,6 +30,9 @@ jobs:
   check:
     uses: ./.github/workflows/check.yaml
 
+  check-msrv:
+    uses: ./.github/workflows/verify-msrv.yaml
+
   coverage:
     uses: ./.github/workflows/coverage.yaml  
 
@@ -42,6 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: 
       - check
+      - check-msrv
       - coverage
       - licenses
     steps:
