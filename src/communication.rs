@@ -104,7 +104,7 @@ impl From<UStatus> for RegistrationError {
 }
 
 /// General options that clients might want to specify when sending a uProtocol message.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CallOptions {
     ttl: u32,
     message_id: Option<UUID>,
