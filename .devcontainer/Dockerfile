@@ -11,8 +11,7 @@
 # SPDX-License-Identifier: Apache-2.0
 ################################################################################
 
-FROM mcr.microsoft.com/devcontainers/rust:1-1-bookworm
-
+FROM mcr.microsoft.com/devcontainers/rust:latest
 ARG USERNAME=vscode
 ARG TARGETARCH
 
@@ -33,7 +32,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 USER ${USERNAME}
 
 # Install cargo cli tools
-RUN cargo install cargo-tarpaulin --locked
+RUN cargo install cargo-nextest cargo-deny cargo-tarpaulin --locked
 
 # Install cargo tools for cross compilation
 RUN rustup target add aarch64-unknown-linux-gnu \
