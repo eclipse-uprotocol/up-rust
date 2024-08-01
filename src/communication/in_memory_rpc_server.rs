@@ -11,6 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+// [impl->req~up-language-comm-api-default-impl~1]
+
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -279,6 +281,8 @@ impl RpcServer for InMemoryRpcServer {
 
 #[cfg(test)]
 mod tests {
+
+    // [utest->req~up-language-comm-api-default-impl~1]
 
     use super::*;
 

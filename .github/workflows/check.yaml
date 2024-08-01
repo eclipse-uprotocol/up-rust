@@ -60,6 +60,7 @@ jobs:
       run: |
         cargo deny check
 
+  # [impl->req~up-language-ci-build~1]
   check:
     runs-on: ubuntu-latest
     steps:
@@ -73,6 +74,7 @@ jobs:
       run: |
         cargo check --all --tests
 
+  # [impl->req~up-language-ci-linter~1]
   fmt:
     runs-on: ubuntu-latest
     steps:
@@ -87,6 +89,7 @@ jobs:
         run: |
           cargo fmt --all -- --check
 
+  # [impl->req~up-language-ci-linter~1]
   clippy:
     runs-on: ubuntu-latest
     steps:
@@ -102,6 +105,7 @@ jobs:
           cargo clippy --version
           cargo clippy --tests --examples
 
+  # [impl->req~up-language-ci-api-docs~1]
   docu:
     runs-on: ubuntu-latest
     env:
@@ -134,6 +138,7 @@ jobs:
         run: |
           cargo hack check --feature-powerset --no-dev-deps
 
+  # [impl->req~up-language-ci-test~1]
   nextest:
     # Subset of feature-combos, on only one OS - more complete testing in test-featurematrix.yaml
     outputs:
@@ -166,6 +171,7 @@ jobs:
           name: test-results
           path: testresults--all-features.json
 
+  # [impl->req~up-language-ci-test~1]
   doctest:
     # Run doctests separately, as nextest doesn't yet (https://github.com/nextest-rs/nextest/issues/16)
     outputs:

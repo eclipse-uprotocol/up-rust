@@ -43,6 +43,7 @@ pub trait LocalUriProvider: Send + Sync {
 ///
 /// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.3/up-l1/README.adoc)
 /// for details.
+// [impl->req~up-language-transport-api~1]
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait UListener: Send + Sync {
