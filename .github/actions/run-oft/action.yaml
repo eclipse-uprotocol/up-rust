@@ -1,0 +1,87 @@
+# ********************************************************************************
+#  Copyright (c) 2024 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************/
+
+# Perform requirements tracing against the uProtocol Specification using OpenFastTrace (https://github.com/itsallcode/openfasttrace)
+# Returns the URL of the created HTML report as an output
+
+name: "Run OpenFastTrace"
+description: |
+  Runs OpenFastTrace with the trace command on the local up-rust workspace.
+outputs:
+  requirements-tracing-exit-code:
+    description: |
+      A flag indicating the outcome of running OpenFastTrace (0: success, 1: failure).
+      The report is created in any case, as long as OpenFastTrace could be run at all.
+    value: ${{ steps.run-oft.outputs.requirements-tracing-exit-code }}
+  requirements-tracing-report-url:
+    description: "The URL to the OpenFastTrace HTML report"
+    value: ${{ steps.tracing-report-html.artifact-url }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Prepare Environment
+      shell: bash
+      run: |
+        echo "TRACING_REPORT_FILE_NAME=requirements-tracing-report.html" >> $GITHUB_ENV
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: "temurin"
+        java-version: "17"
+    - name: Download OpenFastTrace JARs
+      shell: bash
+      env:
+        OFT_REPO_BASE: "https://github.com/itsallcode"
+        OFT_CORE_VERSION: "4.1.0"
+        OFT_ASCIIDOC_PLUGIN_VERSION: "0.2.0"
+      run: |
+        mkdir "${{ github.workspace }}/lib"
+        curl -L -o "${{ github.workspace }}/lib/openfasttrace.jar" \
+          "${{ env.OFT_REPO_BASE }}/openfasttrace/releases/download/${{ env.OFT_CORE_VERSION }}/openfasttrace-${{ env.OFT_CORE_VERSION }}.jar"
+        curl -L -o "${{ github.workspace }}/lib/openfasttrace-asciidoc-plugin.jar" \
+          "${{ env.OFT_REPO_BASE }}/openfasttrace-asciidoc-plugin/releases/download/${{ env.OFT_ASCIIDOC_PLUGIN_VERSION }}/openfasttrace-asciidoc-plugin-${{ env.OFT_ASCIIDOC_PLUGIN_VERSION }}-with-dependencies.jar"
+    - name: Run OpenFastTrace
+      id: run-oft
+      shell: bash
+      run: |
+        if java -cp "${{ github.workspace }}/lib/*" \
+          org.itsallcode.openfasttrace.core.cli.CliStarter trace -o html \
+          -f "${{ env.TRACING_REPORT_FILE_NAME }}" \
+          *.md \
+          *.rs \
+          .github \
+          examples \
+          src \
+          tests \
+          tools \
+          up-spec/*.adoc \
+          up-spec/*.md \
+          up-spec/basics \
+          up-spec/up-l1/README.* \
+          up-spec/up-l2 \
+          up-spec/up-l3;
+        then
+          echo "requirements-tracing-exit-code=0" >> $GITHUB_OUTPUT
+          echo "All requirements from uProtocol Specification are covered by crate." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "requirements-tracing-exit-code=1" >> $GITHUB_OUTPUT
+          echo "Some requirements from uProtocol Specification are not covered by crate. See attached report for details." >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload tracing report (html)
+      uses: actions/upload-artifact@v4
+      id: tracing-report-html
+      with:
+        name: tracing-report-html
+        path: ${{ env.TRACING_REPORT_FILE_NAME }}

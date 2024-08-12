@@ -11,7 +11,8 @@
 #  SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************/
 
-# Verifies that this crate can be built with the most recent changes from up-spec's main branch
+# Verifies that this crate can be built using the uProtocol Core API from up-spec's main branch.
+# Also performs requirements tracing using OpenFastTrace
 
 name: uP Spec Compatibility
 
@@ -30,8 +31,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  nextest:
-    # Subset of feature-combos, on only one OS - more complete testing in test-featurematrix.yaml
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +46,14 @@ jobs:
           git pull
           git status
           cd "${{ github.workspace }}"
+
+      # run OpenFastTrace first because OFT will always succeed and produce
+      # a tracing report
+      - name: Run OpenFastTrace
+        uses: ./.github/actions/run-oft
+
+      # now try to build and run the tests which may fail if incomaptible changes
+      # have been introduced in up-spec
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
