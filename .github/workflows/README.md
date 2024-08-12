@@ -28,6 +28,7 @@ This is implemented in [`nightly.yaml`](nightly.yaml)
 
 In addition to the main workflows described above, there exist a number of modules that are used by these main workflows. They can also be run standalone, and are intendet to make composing the capabilities of our main workflows simpler. These are:
 
+- [`check-up-spec-compatibility.yaml`](check-up-spec-compatibility.yaml) - checks if the current main branch can be built against up-spec's main branch instead of its latest tag/release
 - [`coverage.yaml`](coverage.yaml) - collects test code coverage, and can optionally upload the results to codecov.io
   - Will publish coverage data to CodeCov if `${{ secrets.CODECOV_TOKEN }}` is set
   - outputs: download URL for the workflow-generated coverage info file
