@@ -34,6 +34,7 @@ In addition to the main workflows described above, there exist a number of modul
   - outputs: download URL for the workflow-generated coverage info file
 - [`license-report.yaml`](license-report.yaml) - create a license report for `up-rust` and all its dependencies in html format
   - outputs: download URL for the workflow-generated license report
+- [`requirements-tracing.yaml`](requirements-tracing.yaml) - Run OpenFastTrace to verify that all requirements from uProtocol Specification are met
 - [`test-featurematrix.yaml`](test-featurematrix.yaml) - Test all feature combinations on a range of OS platforms
 - [`verify-msrv.yaml`](verify-msrv.yaml) - checks if the MSRV ('Minimum Supported Rust Version) declared in Cargo.toml is correct
 - [`x-build.yaml`](x-build.yaml) - Run release builds on multiple architecture targets
