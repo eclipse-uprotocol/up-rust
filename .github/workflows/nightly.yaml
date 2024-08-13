@@ -25,9 +25,24 @@ concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
+env:
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+
 jobs:
   check-msrv:
     uses: ./.github/workflows/verify-msrv.yaml
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: "recursive"
+    - uses: EmbarkStudios/cargo-deny-action@v2
+      with: 
+        rust-version: ${{ env.RUST_TOOLCHAIN }}
+        command: check
+        arguments: --all-features
 
   test-all-features:
     uses: ./.github/workflows/test-featurematrix.yaml
