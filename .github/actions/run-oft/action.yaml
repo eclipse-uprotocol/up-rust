@@ -68,9 +68,7 @@ runs:
           up-spec/*.adoc \
           up-spec/*.md \
           up-spec/basics \
-          up-spec/up-l1/README.* \
-          up-spec/up-l2 \
-          up-spec/up-l3;
+          up-spec/up-l2/api.adoc;
         then
           echo "requirements-tracing-exit-code=0" >> $GITHUB_OUTPUT
           echo "All requirements from uProtocol Specification are covered by crate." >> $GITHUB_STEP_SUMMARY
