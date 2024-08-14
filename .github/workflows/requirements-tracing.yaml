@@ -18,6 +18,12 @@ name: Requirements tracing
 
 on:
   workflow_call:
+    inputs:
+      oft-file-patterns:
+        description: |
+          A whitespace separated list of glob patterns which specify the files to include in the OFT trace run.
+          If not specified, defaults to all files relevant for checking up-rust against the uProtocol Specification.
+        type: string
     outputs:
       tracing_report_url:
         description: 'URL of the requirements tracing report'
@@ -39,6 +45,8 @@ jobs:
       - name: Run OpenFastTrace
         id: run-oft
         uses: ./.github/actions/run-oft
+        with:
+          file-patterns: ${{ inputs.oft-file-patterns || '*.md *.rs .github examples src tests tools up-spec/*.adoc up-spec/*.md up-spec/basics up-spec/up-l2/api.adoc' }}
 
       - name: "Determine exit code"
         run: |
