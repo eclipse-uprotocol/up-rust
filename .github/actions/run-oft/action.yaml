@@ -17,6 +17,17 @@
 name: "Run OpenFastTrace"
 description: |
   Runs OpenFastTrace with the trace command on the local up-rust workspace.
+inputs:
+  file-patterns:
+    description: |
+      A whitespace separated list of glob patterns which specify the files to include in the OFT trace run.
+    default: "**/*.*"
+    required: false
+  java-version:
+    description: |
+      The version of Java to use for running OpenFastTrace.
+    default: "21"
+    required: false
 outputs:
   requirements-tracing-exit-code:
     description: |
@@ -38,7 +49,7 @@ runs:
       uses: actions/setup-java@v4
       with:
         distribution: "temurin"
-        java-version: "17"
+        java-version: ${{ inputs.java-version }}
     - name: Download OpenFastTrace JARs
       shell: bash
       env:
@@ -54,21 +65,13 @@ runs:
     - name: Run OpenFastTrace
       id: run-oft
       shell: bash
+      env:
+        INPUT_FILE_PATTERNS: ${{ inputs.file-patterns }}
       run: |
         if java -cp "${{ github.workspace }}/lib/*" \
           org.itsallcode.openfasttrace.core.cli.CliStarter trace -o html \
           -f "${{ env.TRACING_REPORT_FILE_NAME }}" \
-          *.md \
-          *.rs \
-          .github \
-          examples \
-          src \
-          tests \
-          tools \
-          up-spec/*.adoc \
-          up-spec/*.md \
-          up-spec/basics \
-          up-spec/up-l2/api.adoc;
+          ${{ env.INPUT_FILE_PATTERNS }};
         then
           echo "requirements-tracing-exit-code=0" >> $GITHUB_OUTPUT
           echo "All requirements from uProtocol Specification are covered by crate." >> $GITHUB_STEP_SUMMARY
