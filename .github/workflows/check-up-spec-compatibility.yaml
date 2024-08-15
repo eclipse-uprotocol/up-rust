@@ -51,6 +51,8 @@ jobs:
       # a tracing report
       - name: Run OpenFastTrace
         uses: ./.github/actions/run-oft
+        with:
+          file-patterns: 'up-spec/*.adoc up-spec/*.md up-spec/basics up-spec/up-l2/api.adoc *.adoc *.md *.rs .github examples src tests tools'
 
       # now try to build and run the tests which may fail if incomaptible changes
       # have been introduced in up-spec
