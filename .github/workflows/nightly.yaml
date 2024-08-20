@@ -53,3 +53,8 @@ jobs:
 
   coverage:
     uses: ./.github/workflows/coverage.yaml
+
+  requirements-tracing:
+    uses: ./.github/workflows/requirements-tracing.yaml
+    with:
+      oft-file-patterns: ${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }}
