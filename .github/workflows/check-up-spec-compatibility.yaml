@@ -12,7 +12,9 @@
 # *******************************************************************************/
 
 # Verifies that this crate can be built using the uProtocol Core API from up-spec's main branch.
-# Also performs requirements tracing using OpenFastTrace
+# Also performs requirements tracing using OpenFastTrace. For that purpose, the workflow requires
+# the UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS variable to contain the file patterns to use for
+# invoking the "run-oft" Action.
 
 name: uP Spec Compatibility
 
@@ -52,7 +54,7 @@ jobs:
       - name: Run OpenFastTrace
         uses: ./.github/actions/run-oft
         with:
-          file-patterns: 'up-spec/*.adoc up-spec/*.md up-spec/basics up-spec/up-l2/api.adoc *.adoc *.md *.rs .github examples src tests tools'
+          file-patterns: ${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }}
 
       # now try to build and run the tests which may fail if incomaptible changes
       # have been introduced in up-spec
