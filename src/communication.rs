@@ -254,10 +254,22 @@ pub struct UPayload {
 
 impl UPayload {
     /// Creates a new payload for some data.
-    pub fn new(payload: Bytes, payload_format: UPayloadFormat) -> Self {
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UPayloadFormat;
+    /// use up_rust::communication::UPayload;
+    ///
+    /// let data: Vec<u8> = vec![0x00_u8, 0x01_u8, 0x02_u8];
+    /// let payload = UPayload::new(data, UPayloadFormat::UPAYLOAD_FORMAT_RAW);
+    /// assert_eq!(payload.payload_format(), UPayloadFormat::UPAYLOAD_FORMAT_RAW);
+    /// assert_eq!(payload.payload().len(), 3);
+    /// ```
+    pub fn new<T: Into<Bytes>>(payload: T, payload_format: UPayloadFormat) -> Self {
         UPayload {
             payload_format,
-            payload,
+            payload: payload.into(),
         }
     }
 
@@ -287,12 +299,7 @@ impl UPayload {
     {
         Any::pack(&message)
             .and_then(|any| any.write_to_bytes())
-            .map(|buf| {
-                UPayload::new(
-                    buf.into(),
-                    UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
-                )
-            })
+            .map(|buf| UPayload::new(buf, UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY))
             .map_err(UMessageError::DataSerializationError)
     }
 

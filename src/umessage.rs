@@ -59,9 +59,15 @@ impl From<protobuf::Error> for UMessageError {
     }
 }
 
+impl From<String> for UMessageError {
+    fn from(value: String) -> Self {
+        Self::PayloadError(value)
+    }
+}
+
 impl From<&str> for UMessageError {
     fn from(value: &str) -> Self {
-        Self::PayloadError(value.into())
+        Self::from(value.to_string())
     }
 }
 
@@ -224,9 +230,12 @@ pub(crate) fn deserialize_protobuf_bytes<T: MessageFull + Default>(
                 )),
                 Err(e) => Err(UMessageError::DataSerializationError(e)),
             }),
-        _ => Err(UMessageError::from(
-            "Unknown/invalid/unsupported payload format",
-        )),
+        _ => Err(UMessageError::from(format!(
+            "Unknown/invalid/unsupported payload format: {}",
+            payload_format
+                .to_media_type()
+                .unwrap_or("unknown".to_string())
+        ))),
     }
 }
 
