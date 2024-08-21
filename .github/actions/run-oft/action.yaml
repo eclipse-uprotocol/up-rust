@@ -47,6 +47,7 @@ runs:
       with:
         file-patterns: ${{ inputs.file-patterns }}
         report-filename: ${{ env.TRACING_REPORT_FILE_NAME }}
+        report-format: "html"
 
     - name: Upload tracing report (html)
       uses: actions/upload-artifact@v4
