@@ -31,7 +31,7 @@ outputs:
     value: ${{ steps.run-oft.outputs.oft-exit-code }}
   tracing-report-url:
     description: "The URL to the OpenFastTrace HTML report"
-    value: ${{ steps.tracing-report-html.artifact-url }}
+    value: ${{ steps.upload-tracing-report.artifact-url }}
 
 runs:
   using: "composite"
@@ -40,60 +40,17 @@ runs:
       run: |
         # Prepare Environment
         echo "TRACING_REPORT_FILE_NAME=oft-report.html" >> $GITHUB_ENV
-    - shell: bash
-      env:
-        OFT_REPO_BASE: "https://github.com/itsallcode"
-        OFT_CORE_VERSION: "4.1.0"
-        OFT_ASCIIDOC_PLUGIN_VERSION: "0.2.0"
-        LIB_DIR: ${{ github.workspace }}/lib
-      run: |
-        # Download OpenFastTrace JARs
-        curl_opts="--silent --show-error --location --create-dirs --output-dir ${LIB_DIR} -O"
-        curl ${curl_opts} \
-          "${OFT_REPO_BASE}/openfasttrace/releases/download/${OFT_CORE_VERSION}/openfasttrace-${OFT_CORE_VERSION}.jar"
-        curl ${curl_opts} \
-          "${OFT_REPO_BASE}/openfasttrace-asciidoc-plugin/releases/download/${OFT_ASCIIDOC_PLUGIN_VERSION}/openfasttrace-asciidoc-plugin-${OFT_ASCIIDOC_PLUGIN_VERSION}-with-dependencies.jar"
 
-    - name: Determine Java executable
-      shell: bash
-      env:
-        CLASSPATH: ${{ github.workspace }}/lib/*
-      run: $GITHUB_ACTION_PATH/determine_java_executable.sh
-
-    - name: Set up JDK
-      if: ${{ env.JAVA_CMD == '' }}
-      uses: actions/setup-java@v4
+    - name: Run OpenFastTrace
+      id: run-oft
+      uses: itsallcode/openfasttrace-github-action@cb57d294325ed95629dcf10870b1dacd39cd3941
       with:
-        distribution: "temurin"
-        java-version: 22
-
-    - id: run-oft
-      shell: bash
-      env:
-        CLASSPATH: ${{ github.workspace }}/lib/*
-        INPUT_FILE_PATTERNS: ${{ inputs.file-patterns }}
-        JAVA_CMD: ${{ env.JAVA_CMD || 'java' }}
-      run: |
-        if [[ ! -x ${JAVA_CMD} ]]; then
-          echo "Cannot find Java command ${JAVA_CMD}"
-          exit 127
-        fi
-        # Run OpenFastTrace
-        if (${JAVA_CMD} -cp "${CLASSPATH}" \
-          org.itsallcode.openfasttrace.core.cli.CliStarter trace -o html \
-          -f "${TRACING_REPORT_FILE_NAME}" \
-          ${INPUT_FILE_PATTERNS})
-        then
-          echo "oft-exit-code=0" >> $GITHUB_OUTPUT
-          echo "All specification items are covered." >> $GITHUB_STEP_SUMMARY
-        else
-          echo "oft-exit-code=1" >> $GITHUB_OUTPUT
-          echo "Some specification items are not covered. See attached report for details." >> $GITHUB_STEP_SUMMARY
-        fi
+        file-patterns: ${{ inputs.file-patterns }}
+        report-filename: ${{ env.TRACING_REPORT_FILE_NAME }}
 
     - name: Upload tracing report (html)
       uses: actions/upload-artifact@v4
-      id: tracing-report-html
+      id: upload-tracing-report
       if: ${{ steps.run-oft.outputs.oft-exit-code != '' }}
       with:
         name: tracing-report-html
