@@ -22,7 +22,7 @@ on:
     outputs:
       license_report_url:
         description: "URL of the license report artifact"
-        value: ${{ jobs.coverage.outputs.test_coverage_url }}
+        value: ${{ jobs.license_check.outputs.license_report_url }}
   workflow_dispatch:
           
 env:
@@ -31,11 +31,11 @@ env:
     CARGO_TERM_COLOR: always
       
 jobs:
-  coverage:
+  license_check:
     name: create
     runs-on: ubuntu-latest
     outputs:
-      test_coverage_url: ${{ steps.license_report.outputs.artifact-url }}
+      license_report_url: ${{ steps.license_report.outputs.artifact-url }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -50,7 +50,6 @@ jobs:
         cargo install cargo-about
     - name: Create license report
       run: |
-        mkdir -p release
         cargo about generate about.hbs > licenses.html
     - uses: actions/upload-artifact@v4
       id: license_report
