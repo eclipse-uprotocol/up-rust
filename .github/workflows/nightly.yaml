@@ -57,4 +57,4 @@ jobs:
   requirements-tracing:
     uses: ./.github/workflows/requirements-tracing.yaml
     with:
-      oft-file-patterns: ${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }}
+      oft-file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_RUST_OPEN_FAST_TRACE_FILE_PATTERNS }}"
