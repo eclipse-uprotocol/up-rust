@@ -41,13 +41,13 @@ util = ["tokio/sync"]
 
 [dependencies]
 async-trait = { version = "0.1" }
-bytes = { version = "1.6.1" }
+bytes = { version = "1.7" }
 mediatype = "0.19"
-protobuf = { version = "3.3", features = ["with-bytes"] }
+protobuf = { version = "3.5", features = ["with-bytes"] }
 rand = { version = "0.8" }
-thiserror = { version = "1.0.52", optional = true }
-tokio = { version = "1.35", default-features = false, optional = true }
-tracing = { version = "0.1.35", default-features = false, features = [
+thiserror = { version = "1.0", optional = true }
+tokio = { version = "1.40", default-features = false, optional = true }
+tracing = { version = "0.1", default-features = false, features = [
     "log",
     "std",
 ] }
@@ -58,13 +58,13 @@ uuid-simd = { version = "0.8", default-features = false, features = [
 ] }
 
 [build-dependencies]
-protobuf-codegen = { version = "3.3" }
+protobuf-codegen = { version = "3.5" }
 protoc-bin-vendored = { version = "3.0" }
 
 [dev-dependencies]
-mockall = "0.12.1"
+mockall = "0.13"
 test-case = { version = "3.3" }
-tokio = { version = "1.35", default-features = false, features = [
+tokio = { version = "1.40", default-features = false, features = [
     "macros",
     "rt",
     "rt-multi-thread",

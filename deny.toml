@@ -24,3 +24,6 @@ unused-allowed-license = "allow"
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
+skip-tree = [
+    { crate = "windows-sys", reason = "a foundational crate for many that bumps far too frequently to ever have a shared version" },
+]
