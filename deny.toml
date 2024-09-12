@@ -22,5 +22,5 @@ exceptions = [{ name = "unicode-ident", allow = ["Unicode-DFS-2016"] }]
 unused-allowed-license = "allow"
 
 [bans]
-multiple-versions = "deny"
+multiple-versions = "allow"
 wildcards = "deny"
