@@ -24,7 +24,7 @@ use tracing::{debug, info};
 
 use crate::{
     core::usubscription::{
-        self, State, SubscriberInfo, SubscriptionRequest, USubscription, UnsubscribeRequest, Update,
+        self, State, SubscriptionRequest, USubscription, UnsubscribeRequest, Update,
     },
     LocalUriProvider, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri,
 };
@@ -245,7 +245,7 @@ impl Publisher for SimplePublisher {
 /// handler is being looked up and invoked.
 pub struct InMemorySubscriber {
     transport: Arc<dyn UTransport>,
-    uri_provider: Arc<dyn LocalUriProvider>,
+    _uri_provider: Arc<dyn LocalUriProvider>,
     usubscription: Arc<dyn USubscription>,
     notifier: Arc<dyn Notifier>,
     subscription_change_listener: Arc<SubscriptionChangeListener>,
@@ -305,7 +305,7 @@ impl InMemorySubscriber {
             .await?;
         Ok(InMemorySubscriber {
             transport,
-            uri_provider,
+            _uri_provider: uri_provider,
             usubscription,
             notifier,
             subscription_change_listener,
@@ -329,20 +329,12 @@ impl InMemorySubscriber {
             .and_then(|_ok| self.subscription_change_listener.clear())
     }
 
-    fn subscriber_info(&self) -> SubscriberInfo {
-        SubscriberInfo {
-            uri: Some(self.uri_provider.get_source_uri()).into(),
-            ..Default::default()
-        }
-    }
-
     async fn invoke_subscribe(
         &self,
         topic: &UUri,
         subscription_change_handler: Option<Arc<dyn SubscriptionChangeHandler>>,
     ) -> Result<State, RegistrationError> {
         let subscription_request = SubscriptionRequest {
-            subscriber: Some(self.subscriber_info()).into(),
             topic: Some(topic.to_owned()).into(),
             ..Default::default()
         };
@@ -375,8 +367,6 @@ impl InMemorySubscriber {
 
     async fn invoke_unsubscribe(&self, topic: &UUri) -> Result<(), RegistrationError> {
         let request = UnsubscribeRequest {
-            subscriber: Some(self.subscriber_info()).into(),
-            topic: Some(topic.to_owned()).into(),
             ..Default::default()
         };
         self.usubscription
@@ -643,7 +633,7 @@ mod tests {
 
         let subscriber = InMemorySubscriber {
             transport: Arc::new(MockTransport::new()),
-            uri_provider: new_uri_provider(),
+            _uri_provider: new_uri_provider(),
             usubscription: Arc::new(MockUSubscription::new()),
             notifier: Arc::new(notifier),
             subscription_change_listener,
