@@ -291,22 +291,12 @@ mod tests {
     use tokio::sync::Notify;
 
     use crate::{
-        communication::rpc::MockRequestHandler,
-        utransport::{MockLocalUriProvider, MockTransport},
+        communication::rpc::MockRequestHandler, utransport::MockTransport, StaticUriProvider,
         UAttributes, UMessageType, UPriority, UUri, UUID,
     };
 
     fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
-        let mut mock_uri_provider = MockLocalUriProvider::new();
-        mock_uri_provider
-            .expect_get_resource_uri()
-            .returning(|resource_id| UUri {
-                ue_id: 0x0005,
-                ue_version_major: 0x02,
-                resource_id: resource_id as u32,
-                ..Default::default()
-            });
-        Arc::new(mock_uri_provider)
+        Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
     }
 
     #[test_case(None, 0x4A10; "for empty origin filter")]

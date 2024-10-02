@@ -76,7 +76,9 @@ mod ustatus;
 pub use ustatus::{UCode, UStatus};
 
 mod utransport;
-pub use utransport::{ComparableListener, LocalUriProvider, UListener, UTransport};
+pub use utransport::{
+    ComparableListener, LocalUriProvider, StaticUriProvider, UListener, UTransport,
+};
 mod uuid;
 pub use uuid::UUID;
 

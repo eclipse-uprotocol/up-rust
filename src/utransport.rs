@@ -13,6 +13,7 @@
 
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::num::TryFromIntError;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -26,6 +27,7 @@ use crate::{UCode, UMessage, UStatus, UUri};
 ///
 /// Implementations may use arbitrary mechanisms to determine the information that
 /// is necessary for creating URIs, e.g. environment variables, configuration files etc.
+// [impl->req~up-language-transport-api~1]
 #[cfg_attr(test, automock)]
 pub trait LocalUriProvider: Send + Sync {
     /// Gets the _authority_ used for URIs representing this uEntity's resources.
@@ -35,6 +37,109 @@ pub trait LocalUriProvider: Send + Sync {
     /// Gets the URI that represents the resource that this uEntity expects
     /// RPC responses and notifications to be sent to.
     fn get_source_uri(&self) -> UUri;
+}
+
+/// A URI provider that is statically configured with the uEntity's authority, entity ID and version.
+pub struct StaticUriProvider {
+    local_uri: UUri,
+}
+
+impl StaticUriProvider {
+    /// Creates a new URI provider from static information.
+    ///
+    /// # Arguments
+    ///
+    /// * `authority` - The uEntity's authority name.
+    /// * `entity_id` - The entity identifier.
+    /// * `major_version` - The uEntity's major version.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{LocalUriProvider, StaticUriProvider};
+    ///
+    /// let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05);
+    /// assert_eq!(provider.get_authority(), "my-vehicle");
+    /// ```
+    pub fn new(authority: impl Into<String>, entity_id: u32, major_version: u8) -> Self {
+        let local_uri = UUri {
+            authority_name: authority.into(),
+            ue_id: entity_id,
+            ue_version_major: major_version as u32,
+            resource_id: 0x0000,
+            ..Default::default()
+        };
+        StaticUriProvider { local_uri }
+    }
+}
+
+impl LocalUriProvider for StaticUriProvider {
+    fn get_authority(&self) -> String {
+        self.local_uri.authority_name.clone()
+    }
+
+    fn get_resource_uri(&self, resource_id: u16) -> UUri {
+        let mut uri = self.local_uri.clone();
+        uri.resource_id = resource_id as u32;
+        uri
+    }
+
+    fn get_source_uri(&self) -> UUri {
+        self.local_uri.clone()
+    }
+}
+
+impl TryFrom<UUri> for StaticUriProvider {
+    type Error = TryFromIntError;
+    fn try_from(value: UUri) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+impl TryFrom<&UUri> for StaticUriProvider {
+    type Error = TryFromIntError;
+    /// Creates a URI provider from a UUri.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_uri` - The UUri to take the entity's authority, entity ID and version information from.
+    ///                  The UUri's resource ID is ignored.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the given UUri's major version property is not a `u8`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{LocalUriProvider, StaticUriProvider, UUri};
+    ///
+    /// let source_uri = UUri::try_from("//my-vehicle/4210/5/0").unwrap();
+    /// assert!(StaticUriProvider::try_from(&source_uri).is_ok());
+    /// ```
+    ///
+    /// ## Invalid Major Version
+    ///
+    /// ```rust
+    /// use up_rust::{LocalUriProvider, StaticUriProvider, UUri};
+    ///
+    /// let uuri_with_invalid_version = UUri {
+    ///   authority_name: "".to_string(),
+    ///   ue_id: 0x5430,
+    ///   ue_version_major: 0x1234, // not a u8
+    ///   resource_id: 0x0000,
+    ///   ..Default::default()
+    /// };
+    /// assert!(StaticUriProvider::try_from(uuri_with_invalid_version).is_err());
+    /// ```
+    fn try_from(source_uri: &UUri) -> Result<Self, Self::Error> {
+        let major_version = u8::try_from(source_uri.ue_version_major)?;
+        Ok(StaticUriProvider::new(
+            &source_uri.authority_name,
+            source_uri.ue_id,
+            major_version,
+        ))
+    }
 }
 
 /// A handler for processing uProtocol messages.
@@ -293,6 +398,26 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_static_uri_provider_get_source() {
+        let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05);
+        let source_uri = provider.get_source_uri();
+        assert_eq!(source_uri.authority_name, "my-vehicle");
+        assert_eq!(source_uri.ue_id, 0x4210);
+        assert_eq!(source_uri.ue_version_major, 0x05);
+        assert_eq!(source_uri.resource_id, 0x0000);
+    }
+
+    #[test]
+    fn test_static_uri_provider_get_resource() {
+        let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05);
+        let resource_uri = provider.get_resource_uri(0x1234);
+        assert_eq!(resource_uri.authority_name, "my-vehicle");
+        assert_eq!(resource_uri.ue_id, 0x4210);
+        assert_eq!(resource_uri.ue_version_major, 0x05);
+        assert_eq!(resource_uri.resource_id, 0x1234);
+    }
 
     #[tokio::test]
     async fn test_deref_returns_wrapped_listener() {
