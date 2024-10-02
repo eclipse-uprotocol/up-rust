@@ -17,7 +17,7 @@ use protobuf::well_known_types::wrappers::StringValue;
 use up_rust::{
     communication::{CallOptions, Publisher, SimplePublisher, UPayload},
     local_transport::LocalTransport,
-    LocalUriProvider, UListener, UMessage, UTransport,
+    LocalUriProvider, StaticUriProvider, UListener, UMessage, UTransport,
 };
 
 struct ConsolePrinter {}
@@ -34,8 +34,8 @@ impl UListener for ConsolePrinter {
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const ORIGIN_RESOURCE_ID: u16 = 0xb4c1;
-    let transport = Arc::new(LocalTransport::new("my-vehicle", 0xa34b, 0x01));
-    let uri_provider: Arc<dyn LocalUriProvider> = transport.clone();
+    let uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xa34b, 0x01));
+    let transport = Arc::new(LocalTransport::default());
     let publisher = SimplePublisher::new(transport.clone(), uri_provider.clone());
     let listener = Arc::new(ConsolePrinter {});
 

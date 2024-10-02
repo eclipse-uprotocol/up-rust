@@ -24,7 +24,7 @@ use up_rust::{
         ServiceInvocationError, UPayload,
     },
     local_transport::LocalTransport,
-    LocalUriProvider,
+    LocalUriProvider, StaticUriProvider,
 };
 
 struct EchoOperation {}
@@ -49,8 +49,8 @@ impl RequestHandler for EchoOperation {
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const METHOD_RESOURCE_ID: u16 = 0x00a0;
-    let transport = Arc::new(LocalTransport::new("my-vehicle", 0xa34b, 0x01));
-    let uri_provider: Arc<dyn LocalUriProvider> = transport.clone();
+    let uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xa34b, 0x01));
+    let transport = Arc::new(LocalTransport::default());
 
     // create the RpcServer using the local transport
     let rpc_server = InMemoryRpcServer::new(transport.clone(), uri_provider.clone());
@@ -62,7 +62,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // now create an RpcClient attached to the same local transport
-    let rpc_client = InMemoryRpcClient::new(transport.clone(), uri_provider.clone()).await?;
+    let rpc_client = InMemoryRpcClient::new(transport, uri_provider.clone()).await?;
     // and invoke the service operation without any payload
     match rpc_client
         .invoke_method(

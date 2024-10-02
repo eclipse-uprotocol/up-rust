@@ -17,7 +17,7 @@ use protobuf::well_known_types::wrappers::StringValue;
 use up_rust::{
     communication::{CallOptions, Notifier, SimpleNotifier, UPayload},
     local_transport::LocalTransport,
-    LocalUriProvider, UListener, UMessage,
+    LocalUriProvider, StaticUriProvider, UListener, UMessage,
 };
 
 struct ConsolePrinter {}
@@ -35,9 +35,9 @@ impl UListener for ConsolePrinter {
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const ORIGIN_RESOURCE_ID: u16 = 0xd100;
 
-    let transport = Arc::new(LocalTransport::new("my-vehicle", 0xa34b, 0x01));
-    let uri_provider: Arc<dyn LocalUriProvider> = transport.clone();
-    let notifier = SimpleNotifier::new(transport.clone(), uri_provider.clone());
+    let uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xa34b, 0x01));
+    let transport = Arc::new(LocalTransport::default());
+    let notifier = SimpleNotifier::new(transport, uri_provider.clone());
     let topic = uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID);
     let listener = Arc::new(ConsolePrinter {});
 

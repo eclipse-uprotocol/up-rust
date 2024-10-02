@@ -20,7 +20,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use crate::{ComparableListener, LocalUriProvider, UListener, UMessage, UStatus, UTransport, UUri};
+use crate::{ComparableListener, UListener, UMessage, UStatus, UTransport, UUri};
 
 #[derive(Eq, PartialEq, Hash)]
 struct RegisteredListener {
@@ -66,22 +66,12 @@ impl RegisteredListener {
 ///
 /// A message sent via [`UTransport::send`] will be dispatched to all registered listeners that
 /// match the message's source and sink filters.
+#[derive(Default)]
 pub struct LocalTransport {
     listeners: RwLock<HashSet<RegisteredListener>>,
-    authority_name: String,
-    entity_id: u32,
-    entity_version: u8,
 }
 
 impl LocalTransport {
-    pub fn new(authority_name: &str, entity_id: u32, entity_version: u8) -> Self {
-        LocalTransport {
-            listeners: RwLock::new(HashSet::new()),
-            authority_name: authority_name.to_string(),
-            entity_id,
-            entity_version,
-        }
-    }
     async fn dispatch(&self, message: UMessage) {
         let listeners = self.listeners.read().await;
         for listener in listeners.iter() {
@@ -89,25 +79,6 @@ impl LocalTransport {
                 listener.on_receive(message.clone()).await;
             }
         }
-    }
-}
-
-impl LocalUriProvider for LocalTransport {
-    fn get_authority(&self) -> String {
-        self.authority_name.clone()
-    }
-
-    fn get_resource_uri(&self, resource_id: u16) -> UUri {
-        UUri::try_from_parts(
-            &self.authority_name,
-            self.entity_id,
-            self.entity_version,
-            resource_id,
-        )
-        .unwrap()
-    }
-    fn get_source_uri(&self) -> UUri {
-        self.get_resource_uri(0x0000)
     }
 }
 
@@ -167,7 +138,7 @@ impl UTransport for LocalTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{utransport::MockUListener, UMessageBuilder};
+    use crate::{utransport::MockUListener, LocalUriProvider, StaticUriProvider, UMessageBuilder};
 
     #[tokio::test]
     async fn test_send_dispatches_to_matching_listener() {
@@ -175,11 +146,12 @@ mod tests {
         let mut listener = MockUListener::new();
         listener.expect_on_receive().once().return_const(());
         let listener_ref = Arc::new(listener);
-        let transport = LocalTransport::new("my-vehicle", 0x100d, 0x02);
+        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02);
+        let transport = LocalTransport::default();
 
         transport
             .register_listener(
-                &transport.get_resource_uri(RESOURCE_ID),
+                &uri_provider.get_resource_uri(RESOURCE_ID),
                 None,
                 listener_ref.clone(),
             )
@@ -187,19 +159,23 @@ mod tests {
             .unwrap();
         let _ = transport
             .send(
-                UMessageBuilder::publish(transport.get_resource_uri(RESOURCE_ID))
+                UMessageBuilder::publish(uri_provider.get_resource_uri(RESOURCE_ID))
                     .build()
                     .unwrap(),
             )
             .await;
 
         transport
-            .unregister_listener(&transport.get_resource_uri(RESOURCE_ID), None, listener_ref)
+            .unregister_listener(
+                &uri_provider.get_resource_uri(RESOURCE_ID),
+                None,
+                listener_ref,
+            )
             .await
             .unwrap();
         let _ = transport
             .send(
-                UMessageBuilder::publish(transport.get_resource_uri(RESOURCE_ID))
+                UMessageBuilder::publish(uri_provider.get_resource_uri(RESOURCE_ID))
                     .build()
                     .unwrap(),
             )
@@ -212,11 +188,12 @@ mod tests {
         let mut listener = MockUListener::new();
         listener.expect_on_receive().never().return_const(());
         let listener_ref = Arc::new(listener);
-        let transport = LocalTransport::new("my-vehicle", 0x100d, 0x02);
+        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02);
+        let transport = LocalTransport::default();
 
         transport
             .register_listener(
-                &transport.get_resource_uri(RESOURCE_ID + 10),
+                &uri_provider.get_resource_uri(RESOURCE_ID + 10),
                 None,
                 listener_ref.clone(),
             )
@@ -224,7 +201,7 @@ mod tests {
             .unwrap();
         let _ = transport
             .send(
-                UMessageBuilder::publish(transport.get_resource_uri(RESOURCE_ID))
+                UMessageBuilder::publish(uri_provider.get_resource_uri(RESOURCE_ID))
                     .build()
                     .unwrap(),
             )
@@ -232,7 +209,7 @@ mod tests {
 
         transport
             .unregister_listener(
-                &transport.get_resource_uri(RESOURCE_ID + 10),
+                &uri_provider.get_resource_uri(RESOURCE_ID + 10),
                 None,
                 listener_ref,
             )
@@ -240,7 +217,7 @@ mod tests {
             .unwrap();
         let _ = transport
             .send(
-                UMessageBuilder::publish(transport.get_resource_uri(RESOURCE_ID))
+                UMessageBuilder::publish(uri_provider.get_resource_uri(RESOURCE_ID))
                     .build()
                     .unwrap(),
             )
