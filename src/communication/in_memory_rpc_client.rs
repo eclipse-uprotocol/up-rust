@@ -298,20 +298,10 @@ mod tests {
     use protobuf::{well_known_types::wrappers::StringValue, Enum};
     use tokio::{join, sync::Notify};
 
-    use crate::{
-        utransport::{MockLocalUriProvider, MockTransport},
-        UMessageBuilder, UPriority, UUri,
-    };
+    use crate::{utransport::MockTransport, StaticUriProvider, UMessageBuilder, UPriority, UUri};
 
     fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
-        let mut mock_uri_locator = MockLocalUriProvider::new();
-        mock_uri_locator.expect_get_source_uri().returning(|| UUri {
-            ue_id: 0x0005,
-            ue_version_major: 0x02,
-            resource_id: 0x0000,
-            ..Default::default()
-        });
-        Arc::new(mock_uri_locator)
+        Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
     }
 
     fn service_method_uri() -> UUri {
