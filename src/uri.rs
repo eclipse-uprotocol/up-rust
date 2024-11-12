@@ -22,7 +22,8 @@ use uriparse::{Authority, URIReference};
 pub use crate::up_core_api::uri::UUri;
 
 pub(crate) const WILDCARD_AUTHORITY: &str = "*";
-pub(crate) const WILDCARD_ENTITY_ID: u32 = 0x0000_FFFF;
+pub(crate) const WILDCARD_ENTITY_INSTANCE: u32 = 0xFFFF_0000;
+pub(crate) const WILDCARD_ENTITY_TYPE: u32 = 0x0000_FFFF;
 pub(crate) const WILDCARD_ENTITY_VERSION: u32 = 0x0000_00FF;
 pub(crate) const WILDCARD_RESOURCE_ID: u32 = 0x0000_FFFF;
 
@@ -412,7 +413,7 @@ impl UUri {
     pub fn any_with_resource_id(resource_id: u32) -> Self {
         UUri {
             authority_name: WILDCARD_AUTHORITY.to_string(),
-            ue_id: WILDCARD_ENTITY_ID,
+            ue_id: WILDCARD_ENTITY_INSTANCE | WILDCARD_ENTITY_TYPE,
             ue_version_major: WILDCARD_ENTITY_VERSION,
             resource_id,
             ..Default::default()
@@ -498,18 +499,32 @@ impl UUri {
         self.authority_name == WILDCARD_AUTHORITY
     }
 
-    /// Checks if this UUri has a wildcard entity identifier.
+    /// Checks if this UUri has an entity identifier matching any instance.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uuri = UUri::try_from_parts("vin", 0xFFFF, 0x01, 0x145b).unwrap();
-    /// assert!(uuri.has_wildcard_entity_id());
+    /// let uuri = UUri::try_from_parts("vin", 0xFFFF_0123, 0x01, 0x145b).unwrap();
+    /// assert!(uuri.has_wildcard_entity_instance());
     /// ```
-    pub fn has_wildcard_entity_id(&self) -> bool {
-        self.ue_id & WILDCARD_ENTITY_ID == WILDCARD_ENTITY_ID
+    pub fn has_wildcard_entity_instance(&self) -> bool {
+        self.ue_id & WILDCARD_ENTITY_INSTANCE == WILDCARD_ENTITY_INSTANCE
+    }
+
+    /// Checks if this UUri has an entity identifier matching any type.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri::try_from_parts("vin", 0x00C0_FFFF, 0x01, 0x145b).unwrap();
+    /// assert!(uuri.has_wildcard_entity_type());
+    /// ```
+    pub fn has_wildcard_entity_type(&self) -> bool {
+        self.ue_id & WILDCARD_ENTITY_TYPE == WILDCARD_ENTITY_TYPE
     }
 
     /// Checks if this UUri has a wildcard major version.
@@ -566,10 +581,15 @@ impl UUri {
                 "Authority must not contain wildcard character [{}]",
                 WILDCARD_AUTHORITY
             )))
-        } else if self.has_wildcard_entity_id() {
+        } else if self.has_wildcard_entity_instance() {
             Err(UUriError::validation_error(format!(
-                "Entity ID must not be set to wildcard value [{:#X}]",
-                WILDCARD_ENTITY_ID
+                "Entity instance ID must not be set to wildcard value [{:#X}]",
+                WILDCARD_ENTITY_INSTANCE
+            )))
+        } else if self.has_wildcard_entity_type() {
+            Err(UUriError::validation_error(format!(
+                "Entity type ID must not be set to wildcard value [{:#X}]",
+                WILDCARD_ENTITY_TYPE
             )))
         } else if self.has_wildcard_version() {
             Err(UUriError::validation_error(format!(
@@ -760,13 +780,13 @@ impl UUri {
     }
 
     fn matches_entity_type(&self, candidate: &UUri) -> bool {
-        self.ue_id & WILDCARD_ENTITY_ID == WILDCARD_ENTITY_ID
-            || self.ue_id & WILDCARD_ENTITY_ID == candidate.ue_id & WILDCARD_ENTITY_ID
+        self.ue_id & WILDCARD_ENTITY_TYPE == WILDCARD_ENTITY_TYPE
+            || self.ue_id & WILDCARD_ENTITY_TYPE == candidate.ue_id & WILDCARD_ENTITY_TYPE
     }
 
     fn matches_entity_instance(&self, candidate: &UUri) -> bool {
-        self.ue_id & 0xFFFF_0000 == 0x0000_0000
-            || self.ue_id & 0xFFFF_0000 == candidate.ue_id & 0xFFFF_0000
+        self.ue_id & WILDCARD_ENTITY_INSTANCE == WILDCARD_ENTITY_INSTANCE
+            || self.ue_id & WILDCARD_ENTITY_INSTANCE == candidate.ue_id & WILDCARD_ENTITY_INSTANCE
     }
 
     fn matches_entity_version(&self, candidate: &UUri) -> bool {
@@ -799,7 +819,7 @@ impl UUri {
     /// let candidate = UUri::try_from("//VIN/A14F/3/B1D4").unwrap();
     /// assert!(pattern.matches(&candidate));
     /// ```
-    // [impl->dsn~uri-pattern-matching~1]
+    // [impl->dsn~uri-pattern-matching~2]
     pub fn matches(&self, candidate: &UUri) -> bool {
         self.matches_authority(candidate)
             && self.matches_entity(candidate)
@@ -903,7 +923,8 @@ mod tests {
     }
 
     #[test_case("//*/A100/1/1"; "for any authority")]
-    #[test_case("//VIN/FFFF/1/1"; "for any entity")]
+    #[test_case("//VIN/FFFF/1/1"; "for any entity type")]
+    #[test_case("//VIN/FFFF0ABC/1/1"; "for any entity instance")]
     #[test_case("//VIN/A100/FF/1"; "for any version")]
     #[test_case("//VIN/A100/1/FFFF"; "for any resource")]
     fn test_verify_no_wildcards_fails(uri: &str) {
@@ -961,12 +982,12 @@ mod tests {
         assert!(UUri::try_from_parts(authority, 0xa100, 0x01, 0x6501).is_err());
     }
 
-    // [utest->dsn~uri-pattern-matching~1]
+    // [utest->dsn~uri-pattern-matching~2]
     #[test_case("//authority/A410/3/1003", "//authority/A410/3/1003"; "for identical URIs")]
     #[test_case("//*/A410/3/1003", "//authority/A410/3/1003"; "for pattern with wildcard authority")]
     #[test_case("//*/A410/3/1003", "/A410/3/1003"; "for pattern with wildcard authority and local candidate URI")]
     #[test_case("//authority/FFFF/3/1003", "//authority/A410/3/1003"; "for pattern with wildcard entity ID")]
-    #[test_case("//authority/A410/3/1003", "//authority/2A410/3/1003"; "for pattern with wildcard entity instance")]
+    #[test_case("//authority/FFFFA410/3/1003", "//authority/2A410/3/1003"; "for pattern with wildcard entity instance")]
     #[test_case("//authority/A410/FF/1003", "//authority/A410/3/1003"; "for pattern with wildcard entity version")]
     #[test_case("//authority/A410/3/FFFF", "//authority/A410/3/1003"; "for pattern with wildcard resource")]
     fn test_matches_succeeds(pattern: &str, candidate: &str) {
@@ -977,11 +998,12 @@ mod tests {
         assert!(pattern_uri.matches(&candidate_uri));
     }
 
-    // [utest->dsn~uri-pattern-matching~1]
+    // [utest->dsn~uri-pattern-matching~2]
     #[test_case("//Authority/A410/3/1003", "//authority/A410/3/1003"; "for pattern with upper case authority")]
     #[test_case("/A410/3/1003", "//authority/A410/3/1003"; "for local pattern and candidate URI with authority")]
     #[test_case("//other/A410/3/1003", "//authority/A410/3/1003"; "for pattern with different authority")]
     #[test_case("//authority/45/3/1003", "//authority/A410/3/1003"; "for pattern with different entity ID")]
+    #[test_case("//authority/A410/3/1003", "//authority/2A410/3/1003"; "for pattern with default entity instance")]
     #[test_case("//authority/30A410/3/1003", "//authority/2A410/3/1003"; "for pattern with different entity instance")]
     #[test_case("//authority/A410/1/1003", "//authority/A410/3/1003"; "for pattern with different entity version")]
     #[test_case("//authority/A410/3/ABCD", "//authority/A410/3/1003"; "for pattern with different resource")]
