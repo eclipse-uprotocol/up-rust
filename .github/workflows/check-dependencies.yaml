@@ -35,7 +35,7 @@ jobs:
     - name: cargo tree
       working-directory: ${{github.workspace}}
       run: |
-        cargo tree -e normal --prefix none --no-dedupe \
+        cargo tree -e no-build,no-dev --prefix none --no-dedupe \
           | sort -u \
           | grep -v '^[[:space:]]*$' \
           | grep -v up-rust \
