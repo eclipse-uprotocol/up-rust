@@ -64,15 +64,16 @@ impl std::error::Error for UUriError {}
 
 // [impl->req~uri-serialization~1]
 impl From<&UUri> for String {
-    /// Serializes a UUri to a URI string.
+    /// Serializes a uProtocol URI to a URI string.
     ///
     /// # Arguments
     ///
-    /// * `uri` - The UUri to serialize.
+    /// * `uri` - The URI to serialize. Note that the given URI is **not** validated before serialization.
+    ///           In particular, the URI's version and resource ID length are not checked to be within limits.
     ///
     /// # Returns
     ///
-    /// The output of [`UUri::to_uri`] without inlcuding the uProtocol scheme.
+    /// The output of [`UUri::to_uri`] without including the uProtocol scheme.
     ///
     /// # Examples
     ///
@@ -421,6 +422,14 @@ impl UUri {
         })
     }
 
+    fn verify_resource_id(resource_id: u32) -> Result<u16, UUriError> {
+        u16::try_from(resource_id).map_err(|_e| {
+            UUriError::ValidationError(
+                "uProtocol URI's resource ID must be a 16 bit unsigned integer".to_string(),
+            )
+        })
+    }
+
     /// Verifies that this UUri is indeed a valid uProtocol URI.
     ///
     /// This check is not necessary, if any of UUri's constructors functions has been used
@@ -450,6 +459,7 @@ impl UUri {
     pub fn check_validity(&self) -> Result<(), UUriError> {
         Self::verify_authority(self.authority_name.as_str())?;
         Self::verify_major_version(self.ue_version_major)?;
+        Self::verify_resource_id(self.resource_id)?;
         Ok(())
     }
 
@@ -847,6 +857,46 @@ mod tests {
     use protobuf::Message;
     use test_case::test_case;
 
+    // [utest->dsn~uri-authority-name-length~1]
+    // [utest->dsn~uri-host-only~2]
+    #[test_case(UUri {
+            authority_name: "invalid:5671".into(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x01,
+            resource_id: 0x0002,
+            ..Default::default()
+        };
+        "for authority including port")]
+    #[test_case(UUri {
+            authority_name: ['a'; 129].iter().collect::<String>(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x01,
+            resource_id: 0x0002,
+            ..Default::default()
+        };
+        "for authority exceeding max length")]
+    // additional test cases covering all sorts of invalid authority are
+    // included in [`test_from_string_fails`]
+    #[test_case(UUri {
+            authority_name: "valid".into(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x0101,
+            resource_id: 0x0002,
+            ..Default::default()
+        };
+        "for invalid major version")]
+    #[test_case(UUri {
+            authority_name: "valid".into(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x01,
+            resource_id: 0x10002,
+            ..Default::default()
+        };
+        "for invalid resource ID")]
+    fn test_check_validity_fails(uuri: UUri) {
+        assert!(uuri.check_validity().is_err());
+    }
+
     // [utest->req~uri-serialization~1]
     // [utest->dsn~uri-scheme~1]
     // [utest->dsn~uri-host-only~2]
@@ -864,13 +914,15 @@ mod tests {
     #[test_case("up://MYVIN/1A23/1/a13#foobar"; "for URI with fragement")]
     #[test_case("up://MYVIN:1000/1A23/1/A13"; "for authority with port")]
     #[test_case("up://user:pwd@MYVIN/1A23/1/A13"; "for authority with userinfo")]
-    #[test_case("5up://MYVIN/55A1/1/1"; "for invalid scheme")]
     #[test_case("up://MY#VIN/55A1/1/1"; "for invalid authority")]
     #[test_case("up://MYVIN/55T1/1/1"; "for non-hex entity ID")]
+    #[test_case("up://MYVIN/123456789/1/1"; "for entity ID exceeding max length")]
     #[test_case("up://MYVIN/55A1//1"; "for empty version")]
     #[test_case("up://MYVIN/55A1/T/1"; "for non-hex version")]
+    #[test_case("up://MYVIN/55A1/123/1"; "for version exceeding max length")]
     #[test_case("up://MYVIN/55A1/1/"; "for empty resource ID")]
     #[test_case("up://MYVIN/55A1/1/1T"; "for non-hex resource ID")]
+    #[test_case("up://MYVIN/55A1/1/10001"; "for resource ID exceeding max length")]
     fn test_from_string_fails(string: &str) {
         let parsing_result = UUri::from_str(string);
         assert!(parsing_result.is_err());
