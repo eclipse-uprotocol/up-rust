@@ -64,15 +64,16 @@ impl std::error::Error for UUriError {}
 
 // [impl->req~uri-serialization~1]
 impl From<&UUri> for String {
-    /// Serializes a UUri to a URI string.
+    /// Serializes a uProtocol URI to a URI string.
     ///
     /// # Arguments
     ///
-    /// * `uri` - The UUri to serialize.
+    /// * `uri` - The URI to serialize. Note that the given URI is **not** validated before serialization.
+    ///           In particular, the URI's version and resource ID length are not checked to be within limits.
     ///
     /// # Returns
     ///
-    /// The output of [`UUri::to_uri`] without inlcuding the uProtocol scheme.
+    /// The output of [`UUri::to_uri`] without including the uProtocol scheme.
     ///
     /// # Examples
     ///
@@ -161,26 +162,7 @@ impl FromStr for UUri {
         }
         let authority_name = parsed_uri
             .authority()
-            .map_or(Ok(String::default()), |auth| {
-                if auth.has_port() {
-                    Err(UUriError::serialization_error(
-                        "uProtocol URI's authority must not contain port",
-                    ))
-                } else if auth.has_username() || auth.has_password() {
-                    Err(UUriError::serialization_error(
-                        "uProtocol URI's authority must not contain userinfo",
-                    ))
-                } else {
-                    let auth_name = auth.host().to_string();
-                    if auth_name.len() <= 128 {
-                        Ok(auth_name)
-                    } else {
-                        Err(UUriError::serialization_error(
-                            "URI's authority name must not exceed 128 characters",
-                        ))
-                    }
-                }
-            })?;
+            .map_or(Ok(String::default()), Self::verify_parsed_authority)?;
 
         let path_segments = parsed_uri.path().segments();
         if path_segments.len() != 3 {
@@ -334,6 +316,9 @@ impl UUri {
     /// let uri_string = uuri.to_uri(true);
     /// assert_eq!(uri_string, "up://VIN.vehicles/800A/2/1A50");
     /// ````
+    // [impl->dsn~uri-authority-mapping~1]
+    // [impl->dsn~uri-path-mapping~1]
+    // [impl->req~uri-serialization~1]
     pub fn to_uri(&self, include_scheme: bool) -> String {
         let mut output = String::default();
         if include_scheme {
@@ -372,30 +357,9 @@ impl UUri {
         entity_version: u8,
         resource_id: u16,
     ) -> Result<Self, UUriError> {
-        let auth = Authority::try_from(authority)
-            .map_err(|e| UUriError::validation_error(format!("invalid authority: {}", e)))
-            .and_then(|auth| {
-                if auth.has_port() {
-                    Err(UUriError::validation_error(
-                        "uProtocol URI's authority must not contain port",
-                    ))
-                } else if auth.has_username() || auth.has_password() {
-                    Err(UUriError::validation_error(
-                        "uProtocol URI's authority must not contain userinfo",
-                    ))
-                } else {
-                    let auth_name = auth.host().to_string();
-                    if auth_name.len() <= 128 {
-                        Ok(auth)
-                    } else {
-                        Err(UUriError::validation_error(
-                            "URI's authority name must not exceed 128 characters",
-                        ))
-                    }
-                }
-            })?;
+        let authority_name = Self::verify_authority(authority)?;
         Ok(UUri {
-            authority_name: auth.host().to_string(),
+            authority_name,
             ue_id: entity_id,
             ue_version_major: entity_version as u32,
             resource_id: resource_id as u32,
@@ -417,6 +381,86 @@ impl UUri {
             resource_id,
             ..Default::default()
         }
+    }
+
+    // [impl->dsn~uri-authority-name-length~1]
+    // [impl->dsn~uri-host-only~2]
+    fn verify_authority(authority: &str) -> Result<String, UUriError> {
+        Authority::try_from(authority)
+            .map_err(|e| UUriError::validation_error(format!("invalid authority: {}", e)))
+            .and_then(|auth| Self::verify_parsed_authority(&auth))
+    }
+
+    // [impl->dsn~uri-authority-name-length~1]
+    // [impl->dsn~uri-host-only~2]
+    fn verify_parsed_authority(auth: &Authority) -> Result<String, UUriError> {
+        if auth.has_port() {
+            Err(UUriError::validation_error(
+                "uProtocol URI's authority must not contain port",
+            ))
+        } else if auth.has_username() || auth.has_password() {
+            Err(UUriError::validation_error(
+                "uProtocol URI's authority must not contain userinfo",
+            ))
+        } else {
+            let auth_name = auth.host().to_string();
+            if auth_name.len() <= 128 {
+                Ok(auth_name)
+            } else {
+                Err(UUriError::validation_error(
+                    "URI's authority name must not exceed 128 characters",
+                ))
+            }
+        }
+    }
+
+    fn verify_major_version(major_version: u32) -> Result<u8, UUriError> {
+        u8::try_from(major_version).map_err(|_e| {
+            UUriError::ValidationError(
+                "uProtocol URI's major version must be an 8 bit unsigned integer".to_string(),
+            )
+        })
+    }
+
+    fn verify_resource_id(resource_id: u32) -> Result<u16, UUriError> {
+        u16::try_from(resource_id).map_err(|_e| {
+            UUriError::ValidationError(
+                "uProtocol URI's resource ID must be a 16 bit unsigned integer".to_string(),
+            )
+        })
+    }
+
+    /// Verifies that this UUri is indeed a valid uProtocol URI.
+    ///
+    /// This check is not necessary, if any of UUri's constructors functions has been used
+    /// to create the URI. However, if the origin of a UUri is unknown, e.g. when it has
+    /// been deserialized from a protobuf, then this function can be used to check if all
+    /// properties are compliant with the uProtocol specification.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if this UUri is not a valid uProtocol URI. The returned error may
+    /// contain details regarding the cause of the validation to have failed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uuri = UUri {
+    ///   authority_name: "valid_name".into(),
+    ///   ue_id: 0x1000,
+    ///   ue_version_major: 0x01,
+    ///   resource_id: 0x8100,
+    ///   ..Default::default()
+    /// };
+    /// assert!(uuri.check_validity().is_ok());
+    /// ```
+    pub fn check_validity(&self) -> Result<(), UUriError> {
+        Self::verify_authority(self.authority_name.as_str())?;
+        Self::verify_major_version(self.ue_version_major)?;
+        Self::verify_resource_id(self.resource_id)?;
+        Ok(())
     }
 
     /// Checks if this URI is empty.
@@ -813,6 +857,46 @@ mod tests {
     use protobuf::Message;
     use test_case::test_case;
 
+    // [utest->dsn~uri-authority-name-length~1]
+    // [utest->dsn~uri-host-only~2]
+    #[test_case(UUri {
+            authority_name: "invalid:5671".into(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x01,
+            resource_id: 0x0002,
+            ..Default::default()
+        };
+        "for authority including port")]
+    #[test_case(UUri {
+            authority_name: ['a'; 129].iter().collect::<String>(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x01,
+            resource_id: 0x0002,
+            ..Default::default()
+        };
+        "for authority exceeding max length")]
+    // additional test cases covering all sorts of invalid authority are
+    // included in [`test_from_string_fails`]
+    #[test_case(UUri {
+            authority_name: "valid".into(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x0101,
+            resource_id: 0x0002,
+            ..Default::default()
+        };
+        "for invalid major version")]
+    #[test_case(UUri {
+            authority_name: "valid".into(),
+            ue_id: 0x0000_8000,
+            ue_version_major: 0x01,
+            resource_id: 0x10002,
+            ..Default::default()
+        };
+        "for invalid resource ID")]
+    fn test_check_validity_fails(uuri: UUri) {
+        assert!(uuri.check_validity().is_err());
+    }
+
     // [utest->req~uri-serialization~1]
     // [utest->dsn~uri-scheme~1]
     // [utest->dsn~uri-host-only~2]
@@ -830,13 +914,15 @@ mod tests {
     #[test_case("up://MYVIN/1A23/1/a13#foobar"; "for URI with fragement")]
     #[test_case("up://MYVIN:1000/1A23/1/A13"; "for authority with port")]
     #[test_case("up://user:pwd@MYVIN/1A23/1/A13"; "for authority with userinfo")]
-    #[test_case("5up://MYVIN/55A1/1/1"; "for invalid scheme")]
     #[test_case("up://MY#VIN/55A1/1/1"; "for invalid authority")]
     #[test_case("up://MYVIN/55T1/1/1"; "for non-hex entity ID")]
+    #[test_case("up://MYVIN/123456789/1/1"; "for entity ID exceeding max length")]
     #[test_case("up://MYVIN/55A1//1"; "for empty version")]
     #[test_case("up://MYVIN/55A1/T/1"; "for non-hex version")]
+    #[test_case("up://MYVIN/55A1/123/1"; "for version exceeding max length")]
     #[test_case("up://MYVIN/55A1/1/"; "for empty resource ID")]
     #[test_case("up://MYVIN/55A1/1/1T"; "for non-hex resource ID")]
+    #[test_case("up://MYVIN/55A1/1/10001"; "for resource ID exceeding max length")]
     fn test_from_string_fails(string: &str) {
         let parsing_result = UUri::from_str(string);
         assert!(parsing_result.is_err());
