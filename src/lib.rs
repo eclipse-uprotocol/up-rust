@@ -46,6 +46,7 @@ For user convenience, all of these modules export their types on up_rust top-lev
   implementations. Enabled by default.
 * `utwin` enables support for types required to interact with [uTwin service](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/v1.6.0-alpha.3/up-l3/utwin/v3/README.adoc)
   implementations.
+* `test-util` provides some useful mock implementations for testing. In particular, provides mock implementations of UTransport and Communication Layer API traits which make implementing unit tests a lot easier.
 * `util` provides some useful helper structs. In particular, provides a local, in-memory UTransport for exchanging messages within a single process. This transport is also used by the examples illustrating usage of the Communication Layer API.
 
 ## References
@@ -57,14 +58,16 @@ For user convenience, all of these modules export their types on up_rust top-lev
 // up_core_api types used and augmented by up_rust - symbols re-exported to toplevel, errors are module-specific
 #[cfg(feature = "communication")]
 pub mod communication;
+
 #[cfg(feature = "util")]
 pub mod local_transport;
+
 mod uattributes;
 pub use uattributes::{
-    NotificationValidator, PublishValidator, RequestValidator, ResponseValidator,
-    UAttributesValidator, UAttributesValidators,
+    NotificationValidator, PublishValidator, RequestValidator, ResponseValidator, UAttributes,
+    UAttributesError, UAttributesValidator, UAttributesValidators, UMessageType, UPayloadFormat,
+    UPriority,
 };
-pub use uattributes::{UAttributes, UAttributesError, UMessageType, UPayloadFormat, UPriority};
 
 mod umessage;
 pub use umessage::{UMessage, UMessageBuilder, UMessageError};
@@ -79,6 +82,9 @@ mod utransport;
 pub use utransport::{
     ComparableListener, LocalUriProvider, StaticUriProvider, UListener, UTransport,
 };
+#[cfg(feature = "test-util")]
+pub use utransport::{MockLocalUriProvider, MockTransport, MockUListener};
+
 mod uuid;
 pub use uuid::UUID;
 

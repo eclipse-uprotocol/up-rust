@@ -14,8 +14,6 @@
 use std::{error::Error, fmt::Display, sync::Arc};
 
 use async_trait::async_trait;
-#[cfg(test)]
-use mockall::automock;
 
 use crate::communication::RegistrationError;
 use crate::core::usubscription::SubscriptionStatus;
@@ -73,7 +71,7 @@ pub trait Publisher: Send + Sync {
 }
 
 // [impl->req~up-language-comm-api~1]
-#[cfg_attr(test, automock)]
+#[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 pub trait SubscriptionChangeHandler: Send + Sync {
     /// Invoked for each update to the subscription status for a given topic.
     ///
