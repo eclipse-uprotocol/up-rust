@@ -18,8 +18,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-#[cfg(test)]
-use mockall::automock;
 
 use crate::{UCode, UMessage, UStatus, UUri};
 
@@ -28,7 +26,7 @@ use crate::{UCode, UMessage, UStatus, UUri};
 /// Implementations may use arbitrary mechanisms to determine the information that
 /// is necessary for creating URIs, e.g. environment variables, configuration files etc.
 // [impl->req~up-language-transport-api~1]
-#[cfg_attr(test, automock)]
+#[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 pub trait LocalUriProvider: Send + Sync {
     /// Gets the _authority_ used for URIs representing this uEntity's resources.
     fn get_authority(&self) -> String;
@@ -149,7 +147,7 @@ impl TryFrom<&UUri> for StaticUriProvider {
 /// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.3/up-l1/README.adoc)
 /// for details.
 // [impl->req~up-language-transport-api~1]
-#[cfg_attr(test, automock)]
+#[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
 pub trait UListener: Send + Sync {
     /// Performs some action on receipt of a message.
@@ -273,10 +271,10 @@ pub trait UTransport: Send + Sync {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 mockall::mock! {
     /// This extra struct is necessary in order to comply with mockall's requirements regarding the parameter lifetimes
-    /// see https://github.com/asomers/mockall/issues/571
+    /// see <https://github.com/asomers/mockall/issues/571>
     pub Transport {
         pub async fn do_send(&self, message: UMessage) -> Result<(), UStatus>;
         pub async fn do_register_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
@@ -284,10 +282,10 @@ mockall::mock! {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 #[async_trait]
 /// This delegates the invocation of the UTransport functions to the mocked functions of the Transport struct.
-/// see https://github.com/asomers/mockall/issues/571
+/// see <https://github.com/asomers/mockall/issues/571>
 impl UTransport for MockTransport {
     async fn send(&self, message: UMessage) -> Result<(), UStatus> {
         self.do_send(message).await

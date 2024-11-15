@@ -20,9 +20,15 @@ pub use default_notifier::SimpleNotifier;
 pub use default_pubsub::{InMemorySubscriber, SimplePublisher};
 pub use in_memory_rpc_client::InMemoryRpcClient;
 pub use in_memory_rpc_server::InMemoryRpcServer;
+#[cfg(any(test, feature = "test-util"))]
+pub use notification::MockNotifier;
 pub use notification::{NotificationError, Notifier};
+#[cfg(any(test, feature = "test-util"))]
+pub use pubsub::MockSubscriptionChangeHandler;
 #[cfg(feature = "usubscription")]
 pub use pubsub::{PubSubError, Publisher, Subscriber};
+#[cfg(any(test, feature = "test-util"))]
+pub use rpc::{MockRequestHandler, MockRpcClient, MockRpcServerImpl};
 pub use rpc::{RequestHandler, RpcClient, RpcServer, ServiceInvocationError};
 #[cfg(feature = "usubscription")]
 pub use usubscription_client::RpcClientUSubscription;
