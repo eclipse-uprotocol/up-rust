@@ -15,8 +15,6 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use async_trait::async_trait;
-#[cfg(test)]
-use mockall::automock;
 use protobuf::MessageFull;
 
 use crate::communication::RegistrationError;
@@ -139,7 +137,7 @@ impl From<ServiceInvocationError> for UStatus {
 /// [Communication Layer API specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc)
 /// for details.
 // [impl->req~up-language-comm-api~1]
-#[cfg_attr(test, automock)]
+#[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
 pub trait RpcClient: Send + Sync {
     /// Invokes a method on a service.
@@ -213,7 +211,7 @@ impl dyn RpcClient {
 /// A handler for processing incoming RPC requests.
 ///
 // [impl->req~up-language-comm-api~1]
-#[cfg_attr(test, automock)]
+#[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
 pub trait RequestHandler: Send + Sync {
     /// Handles a request to invoke a method with given input parameters.
@@ -289,6 +287,41 @@ pub trait RpcServer {
         resource_id: u16,
         request_handler: Arc<dyn RequestHandler>,
     ) -> Result<(), RegistrationError>;
+}
+
+#[cfg(any(test, feature = "test-util"))]
+mockall::mock! {
+    /// This extra struct is necessary in order to comply with mockall's requirements regarding the parameter lifetimes
+    /// see <https://github.com/asomers/mockall/issues/571>
+    pub RpcServerImpl {
+        pub async fn do_register_endpoint<'a>(&'a self, origin_filter: Option<&'a UUri>, resource_id: u16, request_handler: Arc<dyn RequestHandler>) -> Result<(), RegistrationError>;
+        pub async fn do_unregister_endpoint<'a>(&'a self, origin_filter: Option<&'a UUri>, resource_id: u16, request_handler: Arc<dyn RequestHandler>) -> Result<(), RegistrationError>;
+    }
+}
+
+#[cfg(any(test, feature = "test-util"))]
+#[async_trait]
+/// This delegates the invocation of the UTransport functions to the mocked functions of the Transport struct.
+/// see <https://github.com/asomers/mockall/issues/571>
+impl RpcServer for MockRpcServerImpl {
+    async fn register_endpoint(
+        &self,
+        origin_filter: Option<&UUri>,
+        resource_id: u16,
+        request_handler: Arc<dyn RequestHandler>,
+    ) -> Result<(), RegistrationError> {
+        self.do_register_endpoint(origin_filter, resource_id, request_handler)
+            .await
+    }
+    async fn unregister_endpoint(
+        &self,
+        origin_filter: Option<&UUri>,
+        resource_id: u16,
+        request_handler: Arc<dyn RequestHandler>,
+    ) -> Result<(), RegistrationError> {
+        self.do_unregister_endpoint(origin_filter, resource_id, request_handler)
+            .await
+    }
 }
 
 #[cfg(test)]
