@@ -67,10 +67,10 @@ mod tests {
 
     use crate::{UAttributesError, UMessageType};
 
-    const TYPE_PUBLISH: &str = "pub.v1";
-    const TYPE_NOTIFICATION: &str = "not.v1";
-    const TYPE_REQUEST: &str = "req.v1";
-    const TYPE_RESPONSE: &str = "res.v1";
+    const TYPE_PUBLISH: &str = "up-pub.v1";
+    const TYPE_NOTIFICATION: &str = "up-not.v1";
+    const TYPE_REQUEST: &str = "up-req.v1";
+    const TYPE_RESPONSE: &str = "up-res.v1";
 
     #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, TYPE_PUBLISH; "for PUBLISH")]
     #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, TYPE_NOTIFICATION; "for NOTIFICATION")]
