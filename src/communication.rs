@@ -30,6 +30,8 @@ pub use pubsub::{PubSubError, Publisher, Subscriber};
 #[cfg(any(test, feature = "test-util"))]
 pub use rpc::{MockRequestHandler, MockRpcClient, MockRpcServerImpl};
 pub use rpc::{RequestHandler, RpcClient, RpcServer, ServiceInvocationError};
+#[cfg(feature = "udiscovery")]
+pub use udiscovery_client::RpcClientUDiscovery;
 #[cfg(feature = "usubscription")]
 pub use usubscription_client::RpcClientUSubscription;
 
@@ -46,6 +48,8 @@ mod notification;
 #[cfg(feature = "usubscription")]
 mod pubsub;
 mod rpc;
+#[cfg(feature = "udiscovery")]
+mod udiscovery_client;
 #[cfg(feature = "usubscription")]
 mod usubscription_client;
 
