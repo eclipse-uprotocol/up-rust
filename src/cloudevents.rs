@@ -407,6 +407,7 @@ mod tests {
 
     //
     // tests asserting conversion of UMessage -> CloudEvent
+    // [utest->dsn~cloudevents-umessage-mapping~2]
     //
 
     fn assert_standard_cloudevent_attributes(
@@ -632,6 +633,7 @@ mod tests {
 
     //
     // tests asserting conversion of CloudEvent -> UMessage
+    // [utest->dsn~cloudevents-umessage-mapping~2]
     //
 
     fn assert_standard_umessage_attributes(
