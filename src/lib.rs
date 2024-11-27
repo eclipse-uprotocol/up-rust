@@ -37,6 +37,9 @@ For user convenience, all of these modules export their types on up_rust top-lev
 
 ## Features
 
+* `cloudevents` enables support for mapping UMessages to/from CloudEvents using Protobuf Format according to the
+  [uProtocol specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.4/up-l1/cloudevents.adoc).
+
 * `communication` enables support for the [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.3/up-l2/api.adoc) and its
   default implementation on top of the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.3/up-l1/README.adoc).
   Enabled by default.
@@ -56,6 +59,11 @@ For user convenience, all of these modules export their types on up_rust top-lev
 */
 
 // up_core_api types used and augmented by up_rust - symbols re-exported to toplevel, errors are module-specific
+#[cfg(feature = "cloudevents")]
+mod cloudevents;
+#[cfg(feature = "cloudevents")]
+pub use cloudevents::{CloudEvent, CONTENT_TYPE_CLOUDEVENTS_PROTOBUF};
+
 #[cfg(feature = "communication")]
 pub mod communication;
 

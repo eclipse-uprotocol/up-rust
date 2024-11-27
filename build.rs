@@ -54,5 +54,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .cargo_out_dir("uprotocol")
         .run_from_script();
 
+    #[cfg(feature = "cloudevents")]
+    protobuf_codegen::Codegen::new()
+        .protoc()
+        // use vendored protoc instead of relying on user provided protobuf installation
+        .protoc_path(&protoc_bin_vendored::protoc_bin_path().unwrap())
+        .include("proto")
+        .inputs(["proto/io/cloudevents/v1/cloudevents.proto"])
+        .cargo_out_dir("cloudevents")
+        .run_from_script();
+
     Ok(())
 }
