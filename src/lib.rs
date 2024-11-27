@@ -56,6 +56,9 @@ For user convenience, all of these modules export their types on up_rust top-lev
 */
 
 // up_core_api types used and augmented by up_rust - symbols re-exported to toplevel, errors are module-specific
+#[cfg(feature = "cloudevents")]
+pub mod cloudevents;
+
 #[cfg(feature = "communication")]
 pub mod communication;
 
