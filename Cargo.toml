@@ -16,12 +16,13 @@ categories = ["api-bindings"]
 description = "The Eclipse uProtocol Rust Language Library"
 edition = "2021"
 include = [
-    "/src/*",
-    "/examples/*",
-    "/up-spec/up-core-api/uprotocol/*",
     "/build.rs",
     "/Cargo.toml",
+    "/examples/*",
+    "/proto/*",
     "/README.md",
+    "/src/*",
+    "/up-spec/up-core-api/uprotocol/*",
 ]
 keywords = ["uProtocol", "SDK", "communication"]
 license = "Apache-2.0"
@@ -33,6 +34,7 @@ version = "0.2.0"
 
 [features]
 default = ["communication"]
+cloudevents = []
 communication = ["usubscription", "dep:thiserror", "tokio/sync", "tokio/time"]
 udiscovery = []
 usubscription = []
