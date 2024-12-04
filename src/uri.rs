@@ -384,6 +384,76 @@ impl UUri {
         }
     }
 
+    /// Gets the authority name part from this uProtocol URI.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
+    /// assert_eq!(uri.authority_name(), *"my-vehicle");
+    /// ```
+    pub fn authority_name(&self) -> String {
+        self.authority_name.to_owned()
+    }
+
+    // Gets the uEntity type identifier part from this uProtocol URI.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
+    /// assert_eq!(uri.uentity_type_id(), 0x1234);
+    /// ```
+    pub fn uentity_type_id(&self) -> u16 {
+        (self.ue_id & WILDCARD_ENTITY_TYPE) as u16
+    }
+
+    // Gets the uEntity instance identifier part from this uProtocol URI.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
+    /// assert_eq!(uri.uentity_instance_id(), 0x1010);
+    /// ```
+    pub fn uentity_instance_id(&self) -> u16 {
+        ((self.ue_id & WILDCARD_ENTITY_INSTANCE) >> 16) as u16
+    }
+
+    // Gets the major version part from this uProtocol URI.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
+    /// assert_eq!(uri.uentity_major_version(), 0x01);
+    /// ```
+    pub fn uentity_major_version(&self) -> u8 {
+        (self.ue_version_major & WILDCARD_ENTITY_VERSION) as u8
+    }
+
+    // Gets the resource identifier part from this uProtocol URI.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
+    /// assert_eq!(uri.resource_id(), 0x9a10);
+    /// ```
+    pub fn resource_id(&self) -> u16 {
+        (self.resource_id & WILDCARD_RESOURCE_ID) as u16
+    }
+
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
     fn verify_authority(authority: &str) -> Result<String, UUriError> {
@@ -820,22 +890,21 @@ impl UUri {
     }
 
     fn matches_authority(&self, candidate: &UUri) -> bool {
-        self.authority_name == WILDCARD_AUTHORITY || self.authority_name == candidate.authority_name
+        self.has_wildcard_authority() || self.authority_name == candidate.authority_name
     }
 
     fn matches_entity_type(&self, candidate: &UUri) -> bool {
-        self.ue_id & WILDCARD_ENTITY_TYPE == WILDCARD_ENTITY_TYPE
-            || self.ue_id & WILDCARD_ENTITY_TYPE == candidate.ue_id & WILDCARD_ENTITY_TYPE
+        self.has_wildcard_entity_type() || self.uentity_type_id() == candidate.uentity_type_id()
     }
 
     fn matches_entity_instance(&self, candidate: &UUri) -> bool {
-        self.ue_id & WILDCARD_ENTITY_INSTANCE == WILDCARD_ENTITY_INSTANCE
-            || self.ue_id & WILDCARD_ENTITY_INSTANCE == candidate.ue_id & WILDCARD_ENTITY_INSTANCE
+        self.has_wildcard_entity_instance()
+            || self.uentity_instance_id() == candidate.uentity_instance_id()
     }
 
     fn matches_entity_version(&self, candidate: &UUri) -> bool {
-        self.ue_version_major == WILDCARD_ENTITY_VERSION
-            || self.ue_version_major == candidate.ue_version_major
+        self.has_wildcard_version()
+            || self.uentity_major_version() == candidate.uentity_major_version()
     }
 
     fn matches_entity(&self, candidate: &UUri) -> bool {
@@ -845,7 +914,7 @@ impl UUri {
     }
 
     fn matches_resource(&self, candidate: &UUri) -> bool {
-        self.resource_id == WILDCARD_RESOURCE_ID || self.resource_id == candidate.resource_id
+        self.has_wildcard_resource_id() || self.resource_id == candidate.resource_id
     }
 
     /// Checks if a given candidate URI matches a pattern.
