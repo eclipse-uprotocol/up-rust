@@ -58,8 +58,11 @@ impl RequestListener {
 
         debug!(ttl = request_timeout, id = %request_id, "processing RPC request");
 
-        let invocation_result_future =
-            request_handler_clone.handle_request(resource_id, request_payload);
+        let invocation_result_future = request_handler_clone.handle_request(
+            resource_id,
+            &request_message.attributes,
+            request_payload,
+        );
         let outcome = tokio::time::timeout(
             Duration::from_millis(request_timeout as u64),
             invocation_result_future,
@@ -552,19 +555,24 @@ mod tests {
         };
         let message_id = UUID::build();
         let message_id_clone = message_id.clone();
+        let message_source = UUri::try_from("up://localhost/A100/1/0").unwrap();
+        let message_source_clone = message_source.clone();
 
         request_handler
             .expect_handle_request()
             .once()
-            .withf(|resource_id, request_payload| {
+            .withf(move |resource_id, message_attributes, request_payload| {
                 if let Some(pl) = request_payload {
+                    let message_source = message_attributes.source.as_ref().unwrap();
                     let msg: StringValue = pl.extract_protobuf().unwrap();
-                    msg.value == *"Hello" && *resource_id == 0x7000_u16
+                    msg.value == *"Hello"
+                        && *resource_id == 0x7000_u16
+                        && *message_source == message_source_clone
                 } else {
                     false
                 }
             })
-            .returning(|_resource_id, _request_payload| {
+            .returning(|_resource_id, _message_attributes, _request_payload| {
                 let response_payload = UPayload::try_from_protobuf(StringValue {
                     value: "Hello World".to_string(),
                     ..Default::default()
@@ -597,7 +605,7 @@ mod tests {
             });
         let request_message = UMessageBuilder::request(
             UUri::try_from("up://localhost/A200/1/7000").unwrap(),
-            UUri::try_from("up://localhost/A100/1/0").unwrap(),
+            message_source,
             5_000,
         )
         .with_message_id(message_id)
@@ -625,8 +633,8 @@ mod tests {
         request_handler
             .expect_handle_request()
             .once()
-            .withf(|resource_id, _request_payload| *resource_id == 0x7000_u16)
-            .returning(|_resource_id, _request_payload| {
+            .withf(|resource_id, _message_attributes, _request_payload| *resource_id == 0x7000_u16)
+            .returning(|_resource_id, _message_attributes, _request_payload| {
                 Err(ServiceInvocationError::NotFound(
                     "no such object".to_string(),
                 ))
@@ -684,6 +692,7 @@ mod tests {
             async fn handle_request(
                 &self,
                 resource_id: u16,
+                _message_attributes: &UAttributes,
                 _request_payload: Option<UPayload>,
             ) -> Result<Option<UPayload>, ServiceInvocationError> {
                 assert_eq!(resource_id, 0x7000);

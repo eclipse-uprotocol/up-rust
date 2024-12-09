@@ -24,7 +24,7 @@ use up_rust::{
         ServiceInvocationError, UPayload,
     },
     local_transport::LocalTransport,
-    LocalUriProvider, StaticUriProvider,
+    LocalUriProvider, StaticUriProvider, UAttributes,
 };
 
 struct EchoOperation {}
@@ -34,6 +34,7 @@ impl RequestHandler for EchoOperation {
     async fn handle_request(
         &self,
         _resource_id: u16,
+        _message_attributes: &UAttributes,
         request_payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError> {
         if let Some(req_payload) = request_payload {
