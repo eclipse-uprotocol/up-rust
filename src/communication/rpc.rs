@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use protobuf::MessageFull;
 
 use crate::communication::RegistrationError;
-use crate::{UCode, UStatus, UUri};
+use crate::{UAttributes, UCode, UStatus, UUri};
 
 use super::{CallOptions, UPayload};
 
@@ -223,6 +223,7 @@ pub trait RequestHandler: Send + Sync {
     /// # Arguments
     ///
     /// * `resource_id` - The resource identifier of the method to invoke.
+    /// * `message_attributes` - Any metadata that is associated with the request message.
     /// * `request_payload` - The raw payload that contains the input data for the method.
     ///
     /// # Returns
@@ -235,6 +236,7 @@ pub trait RequestHandler: Send + Sync {
     async fn handle_request(
         &self,
         resource_id: u16,
+        message_attributes: &UAttributes,
         request_payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError>;
 }
