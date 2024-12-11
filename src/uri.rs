@@ -553,8 +553,8 @@ impl UUri {
         self.eq(&UUri::default())
     }
 
-    /// Check if an `UUri` is remote, by comparing authority fields. UUris with empty authority are
-    /// considered to be local.
+    /// Check if an `UUri` is remote, by comparing authority fields.
+    /// UUris with empty authority are considered to be local.
     ///
     /// # Returns
     ///
@@ -568,21 +568,49 @@ impl UUri {
     ///
     /// let authority_a = UUri::from_str("up://Authority.A/100A/1/0").unwrap();
     /// let authority_b = UUri::from_str("up://Authority.B/200B/2/20").unwrap();
-    /// assert!(authority_a.is_remote_authority(&authority_b));
+    /// assert!(authority_a.is_remote(&authority_b));
     ///
     /// let authority_local = UUri::from_str("up:///100A/1/0").unwrap();
-    /// assert!(!authority_local.is_remote_authority(&authority_a));
+    /// assert!(!authority_local.is_remote(&authority_a));
     ///
     /// let authority_wildcard = UUri::from_str("up://*/100A/1/0").unwrap();
-    /// assert!(!authority_wildcard.is_remote_authority(&authority_a));
-    /// assert!(!authority_a.is_remote_authority(&authority_wildcard));
-    /// assert!(!authority_wildcard.is_remote_authority(&authority_wildcard));
+    /// assert!(!authority_wildcard.is_remote(&authority_a));
+    /// assert!(!authority_a.is_remote(&authority_wildcard));
+    /// assert!(!authority_wildcard.is_remote(&authority_wildcard));
     /// ````
-    pub fn is_remote_authority(&self, other_uri: &UUri) -> bool {
-        !self.authority_name.is_empty()
-            && self.authority_name != WILDCARD_AUTHORITY
-            && other_uri.authority_name != WILDCARD_AUTHORITY
-            && self.authority_name != other_uri.authority_name
+    pub fn is_remote(&self, other_uri: &UUri) -> bool {
+        self.is_remote_authority(&other_uri.authority_name)
+    }
+
+    /// Check if an authority is remote compared to the authority field of the UUri.
+    /// Empty authorities are considered to be local.
+    ///
+    /// # Returns
+    ///
+    /// 'true' if authority is a different than `Self.authority_name`, `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::str::FromStr;
+    /// use up_rust::UUri;
+    ///
+    /// let authority_a = UUri::from_str("up://Authority.A/100A/1/0").unwrap();
+    /// let authority_b = "Authority.B".to_string();
+    /// assert!(authority_a.is_remote_authority(&authority_b));
+    ///
+    /// let authority_local = "".to_string();
+    /// assert!(!authority_a.is_remote_authority(&authority_local));
+    ///
+    /// let authority_wildcard = "*".to_string();
+    /// assert!(!authority_a.is_remote_authority(&authority_wildcard));
+    /// ```
+    pub fn is_remote_authority(&self, authority: &String) -> bool {
+        !authority.is_empty()
+            && !self.authority_name.is_empty()
+            && !self.has_wildcard_authority()
+            && authority != WILDCARD_AUTHORITY
+            && self.authority_name != *authority
     }
 
     /// Checks if this UUri has an empty authority name.
