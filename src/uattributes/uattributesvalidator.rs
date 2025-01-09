@@ -64,7 +64,7 @@ pub trait UAttributesValidator: Send {
         if attributes
             .id
             .as_ref()
-            .map_or(false, |id| id.is_uprotocol_uuid())
+            .is_some_and(|id| id.is_uprotocol_uuid())
         {
             Ok(())
         } else {
@@ -515,7 +515,7 @@ impl ResponseValidator {
         if !attributes
             .reqid
             .as_ref()
-            .map_or(false, |id| id.is_uprotocol_uuid())
+            .is_some_and(|id| id.is_uprotocol_uuid())
         {
             Err(UAttributesError::validation_error(
                 "Request ID is not a valid uProtocol UUID",

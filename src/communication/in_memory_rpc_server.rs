@@ -459,7 +459,7 @@ mod tests {
                         .attributes
                         .get_or_default()
                         .commstatus
-                        .map_or(false, |v| v.enum_value_or_default() == error.get_code())
+                        .is_some_and(|v| v.enum_value_or_default() == error.get_code())
             })
             .returning(move |_msg| {
                 notify_clone.notify_one();
@@ -650,7 +650,7 @@ mod tests {
                         .attributes
                         .get_or_default()
                         .commstatus
-                        .map_or(false, |v| v.enum_value_or_default() == error.get_code())
+                        .is_some_and(|v| v.enum_value_or_default() == error.get_code())
                     && response_message
                         .attributes
                         .get_or_default()
@@ -721,7 +721,7 @@ mod tests {
                         .attributes
                         .get_or_default()
                         .commstatus
-                        .map_or(false, |v| v.enum_value_or_default() == error.get_code())
+                        .is_some_and(|v| v.enum_value_or_default() == error.get_code())
                     && response_message
                         .attributes
                         .get_or_default()

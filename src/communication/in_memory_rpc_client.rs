@@ -126,9 +126,7 @@ impl ResponseListener {
     fn contains(&self, reqid: &UUID) -> bool {
         self.pending_requests
             .lock()
-            .map_or(false, |pending_requests| {
-                pending_requests.contains_key(reqid)
-            })
+            .is_ok_and(|pending_requests| pending_requests.contains_key(reqid))
     }
 }
 
@@ -401,15 +399,12 @@ mod tests {
             .expect_do_send()
             .once()
             .withf(move |request_message| {
-                request_message
-                    .attributes
-                    .as_ref()
-                    .map_or(false, |attribs| {
-                        attribs.id.as_ref() == Some(&expected_message_id)
-                            && attribs.priority.value() == UPriority::UPRIORITY_CS6.value()
-                            && attribs.ttl == Some(5_000)
-                            && attribs.token == Some("my_token".to_string())
-                    })
+                request_message.attributes.as_ref().is_some_and(|attribs| {
+                    attribs.id.as_ref() == Some(&expected_message_id)
+                        && attribs.priority.value() == UPriority::UPRIORITY_CS6.value()
+                        && attribs.ttl == Some(5_000)
+                        && attribs.token == Some("my_token".to_string())
+                })
             })
             .returning(move |_request_message| {
                 request_sent_clone.notify_one();
@@ -496,9 +491,7 @@ mod tests {
                 request_message
                     .attributes
                     .as_ref()
-                    .map_or(false, |attribs| {
-                        attribs.id.as_ref() == Some(&expected_message_id)
-                    })
+                    .is_some_and(|attribs| attribs.id.as_ref() == Some(&expected_message_id))
             })
             .returning(move |_request_message| {
                 first_request_sent_clone.notify_one();

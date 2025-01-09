@@ -68,9 +68,7 @@ impl UAttributes {
     /// assert!(attribs.is_publish());
     /// ```
     pub fn is_publish(&self) -> bool {
-        self.type_
-            .enum_value()
-            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_PUBLISH)
+        self.type_.enum_value() == Ok(UMessageType::UMESSAGE_TYPE_PUBLISH)
     }
 
     /// Checks if these are the attributes for an RPC Request message.
@@ -87,9 +85,7 @@ impl UAttributes {
     /// assert!(attribs.is_request());
     /// ```
     pub fn is_request(&self) -> bool {
-        self.type_
-            .enum_value()
-            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_REQUEST)
+        self.type_.enum_value() == Ok(UMessageType::UMESSAGE_TYPE_REQUEST)
     }
 
     /// Checks if these are the attributes for an RPC Response message.
@@ -106,9 +102,7 @@ impl UAttributes {
     /// assert!(attribs.is_response());
     /// ```
     pub fn is_response(&self) -> bool {
-        self.type_
-            .enum_value()
-            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_RESPONSE)
+        self.type_.enum_value() == Ok(UMessageType::UMESSAGE_TYPE_RESPONSE)
     }
 
     /// Checks if these are the attributes for a Notification message.
@@ -125,8 +119,6 @@ impl UAttributes {
     /// assert!(attribs.is_notification());
     /// ```
     pub fn is_notification(&self) -> bool {
-        self.type_
-            .enum_value()
-            .map_or(false, |v| v == UMessageType::UMESSAGE_TYPE_NOTIFICATION)
+        self.type_.enum_value() == Ok(UMessageType::UMESSAGE_TYPE_NOTIFICATION)
     }
 }
