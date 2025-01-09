@@ -92,7 +92,7 @@ impl UMessage {
     pub fn is_publish(&self) -> bool {
         self.attributes
             .as_ref()
-            .map_or(false, |attribs| attribs.is_publish())
+            .is_some_and(|attribs| attribs.is_publish())
     }
 
     /// Checks if this is an RPC Request message.
@@ -115,7 +115,7 @@ impl UMessage {
     pub fn is_request(&self) -> bool {
         self.attributes
             .as_ref()
-            .map_or(false, |attribs| attribs.is_request())
+            .is_some_and(|attribs| attribs.is_request())
     }
 
     /// Checks if this is an RPC Response message.
@@ -138,7 +138,7 @@ impl UMessage {
     pub fn is_response(&self) -> bool {
         self.attributes
             .as_ref()
-            .map_or(false, |attribs| attribs.is_response())
+            .is_some_and(|attribs| attribs.is_response())
     }
 
     /// Checks if this is a Notification message.
@@ -161,7 +161,7 @@ impl UMessage {
     pub fn is_notification(&self) -> bool {
         self.attributes
             .as_ref()
-            .map_or(false, |attribs| attribs.is_notification())
+            .is_some_and(|attribs| attribs.is_notification())
     }
 
     /// If `UMessage` payload is available, deserialize it as a protobuf `Message`.

@@ -153,7 +153,7 @@ impl SubscriptionChangeListener {
     fn has_handler(&self, topic: &UUri) -> bool {
         self.subscription_change_handlers
             .read()
-            .map_or(false, |handlers| handlers.contains_key(topic))
+            .is_ok_and(|handlers| handlers.contains_key(topic))
     }
 }
 
@@ -541,7 +541,7 @@ mod tests {
                 };
                 payload.value == *"Hello"
                     && message.is_publish()
-                    && message.attributes.as_ref().map_or(false, |attribs| {
+                    && message.attributes.as_ref().is_some_and(|attribs| {
                         attribs.id.as_ref() == Some(&expected_message_id)
                             && attribs.priority.value() == UPriority::UPRIORITY_CS3.value()
                             && attribs.ttl == Some(5_000)
