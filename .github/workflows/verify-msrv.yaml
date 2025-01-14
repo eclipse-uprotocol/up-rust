@@ -34,7 +34,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@master
       with: 
         toolchain: ${{ env.RUST_TOOLCHAIN }}
+    - uses: taiki-e/install-action@cargo-hack
     - name: check MSRV
       run: |
-        cargo install cargo-msrv
-        cargo msrv verify
+        cargo hack check --rust-version --workspace --all-targets --all-features --ignore-private
