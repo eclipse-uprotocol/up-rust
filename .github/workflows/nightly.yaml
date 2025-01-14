@@ -32,6 +32,9 @@ jobs:
   check-msrv:
     uses: ./.github/workflows/verify-msrv.yaml
 
+  check-latest-deps:
+    uses: ./.github/workflows/verify-latest-deps.yaml
+
   deny:
     runs-on: ubuntu-latest
     steps:
