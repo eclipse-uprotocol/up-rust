@@ -18,7 +18,12 @@
 [licenses]
 allow = ["Apache-2.0", "BSD-3-Clause", "MIT"]
 private = { ignore = true }
-exceptions = [{ name = "unicode-ident", allow = ["Unicode-DFS-2016"] }]
+exceptions = [
+    { name = "unicode-ident", allow = [
+        "Unicode-DFS-2016",
+        "Unicode-3.0",
+    ] },
+]
 unused-allowed-license = "allow"
 
 [bans]
