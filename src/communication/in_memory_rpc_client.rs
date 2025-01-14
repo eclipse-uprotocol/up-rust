@@ -249,9 +249,8 @@ impl RpcClient for InMemoryRpcClient {
         self.transport
             .send(rpc_request_message)
             .await
-            .map_err(|e| {
+            .inspect_err(|_e| {
                 self.response_listener.remove_pending_request(&message_id);
-                e
             })?;
         debug!(
             request_id = message_id.to_hyphenated_string(),
