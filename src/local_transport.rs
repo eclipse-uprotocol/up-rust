@@ -36,7 +36,7 @@ impl RegisteredListener {
         }
 
         if let Some(pattern) = &self.sink_filter {
-            sink.map_or(false, |candidate_sink| pattern.matches(candidate_sink))
+            sink.is_some_and(|candidate_sink| pattern.matches(candidate_sink))
         } else {
             sink.is_none()
         }
