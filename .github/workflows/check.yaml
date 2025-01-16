@@ -70,7 +70,7 @@ jobs:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
     - name: Run cargo check
       run: |
-        cargo check --all --tests
+        cargo check --workspace --all-targets --all-features
 
   # [impl->req~up-language-ci-linter~1]
   fmt:
@@ -85,7 +85,7 @@ jobs:
           components: rustfmt
       - name: Run cargo fmt
         run: |
-          cargo fmt --all -- --check
+          cargo fmt --all --check
 
   # [impl->req~up-language-ci-linter~1]
   clippy:
@@ -101,7 +101,7 @@ jobs:
       - name: Run cargo clippy
         run: |
           cargo clippy --version
-          cargo clippy --tests --examples
+          cargo clippy --all-targets --all-features --no-deps -- -W warnings -D warnings
 
   # [impl->req~up-language-ci-api-docs~1]
   docu:
