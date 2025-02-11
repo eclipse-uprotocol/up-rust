@@ -33,6 +33,8 @@ jobs:
       CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: allow
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: "recursive"
     - run: rustup update stable && rustup default stable
     - run: cargo update --verbose
     - run: cargo build --verbose --all-features
