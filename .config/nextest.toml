@@ -1,0 +1,6 @@
+[profile.ci]
+fail-fast = false
+leak-timeout = "200ms"
+
+[profile.ci.junit]
+path = "nextest-results.xml"
