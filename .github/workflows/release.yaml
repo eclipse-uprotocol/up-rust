@@ -29,19 +29,22 @@ jobs:
     uses: ./.github/workflows/check.yaml
 
   check-msrv:
-    uses: ./.github/workflows/verify-msrv.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-msrv.yaml@main
 
   coverage:
-    uses: ./.github/workflows/coverage.yaml  
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-coverage.yaml@main 
 
   requirements-tracing:
-    uses: ./.github/workflows/requirements-tracing.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@main
     with:
       oft-file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_RUST_OPEN_FAST_TRACE_FILE_PATTERNS }}"
 
   licenses:
     # This works off the license declarations in dependent packages/crates, so if these declarations are wrong, this report will contain erroneous information
-    uses: ./.github/workflows/license-report.yaml  
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-license-report.yaml@main
+    with:
+      templates: "about.hbs"
+      config: "about.toml"
 
   tag_release_artifacts:
     # This only runs if this workflow is initiated via a tag-push with pattern 'v*'

@@ -30,10 +30,10 @@ env:
 
 jobs:
   check-msrv:
-    uses: ./.github/workflows/verify-msrv.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-msrv.yaml@main
 
   check-latest-deps:
-    uses: ./.github/workflows/verify-latest-deps.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-latest-deps.yaml@main
 
   deny:
     runs-on: ubuntu-latest
@@ -47,17 +47,18 @@ jobs:
         command: check
         arguments: --all-features
 
+  # [impl->req~up-language-ci-test~1]
   test-all-features:
-    uses: ./.github/workflows/test-featurematrix.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-test-featurematrix.yaml@main
 
   x-build:
     # The jury is still out on whether this actually adds any value, besides simply being possible...
-    uses: ./.github/workflows/x-build.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-x-build.yaml@main
 
   coverage:
-    uses: ./.github/workflows/coverage.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-coverage.yaml@main
 
   requirements-tracing:
-    uses: ./.github/workflows/requirements-tracing.yaml
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@main
     with:
       oft-file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_RUST_OPEN_FAST_TRACE_FILE_PATTERNS }}"
