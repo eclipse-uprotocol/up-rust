@@ -52,7 +52,7 @@ jobs:
       # run OpenFastTrace first because OFT will always succeed and produce
       # a tracing report
       - name: Run OpenFastTrace
-        uses: ./.github/actions/run-oft
+        uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@main
         with:
           file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_RUST_OPEN_FAST_TRACE_FILE_PATTERNS }}"
 
