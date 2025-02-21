@@ -36,16 +36,7 @@ jobs:
     uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-latest-deps.yaml@main
 
   deny:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: "recursive"
-    - uses: EmbarkStudios/cargo-deny-action@v2
-      with: 
-        rust-version: ${{ env.RUST_TOOLCHAIN }}
-        command: check
-        arguments: --all-features
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-deny-check.yaml@main
 
   # [impl->req~up-language-ci-test~1]
   test-all-features:
