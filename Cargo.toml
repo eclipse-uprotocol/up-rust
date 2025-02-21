@@ -95,3 +95,8 @@ required-features = ["communication", "util"]
 [[example]]
 name = "simple_rpc"
 required-features = ["communication", "util"]
+
+[lints.rust]
+# this prevents cargo from complaining about code blocks
+# excluded from tarpaulin coverage checks
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
