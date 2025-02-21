@@ -113,7 +113,7 @@ pub trait Subscriber: Send + Sync {
         subscription_change_handler: Option<Arc<dyn SubscriptionChangeHandler>>,
     ) -> Result<(), RegistrationError>;
 
-    /// Unregisters a previously [registered handler](`Self::subscribe`).
+    /// Deregisters a previously [registered handler](`Self::subscribe`).
     ///
     /// # Arguments
     ///

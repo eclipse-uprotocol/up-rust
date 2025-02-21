@@ -29,7 +29,7 @@ This crate can be used to
 * `umessage` module, which defines the uProtocol core message type and provides related convenience functionality
 * `upayload` module, which defines payload representation for uProtocol messages
 * `uri` module, providing convenience wrappers for creation and validation of uProtocol-style resource identifiers
-* `ustatus` module, which provices uProtocol types for representing status and status codes
+* `ustatus` module, which provides uProtocol types for representing status and status codes
 * `utransport` module, as an interface contract between uProtocol and specific transport protocol implementations
 * `uuid` module, which generates and validates UUIDs as per the uProtocol specification
 

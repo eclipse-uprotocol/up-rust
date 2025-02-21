@@ -90,7 +90,7 @@ impl SubscriberInfo {
 impl SubscriptionResponse {
     /// Checks if this `SubscriptionResponse` is in a specific state (`usubscription::State``).
     ///
-    /// Returns `true` if SubscriptionReponse contains a valied SusbcriptionStatus, which has a
+    /// Returns `true` if SubscriptionResponse contains a valid SubscriptionStatus, which has a
     /// state property that is equal to state passed as argument.
     ///
     /// # Examples

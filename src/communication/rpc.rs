@@ -38,7 +38,7 @@ pub enum ServiceInvocationError {
     /// Indicates that the service provider is in a state that prevents it from handling the request.
     #[error("failed precondition: {0}")]
     FailedPrecondition(String),
-    /// Indicates that a serious but unspeciified internal error has occurred while sending/processing the request.
+    /// Indicates that a serious but unspecified internal error has occurred while sending/processing the request.
     #[error("internal error: {0}")]
     Internal(String),
     /// Indicates that the request cannot be processed because some of its parameters are invalid, e.g. not properly formatted.
@@ -272,7 +272,7 @@ pub trait RpcServer {
         request_handler: Arc<dyn RequestHandler>,
     ) -> Result<(), RegistrationError>;
 
-    /// Unregisters a previously [registered endpoint](Self::register_endpoint).
+    /// Deregisters a previously [registered endpoint](Self::register_endpoint).
     ///
     /// # Arguments
     ///
