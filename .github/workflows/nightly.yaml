@@ -47,6 +47,16 @@ jobs:
         command: check
         arguments: --all-features
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
   # [impl->req~up-language-ci-test~1]
   test-all-features:
     uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-test-featurematrix.yaml@main

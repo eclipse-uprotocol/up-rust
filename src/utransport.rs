@@ -271,6 +271,7 @@ pub trait UTransport: Send + Sync {
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 #[cfg(any(test, feature = "test-util"))]
 mockall::mock! {
     /// This extra struct is necessary in order to comply with mockall's requirements regarding the parameter lifetimes
@@ -282,6 +283,7 @@ mockall::mock! {
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 #[cfg(any(test, feature = "test-util"))]
 #[async_trait]
 /// This delegates the invocation of the UTransport functions to the mocked functions of the Transport struct.
