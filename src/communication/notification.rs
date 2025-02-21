@@ -55,7 +55,7 @@ pub trait Notifier: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `resource_id` - The (local) resource identifier repesenting the origin of the notification.
+    /// * `resource_id` - The (local) resource identifier representing the origin of the notification.
     /// * `destination` - A URI representing the uEntity that the notification should be sent to.
     /// * `call_options` - Options to include in the notification message.
     /// * `payload` - The payload to include in the notification message.
@@ -91,7 +91,7 @@ pub trait Notifier: Send + Sync {
         listener: Arc<dyn UListener>,
     ) -> Result<(), RegistrationError>;
 
-    /// Unregisters a previously [registered handler](`Self::start_listening`) for listening to notifications.
+    /// Deregisters a previously [registered handler](`Self::start_listening`) for listening to notifications.
     ///
     /// # Arguments
     ///

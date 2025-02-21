@@ -224,7 +224,7 @@ impl UUID {
     // [utest->dsn~uuid-spec~1]
     pub fn get_time(&self) -> Option<u64> {
         if self.is_uprotocol_uuid() {
-            // the timstamp is contained in the 48 most significant bits
+            // the timestamp is contained in the 48 most significant bits
             Some(self.msb >> 16)
         } else {
             None

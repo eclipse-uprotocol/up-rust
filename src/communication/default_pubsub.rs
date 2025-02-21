@@ -228,7 +228,7 @@ impl Publisher for SimplePublisher {
     }
 }
 
-/// A [`Subscriber`] which keeps all information about registered susbcription change handlers in memory.
+/// A [`Subscriber`] which keeps all information about registered subscription change handlers in memory.
 ///
 /// The subscriber requires a (client) implementation of [`USubscription`] in order to inform the local
 /// USubscription service about newly subscribed and unsubscribed topics. It also needs a [`Notifier`]
@@ -314,7 +314,7 @@ impl InMemorySubscriber {
 
     /// Stops this client.
     ///
-    /// Clears all internal state and unregisters the listener for subscription updates from the USubscription service.
+    /// Clears all internal state and deregisters the listener for subscription updates from the USubscription service.
     ///
     /// # Errors
     ///
@@ -414,7 +414,7 @@ impl Subscriber for InMemorySubscriber {
             .register_listener(topic_filter, None, handler.clone())
             .await
             // When this fails, we have ended up in a situation where we
-            // have successfully (logically) subscribed to the topic via the USubscriptio service
+            // have successfully (logically) subscribed to the topic via the USubscription service
             // but we have not been able to register the listener with the local transport.
             // This means that events might start getting forwarded to the local authority which
             // are not being consumed. Apart from this inefficiency, this does not pose a real
@@ -433,7 +433,7 @@ impl Subscriber for InMemorySubscriber {
             .unregister_listener(topic, None, listener)
             .await
             // When this fails, we have ended up in a situation where we
-            // have successfully (logically) unsubscribed from the topic via the USubscriptio service
+            // have successfully (logically) unsubscribed from the topic via the USubscription service
             // but we have not been able to unregister the listener from the local transport.
             // This means that events originating from entities connected to a different transport
             // may no longer get forwarded to the local transport, resulting in the (still registered)
@@ -465,7 +465,7 @@ mod tests {
         Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
     }
 
-    fn succeding_notifier() -> Arc<dyn Notifier> {
+    fn succeeding_notifier() -> Arc<dyn Notifier> {
         let mut notifier = MockNotifier::new();
         notifier
             .expect_start_listening()
@@ -690,7 +690,7 @@ mod tests {
             Arc::new(transport),
             new_uri_provider(),
             Arc::new(usubscription_client),
-            succeding_notifier(),
+            succeeding_notifier(),
         )
         .await
         .unwrap();
@@ -760,7 +760,7 @@ mod tests {
             Arc::new(transport),
             new_uri_provider(),
             Arc::new(usubscription_client),
-            succeding_notifier(),
+            succeeding_notifier(),
         )
         .await
         .unwrap();
@@ -842,7 +842,7 @@ mod tests {
             Arc::new(transport),
             new_uri_provider(),
             Arc::new(usubscription_client),
-            succeding_notifier(),
+            succeeding_notifier(),
         )
         .await
         .unwrap();
@@ -899,7 +899,7 @@ mod tests {
             Arc::new(transport),
             new_uri_provider(),
             Arc::new(usubscription_client),
-            succeding_notifier(),
+            succeeding_notifier(),
         )
         .await
         .unwrap();
@@ -936,7 +936,7 @@ mod tests {
             Arc::new(transport),
             new_uri_provider(),
             Arc::new(usubscription_client),
-            succeding_notifier(),
+            succeeding_notifier(),
         )
         .await
         .unwrap();
@@ -983,7 +983,7 @@ mod tests {
             Arc::new(transport),
             new_uri_provider(),
             Arc::new(usubscription_client),
-            succeding_notifier(),
+            succeeding_notifier(),
         )
         .await
         .unwrap();
@@ -1039,7 +1039,7 @@ mod tests {
             Arc::new(transport),
             new_uri_provider(),
             Arc::new(usubscription_client),
-            succeding_notifier(),
+            succeeding_notifier(),
         )
         .await
         .unwrap();

@@ -242,7 +242,7 @@ pub trait UTransport: Send + Sync {
         ))
     }
 
-    /// Unregisters a message listener.
+    /// Deregisters a message listener.
     ///
     /// The listener will no longer be called for any (matching) messages after this function has
     /// returned successfully.
