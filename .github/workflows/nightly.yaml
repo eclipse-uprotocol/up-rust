@@ -37,6 +37,8 @@ jobs:
 
   deny:
     uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-deny-check.yaml@main
+    with:
+      arguments: --all-features --locked --exclude-dev
 
   # [impl->req~up-language-ci-test~1]
   test-all-features:
