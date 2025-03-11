@@ -200,15 +200,12 @@ mod tests {
                 let Ok(payload) = message.extract_protobuf::<StringValue>() else {
                     return false;
                 };
-                let Some(attribs) = message.attributes.as_ref() else {
-                    return false;
-                };
-                attribs.is_notification()
-                    && attribs.id.get_or_default() == &expected_message_id
-                    && attribs.source.get_or_default() == &expected_source
-                    && attribs.sink.get_or_default() == &expected_sink
-                    && attribs.ttl == Some(10_000)
-                    && attribs.priority.enum_value_or_default() == UPriority::UPRIORITY_CS2
+                message.is_notification()
+                    && message.id_unchecked() == &expected_message_id
+                    && message.source_unchecked() == &expected_source
+                    && message.sink_unchecked() == &expected_sink
+                    && message.ttl_unchecked() == 10_000
+                    && message.priority_unchecked() == UPriority::UPRIORITY_CS2
                     && payload.value == *"Hello"
             })
             .return_const(Ok(()));

@@ -452,7 +452,6 @@ mod tests {
 
     use mockall::Sequence;
     use protobuf::well_known_types::wrappers::StringValue;
-    use protobuf::Enum;
     use usubscription::{MockUSubscription, SubscriptionResponse, SubscriptionStatus};
 
     use crate::{
@@ -505,9 +504,7 @@ mod tests {
         transport
             .expect_do_send()
             .once()
-            .withf(move |msg| {
-                msg.attributes.get_or_default().id.get_or_default() == &expected_message_id
-            })
+            .withf(move |msg| msg.id_unchecked() == &expected_message_id)
             .returning(|_msg| {
                 Err(UStatus::fail_with_code(
                     UCode::UNAVAILABLE,
@@ -541,11 +538,9 @@ mod tests {
                 };
                 payload.value == *"Hello"
                     && message.is_publish()
-                    && message.attributes.as_ref().is_some_and(|attribs| {
-                        attribs.id.as_ref() == Some(&expected_message_id)
-                            && attribs.priority.value() == UPriority::UPRIORITY_CS3.value()
-                            && attribs.ttl == Some(5_000)
-                    })
+                    && message.id_unchecked() == &expected_message_id
+                    && message.priority_unchecked() == UPriority::UPRIORITY_CS3
+                    && message.ttl_unchecked() == 5_000
             })
             .returning(|_msg| Ok(()));
 
