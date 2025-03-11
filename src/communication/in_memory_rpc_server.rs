@@ -444,22 +444,12 @@ mod tests {
                 if !response_message.is_response() {
                     return false;
                 }
-                if response_message
-                    .attributes
-                    .get_or_default()
-                    .reqid
-                    .get_or_default()
-                    != &request_id
-                {
+                if response_message.request_id_unchecked() != &request_id {
                     return false;
                 }
                 let error: UStatus = response_message.extract_protobuf().unwrap();
                 error.get_code() == UCode::INVALID_ARGUMENT
-                    && response_message
-                        .attributes
-                        .get_or_default()
-                        .commstatus
-                        .is_some_and(|v| v.enum_value_or_default() == error.get_code())
+                    && response_message.commstatus_unchecked() == error.get_code()
             })
             .returning(move |_msg| {
                 notify_clone.notify_one();
@@ -588,16 +578,9 @@ mod tests {
                 msg.value == *"Hello World"
                     && response_message.is_response()
                     && response_message
-                        .attributes
-                        .get_or_default()
-                        .commstatus
-                        .map_or(true, |v| v.enum_value_or_default() == UCode::OK)
-                    && response_message
-                        .attributes
-                        .get_or_default()
-                        .reqid
-                        .get_or_default()
-                        == &message_id_clone
+                        .commstatus()
+                        .is_none_or(|code| code == UCode::OK)
+                    && response_message.request_id_unchecked() == &message_id_clone
             })
             .returning(move |_msg| {
                 notify_clone.notify_one();
@@ -646,17 +629,8 @@ mod tests {
                 let error: UStatus = response_message.extract_protobuf().unwrap();
                 error.get_code() == UCode::NOT_FOUND
                     && response_message.is_response()
-                    && response_message
-                        .attributes
-                        .get_or_default()
-                        .commstatus
-                        .is_some_and(|v| v.enum_value_or_default() == error.get_code())
-                    && response_message
-                        .attributes
-                        .get_or_default()
-                        .reqid
-                        .get_or_default()
-                        == &message_id_clone
+                    && response_message.commstatus_unchecked() == error.get_code()
+                    && response_message.request_id_unchecked() == &message_id_clone
             })
             .returning(move |_msg| {
                 notify_clone.notify_one();
@@ -717,17 +691,8 @@ mod tests {
                 let error: UStatus = response_message.extract_protobuf().unwrap();
                 error.get_code() == UCode::DEADLINE_EXCEEDED
                     && response_message.is_response()
-                    && response_message
-                        .attributes
-                        .get_or_default()
-                        .commstatus
-                        .is_some_and(|v| v.enum_value_or_default() == error.get_code())
-                    && response_message
-                        .attributes
-                        .get_or_default()
-                        .reqid
-                        .get_or_default()
-                        == &message_id_clone
+                    && response_message.commstatus_unchecked() == error.get_code()
+                    && response_message.request_id_unchecked() == &message_id_clone
             })
             .returning(move |_msg| {
                 notify_clone.notify_one();

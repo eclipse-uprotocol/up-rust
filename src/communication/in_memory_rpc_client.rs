@@ -292,7 +292,7 @@ mod tests {
 
     use super::*;
 
-    use protobuf::{well_known_types::wrappers::StringValue, Enum};
+    use protobuf::well_known_types::wrappers::StringValue;
     use tokio::{join, sync::Notify};
 
     use crate::{utransport::MockTransport, StaticUriProvider, UMessageBuilder, UPriority, UUri};
@@ -398,12 +398,10 @@ mod tests {
             .expect_do_send()
             .once()
             .withf(move |request_message| {
-                request_message.attributes.as_ref().is_some_and(|attribs| {
-                    attribs.id.as_ref() == Some(&expected_message_id)
-                        && attribs.priority.value() == UPriority::UPRIORITY_CS6.value()
-                        && attribs.ttl == Some(5_000)
-                        && attribs.token == Some("my_token".to_string())
-                })
+                request_message.id_unchecked() == &expected_message_id
+                    && request_message.priority_unchecked() == UPriority::UPRIORITY_CS6
+                    && request_message.ttl_unchecked() == 5_000
+                    && request_message.token() == Some(&String::from("my_token"))
             })
             .returning(move |_request_message| {
                 request_sent_clone.notify_one();
@@ -486,12 +484,7 @@ mod tests {
         mock_transport
             .expect_do_send()
             .once()
-            .withf(move |request_message| {
-                request_message
-                    .attributes
-                    .as_ref()
-                    .is_some_and(|attribs| attribs.id.as_ref() == Some(&expected_message_id))
-            })
+            .withf(move |request_message| request_message.id_unchecked() == &expected_message_id)
             .returning(move |_request_message| {
                 first_request_sent_clone.notify_one();
                 Ok(())

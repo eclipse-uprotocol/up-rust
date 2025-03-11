@@ -238,38 +238,38 @@ impl TryFrom<UMessage> for CloudEvent {
     //
     // Returns an error if the given message does not contain the necessary information for creating a CloudEvent.
     fn try_from(message: UMessage) -> Result<Self, Self::Error> {
-        let Some(attributes) = message.attributes.as_ref() else {
+        if message.attributes.as_ref().is_none() {
             return Err(UMessageError::AttributesValidationError(
                 UAttributesError::ValidationError("message has no attributes".to_string()),
             ));
         };
         let mut event = CloudEvent::new();
         event.spec_version = CLOUDEVENTS_SPEC_VERSION.into();
-        if let Some(id) = attributes.id.as_ref() {
+        if let Some(id) = message.id() {
             event.set_id(id);
         } else {
             return Err(UMessageError::AttributesValidationError(
                 UAttributesError::ValidationError("message has no id".to_string()),
             ));
         }
-        if let Ok(message_type) = attributes.type_.enum_value() {
+        if let Some(message_type) = message.type_() {
             event.set_type(message_type);
         } else {
             return Err(UMessageError::AttributesValidationError(
                 UAttributesError::ValidationError("message has no type".to_string()),
             ));
         }
-        if let Some(source) = attributes.source.as_ref() {
+        if let Some(source) = message.source() {
             event.set_source(source);
         } else {
             return Err(UMessageError::AttributesValidationError(
                 UAttributesError::ValidationError("message has no source address".to_string()),
             ));
         }
-        if let Some(sink) = attributes.sink.as_ref() {
+        if let Some(sink) = message.sink() {
             event.set_sink(sink);
         }
-        if let Ok(priority) = attributes.priority.enum_value() {
+        if let Some(priority) = message.priority() {
             if priority != UPriority::UPRIORITY_UNSPECIFIED {
                 event.set_priority(priority);
             }
@@ -278,26 +278,26 @@ impl TryFrom<UMessage> for CloudEvent {
                 UAttributesError::ValidationError("message has unsupported priority".to_string()),
             ));
         }
-        if let Some(ttl) = attributes.ttl {
+        if let Some(ttl) = message.ttl() {
             event.set_ttl(ttl)?;
         }
-        if let Some(token) = attributes.token.as_ref() {
+        if let Some(token) = message.token() {
             event.set_token(token);
         }
-        if let Some(plevel) = attributes.permission_level {
+        if let Some(plevel) = message.permission_level() {
             event.set_permission_level(plevel)?;
         }
-        if let Some(reqid) = attributes.reqid.as_ref() {
+        if let Some(reqid) = message.request_id() {
             event.set_request_id(reqid);
         }
-        if let Some(commstatus) = attributes.commstatus.as_ref() {
-            event.set_commstatus(commstatus.enum_value_or_default());
+        if let Some(commstatus) = message.commstatus() {
+            event.set_commstatus(commstatus);
         }
-        if let Some(traceparent) = attributes.traceparent.as_ref() {
+        if let Some(traceparent) = message.traceparent() {
             event.set_traceparent(traceparent);
         }
+        let payload_format = message.payload_format().unwrap_or_default();
         if let Some(payload) = message.payload {
-            let payload_format = attributes.payload_format.enum_value_or_default();
             event.set_payload_format(payload_format);
             match payload_format {
                 UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF
