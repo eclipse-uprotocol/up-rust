@@ -4,8 +4,7 @@
 # If you add a license in the following section also consider changing deny.toml
 accepted = [
     "Apache-2.0",
-    "MIT",
-    "BSD-3-Clause"
+    "MIT"
 ]
 
 targets = [
@@ -13,7 +12,22 @@ targets = [
     "aarch64-unknown-linux-musl"
 ]
 
+ignore-build-dependencies = true
 ignore-dev-dependencies = true
 
 [unicode-ident]
-accepted = ["Unicode-DFS-2016"]
+accepted = ["Unicode-3.0"]
+
+[protobuf.clarify]
+license = "MIT"
+
+[[protobuf.clarify.files]]
+path = "LICENSE.txt"
+checksum = "7f2fa80a60e84f8dc0747abb0e42342f83bded04a20461a636b47c0331b92ddf"
+
+[protobuf-support.clarify]
+license = "MIT"
+
+[[protobuf-support.clarify.files]]
+path = "LICENSE.txt"
+checksum = "7f2fa80a60e84f8dc0747abb0e42342f83bded04a20461a636b47c0331b92ddf"

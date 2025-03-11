@@ -16,15 +16,14 @@
 
 # If you add a license in the following section also consider changing about.toml
 [licenses]
-allow = ["Apache-2.0", "BSD-3-Clause", "MIT"]
+allow = ["Apache-2.0", "MIT"]
 private = { ignore = true }
 exceptions = [
     { name = "unicode-ident", allow = [
-        "Unicode-DFS-2016",
         "Unicode-3.0",
     ] },
 ]
-unused-allowed-license = "allow"
+unused-allowed-license = "deny"
 
 [bans]
 multiple-versions = "deny"
