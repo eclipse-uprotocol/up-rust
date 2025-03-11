@@ -11,11 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::time::SystemTime;
-
 use protobuf::Enum;
 
-use crate::{UAttributes, UMessageType, UPriority, UUri, UUID};
+use crate::{UAttributes, UMessageType, UPriority, UUri};
 
 use crate::UAttributesError;
 
@@ -59,7 +57,7 @@ pub trait UAttributesValidator: Send {
     ///
     /// # Errors
     ///
-    /// Returns an error if [`UAttributes::id`] does not contain a [valid uProtocol UUID](`UUID::is_uprotocol_uuid`).
+    /// Returns an error if [`UAttributes::id`] does not contain a [valid uProtocol UUID](`crate::UUID::is_uprotocol_uuid`).
     fn validate_id(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if attributes
             .id
@@ -76,37 +74,6 @@ pub trait UAttributesValidator: Send {
 
     /// Returns the type of message that this validator can be used with.
     fn message_type(&self) -> UMessageType;
-
-    /// Checks if the message that is described by these attributes should be considered expired.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if [`UAttributes::ttl`] (time-to-live) contains a value greater than 0, but
-    /// * the message has expired according to the timestamp extracted from [`UAttributes::id`] and the time-to-live value, or
-    /// * the current system time cannot be determined.
-    fn is_expired(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        let ttl = match attributes.ttl {
-            Some(t) if t > 0 => u64::from(t),
-            _ => return Ok(()),
-        };
-
-        if let Some(time) = attributes.id.as_ref().and_then(UUID::get_time) {
-            let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                Ok(duration) => {
-                    if let Ok(duration) = u64::try_from(duration.as_millis()) {
-                        duration - time
-                    } else {
-                        return Err(UAttributesError::validation_error("Invalid duration"));
-                    }
-                }
-                Err(e) => return Err(UAttributesError::validation_error(e.to_string())),
-            };
-            if delta >= ttl {
-                return Err(UAttributesError::validation_error("Payload is expired"));
-            }
-        }
-        Ok(())
-    }
 
     /// Verifies that a set of attributes contains a valid source URI.
     ///
@@ -510,7 +477,7 @@ impl ResponseValidator {
     /// # Errors
     ///
     /// Returns an error if [`UAttributes::reqid`] is empty or contains a value which is not
-    /// a [valid uProtocol UUID](`UUID::is_uprotocol_uuid`).
+    /// a [valid uProtocol UUID](`crate::UUID::is_uprotocol_uuid`).
     pub fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         if !attributes
             .reqid
@@ -625,30 +592,11 @@ impl UAttributesValidator for ResponseValidator {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        ops::Sub,
-        time::{Duration, UNIX_EPOCH},
-    };
-
     use protobuf::EnumOrUnknown;
     use test_case::test_case;
 
     use super::*;
     use crate::{UCode, UPriority, UUri, UUID};
-
-    /// Creates a UUID n ms in the past.
-    ///
-    /// # Note
-    ///
-    /// For internal testing purposes only. For end-users, please use [`UUID::build()`]
-    fn build_n_ms_in_past(n_ms_in_past: u64) -> UUID {
-        let duration_since_unix_epoch = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("current system time is set to a point in time before UNIX Epoch");
-        UUID::build_for_timestamp(
-            duration_since_unix_epoch.sub(Duration::from_millis(n_ms_in_past)),
-        )
-    }
 
     #[test]
     fn test_validate_type_fails_for_unknown_type_code() {
@@ -686,52 +634,6 @@ mod tests {
         let validator: Box<dyn UAttributesValidator> =
             UAttributesValidators::get_validator(message_type);
         assert_eq!(validator.message_type(), expected_validator_type);
-    }
-
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, None, false; "for Publish message without ID nor TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, Some(0), false; "for Publish message without ID with TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, None, Some(500), false; "for Publish message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), None, false; "for Publish message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), Some(0), false; "for Publish message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), Some(500), true; "for Publish message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Publish message with ID and non-expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, None, false; "for Notification message without ID nor TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(0), false; "for Notification message without ID with TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, None, Some(500), false; "for Notification message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), None, false; "for Notification message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), Some(0), false; "for Notification message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), Some(500), true; "for Notification message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Notification message with ID and non-expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, None, false; "for Request message without ID nor TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, Some(0), false; "for Request message without ID with TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, None, Some(500), false; "for Request message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), None, false; "for Request message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), Some(0), false; "for Request message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), Some(500), true; "for Request message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Request message with ID and non-expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, None, false; "for Response message without ID nor TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, Some(0), false; "for Response message without ID with TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, None, Some(500), false; "for Response message without ID with TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), None, false; "for Response message with ID without TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), Some(0), false; "for Response message with ID and TTL 0")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), Some(500), true; "for Response message with ID and expired TTL")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, Some(build_n_ms_in_past(1000)), Some(2000), false; "for Response message with ID and non-expired TTL")]
-    fn test_is_expired(
-        message_type: UMessageType,
-        id: Option<UUID>,
-        ttl: Option<u32>,
-        should_be_expired: bool,
-    ) {
-        let attributes = UAttributes {
-            type_: message_type.into(),
-            priority: UPriority::UPRIORITY_CS1.into(),
-            id: id.into(),
-            ttl,
-            ..Default::default()
-        };
-
-        let validator = UAttributesValidators::get_validator(message_type);
-        assert!(validator.is_expired(&attributes).is_err() == should_be_expired);
     }
 
     #[test_case(Some(UUID::build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
