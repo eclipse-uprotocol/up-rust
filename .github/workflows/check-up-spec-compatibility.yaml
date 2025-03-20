@@ -54,10 +54,11 @@ jobs:
       - name: Run OpenFastTrace
         uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@main
         with:
-          file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_RUST_OPEN_FAST_TRACE_FILE_PATTERNS }}"
+          file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_COMPONENT_OPEN_FAST_TRACE_FILE_PATTERNS }}"
+          tags: "_,LanguageLibrary"
 
       # now try to build and run the tests which may fail if incomaptible changes
-      # have been introduced in up-spec
+      # have been introduced into the uProtocol Core API
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
