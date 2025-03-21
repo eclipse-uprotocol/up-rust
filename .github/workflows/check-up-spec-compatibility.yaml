@@ -12,9 +12,8 @@
 # *******************************************************************************/
 
 # Verifies that this crate can be built using the uProtocol Core API from up-spec's main branch.
-# Also performs requirements tracing using OpenFastTrace. For that purpose, the workflow requires
-# the UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS variable to contain the file patterns to use for
-# invoking the "run-oft" Action.
+# Also performs requirements tracing using OpenFastTrace. The job fails if any of the two
+# activities fail.
 
 name: uP Spec Compatibility
 
@@ -33,7 +32,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  tests:
+  up-spec-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,9 +48,10 @@ jobs:
           git status
           cd "${{ github.workspace }}"
 
-      # run OpenFastTrace first because OFT will always succeed and produce
+      # run OpenFastTrace first because the action will always succeed and produce
       # a tracing report
       - name: Run OpenFastTrace
+        id: run-oft
         uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@main
         with:
           file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_COMPONENT_OPEN_FAST_TRACE_FILE_PATTERNS }}"
@@ -70,3 +70,13 @@ jobs:
           cargo nextest run --all-features
           # but it cannot execute doc tests
           cargo test --doc --all-features
+
+      # This step will only be run if the tests in the previous step have succeeded.
+      # In that case, we use the exit code produced by the OFT run as the job's
+      # overall outcome. This means that the job fails if the tests run successfully
+      # but some of the requirements from up-spec are not covered.
+      - name: Determine exit status
+        env:
+          OFT_EXIT_CODE: ${{ steps.run-oft.outputs.oft-exit-code }}
+        run: |
+          exit $OFT_EXIT_CODE
