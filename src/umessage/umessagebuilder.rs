@@ -20,8 +20,6 @@ use crate::{
     UCode, UMessage, UMessageError, UMessageType, UPayloadFormat, UPriority, UUri, UUID,
 };
 
-const PRIORITY_DEFAULT: UPriority = UPriority::UPRIORITY_CS1;
-
 /// A builder for creating [`UMessage`]s.
 ///
 /// Messages are being used by a uEntity to inform other entities about the occurrence of events
@@ -84,7 +82,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::publish(topic.clone())
     ///                    .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.type_unchecked(), UMessageType::UMESSAGE_TYPE_PUBLISH);
-    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_UNSPECIFIED);
+    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS1);
     /// assert_eq!(message.source_unchecked(), &topic);
     /// # Ok(())
     /// # }
@@ -92,6 +90,7 @@ impl UMessageBuilder {
     pub fn publish(topic: UUri) -> UMessageBuilder {
         UMessageBuilder {
             validator: Box::new(PublishValidator),
+            // [impl->dsn~up-attributes-publish-type~1]
             message_type: UMessageType::UMESSAGE_TYPE_PUBLISH,
             source: Some(topic),
             ..Default::default()
@@ -118,7 +117,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
     ///                    .build_with_payload("unexpected movement", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
     /// assert_eq!(message.type_unchecked(), UMessageType::UMESSAGE_TYPE_NOTIFICATION);
-    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_UNSPECIFIED);
+    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS1);
     /// assert_eq!(message.source_unchecked(), &origin);
     /// assert_eq!(message.sink_unchecked(), &destination);
     /// # Ok(())
@@ -127,6 +126,7 @@ impl UMessageBuilder {
     pub fn notification(origin: UUri, destination: UUri) -> UMessageBuilder {
         UMessageBuilder {
             validator: Box::new(NotificationValidator),
+            // [impl->dsn~up-attributes-notification-type~1]
             message_type: UMessageType::UMESSAGE_TYPE_NOTIFICATION,
             source: Some(origin),
             sink: Some(destination),
@@ -169,6 +169,7 @@ impl UMessageBuilder {
     pub fn request(method_to_invoke: UUri, reply_to_address: UUri, ttl: u32) -> UMessageBuilder {
         UMessageBuilder {
             validator: Box::new(RequestValidator),
+            // [impl->dsn~up-attributes-request-type~1]
             message_type: UMessageType::UMESSAGE_TYPE_REQUEST,
             source: Some(reply_to_address),
             sink: Some(method_to_invoke),
@@ -220,6 +221,7 @@ impl UMessageBuilder {
     ) -> UMessageBuilder {
         UMessageBuilder {
             validator: Box::new(ResponseValidator),
+            // [impl->dsn~up-attributes-response-type~1]
             message_type: UMessageType::UMESSAGE_TYPE_RESPONSE,
             source: Some(invoked_method),
             sink: Some(reply_to_address),
@@ -262,12 +264,14 @@ impl UMessageBuilder {
     /// assert_eq!(response_message.source_unchecked(), &method_to_invoke);
     /// assert_eq!(response_message.sink_unchecked(), &reply_to_address);
     /// assert_eq!(response_message.request_id_unchecked(), &request_message_id);
+    /// assert_eq!(response_message.ttl_unchecked(), 5000);
     /// # Ok(())
     /// # }
     /// ```
     pub fn response_for_request(request_attributes: &UAttributes) -> UMessageBuilder {
         UMessageBuilder {
             validator: Box::new(ResponseValidator),
+            // [impl->dsn~up-attributes-response-type~1]
             message_type: UMessageType::UMESSAGE_TYPE_RESPONSE,
             source: request_attributes.sink.as_ref().cloned(),
             sink: request_attributes.source.as_ref().cloned(),
@@ -275,6 +279,8 @@ impl UMessageBuilder {
             priority: request_attributes
                 .priority
                 .enum_value_or(UPriority::UPRIORITY_CS4),
+            // [impl->dsn~up-attributes-response-ttl~1]
+            ttl: request_attributes.ttl,
             ..Default::default()
         }
     }
@@ -364,12 +370,16 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn with_priority(&mut self, priority: UPriority) -> &mut UMessageBuilder {
+        // [impl->dsn~up-attributes-request-priority~1]
         if self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST
+            // up-spec erroneously uses this name to define a requirement
+            // for the response's priority class ...
+            // [impl->dsn~up-attributes-response-reqid~1]
             || self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE
         {
             assert!(priority.value() >= UPriority::UPRIORITY_CS4.value())
         }
-        if priority != PRIORITY_DEFAULT {
+        if !UAttributes::is_default_priority(priority) {
             // only set priority explicitly if it differs from the default priority
             self.priority = priority;
         } else {
@@ -444,6 +454,7 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn with_token<T: Into<String>>(&mut self, token: T) -> &mut UMessageBuilder {
+        // [impl->dsn~up-attributes-request-token~1]
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST);
         self.token = Some(token.into());
         self
@@ -480,6 +491,7 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn with_permission_level(&mut self, level: u32) -> &mut UMessageBuilder {
+        // [impl->dsn~up-attributes-permission-level~1]
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST);
         self.permission_level = Some(level);
         self
@@ -518,6 +530,7 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn with_comm_status(&mut self, comm_status: UCode) -> &mut UMessageBuilder {
+        // [impl->dsn~up-attributes-response-commstatus~1]
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE);
         self.comm_status = Some(comm_status.into());
         self
@@ -548,6 +561,7 @@ impl UMessageBuilder {
     /// # Ok(())
     /// # }
     pub fn with_traceparent<T: Into<String>>(&mut self, traceparent: T) -> &mut UMessageBuilder {
+        // [impl->dsn~up-attributes-traceparent~1]
         self.traceparent = Some(traceparent.into());
         self
     }
@@ -606,6 +620,7 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn build(&self) -> Result<UMessage, UMessageError> {
+        // [impl->dsn~up-attributes-id~1]
         let message_id = self
             .message_id
             .clone()
@@ -670,6 +685,7 @@ impl UMessageBuilder {
         format: UPayloadFormat,
     ) -> Result<UMessage, UMessageError> {
         self.payload = Some(payload.into());
+        // [impl->dsn~up-attributes-payload-format~1]
         self.payload_format = format;
 
         self.build()
@@ -802,8 +818,11 @@ mod tests {
         UMessageBuilder::publish(topic).with_message_id(invalid_message_id);
     }
 
+    // [utest->dsn~up-attributes-permission-level~1]
     #[test_case(Some(5), None, None; "with permission level")]
+    // [utest->dsn~up-attributes-response-commstatus~1]
     #[test_case(None, Some(UCode::NOT_FOUND), None; "with commstatus")]
+    // [utest->dsn~up-attributes-request-token~1]
     #[test_case(None, None, Some(String::from("my-token")); "with token")]
     #[should_panic]
     fn test_publish_message_builder_panics(
@@ -822,10 +841,53 @@ mod tests {
         }
     }
 
-    #[test_case(Some(5), None; "with permission level")]
-    #[test_case(None, Some(String::from("my-token")); "with token")]
+    // [utest->dsn~up-attributes-permission-level~1]
+    #[test_case(Some(5), None, None; "with permission level")]
+    // [utest->dsn~up-attributes-response-commstatus~1]
+    #[test_case(None, Some(UCode::NOT_FOUND), None; "with commstatus")]
+    // [utest->dsn~up-attributes-request-token~1]
+    #[test_case(None, None, Some(String::from("my-token")); "with token")]
     #[should_panic]
-    fn test_response_message_builder_panics(perm_level: Option<u32>, token: Option<String>) {
+    fn test_notification_message_builder_panics(
+        perm_level: Option<u32>,
+        comm_status: Option<UCode>,
+        token: Option<String>,
+    ) {
+        let origin = UUri::try_from(TOPIC).expect("should have been able to create UUri");
+        let destination =
+            UUri::try_from(REPLY_TO_ADDRESS).expect("should have been able to create UUri");
+        let mut builder = UMessageBuilder::notification(origin, destination);
+        if let Some(level) = perm_level {
+            builder.with_permission_level(level);
+        } else if let Some(status_code) = comm_status {
+            builder.with_comm_status(status_code);
+        } else if let Some(t) = token {
+            builder.with_token(t);
+        }
+    }
+
+    // [utest->dsn~up-attributes-permission-level~1]
+    #[test_case(Some(5), None, None; "with permission level")]
+    // [utest->dsn~up-attributes-request-token~1]
+    #[test_case(None, Some(String::from("my-token")), None; "with token")]
+    // up-spec erroneously uses this name to define a requirement
+    // for the response's priority class ...
+    // [utest->dsn~up-attributes-response-reqid~1]
+    #[test_case(None, None, Some(UPriority::UPRIORITY_UNSPECIFIED); "with priority UNSPECIFIED")]
+    // [utest->dsn~up-attributes-response-reqid~1]
+    #[test_case(None, None, Some(UPriority::UPRIORITY_CS0); "with priority CS0")]
+    // [utest->dsn~up-attributes-response-reqid~1]
+    #[test_case(None, None, Some(UPriority::UPRIORITY_CS1); "with priority CS1")]
+    // [utest->dsn~up-attributes-response-reqid~1]
+    #[test_case(None, None, Some(UPriority::UPRIORITY_CS2); "with priority CS2")]
+    // [utest->dsn~up-attributes-response-reqid~1]
+    #[test_case(None, None, Some(UPriority::UPRIORITY_CS3); "with priority CS3")]
+    #[should_panic]
+    fn test_response_message_builder_panics(
+        perm_level: Option<u32>,
+        token: Option<String>,
+        priority: Option<UPriority>,
+    ) {
         let request_id = UUID::build();
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
             .expect("should have been able to create destination UUri");
@@ -837,12 +899,28 @@ mod tests {
             builder.with_permission_level(level);
         } else if let Some(t) = token {
             builder.with_token(t);
+        } else if let Some(prio) = priority {
+            builder.with_priority(prio);
         }
     }
 
+    // [utest->dsn~up-attributes-response-commstatus~1]
     #[test_case(Some(UCode::NOT_FOUND), None; "for comm status")]
+    // [utest->dsn~up-attributes-request-priority~1]
+    #[test_case(None, Some(UPriority::UPRIORITY_UNSPECIFIED); "for priority class unspecified")]
+    // [utest->dsn~up-attributes-request-priority~1]
+    #[test_case(None, Some(UPriority::UPRIORITY_CS0); "for priority class CS0")]
+    // [utest->dsn~up-attributes-request-priority~1]
+    #[test_case(None, Some(UPriority::UPRIORITY_CS1); "for priority class CS1")]
+    // [utest->dsn~up-attributes-request-priority~1]
+    #[test_case(None, Some(UPriority::UPRIORITY_CS2); "for priority class CS2")]
+    // [utest->dsn~up-attributes-request-priority~1]
+    #[test_case(None, Some(UPriority::UPRIORITY_CS3); "for priority class CS3")]
     #[should_panic]
-    fn test_request_message_builder_panics(comm_status: Option<UCode>, perm_level: Option<u32>) {
+    fn test_request_message_builder_panics(
+        comm_status: Option<UCode>,
+        priority: Option<UPriority>,
+    ) {
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
             .expect("should have been able to create destination UUri");
         let reply_to_address = UUri::try_from(REPLY_TO_ADDRESS)
@@ -851,8 +929,8 @@ mod tests {
 
         if let Some(status) = comm_status {
             builder.with_comm_status(status);
-        } else if let Some(level) = perm_level {
-            builder.with_permission_level(level);
+        } else if let Some(prio) = priority {
+            builder.with_priority(prio);
         }
     }
 
@@ -877,20 +955,69 @@ mod tests {
     #[test]
     fn test_build_retains_all_publish_attributes() {
         let message_id = UUID::build();
+        let traceparent = String::from("traceparent");
         let topic = UUri::try_from(TOPIC).expect("should have been able to create UUri");
         let message = UMessageBuilder::publish(topic.clone())
             .with_message_id(message_id.clone())
-            .with_priority(UPriority::UPRIORITY_CS2)
             .with_ttl(5000)
+            .with_traceparent(&traceparent)
             .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
             .expect("should have been able to create message");
+        // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &message_id);
-        assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS2);
+        // [utest->dsn~up-attributes-priority~1]
+        assert!(UAttributes::is_default_priority(
+            message.priority_unchecked()
+        ));
         assert_eq!(message.source_unchecked(), &topic);
+        // [utest->dsn~up-attributes-publish-sink~1]
+        assert!(message.sink().is_none());
         assert_eq!(message.ttl_unchecked(), 5000);
+        // [utest->dsn~up-attributes-traceparent~1]
+        assert_eq!(message.traceparent(), Some(&traceparent));
+        // [utest->dsn~up-attributes-publish-type~1]
         assert_eq!(
             message.type_unchecked(),
             UMessageType::UMESSAGE_TYPE_PUBLISH
+        );
+        // [utest->dsn~up-attributes-payload-format~1]
+        assert_eq!(
+            message.payload_format_unchecked(),
+            UPayloadFormat::UPAYLOAD_FORMAT_TEXT
+        );
+    }
+
+    #[test]
+    fn test_build_retains_all_notification_attributes() {
+        let message_id = UUID::build();
+        let traceparent = String::from("traceparent");
+        let origin = UUri::try_from(TOPIC).expect("should have been able to create UUri");
+        let destination =
+            UUri::try_from(REPLY_TO_ADDRESS).expect("should have been able to create UUri");
+        let message = UMessageBuilder::notification(origin.clone(), destination.clone())
+            .with_message_id(message_id.clone())
+            .with_priority(UPriority::UPRIORITY_CS2)
+            .with_ttl(5000)
+            .with_traceparent(&traceparent)
+            .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .expect("should have been able to create message");
+        // [utest->dsn~up-attributes-id~1]
+        assert_eq!(message.id_unchecked(), &message_id);
+        assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS2);
+        assert_eq!(message.source_unchecked(), &origin);
+        assert_eq!(message.sink_unchecked(), &destination);
+        assert_eq!(message.ttl_unchecked(), 5000);
+        // [utest->dsn~up-attributes-traceparent~1]
+        assert_eq!(message.traceparent(), Some(&traceparent));
+        // [utest->dsn~up-attributes-notification-type~1]
+        assert_eq!(
+            message.type_unchecked(),
+            UMessageType::UMESSAGE_TYPE_NOTIFICATION
+        );
+        // [utest->dsn~up-attributes-payload-format~1]
+        assert_eq!(
+            message.payload_format_unchecked(),
+            UPayloadFormat::UPAYLOAD_FORMAT_TEXT
         );
     }
 
@@ -898,6 +1025,7 @@ mod tests {
     fn test_build_retains_all_request_attributes() {
         let message_id = UUID::build();
         let token = String::from("token");
+        let traceparent = String::from("traceparent");
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
             .expect("should have been able to create destination UUri");
         let reply_to_address = UUri::try_from(REPLY_TO_ADDRESS)
@@ -907,20 +1035,32 @@ mod tests {
                 .with_message_id(message_id.clone())
                 .with_permission_level(5)
                 .with_priority(UPriority::UPRIORITY_CS4)
-                .with_token(token.clone())
+                .with_token(&token)
+                .with_traceparent(&traceparent)
                 .build_with_payload("unlock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
                 .expect("should have been able to create message");
 
+        // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &message_id);
-        assert_eq!(message.attributes.permission_level, Some(5));
+        // [utest->dsn~up-attributes-permission-level~1]
+        assert_eq!(message.permission_level(), Some(5));
         assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS4);
         assert_eq!(message.sink_unchecked(), &method_to_invoke);
         assert_eq!(message.source_unchecked(), &reply_to_address);
+        // [utest->dsn~up-attributes-request-token~1]
         assert_eq!(message.token(), Some(&token));
         assert_eq!(message.ttl_unchecked(), 5000);
+        // [utest->dsn~up-attributes-traceparent~1]
+        assert_eq!(message.traceparent(), Some(&traceparent));
+        // [utest->dsn~up-attributes-request-type~1]
         assert_eq!(
             message.type_unchecked(),
             UMessageType::UMESSAGE_TYPE_REQUEST
+        );
+        // [utest->dsn~up-attributes-payload-format~1]
+        assert_eq!(
+            message.payload_format_unchecked(),
+            UPayloadFormat::UPAYLOAD_FORMAT_TEXT
         );
     }
 
@@ -941,26 +1081,37 @@ mod tests {
         let message = UMessageBuilder::response_for_request(&request_message.attributes)
             .with_message_id(response_message_id.clone())
             .with_comm_status(UCode::DEADLINE_EXCEEDED)
-            .with_ttl(4000)
             .build()
             .expect("should have been able to create message");
+        // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &response_message_id);
         assert_eq!(message.commstatus_unchecked(), UCode::DEADLINE_EXCEEDED);
+        // up-spec erroneously uses this name to define a requirement
+        // for the response's priority class ...
+        // [utest->dsn~up-attributes-response-reqid~1]
         assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS5);
         assert_eq!(message.request_id_unchecked(), &request_message_id);
         assert_eq!(message.sink_unchecked(), &reply_to_address);
         assert_eq!(message.source_unchecked(), &method_to_invoke);
-        assert_eq!(message.ttl_unchecked(), 4000);
+        // [utest->dsn~up-attributes-response-ttl~1]
+        assert_eq!(message.ttl_unchecked(), 5000);
+        // [utest->dsn~up-attributes-response-type~1]
         assert_eq!(
             message.type_unchecked(),
             UMessageType::UMESSAGE_TYPE_RESPONSE
         );
+        assert_eq!(
+            message.payload_format_unchecked(),
+            UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED
+        );
+        assert!(message.payload.is_none());
     }
 
     #[test]
     fn test_build_retains_all_response_attributes() {
         let message_id = UUID::build();
         let request_id = UUID::build();
+        let traceparent = String::from("traceparent");
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
             .expect("should have been able to create destination UUri");
         let reply_to_address = UUri::try_from(REPLY_TO_ADDRESS)
@@ -973,19 +1124,30 @@ mod tests {
         .with_message_id(message_id.clone())
         .with_comm_status(UCode::DEADLINE_EXCEEDED)
         .with_priority(UPriority::UPRIORITY_CS5)
-        .with_ttl(0)
+        .with_ttl(4000)
+        .with_traceparent(&traceparent)
         .build()
         .expect("should have been able to create message");
+        // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &message_id);
+        // [utest->dsn~up-attributes-response-commstatus~1]
         assert_eq!(message.commstatus_unchecked(), UCode::DEADLINE_EXCEEDED);
         assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS5);
         assert_eq!(message.request_id_unchecked(), &request_id);
         assert_eq!(message.sink_unchecked(), &reply_to_address);
         assert_eq!(message.source_unchecked(), &method_to_invoke);
-        assert_eq!(message.ttl_unchecked(), 0);
+        assert_eq!(message.ttl_unchecked(), 4000);
+        // [utest->dsn~up-attributes-traceparent~1]
+        assert_eq!(message.traceparent(), Some(&traceparent));
+        // [utest->dsn~up-attributes-response-type~1]
         assert_eq!(
             message.type_unchecked(),
             UMessageType::UMESSAGE_TYPE_RESPONSE
         );
+        assert_eq!(
+            message.payload_format_unchecked(),
+            UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED
+        );
+        assert!(message.payload.is_none());
     }
 }

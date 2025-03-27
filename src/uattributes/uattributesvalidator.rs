@@ -59,6 +59,7 @@ pub trait UAttributesValidator: Send {
     ///
     /// Returns an error if [`UAttributes::id`] does not contain a [valid uProtocol UUID](`crate::UUID::is_uprotocol_uuid`).
     fn validate_id(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-id~1]
         if attributes
             .id
             .as_ref()
@@ -253,6 +254,7 @@ impl UAttributesValidator for PublishValidator {
     /// * if the source URI contains any wildcards, or
     /// * if the source URI has a resource ID of 0.
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-publish-source~1]
         if let Some(source) = attributes.source.as_ref() {
             source.verify_event().map_err(|e| {
                 UAttributesError::validation_error(format!("Invalid source URI: {}", e))
@@ -270,6 +272,7 @@ impl UAttributesValidator for PublishValidator {
     ///
     /// If the [`UAttributes::sink`] property contains any URI, an error is returned.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-publish-sink~1]
         if attributes.sink.as_ref().is_some() {
             Err(UAttributesError::validation_error(
                 "Attributes for a publish message must not contain a sink URI",
@@ -329,6 +332,7 @@ impl UAttributesValidator for NotificationValidator {
     /// * if the source URI is an RPC response URI, or
     /// * if the source URI contains any wildcards.
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-notification-source~1]
         if let Some(source) = attributes.source.as_ref() {
             if source.is_rpc_response() {
                 Err(UAttributesError::validation_error(
@@ -356,6 +360,7 @@ impl UAttributesValidator for NotificationValidator {
     /// * if the sink URI's resource ID is != 0, or
     /// * if the sink URI contains any wildcards.
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-notification-sink~1]
         if let Some(sink) = attributes.sink.as_ref() {
             if !sink.is_notification_destination() {
                 Err(UAttributesError::validation_error(
@@ -384,6 +389,7 @@ impl RequestValidator {
     ///
     /// Returns an error if [`UAttributes::ttl`] (time-to-live) is empty or contains a value less than 1.
     pub fn validate_ttl(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-request-ttl~1]
         match attributes.ttl {
             Some(ttl) if ttl > 0 => Ok(()),
             Some(invalid_ttl) => Err(UAttributesError::validation_error(format!(
@@ -443,6 +449,7 @@ impl UAttributesValidator for RequestValidator {
     /// Returns an error if the [`UAttributes::source`] property does not contain a valid reply-to-address according to
     /// [`UUri::verify_rpc_response`].
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-request-source~1]
         if let Some(source) = attributes.source.as_ref() {
             UUri::verify_rpc_response(source).map_err(|e| {
                 UAttributesError::validation_error(format!("Invalid source URI: {}", e))
@@ -459,6 +466,7 @@ impl UAttributesValidator for RequestValidator {
     /// Returns an erro if the [`UAttributes::sink`] property does not contain a URI representing a method according to
     /// [`UUri::verify_rpc_method`].
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-request-sink~1]
         if let Some(sink) = attributes.sink.as_ref() {
             UUri::verify_rpc_method(sink)
                 .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {}", e)))
@@ -564,6 +572,7 @@ impl UAttributesValidator for ResponseValidator {
     /// Returns an error if the [`UAttributes::source`] property does not contain a URI representing a method according to
     /// [`UUri::verify_rpc_method`].
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-response-source~1]
         if let Some(source) = attributes.source.as_ref() {
             UUri::verify_rpc_method(source).map_err(|e| {
                 UAttributesError::validation_error(format!("Invalid source URI: {}", e))
@@ -581,6 +590,7 @@ impl UAttributesValidator for ResponseValidator {
     /// Returns an error if the [`UAttributes::sink`] property does not contain a valid reply-to-address according to
     /// [`UUri::verify_rpc_response`].
     fn validate_sink(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
+        // [impl->dsn~up-attributes-response-sink~1]
         if let Some(sink) = &attributes.sink.as_ref() {
             UUri::verify_rpc_response(sink)
                 .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {}", e)))
@@ -637,11 +647,16 @@ mod tests {
     }
 
     #[test_case(Some(UUID::build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
+    // [utest->dsn~up-attributes-publish-sink~1]
     #[test_case(Some(UUID::build()), Some(publish_topic()), Some(destination()), None, false; "fails for message containing destination")]
     #[test_case(Some(UUID::build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
+    // [utest->dsn~up-attributes-publish-source~1]
     #[test_case(Some(UUID::build()), None, None, None, false; "fails for missing topic")]
+    // [utest->dsn~up-attributes-publish-source~1]
     #[test_case(Some(UUID::build()), Some(UUri { resource_id: 0x54, ..Default::default()}), None, None, false; "fails for invalid topic")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(None, Some(publish_topic()), None, None, false; "fails for missing message ID")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -689,14 +704,20 @@ mod tests {
         }
     }
 
+    // [utest->dsn~up-attributes-notification-sink~1]
     #[test_case(Some(UUID::build()), Some(origin()), None, None, false; "fails for missing destination")]
     #[test_case(Some(UUID::build()), Some(origin()), Some(destination()), None, true; "succeeds for both origin and destination")]
     #[test_case(Some(UUID::build()), Some(origin()), Some(destination()), Some(100), true; "succeeds for valid attributes")]
+    // [utest->dsn~up-attributes-notification-source~1]
     #[test_case(Some(UUID::build()), None, Some(destination()), None, false; "fails for missing origin")]
+    // [utest->dsn~up-attributes-notification-source~1]
     #[test_case(Some(UUID::build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid origin")]
+    // [utest->dsn~up-attributes-notification-sink~1]
     #[test_case(Some(UUID::build()), Some(origin()), Some(UUri { ue_id: 0xabcd, ue_version_major: 0x01, resource_id: 0x0011, ..Default::default() }), None, false; "fails for invalid destination")]
     #[test_case(Some(UUID::build()), None, None, None, false; "fails for neither origin nor destination")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(None, Some(origin()), Some(destination()), None, false; "fails for missing message ID")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -746,7 +767,9 @@ mod tests {
 
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for mandatory attributes")]
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), true; "succeeds for valid attributes")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(None, Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), false; "fails for missing message ID")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -762,14 +785,20 @@ mod tests {
         None,
         false;
         "fails for invalid message id")]
+    // [utest->dsn~up-attributes-request-source~1]
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), None, None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing reply-to-address")]
+    // [utest->dsn~up-attributes-request-source~1]
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(UUri { resource_id: 0x0001, ..Default::default()}), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid reply-to-address")]
+    // [utest->dsn~up-attributes-request-sink~1]
     #[test_case(Some(UUID::build()), None, Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing method-to-invoke")]
+    // [utest->dsn~up-attributes-request-sink~1]
     #[test_case(Some(UUID::build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid method-to-invoke")]
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, None, false; "fails for missing priority")]
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS3), None, false; "fails for invalid priority")]
+    // [utest->dsn~up-attributes-request-ttl~1]
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing ttl")]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), Some(UPriority::UPRIORITY_CS4), None, false; "fails for ttl < 1")]
+    // [utest->dsn~up-attributes-request-ttl~1]
+    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), Some(UPriority::UPRIORITY_CS4), None, false; "fails for ttl = 0")]
     #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for valid permission level")]
     #[allow(clippy::too_many_arguments)]
     fn test_validate_attributes_for_rpc_request_message(
@@ -815,7 +844,9 @@ mod tests {
 
     #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for mandatory attributes")]
     #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid attributes")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), false; "fails for missing message ID")]
+    // [utest->dsn~up-attributes-id~1]
     #[test_case(
         Some(UUID {
             // invalid UUID version (not 0b1000 but 0b1010)
@@ -831,9 +862,13 @@ mod tests {
         Some(UPriority::UPRIORITY_CS4),
         false;
         "fails for invalid message id")]
+    // [utest->dsn~up-attributes-response-sink~1]
     #[test_case(Some(UUID::build()), None, Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing reply-to-address")]
+    // [utest->dsn~up-attributes-response-sink~1]
     #[test_case(Some(UUID::build()), Some(UUri { resource_id: 0x0001, ..Default::default()}), Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
+    // [utest->dsn~up-attributes-response-source~1]
     #[test_case(Some(UUID::build()), Some(reply_to_address()), None, Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing invoked-method")]
+    // [utest->dsn~up-attributes-response-source~1]
     #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(UUri::default()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid invoked-method")]
     #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
     #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from_i32(-42)), None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid commstatus")]
