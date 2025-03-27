@@ -54,7 +54,7 @@ jobs:
         id: run-oft
         uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@main
         with:
-          file-patterns: "${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }} ${{ vars.UP_COMPONENT_OPEN_FAST_TRACE_FILE_PATTERNS }}"
+          file-patterns: "up-spec/*.adoc up-spec/*.md up-spec/basics up-spec/up-l1/README.adoc up-spec/up-l1/cloudevents.adoc up-spec/up-l2/api.adoc *.adoc *.md *.rs .github examples src tests tools"
           tags: "_,LanguageLibrary"
 
       # now try to build and run the tests which may fail if incomaptible changes
