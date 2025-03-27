@@ -15,7 +15,7 @@
 # Also performs requirements tracing using OpenFastTrace. The job fails if any of the two
 # activities fail.
 
-name: uP Spec Compatibility
+name: Latest uP Spec Compatibility
 
 on:
   schedule:

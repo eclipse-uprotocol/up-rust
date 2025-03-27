@@ -51,11 +51,5 @@ jobs:
   coverage:
     uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-coverage.yaml@main
 
-  # This check still is based on up-spec v1.6.0_alpha.4
-  # It therefore does not include the recently revamped L1 API spec with requirements for
-  # language libraries.
-  # We also do not use OFT Tags for filtering specitems (yet).
   requirements-tracing:
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@main
-    with:
-      oft-file-patterns: "up-spec/*.adoc up-spec/*.md up-spec/basics up-spec/up-l1/cloudevents.adoc up-spec/up-l2/api.adoc *.adoc *.md *.rs .github examples src tests tools"
+    uses: ./.github/workflows/current-up-spec-compliance.yaml
