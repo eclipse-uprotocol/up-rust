@@ -23,6 +23,8 @@ pub use upriority::*;
 pub use crate::up_core_api::uattributes::*;
 use crate::UUID;
 
+const UPRIORITY_DEFAULT: UPriority = UPriority::UPRIORITY_CS1;
+
 #[derive(Debug)]
 pub enum UAttributesError {
     ValidationError(String),
@@ -57,6 +59,15 @@ impl std::fmt::Display for UAttributesError {
 impl std::error::Error for UAttributesError {}
 
 impl UAttributes {
+    /// Checks if a given priority class is the default priority class.
+    ///
+    /// Messages that do not have a priority class set explicity, are assigned to
+    /// the default prioritiy class.
+    pub(crate) fn is_default_priority(prio: UPriority) -> bool {
+        // [impl->dsn~up-attributes-priority~1]
+        prio == UPRIORITY_DEFAULT
+    }
+
     /// Checks if these are the attributes for a Publish message.
     ///
     /// # Examples
@@ -135,9 +146,11 @@ impl UAttributes {
     pub fn check_expired(&self) -> Result<(), UAttributesError> {
         let ttl = match self.ttl {
             Some(t) if t > 0 => u64::from(t),
+            // [impl->dsn~up-attributes-ttl~1]
             _ => return Ok(()),
         };
 
+        // [impl->dsn~up-attributes-ttl-timeout~1]
         if let Some(creation_time) = self.id.as_ref().and_then(UUID::get_time) {
             let delta = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(duration) => {
@@ -182,11 +195,15 @@ mod tests {
     }
 
     #[test_case(None, None, false; "for message without ID nor TTL")]
+    // [utest->dsn~up-attributes-ttl~1]
     #[test_case(None, Some(0), false; "for message without ID with TTL 0")]
     #[test_case(None, Some(500), false; "for message without ID with TTL")]
     #[test_case(Some(build_n_ms_in_past(1000)), None, false; "for message with ID without TTL")]
+    // [utest->dsn~up-attributes-ttl~1]
     #[test_case(Some(build_n_ms_in_past(1000)), Some(0), false; "for message with ID and TTL 0")]
+    // [utest->dsn~up-attributes-ttl-timeout~1]
     #[test_case(Some(build_n_ms_in_past(1000)), Some(500), true; "for message with ID and expired TTL")]
+    // [utest->dsn~up-attributes-ttl-timeout~1]
     #[test_case(Some(build_n_ms_in_past(1000)), Some(2000), false; "for message with ID and non-expired TTL")]
     fn test_is_expired(id: Option<UUID>, ttl: Option<u32>, should_be_expired: bool) {
         let attributes = UAttributes {

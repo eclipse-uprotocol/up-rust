@@ -141,6 +141,14 @@ impl UMessage {
         self.attributes
             .as_ref()
             .and_then(|attribs| attribs.priority.enum_value().ok())
+            // [impl->dsn~up-attributes-priority~1]
+            .map(|prio| {
+                if prio == UPriority::UPRIORITY_UNSPECIFIED {
+                    UPriority::UPRIORITY_CS1
+                } else {
+                    prio
+                }
+            })
     }
 
     /// Gets this message's priority.
