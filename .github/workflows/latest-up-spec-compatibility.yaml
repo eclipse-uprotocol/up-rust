@@ -32,7 +32,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  up-spec-check:
+  requirements-tracing:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,14 +48,20 @@ jobs:
           git status
           cd "${{ github.workspace }}"
 
+      - name: "Determine OpenFastTrace file patterns from .env file"
+        uses: xom9ikk/dotenv@v2.3.0
+        with:
+          mode: "oft-latest"
+          load-mode: strict
+
       # run OpenFastTrace first because the action will always succeed and produce
       # a tracing report
       - name: Run OpenFastTrace
         id: run-oft
         uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@main
         with:
-          file-patterns: "up-spec/*.adoc up-spec/*.md up-spec/basics up-spec/up-l1/README.adoc up-spec/up-l1/cloudevents.adoc up-spec/up-l2/api.adoc *.adoc *.md *.rs .github examples src tests tools"
-          tags: "_,LanguageLibrary"
+          file-patterns: "${{ env.OFT_FILE_PATTERNS }}"
+          tags: "${{ env.OFT_TAGS_}}"
 
       # now try to build and run the tests which may fail if incomaptible changes
       # have been introduced into the uProtocol Core API
