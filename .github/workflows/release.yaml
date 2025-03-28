@@ -34,8 +34,10 @@ jobs:
   coverage:
     uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-coverage.yaml@main 
 
-  requirements-tracing:
-    uses: ./.github/workflows/current-up-spec-compliance.yaml
+  current-spec-compliance:
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@main
+    with:
+      env-file-suffix: "oft-current"
 
   licenses:
     # This works off the license declarations in dependent packages/crates, so if these declarations are wrong, this report will contain erroneous information
@@ -53,13 +55,19 @@ jobs:
       - check
       - check-msrv
       - coverage
-      - requirements-tracing
+      - current-spec-compliance
       - licenses
     permissions: write-all
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
+
+      - name: "Determine uProtocol Specification file patterns from .env file"
+        uses: xom9ikk/dotenv@v2.3.0
+        with:
+          mode: oft-current
+          load-mode: strict
 
       # License report - we later need the download_url output of the upload step
       - name: Download license report
@@ -133,7 +141,7 @@ jobs:
       - name: Gather uProtocol Specification documents
         shell: bash
         run: |
-          tar cvz --file up-spec.tar.gz ${{ vars.UP_SPEC_OPEN_FAST_TRACE_FILE_PATTERNS }}
+          tar cvz --file up-spec.tar.gz ${{ env.UP_SPEC_FILE_PATTERNS }}
       - name: Upload relevant uProtocol Spec files to release
         uses: svenstaro/upload-release-action@v2
         id: upload_up_spec

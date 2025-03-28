@@ -51,5 +51,7 @@ jobs:
   coverage:
     uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-coverage.yaml@main
 
-  requirements-tracing:
-    uses: ./.github/workflows/current-up-spec-compliance.yaml
+  current-spec-compliance:
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@main
+    with:
+      env-file-suffix: "oft-current"
