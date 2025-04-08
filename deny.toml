@@ -31,3 +31,8 @@ wildcards = "deny"
 skip-tree = [
     { crate = "windows-sys", reason = "a foundational crate for many that bumps far too frequently to ever have a shared version" },
 ]
+
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2025-0023", reason = "this crate does not use tokio::sync::broadcast" }
+]
