@@ -70,7 +70,7 @@ impl From<&UUri> for String {
     /// # Arguments
     ///
     /// * `uri` - The URI to serialize. Note that the given URI is **not** validated before serialization.
-    ///           In particular, the URI's version and resource ID length are not checked to be within limits.
+    ///   In particular, the URI's version and resource ID length are not checked to be within limits.
     ///
     /// # Returns
     ///

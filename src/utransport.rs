@@ -101,7 +101,7 @@ impl TryFrom<&UUri> for StaticUriProvider {
     /// # Arguments
     ///
     /// * `source_uri` - The UUri to take the entity's authority, entity ID and version information from.
-    ///                  The UUri's resource ID is ignored.
+    ///   The UUri's resource ID is ignored.
     ///
     /// # Errors
     ///
