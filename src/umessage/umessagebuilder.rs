@@ -146,7 +146,7 @@ impl UMessageBuilder {
     /// * `method_to_invoke` - The URI identifying the method to invoke.
     /// * `reply_to_address` - The URI that the sender of the request expects the response message at.
     /// * `ttl` - The number of milliseconds after which the request should no longer be processed
-    ///           by the target service. The value is capped at [`i32::MAX`].
+    ///   by the target service. The value is capped at [`i32::MAX`].
     ///
     /// # Examples
     ///
@@ -191,7 +191,7 @@ impl UMessageBuilder {
     /// * `reply_to_address` - The URI that the sender of the request expects to receive the response message at.
     /// * `request_id` - The identifier of the request that this is the response to.
     /// * `invoked_method` - The URI identifying the method that has been invoked and which the created message is
-    ///                      the outcome of.
+    ///   the outcome of.
     ///
     /// # Examples
     ///
@@ -240,8 +240,8 @@ impl UMessageBuilder {
     ///
     /// # Arguments
     ///
-    /// * `request_attributes` - The attributes from the request message. The response message builder will be initialized
-    ///                          with the corresponding attribute values.
+    /// * `request_attributes` - The attributes from the request message. The response message
+    ///   builder will be initialized with the corresponding attribute values.
     ///
     /// # Examples
     ///

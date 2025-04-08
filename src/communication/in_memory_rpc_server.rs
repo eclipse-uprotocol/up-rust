@@ -318,7 +318,7 @@ mod tests {
                                 sink_filter: &Option<&UUri>,
                                 _listener: &Arc<dyn UListener>| {
             source_filter == &expected_source_filter
-                && sink_filter.map_or(false, |uri| uri.resource_id == resource_id as u32)
+                && sink_filter.is_some_and(|uri| uri.resource_id == resource_id as u32)
         };
         transport
             .expect_do_register_listener()
