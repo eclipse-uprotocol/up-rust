@@ -23,6 +23,7 @@ on:
   pull_request:
     paths:
       - "src/**"
+      - "tests/**"
       - "Cargo.*"
       - "build.rs"
       - "deny.toml"
@@ -134,13 +135,11 @@ jobs:
           cargo hack check --feature-powerset --no-dev-deps
 
   # [impl->req~up-language-ci-test~1]
-  nextest:
+  test:
     # Subset of feature-combos, on only one OS - more complete testing in test-featurematrix.yaml
     outputs:
       test_results_url: ${{ steps.test_results.outputs.artifact-url }}
     runs-on: ubuntu-latest
-    env: 
-      NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
     strategy:
       matrix:
         feature-flags: ["", "--no-default-features", "--all-features"]
@@ -151,22 +150,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      - uses: Swatinem/rust-cache@v2
-      # install tool to convert cargo's JSON test output to JUNIT format
-      - run: |
-          cargo install cargo2junit
-      # Using nextest because it's faster than built-in test
-      - uses: taiki-e/install-action@nextest
-      - name: Run cargo nextest
+
+      - name: Run lib tests
         run: |
-          cargo nextest run ${{ matrix.feature-flags }} --profile ci
-      - name: Run doctests
+          mkdir -p ${GITHUB_WORKSPACE}/target
+          RUSTC_BOOTSTRAP=1 cargo test --no-fail-fast --lib ${{ matrix.feature-flags }} -- -Z unstable-options --format junit --report-time > ${GITHUB_WORKSPACE}/target/lib-test-results.xml
+      - name: Run doc tests
         run: |
-          # we use tee to let cargo test print to the console
-          RUSTC_BOOTSTRAP=1 cargo test --doc ${{ matrix.feature-flags }} -- -Z unstable-options --format json --report-time | tee target/doctest-results.json
-          # write output to same directory as the one used by cargo nextest in order
-          # to flatten the directory hierarchy when uploading the test results
-          cat target/doctest-results.json | cargo2junit > target/nextest/ci/doctest-results.xml
+          RUSTC_BOOTSTRAP=1 cargo test --no-fail-fast --doc ${{ matrix.feature-flags }} -- -Z unstable-options --format junit --report-time > ${GITHUB_WORKSPACE}/target/doc-test-results.xml
+      - name: Run TCK tests
+        run: |
+          # the Cucumber based tests write a results file in JUnit format to "tck-[test_name]-results.xml"
+          cargo test --no-fail-fast --test 'tck_*' ${{ matrix.feature-flags }} -- --junit-out-folder=${GITHUB_WORKSPACE}/target
 
       - name: Upload all-features test results artifact
         id: test_results
@@ -174,5 +169,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          # this will include the nextest and doctest result files in the archive's root folder
-          path: target/nextest/ci/*-results.xml
+          # include all test result files
+          path: target/*-results.xml
