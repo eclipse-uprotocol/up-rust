@@ -155,13 +155,15 @@ jobs:
         uses: joutvhu/get-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
+
       - name: Collect quality artifacts
-        uses: anotherdaniel/quevee@v0.4.1
+        uses: eclipse-dash/quevee@v1
         id: quevee_manifest
-        with:          
+        with:
           release_url: ${{ steps.latest_release_info.outputs.html_url }}
-          artifacts_license: ${{ steps.upload_license_report.outputs.browser_download_url }}
+          artifacts_documentation: ${{ steps.upload_up_spec.outputs.browser_download_url }}
+          artifacts_coding_guidelines: https://github.com/AnotherDaniel/up-rust/blob/3a3ddcc2ee49ca6d33bd15577f769575718c22e5/.github/workflows/check.yaml#L85
+          artifacts_release_process: https://github.com/AnotherDaniel/up-rust/blob/3a3ddcc2ee49ca6d33bd15577f769575718c22e5/.github/workflows/release.yaml
           artifacts_readme: ${{ steps.upload_readme.outputs.browser_download_url }}
           artifacts_requirements: ${{ steps.upload_up_spec.outputs.browser_download_url }}
           artifacts_testing: ${{ steps.upload_test_report.outputs.browser_download_url }},${{ steps.upload_test_coverage.outputs.browser_download_url }},${{ steps.upload_requirements_tracing_report.outputs.browser_download_url }}
