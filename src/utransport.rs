@@ -21,6 +21,47 @@ use async_trait::async_trait;
 
 use crate::{UCode, UMessage, UStatus, UUri};
 
+/// Verifies that given UUris can be used as source and sink filter UUris
+/// for registering listeners.
+///
+/// This function is helpful for implementing [`UTransport`] in accordance with the
+/// uProtocol Transport Layer specification.
+///
+/// # Errors
+///
+/// Returns a [`UStatus`] with a [`UCode::INVALID_ARGUMENT`] and a corresponding detail
+/// message, if any of the given UUris cannot be used as filter criteria.
+///
+pub fn verify_filter_criteria(
+    source_filter: &UUri,
+    sink_filter: Option<&UUri>,
+) -> Result<(), UStatus> {
+    if let Some(sink_filter_uuri) = sink_filter {
+        if sink_filter_uuri.is_notification_destination()
+            && source_filter.is_notification_destination()
+        {
+            return Err(UStatus::fail_with_code(
+                UCode::INVALID_ARGUMENT,
+                "source and sink filters must not both have resource ID 0",
+            ));
+        }
+        if sink_filter_uuri.is_rpc_method()
+            && !source_filter.has_wildcard_resource_id()
+            && !source_filter.is_notification_destination()
+        {
+            return Err(UStatus::fail_with_code(
+                UCode::INVALID_ARGUMENT,
+                "source filter must either have the wildcard resource ID or resource ID 0, if sink filter matches RPC method resource ID"));
+        }
+    } else if !source_filter.has_wildcard_resource_id() && !source_filter.is_event() {
+        return Err(UStatus::fail_with_code(
+            UCode::INVALID_ARGUMENT,
+            "source filter must either have the wildcard resource ID or a resource ID from topic range, if sink filter is empty"));
+    }
+    // everything else might match valid messages
+    Ok(())
+}
+
 /// A factory for URIs representing this uEntity's resources.
 ///
 /// Implementations may use arbitrary mechanisms to determine the information that
@@ -394,6 +435,7 @@ mod tests {
     use std::{
         hash::{DefaultHasher, Hash, Hasher},
         ops::Deref,
+        str::FromStr,
         sync::Arc,
     };
 
@@ -544,5 +586,24 @@ mod tests {
         let comp_listener = ComparableListener::new(bar);
         let debug_output = format!("{comp_listener:?}");
         assert!(!debug_output.is_empty());
+    }
+
+    #[test_case::test_case(
+        "//vehicle1/AA/1/0",
+        Some("//vehicle2/BB/1/0");
+        "source and sink both having resource ID 0")]
+    #[test_case::test_case(
+        "//vehicle1/AA/1/CC",
+        Some("//vehicle2/BB/1/1A");
+        "sink is RPC but source has invalid resource ID")]
+    #[test_case::test_case(
+        "//vehicle1/AA/1/CC",
+        None;
+        "sink is empty but source has non-topic resource ID")]
+    fn test_verify_filter_criteria_fails_for(source: &str, sink: Option<&str>) {
+        let source_filter = UUri::from_str(source).expect("invalid source URI");
+        let sink_filter = sink.map(|s| UUri::from_str(s).expect("invalid sink URI"));
+        assert!(verify_filter_criteria(&source_filter, sink_filter.as_ref())
+            .is_err_and(|err| matches!(err.get_code(), UCode::INVALID_ARGUMENT)));
     }
 }

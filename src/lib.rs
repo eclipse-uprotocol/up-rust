@@ -88,7 +88,8 @@ pub use ustatus::{UCode, UStatus};
 
 mod utransport;
 pub use utransport::{
-    ComparableListener, LocalUriProvider, StaticUriProvider, UListener, UTransport,
+    verify_filter_criteria, ComparableListener, LocalUriProvider, StaticUriProvider, UListener,
+    UTransport,
 };
 #[cfg(feature = "test-util")]
 pub use utransport::{MockLocalUriProvider, MockTransport, MockUListener};
