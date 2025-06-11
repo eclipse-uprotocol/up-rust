@@ -29,13 +29,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 ARG OFT_CORE_VERSION=4.1.0
 ARG OFT_ASCIIDOC_PLUGIN_VERSION=0.3.0
 ENV LIB_DIR=/opt/oft/lib
-RUN <<EOF
-mkdir -p $LIB_DIR
-base_url=https://github.com/itsallcode
-wget -P $LIB_DIR ${base_url}/openfasttrace/releases/download/$OFT_CORE_VERSION/openfasttrace-$OFT_CORE_VERSION.jar
-wget -P $LIB_DIR ${base_url}/openfasttrace-asciidoc-plugin/releases/download/$OFT_ASCIIDOC_PLUGIN_VERSION/openfasttrace-asciidoc-plugin-$OFT_ASCIIDOC_PLUGIN_VERSION-with-dependencies.jar
-EOF
-RUN echo '#!/bin/bash\n\njava -cp "${LIB_DIR}/*" org.itsallcode.openfasttrace.core.cli.CliStarter "$@"' > /usr/local/bin/oft \
+RUN mkdir -p $LIB_DIR \
+    && base_url=https://github.com/itsallcode \
+    && wget -P $LIB_DIR ${base_url}/openfasttrace/releases/download/$OFT_CORE_VERSION/openfasttrace-$OFT_CORE_VERSION.jar \
+    && wget -P $LIB_DIR ${base_url}/openfasttrace-asciidoc-plugin/releases/download/$OFT_ASCIIDOC_PLUGIN_VERSION/openfasttrace-asciidoc-plugin-$OFT_ASCIIDOC_PLUGIN_VERSION-with-dependencies.jar \
+    && echo '#!/bin/bash\n\njava -cp "${LIB_DIR}/*" org.itsallcode.openfasttrace.core.cli.CliStarter "$@"' > /usr/local/bin/oft \
     && chmod +x /usr/local/bin/oft
 
 # Before installing cargo tools, change to the user that will be used in the container later.
