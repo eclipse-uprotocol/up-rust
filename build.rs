@@ -27,6 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("{}uprotocol/v1/uattributes.proto", UPROTOCOL_BASE_URI),
         format!("{}uprotocol/v1/ucode.proto", UPROTOCOL_BASE_URI),
         format!("{}uprotocol/v1/umessage.proto", UPROTOCOL_BASE_URI),
+        // [impl->req~ustatus-data-model-impl~1]
+        // [impl->req~ustatus-data-model-proto~1]
         format!("{}uprotocol/v1/ustatus.proto", UPROTOCOL_BASE_URI),
         // not used in the SDK yet, but for completeness sake
         format!("{}uprotocol/v1/file.proto", UPROTOCOL_BASE_URI),
