@@ -15,7 +15,7 @@ mod umessagebuilder;
 mod umessagetype;
 
 use bytes::Bytes;
-use protobuf::{well_known_types::any::Any, Message, MessageFull};
+use protobuf::{well_known_types::any::Any, Enum, Message, MessageFull};
 
 pub use umessagebuilder::*;
 
@@ -345,31 +345,24 @@ impl UMessage {
             .is_some_and(|attribs| attribs.is_notification())
     }
 
-    /// If `UMessage` payload is available, deserialize it as a protobuf `Message`.
-    ///
-    /// This function is used to extract strongly-typed data from a `UMessage` object,
-    /// taking into account the payload format (will only succeed if payload format is
-    /// `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF` or `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`)
+    /// Deserializes this message's protobuf payload into a type.
     ///
     /// # Type Parameters
     ///
     /// * `T`: The target type of the data to be unpacked.
     ///
-    /// # Returns
-    ///
-    /// * `Ok(T)`: The deserialized protobuf message contained in the payload.
-    ///
     /// # Errors
     ///
-    /// * Err(`UMessageError`) if the unpacking process fails, for example if the payload could
-    ///   not be deserialized into the target type `T`.
+    /// Returns an error if the message payload format is neither [UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF]
+    /// nor [UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY] or if the bytes in the
+    /// payload cannot be deserialized into the target type.
     pub fn extract_protobuf<T: MessageFull + Default>(&self) -> Result<T, UMessageError> {
-        if let Some(payload) = &self.payload {
+        if let Some(payload) = self.payload.as_ref() {
             let payload_format = self.attributes.payload_format.enum_value_or_default();
             deserialize_protobuf_bytes(payload, &payload_format)
         } else {
             Err(UMessageError::PayloadError(
-                "No embedded payload".to_string(),
+                "Message has no payload".to_string(),
             ))
         }
     }
@@ -377,22 +370,21 @@ impl UMessage {
 
 /// Deserializes a protobuf message from a byte array.
 ///
+/// # Type Parameters
+///
+/// * `T`: The target type of the data to be unpacked.
+///
 /// # Arguments
 ///
 /// * `payload` - The payload data.
 /// * `payload_format` - The format/encoding of the data. Must be one of
 ///    - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF`
 ///    - `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`
-///    - `UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED`
-///
-/// `UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED` is interpreted as
-/// `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY` according to the uProtocol
-/// specification.
 ///
 /// # Errors
 ///
-/// Returns an error if the payload format is unsupported or if the data is can not be deserialized
-/// based on the given format.
+/// Returns an error if the payload format is unsupported or if the data can not be deserialized
+/// into the target type based on the given format.
 pub(crate) fn deserialize_protobuf_bytes<T: MessageFull + Default>(
     payload: &Bytes,
     payload_format: &UPayloadFormat,
@@ -401,22 +393,24 @@ pub(crate) fn deserialize_protobuf_bytes<T: MessageFull + Default>(
         UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF => {
             T::parse_from_tokio_bytes(payload).map_err(UMessageError::DataSerializationError)
         }
-        UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY
-        | UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED => Any::parse_from_tokio_bytes(payload)
-            .map_err(UMessageError::DataSerializationError)
-            .and_then(|any| match any.unpack() {
-                Ok(Some(v)) => Ok(v),
-                Ok(None) => Err(UMessageError::PayloadError(
-                    "cannot deserialize payload, message type mismatch".to_string(),
-                )),
-                Err(e) => Err(UMessageError::DataSerializationError(e)),
-            }),
-        _ => Err(UMessageError::from(format!(
-            "Unknown/invalid/unsupported payload format: {}",
-            payload_format
-                .to_media_type()
-                .unwrap_or("unknown".to_string())
-        ))),
+        UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY => {
+            Any::parse_from_tokio_bytes(payload)
+                .map_err(UMessageError::DataSerializationError)
+                .and_then(|any| match any.unpack() {
+                    Ok(Some(v)) => Ok(v),
+                    Ok(None) => Err(UMessageError::PayloadError(
+                        "cannot deserialize payload, message type mismatch".to_string(),
+                    )),
+                    Err(e) => Err(UMessageError::DataSerializationError(e)),
+                })
+        }
+        _ => {
+            let detail_msg = payload_format.to_media_type().map_or_else(
+                || format!("Unknown payload format: {}", payload_format.value()),
+                |mt| format!("Invalid/unsupported payload format: {mt}"),
+            );
+            Err(UMessageError::from(detail_msg))
+        }
     }
 }
 
@@ -437,12 +431,6 @@ mod test {
         data.value = "hello world".to_string();
         let any = Any::pack(&data.clone()).unwrap();
         let buf: Bytes = any.write_to_bytes().unwrap().into();
-
-        let result = deserialize_protobuf_bytes::<StringValue>(
-            &buf,
-            &UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED,
-        );
-        assert!(result.is_ok_and(|v| v.value == *"hello world"));
 
         let result = deserialize_protobuf_bytes::<StringValue>(
             &buf,
@@ -476,6 +464,7 @@ mod test {
     #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP; "SOMEIP format")]
     #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP_TLV; "SOMEIP TLV format")]
     #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_TEXT; "TEXT format")]
+    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED; "UNSPECIFIED format")]
     fn test_deserialize_protobuf_bytes_fails_for_(format: UPayloadFormat) {
         let result = deserialize_protobuf_bytes::<UStatus>(&"hello".into(), &format);
         assert!(result.is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
