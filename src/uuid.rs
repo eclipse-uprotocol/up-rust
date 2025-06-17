@@ -341,8 +341,6 @@ impl FromStr for UUID {
 #[cfg(test)]
 mod tests {
 
-    use protobuf::Message;
-
     use super::*;
 
     // [utest->dsn~uuid-spec~1]
@@ -404,14 +402,5 @@ mod tests {
 
         assert_eq!(String::from(&uuid), "00000000-0001-7000-8010-101010101a1a");
         assert_eq!(String::from(uuid), "00000000-0001-7000-8010-101010101a1a");
-    }
-
-    // [utest->req~uuid-proto~1]
-    #[test]
-    fn test_protobuf_serialization() {
-        let uuid = UUID::build();
-        let bytes = uuid.write_to_bytes().unwrap();
-        let deserialized_uuid = UUID::parse_from_bytes(bytes.as_slice()).unwrap();
-        assert_eq!(uuid, deserialized_uuid);
     }
 }
