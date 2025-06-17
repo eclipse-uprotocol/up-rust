@@ -66,7 +66,7 @@ pub fn verify_filter_criteria(
 ///
 /// Implementations may use arbitrary mechanisms to determine the information that
 /// is necessary for creating URIs, e.g. environment variables, configuration files etc.
-// [impl->req~up-language-transport-api~1]
+// [impl->dsn~localuriprovider-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 pub trait LocalUriProvider: Send + Sync {
     /// Gets the _authority_ used for URIs representing this uEntity's resources.
@@ -187,7 +187,7 @@ impl TryFrom<&UUri> for StaticUriProvider {
 ///
 /// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l1/README.adoc)
 /// for details.
-// [impl->req~up-language-transport-api~1]
+// [impl->dsn~ulistener-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
 pub trait UListener: Send + Sync {
@@ -213,7 +213,7 @@ pub trait UListener: Send + Sync {
 ///
 /// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l1/README.adoc)
 /// for details.
-// [impl->req~up-language-transport-api~1]
+// [impl->dsn~utransport-declaration~1]
 #[async_trait]
 pub trait UTransport: Send + Sync {
     /// Sends a message using this transport's message exchange mechanism.
