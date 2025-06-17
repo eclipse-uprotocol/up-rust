@@ -23,7 +23,7 @@ use crate::{UAttributes, UCode, UStatus, UUri};
 use super::{CallOptions, UPayload};
 
 /// An error indicating a problem with invoking a (remote) service operation.
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[derive(Clone, Error, Debug)]
 pub enum ServiceInvocationError {
     /// Indicates that the calling uE requested to add/create something that already exists.
@@ -136,7 +136,7 @@ impl From<ServiceInvocationError> for UStatus {
 /// Please refer to the
 /// [Communication Layer API specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc)
 /// for details.
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
 pub trait RpcClient: Send + Sync {
@@ -210,7 +210,7 @@ impl dyn RpcClient {
 
 /// A handler for processing incoming RPC requests.
 ///
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
 pub trait RequestHandler: Send + Sync {
@@ -246,7 +246,7 @@ pub trait RequestHandler: Send + Sync {
 /// Please refer to the
 /// [Communication Layer API specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc)
 /// for details.
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[async_trait]
 pub trait RpcServer {
     /// Registers an endpoint for RPC requests.

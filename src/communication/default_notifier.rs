@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-// [impl->req~up-language-comm-api-default-impl~1]
+// [impl->dsn~communication-layer-impl-default~1]
 
 use std::sync::Arc;
 
@@ -100,7 +100,7 @@ impl Notifier for SimpleNotifier {
 #[cfg(test)]
 mod tests {
 
-    // [utest->req~up-language-comm-api-default-impl~1]
+    // [utest->dsn~communication-layer-impl-default~1]
 
     use super::*;
 
