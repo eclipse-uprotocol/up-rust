@@ -183,6 +183,7 @@ impl UUID {
     /// let uuid = UUID { msb, lsb, ..Default::default() };
     /// assert_eq!(uuid.to_hyphenated_string(), "00000000-0001-7000-8010-101010101a1a");
     /// ```
+    // [impl->req~uuid-hex-and-dash~1]
     pub fn to_hyphenated_string(&self) -> String {
         let mut bytes = [0_u8; 16];
         bytes[..8].clone_from_slice(self.msb.to_be_bytes().as_slice());
@@ -328,6 +329,7 @@ impl FromStr for UUID {
     ///     .parse::<UUID>()
     ///     .is_err());
     /// ```
+    // [impl->req~uuid-hex-and-dash~1]
     fn from_str(uuid_str: &str) -> Result<Self, Self::Err> {
         let mut uuid = [0u8; 16];
         uuid_simd::parse_hyphenated(uuid_str.as_bytes(), Out::from_mut(&mut uuid))
@@ -344,6 +346,7 @@ mod tests {
     use super::*;
 
     // [utest->dsn~uuid-spec~1]
+    // [utest->req~uuid-type~1]
     #[test]
     fn test_from_u64_pair() {
         // timestamp = 1, ver = 0b0111
@@ -351,10 +354,12 @@ mod tests {
         // variant = 0b10
         let lsb = 0x8000000000000000_u64;
         let conversion_attempt = UUID::from_u64_pair(msb, lsb);
-        assert!(conversion_attempt.is_ok());
-        let uuid = conversion_attempt.unwrap();
-        assert!(uuid.is_uprotocol_uuid());
-        assert_eq!(uuid.get_time(), Some(0x1_u64));
+        assert!(conversion_attempt.is_ok_and(|uuid| {
+            uuid.is_uprotocol_uuid()
+                && uuid.get_time() == Some(0x1_u64)
+                && uuid.msb == msb
+                && uuid.lsb == lsb
+        }));
 
         // timestamp = 1, (invalid) ver = 0b0000
         let msb = 0x0000000000010000_u64;
@@ -385,6 +390,7 @@ mod tests {
     }
 
     #[test]
+    // [utest->req~uuid-hex-and-dash~1]
     fn test_into_string() {
         // timestamp = 1, ver = 0b0111
         let msb = 0x0000000000017000_u64;

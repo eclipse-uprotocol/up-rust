@@ -12,14 +12,14 @@
  ********************************************************************************/
 
 /*!
-up-rust is the [Eclipse uProtocol&trade; Language Library](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.4/languages.adoc) for the
+up-rust is the [Eclipse uProtocol&trade; Language Library](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/languages.adoc) for the
 Rust programming language.
 
 This crate can be used to
 
-* implement uEntities that communicate with each other using the uProtocol [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.4/up-l2/api.adoc)
+* implement uEntities that communicate with each other using the uProtocol [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l2/api.adoc)
   over one of the supported transport protocols.
-* implement support for an additional transport protocol by means of implementing the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.4/up-l1/README.adoc).
+* implement support for an additional transport protocol by means of implementing the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l1/README.adoc).
 
 ## Library contents
 
@@ -38,23 +38,23 @@ For user convenience, all of these modules export their types on up_rust top-lev
 ## Features
 
 * `cloudevents` enables support for mapping UMessages to/from CloudEvents using Protobuf Format according to the
-  [uProtocol specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.4/up-l1/cloudevents.adoc).
+  [uProtocol specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l1/cloudevents.adoc).
 
-* `communication` enables support for the [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.4/up-l2/api.adoc) and its
-  default implementation on top of the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.4/up-l1/README.adoc).
+* `communication` enables support for the [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l2/api.adoc) and its
+  default implementation on top of the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l1/README.adoc).
   Enabled by default.
-* `udiscovery` enables support for types required to interact with [uDiscovery service](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/v1.6.0-alpha.4/up-l3/udiscovery/v3/README.adoc)
+* `udiscovery` enables support for types required to interact with [uDiscovery service](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l3/udiscovery/v3/README.adoc)
   implementations.
-* `usubscription` enables support for types required to interact with [uSubscription service](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/v1.6.0-alpha.4/up-l3/usubscription/v3/README.adoc)
+* `usubscription` enables support for types required to interact with [uSubscription service](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l3/usubscription/v3/README.adoc)
   implementations. Enabled by default.
-* `utwin` enables support for types required to interact with [uTwin service](https://raw.githubusercontent.com/eclipse-uprotocol/up-spec/v1.6.0-alpha.4/up-l3/utwin/v3/README.adoc)
+* `utwin` enables support for types required to interact with [uTwin service](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l3/utwin/v2/README.adoc)
   implementations.
 * `test-util` provides some useful mock implementations for testing. In particular, provides mock implementations of UTransport and Communication Layer API traits which make implementing unit tests a lot easier.
 * `util` provides some useful helper structs. In particular, provides a local, in-memory UTransport for exchanging messages within a single process. This transport is also used by the examples illustrating usage of the Communication Layer API.
 
 ## References
 
-* [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/tree/v1.6.0-alpha.4)
+* [uProtocol Specification](https://github.com/eclipse-uprotocol/up-spec/tree/v1.6.0-alpha.5)
 
 */
 
