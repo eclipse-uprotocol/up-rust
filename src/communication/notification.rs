@@ -21,7 +21,7 @@ use crate::{UListener, UStatus, UUri};
 use super::{CallOptions, UPayload};
 
 /// An error indicating a problem with sending a notification to another uEntity.
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[derive(Debug)]
 pub enum NotificationError {
     /// Indicates that the given message cannot be sent because it is not a [valid Notification message](crate::NotificationValidator).
@@ -48,7 +48,7 @@ impl Error for NotificationError {}
 ///
 /// Please refer to the
 /// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
 pub trait Notifier: Send + Sync {

@@ -64,6 +64,7 @@ mod cloudevents;
 #[cfg(feature = "cloudevents")]
 pub use cloudevents::{CloudEvent, CONTENT_TYPE_CLOUDEVENTS_PROTOBUF};
 
+// [impl->dsn~communication-layer-api-namespace~1]
 #[cfg(feature = "communication")]
 pub mod communication;
 

@@ -22,7 +22,7 @@ use crate::{UListener, UStatus, UUri};
 use super::{CallOptions, UPayload};
 
 /// An error indicating a problem with publishing a message to a topic.
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[derive(Debug)]
 pub enum PubSubError {
     /// Indicates that the given message cannot be sent because it is not a [valid Publish message](crate::PublishValidator).
@@ -49,7 +49,7 @@ impl Error for PubSubError {}
 ///
 /// Please refer to the
 /// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[async_trait]
 pub trait Publisher: Send + Sync {
     /// Publishes a message to a topic.
@@ -71,7 +71,7 @@ pub trait Publisher: Send + Sync {
     ) -> Result<(), PubSubError>;
 }
 
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 pub trait SubscriptionChangeHandler: Send + Sync {
     /// Invoked for each update to the subscription status for a given topic.
@@ -89,7 +89,7 @@ pub trait SubscriptionChangeHandler: Send + Sync {
 ///
 /// Please refer to the
 /// [Communication Layer API Specifications](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l2/api.adoc).
-// [impl->req~up-language-comm-api~1]
+// [impl->dsn~communication-layer-api-declaration~1]
 #[async_trait]
 pub trait Subscriber: Send + Sync {
     /// Registers a handler to invoke for messages that have been published to a given topic.
