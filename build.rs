@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // uProtocol-project proto definitions
         format!("{}uprotocol/uoptions.proto", UPROTOCOL_BASE_URI),
         // [impl->req~uuid-proto~1]
+        // [impl->req~uuid-type~1]
         format!("{}uprotocol/v1/uuid.proto", UPROTOCOL_BASE_URI),
         // [impl->req~uri-data-model-proto~1]
         format!("{}uprotocol/v1/uri.proto", UPROTOCOL_BASE_URI),
