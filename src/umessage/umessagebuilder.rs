@@ -279,7 +279,6 @@ impl UMessageBuilder {
             priority: request_attributes
                 .priority
                 .enum_value_or(UPriority::UPRIORITY_CS4),
-            // [impl->dsn~up-attributes-response-ttl~1]
             ttl: request_attributes.ttl,
             ..Default::default()
         }
@@ -372,9 +371,6 @@ impl UMessageBuilder {
     pub fn with_priority(&mut self, priority: UPriority) -> &mut UMessageBuilder {
         // [impl->dsn~up-attributes-request-priority~1]
         if self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST
-            // up-spec erroneously uses this name to define a requirement
-            // for the response's priority class ...
-            // [impl->dsn~up-attributes-response-reqid~1]
             || self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE
         {
             assert!(priority.value() >= UPriority::UPRIORITY_CS4.value())
@@ -530,7 +526,6 @@ impl UMessageBuilder {
     /// # }
     /// ```
     pub fn with_comm_status(&mut self, comm_status: UCode) -> &mut UMessageBuilder {
-        // [impl->dsn~up-attributes-response-commstatus~1]
         assert!(self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE);
         self.comm_status = Some(comm_status.into());
         self
@@ -800,6 +795,7 @@ mod tests {
 
     use super::*;
 
+    use protobuf::Message;
     use test_case::test_case;
 
     const METHOD_TO_INVOKE: &str = "//my-vehicle/4D123/2/6FA3";
@@ -820,7 +816,6 @@ mod tests {
 
     // [utest->dsn~up-attributes-permission-level~1]
     #[test_case(Some(5), None, None; "with permission level")]
-    // [utest->dsn~up-attributes-response-commstatus~1]
     #[test_case(None, Some(UCode::NOT_FOUND), None; "with commstatus")]
     // [utest->dsn~up-attributes-request-token~1]
     #[test_case(None, None, Some(String::from("my-token")); "with token")]
@@ -843,7 +838,6 @@ mod tests {
 
     // [utest->dsn~up-attributes-permission-level~1]
     #[test_case(Some(5), None, None; "with permission level")]
-    // [utest->dsn~up-attributes-response-commstatus~1]
     #[test_case(None, Some(UCode::NOT_FOUND), None; "with commstatus")]
     // [utest->dsn~up-attributes-request-token~1]
     #[test_case(None, None, Some(String::from("my-token")); "with token")]
@@ -870,17 +864,15 @@ mod tests {
     #[test_case(Some(5), None, None; "with permission level")]
     // [utest->dsn~up-attributes-request-token~1]
     #[test_case(None, Some(String::from("my-token")), None; "with token")]
-    // up-spec erroneously uses this name to define a requirement
-    // for the response's priority class ...
-    // [utest->dsn~up-attributes-response-reqid~1]
+    // [utest->dsn~up-attributes-request-priority~1]
     #[test_case(None, None, Some(UPriority::UPRIORITY_UNSPECIFIED); "with priority UNSPECIFIED")]
-    // [utest->dsn~up-attributes-response-reqid~1]
+    // [utest->dsn~up-attributes-request-priority~1]
     #[test_case(None, None, Some(UPriority::UPRIORITY_CS0); "with priority CS0")]
-    // [utest->dsn~up-attributes-response-reqid~1]
+    // [utest->dsn~up-attributes-request-priority~1]
     #[test_case(None, None, Some(UPriority::UPRIORITY_CS1); "with priority CS1")]
-    // [utest->dsn~up-attributes-response-reqid~1]
+    // [utest->dsn~up-attributes-request-priority~1]
     #[test_case(None, None, Some(UPriority::UPRIORITY_CS2); "with priority CS2")]
-    // [utest->dsn~up-attributes-response-reqid~1]
+    // [utest->dsn~up-attributes-request-priority~1]
     #[test_case(None, None, Some(UPriority::UPRIORITY_CS3); "with priority CS3")]
     #[should_panic]
     fn test_response_message_builder_panics(
@@ -904,7 +896,6 @@ mod tests {
         }
     }
 
-    // [utest->dsn~up-attributes-response-commstatus~1]
     #[test_case(Some(UCode::NOT_FOUND), None; "for comm status")]
     // [utest->dsn~up-attributes-request-priority~1]
     #[test_case(None, Some(UPriority::UPRIORITY_UNSPECIFIED); "for priority class unspecified")]
@@ -953,6 +944,8 @@ mod tests {
     }
 
     #[test]
+    // [utest->req~uattributes-data-model-impl~1]
+    // [utest->req~umessage-data-model-impl~1]
     fn test_build_retains_all_publish_attributes() {
         let message_id = UUID::build();
         let traceparent = String::from("traceparent");
@@ -963,9 +956,9 @@ mod tests {
             .with_traceparent(&traceparent)
             .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
             .expect("should have been able to create message");
+
         // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &message_id);
-        // [utest->dsn~up-attributes-priority~1]
         assert!(UAttributes::is_default_priority(
             message.priority_unchecked()
         ));
@@ -985,9 +978,20 @@ mod tests {
             message.payload_format_unchecked(),
             UPayloadFormat::UPAYLOAD_FORMAT_TEXT
         );
+
+        // [utest->req~uattributes-data-model-proto~1]
+        // [utest->req~umessage-data-model-proto~1]
+        let proto = message
+            .write_to_bytes()
+            .expect("failed to serialize to protobuf");
+        let deserialized_message =
+            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
+        assert_eq!(message, deserialized_message);
     }
 
     #[test]
+    // [utest->req~uattributes-data-model-impl~1]
+    // [utest->req~umessage-data-model-impl~1]
     fn test_build_retains_all_notification_attributes() {
         let message_id = UUID::build();
         let traceparent = String::from("traceparent");
@@ -1001,6 +1005,7 @@ mod tests {
             .with_traceparent(&traceparent)
             .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
             .expect("should have been able to create message");
+
         // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &message_id);
         assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS2);
@@ -1019,9 +1024,20 @@ mod tests {
             message.payload_format_unchecked(),
             UPayloadFormat::UPAYLOAD_FORMAT_TEXT
         );
+
+        // [utest->req~uattributes-data-model-proto~1]
+        // [utest->req~umessage-data-model-proto~1]
+        let proto = message
+            .write_to_bytes()
+            .expect("failed to serialize to protobuf");
+        let deserialized_message =
+            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
+        assert_eq!(message, deserialized_message);
     }
 
     #[test]
+    // [utest->req~uattributes-data-model-impl~1]
+    // [utest->req~umessage-data-model-impl~1]
     fn test_build_retains_all_request_attributes() {
         let message_id = UUID::build();
         let token = String::from("token");
@@ -1062,6 +1078,15 @@ mod tests {
             message.payload_format_unchecked(),
             UPayloadFormat::UPAYLOAD_FORMAT_TEXT
         );
+
+        // [utest->req~uattributes-data-model-proto~1]
+        // [utest->req~umessage-data-model-proto~1]
+        let proto = message
+            .write_to_bytes()
+            .expect("failed to serialize to protobuf");
+        let deserialized_message =
+            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
+        assert_eq!(message, deserialized_message);
     }
 
     #[test]
@@ -1086,14 +1111,10 @@ mod tests {
         // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &response_message_id);
         assert_eq!(message.commstatus_unchecked(), UCode::DEADLINE_EXCEEDED);
-        // up-spec erroneously uses this name to define a requirement
-        // for the response's priority class ...
-        // [utest->dsn~up-attributes-response-reqid~1]
         assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS5);
         assert_eq!(message.request_id_unchecked(), &request_message_id);
         assert_eq!(message.sink_unchecked(), &reply_to_address);
         assert_eq!(message.source_unchecked(), &method_to_invoke);
-        // [utest->dsn~up-attributes-response-ttl~1]
         assert_eq!(message.ttl_unchecked(), 5000);
         // [utest->dsn~up-attributes-response-type~1]
         assert_eq!(
@@ -1108,6 +1129,8 @@ mod tests {
     }
 
     #[test]
+    // [utest->req~uattributes-data-model-impl~1]
+    // [utest->req~umessage-data-model-impl~1]
     fn test_build_retains_all_response_attributes() {
         let message_id = UUID::build();
         let request_id = UUID::build();
@@ -1128,9 +1151,9 @@ mod tests {
         .with_traceparent(&traceparent)
         .build()
         .expect("should have been able to create message");
+
         // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id_unchecked(), &message_id);
-        // [utest->dsn~up-attributes-response-commstatus~1]
         assert_eq!(message.commstatus_unchecked(), UCode::DEADLINE_EXCEEDED);
         assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS5);
         assert_eq!(message.request_id_unchecked(), &request_id);
@@ -1149,5 +1172,14 @@ mod tests {
             UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED
         );
         assert!(message.payload.is_none());
+
+        // [utest->req~uattributes-data-model-proto~1]
+        // [utest->req~umessage-data-model-proto~1]
+        let proto = message
+            .write_to_bytes()
+            .expect("failed to serialize to protobuf");
+        let deserialized_message =
+            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
+        assert_eq!(message, deserialized_message);
     }
 }

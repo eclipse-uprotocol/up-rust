@@ -24,8 +24,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("{}uprotocol/v1/uuid.proto", UPROTOCOL_BASE_URI),
         // [impl->req~uri-data-model-proto~1]
         format!("{}uprotocol/v1/uri.proto", UPROTOCOL_BASE_URI),
+        // [impl->req~uattributes-data-model-impl~1]
+        // [impl->req~uattributes-data-model-proto~1]
         format!("{}uprotocol/v1/uattributes.proto", UPROTOCOL_BASE_URI),
         format!("{}uprotocol/v1/ucode.proto", UPROTOCOL_BASE_URI),
+        // [impl->req~umessage-data-model-impl~1]
+        // [impl->req~umessage-data-model-proto~1]
         format!("{}uprotocol/v1/umessage.proto", UPROTOCOL_BASE_URI),
         // [impl->req~ustatus-data-model-impl~1]
         // [impl->req~ustatus-data-model-proto~1]
