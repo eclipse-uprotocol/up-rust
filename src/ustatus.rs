@@ -158,7 +158,45 @@ impl Error for UStatus {}
 mod tests {
     use super::*;
 
-    use protobuf::{Enum, EnumOrUnknown};
+    use protobuf::{well_known_types::any::Any, Enum, EnumOrUnknown, Message};
+
+    #[test]
+    // [utest->req~ustatus-data-model-impl~1]
+    fn test_ustatus_fail_with_code() {
+        let details = vec![Any {
+            type_url: "https://google.com/timestamp".to_string(),
+            ..Default::default()
+        }];
+        UCode::VALUES.iter().for_each(|code| {
+            let mut ustatus = UStatus::fail_with_code(*code, "the message");
+            // just make sure that the field exists and we can assign a value to it
+            ustatus.details = details.clone();
+            assert!(
+                ustatus.code.enum_value().is_ok_and(|v| v == *code)
+                    && ustatus.message.is_some_and(|v| v == "the message")
+            );
+        });
+    }
+
+    #[test]
+    // [utest->req~ustatus-data-model-proto~1]
+    fn test_proto_serialization() {
+        let ustatus = UStatus {
+            code: UCode::CANCELLED.into(),
+            message: Some("the message".to_string()),
+            details: vec![Any {
+                type_url: "https://google.com/timestamp".to_string(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let proto = ustatus
+            .write_to_bytes()
+            .expect("failed to serialize to protobuf");
+        let deserialized_status =
+            UStatus::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
+        assert_eq!(ustatus, deserialized_status);
+    }
 
     #[test]
     fn test_is_failed() {
