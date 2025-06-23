@@ -18,8 +18,10 @@ use std::{
 
 use cucumber::{cli, codegen::WorldInventory, parser::basic::Walker, World};
 
+#[allow(dead_code)]
 const FEATURES_PATH: &str = "";
 
+#[allow(dead_code)]
 #[derive(cli::Args)]
 struct CustomTckOpts {
     /// The folder to write the JUnit report to.
@@ -28,6 +30,7 @@ struct CustomTckOpts {
 }
 
 impl CustomTckOpts {
+    #[allow(dead_code)]
     pub(crate) fn get_junit_out_file(&self, tck_test_name: &str) -> Option<File> {
         self.junit_out_folder.as_ref().map(|path| {
             fs::File::create(format!("{}/tck-{}-results.xml", path, tck_test_name))
@@ -43,6 +46,7 @@ impl CustomTckOpts {
 /// * `features_glob_pattern` - A glob pattern that is used to determine the Gherkin
 ///   feature files containing the scenarios to run.
 /// * `junit_result_file_name_prefix` - The prefix to include in the JUnit result file
+#[allow(dead_code)]
 pub(crate) async fn run<T: World + WorldInventory + std::fmt::Debug>(
     features_glob_pattern: &str,
     test_name_prefix: &str,
@@ -80,4 +84,71 @@ pub(crate) async fn run<T: World + WorldInventory + std::fmt::Debug>(
             .await;
     }
     Ok(())
+}
+
+/// Strips the `0x` or `0X` prefix from a hex string.
+#[allow(dead_code)]
+pub(crate) fn trimhex(s: &str) -> &str {
+    s.strip_prefix("0x")
+        .unwrap_or(s.strip_prefix("0X").unwrap_or(s))
+}
+
+/// Tries to parse a string into an unsigned integer.
+///
+/// # Panics
+///
+/// if the given string is neither a hex nor decimal string representation of
+/// the expected unsigned integer type.
+#[allow(dead_code)]
+pub(crate) fn value_as_u8(value: String) -> u8 {
+    if value.starts_with("0x") || value.starts_with("0X") {
+        u8::from_str_radix(trimhex(&value), 16).expect("not a hex number")
+    } else {
+        value.parse().expect("not an integer number")
+    }
+}
+
+/// Tries to parse a string into an unsigned integer.
+///
+/// # Panics
+///
+/// if the given string is neither a hex nor decimal string representation of
+/// the expected unsigned integer type.
+#[allow(dead_code)]
+pub(crate) fn value_as_u16(value: String) -> u16 {
+    if value.starts_with("0x") || value.starts_with("0X") {
+        u16::from_str_radix(trimhex(&value), 16).expect("not a hex number")
+    } else {
+        value.parse().expect("not an integer number")
+    }
+}
+
+/// Tries to parse a string into an unsigned integer.
+///
+/// # Panics
+///
+/// if the given string is neither a hex nor decimal string representation of
+/// the expected unsigned integer type.
+#[allow(dead_code)]
+pub(crate) fn value_as_u32(value: String) -> u32 {
+    if value.starts_with("0x") || value.starts_with("0X") {
+        u32::from_str_radix(trimhex(&value), 16).expect("not a hex number")
+    } else {
+        value.parse().expect("not an integer number")
+    }
+}
+
+/// Tries to parse a string into an unsigned integer.
+///
+/// # Panics
+///
+/// if the given string is neither a hex nor decimal string representation of
+/// the expected unsigned integer type.
+#[allow(dead_code)]
+pub(crate) fn value_as_u64(value: String) -> u64 {
+    if value.starts_with("0x") || value.starts_with("0X") {
+        u64::from_str_radix(trimhex(&value), 16).expect("not a hex number")
+    } else {
+        value.parse().expect("not an integer number")
+    }
 }
