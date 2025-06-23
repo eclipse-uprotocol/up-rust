@@ -51,22 +51,19 @@ protobuf = { version = "3.7.2", features = ["with-bytes"] }
 rand = { version = "0.8.0" }
 thiserror = { version = "1.0.69", optional = true }
 tokio = { version = "1.44", default-features = false, optional = true }
-tracing = { version = "0.1", default-features = false, features = [
-    "log",
-    "std",
-] }
+tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 uriparse = { version = "0.6" }
-uuid-simd = { version = "0.8", default-features = false, features = [
-    "std",
-    "detect",
-] }
+uuid-simd = { version = "0.8", default-features = false, features = ["std", "detect"] }
 
 [build-dependencies]
 protobuf-codegen = { version = "3.7.2" }
 protoc-bin-vendored = { version = "3.1" }
 
 [dev-dependencies]
-mockall = "0.13"
+clap = { version = "4.5.40" }
+cucumber = { version = "0.21.1", features = ["output-junit"] }
+hex = { version = "0.4" }
+mockall = { version = "0.13" }
 test-case = { version = "3.3" }
 tokio = { version = "1.44", default-features = false, features = [
     "macros",
@@ -95,6 +92,14 @@ required-features = ["communication", "util"]
 [[example]]
 name = "simple_rpc"
 required-features = ["communication", "util"]
+
+[[test]]
+name = "tck_uuri"
+harness = false   # allows Cucumber to print output instead of libtest
+
+[[test]]
+name = "tck_uuid"
+harness = false   # allows Cucumber to print output instead of libtest
 
 [lints.rust]
 # this prevents cargo from complaining about code blocks
