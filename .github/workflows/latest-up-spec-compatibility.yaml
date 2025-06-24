@@ -63,7 +63,7 @@ jobs:
           file-patterns: "${{ env.OFT_FILE_PATTERNS }}"
           tags: "${{ env.OFT_TAGS_}}"
 
-      # now try to build and run the tests which may fail if incomaptible changes
+      # now try to build and run the tests which may fail if incompatible changes
       # have been introduced into the uProtocol Core API
       - uses: dtolnay/rust-toolchain@master
         with: 
@@ -72,10 +72,10 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Run tests
         run: |
-          # Using nextest because it's faster than built-in test
-          cargo nextest run --all-features
-          # but it cannot execute doc tests
-          cargo test --doc --all-features
+          # We need to use standard "cargo test" here because nextest cannot execute
+          # cucumber based integration tests which do not use the standard test harness.
+          cargo test --all-features --all-targets
+          cargo test --all-features --doc
 
       # This step will only be run if the tests in the previous step have succeeded.
       # In that case, we use the exit code produced by the OFT run as the job's
