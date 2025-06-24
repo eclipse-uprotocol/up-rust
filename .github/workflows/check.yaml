@@ -118,6 +118,25 @@ jobs:
         run: |
           cargo doc --no-deps --all-features
 
+  check-links:
+    # check links contained in markdown, asciidoc and source code files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+      - name: Restore lychee cache
+        uses: actions/cache@v4
+        with:
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
+      
+      - name: Run lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: "--cache --max-cache-age 1d --verbose --no-progress --exclude-path './target/' --exclude-path './up-spec/' -- './**/*.md' './**/*.rs' './**/*.adoc'"
+
   feature-check:
     # Comprehensive check on dependencies for all feature flag combinations, excluding development dependencies
     needs: check
