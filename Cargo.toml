@@ -62,10 +62,10 @@ protoc-bin-vendored = { version = "3.1" }
 [dev-dependencies]
 clap = { version = "4.5.40" }
 cucumber = { version = "0.21.1", features = ["output-junit"] }
-hex = { version = "0.4" }
-mockall = { version = "0.13" }
-test-case = { version = "3.3" }
-tokio = { version = "1.44", default-features = false, features = [
+hex = { version = "0.4.3" }
+mockall = { version = "0.13.1" }
+test-case = { version = "3.3.1" }
+tokio = { version = "1.44.2", default-features = false, features = [
     "macros",
     "rt",
     "rt-multi-thread",
