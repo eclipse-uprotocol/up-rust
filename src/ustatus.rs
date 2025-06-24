@@ -164,7 +164,7 @@ mod tests {
     // [utest->req~ustatus-data-model-impl~1]
     fn test_ustatus_fail_with_code() {
         let details = vec![Any {
-            type_url: "https://google.com/timestamp".to_string(),
+            type_url: "type.googleapis.com/google.protobuf.Timestamp".to_string(),
             ..Default::default()
         }];
         UCode::VALUES.iter().for_each(|code| {
@@ -185,7 +185,7 @@ mod tests {
             code: UCode::CANCELLED.into(),
             message: Some("the message".to_string()),
             details: vec![Any {
-                type_url: "https://google.com/timestamp".to_string(),
+                type_url: "type.googleapis.com/google.protobuf.Timestamp".to_string(),
                 ..Default::default()
             }],
             ..Default::default()
