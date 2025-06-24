@@ -8,9 +8,9 @@ At this time, there are three events that will initiate a workflow run:
 
 ## PRs and merges to main
 
-We want a comprehensive but also quick check&test workflow. This should be testing all relevant/obvious feature sets, run on all major OSes, and of course include all the Rust goodness around cargo check, fmt, clippy and so on.
+We want a comprehensive but also quick check & test workflow. This should be testing all relevant/obvious feature sets, run on all major OSes, and of course include all the Rust goodness around cargo check, fmt, clippy and so on.
 
-This is implemented in [`check.yaml`](check.yaml)
+This is implemented in [`check.yaml`](check.yaml) and [`check-dependencies.yaml`](check-dependencies.yaml)
 
 ## Release publication
 
@@ -24,17 +24,12 @@ All the tests we can think of, however long they might take. For instance, we ca
 
 This is implemented in [`nightly.yaml`](nightly.yaml)
 
+## uProtocol specification compatibility
+
+The uProtocol specification is evolving over time. In order to discover any discrepancies between the currently implemented version and the changes being introduced to the specification, we perform a nightly check that verifies if the current up-rust code base on the main branch can be compiled and test can be run successfully using the most recent revision of the uProtocol specification.
+
+This is implemented in [`latest-up-spec-compatibility.yaml`](latest-up-spec-compatibility.yaml)
+
 ## Further workflow modules
 
-In addition to the main workflows described above, there exist a number of modules that are used by these main workflows. They can also be run standalone, and are intendet to make composing the capabilities of our main workflows simpler. These are:
-
-- [`check-up-spec-compatibility.yaml`](check-up-spec-compatibility.yaml) - checks if the current main branch can be built against up-spec's main branch instead of its latest tag/release
-- [`coverage.yaml`](coverage.yaml) - collects test code coverage, and can optionally upload the results to codecov.io
-  - Will publish coverage data to CodeCov if `${{ secrets.CODECOV_TOKEN }}` is set
-  - outputs: download URL for the workflow-generated coverage info file
-- [`license-report.yaml`](license-report.yaml) - create a license report for `up-rust` and all its dependencies in html format
-  - outputs: download URL for the workflow-generated license report
-- [`requirements-tracing.yaml`](requirements-tracing.yaml) - Run OpenFastTrace to verify that all requirements from uProtocol Specification are met
-- [`test-featurematrix.yaml`](test-featurematrix.yaml) - Test all feature combinations on a range of OS platforms
-- [`verify-msrv.yaml`](verify-msrv.yaml) - checks if the MSRV ('Minimum Supported Rust Version) declared in Cargo.toml is correct
-- [`x-build.yaml`](x-build.yaml) - Run release builds on multiple architecture targets
+In addition to the main workflows described above, there exist a number of modules that are used by these main workflows. These live in the [uProtocol CI/CD repository](https://github.com/eclipse-uprotocol/ci-cd)
