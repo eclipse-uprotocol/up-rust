@@ -48,7 +48,7 @@ bytes = { version = "1.10" }
 mediatype = "0.19"
 mockall = { version = "0.13", optional = true }
 protobuf = { version = "3.7.2", features = ["with-bytes"] }
-rand = { version = "0.8.0" }
+rand = { version = "0.9" }
 thiserror = { version = "1.0.69", optional = true }
 tokio = { version = "1.44", default-features = false, optional = true }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }

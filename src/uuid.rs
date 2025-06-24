@@ -132,13 +132,13 @@ impl UUID {
         // fill upper 48 bits with timestamp
         let mut msb = (timestamp_millis << 16).to_be_bytes();
         // fill remaining bits with random bits
-        rand::thread_rng().fill_bytes(&mut msb[6..]);
+        rand::rng().fill_bytes(&mut msb[6..]);
         // set version (7)
         msb[6] = msb[6] & 0b00001111 | 0b01110000;
 
         let mut lsb = [0u8; 8];
         // fill lsb with random bits
-        rand::thread_rng().fill_bytes(&mut lsb);
+        rand::rng().fill_bytes(&mut lsb);
         // set variant (RFC4122)
         lsb[0] = lsb[0] & 0b00111111 | 0b10000000;
         Self::from_bytes_unchecked(msb, lsb)
