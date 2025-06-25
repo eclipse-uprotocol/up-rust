@@ -81,6 +81,18 @@ codegen-units = 1
 [package.metadata.docs.rs]
 all-features = true
 
+[package.metadata.cargo-all-features]
+# we currently do not have implementations for these features
+# so there is no need to test compatibility with other features
+denylist = ["udiscovery", "utwin"]
+skip_feature_sets = [
+    # communication includes usubscription
+    ["communication", "usubscription"],
+]
+# optional dependencies are activated by means of features only
+skip_optional_dependencies = true
+max_combination_size = 3
+
 [[example]]
 name = "simple_notify"
 required-features = ["communication", "util"]
