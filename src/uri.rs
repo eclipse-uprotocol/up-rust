@@ -55,8 +55,8 @@ impl UUriError {
 impl std::fmt::Display for UUriError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SerializationError(e) => f.write_fmt(format_args!("Serialization error: {}", e)),
-            Self::ValidationError(e) => f.write_fmt(format_args!("Validation error: {}", e)),
+            Self::SerializationError(e) => f.write_fmt(format_args!("Serialization error: {e}")),
+            Self::ValidationError(e) => f.write_fmt(format_args!("Validation error: {e}")),
         }
     }
 }
@@ -177,9 +177,8 @@ impl FromStr for UUri {
                 "URI must contain non-empty entity ID",
             ));
         }
-        let ue_id = u32::from_str_radix(entity, 16).map_err(|e| {
-            UUriError::serialization_error(format!("Cannot parse entity ID: {}", e))
-        })?;
+        let ue_id = u32::from_str_radix(entity, 16)
+            .map_err(|e| UUriError::serialization_error(format!("Cannot parse entity ID: {e}")))?;
         let version = path_segments[1].as_str();
         if version.is_empty() {
             return Err(UUriError::serialization_error(
@@ -187,7 +186,7 @@ impl FromStr for UUri {
             ));
         }
         let ue_version_major = u8::from_str_radix(version, 16).map_err(|e| {
-            UUriError::serialization_error(format!("Cannot parse entity version: {}", e))
+            UUriError::serialization_error(format!("Cannot parse entity version: {e}"))
         })?;
         let resource = path_segments[2].as_str();
         if resource.is_empty() {
@@ -196,7 +195,7 @@ impl FromStr for UUri {
             ));
         }
         let resource_id = u16::from_str_radix(resource, 16).map_err(|e| {
-            UUriError::serialization_error(format!("Cannot parse resource ID: {}", e))
+            UUriError::serialization_error(format!("Cannot parse resource ID: {e}"))
         })?;
 
         Ok(UUri {
@@ -458,7 +457,7 @@ impl UUri {
     // [impl->dsn~uri-host-only~2]
     fn verify_authority(authority: &str) -> Result<String, UUriError> {
         Authority::try_from(authority)
-            .map_err(|e| UUriError::validation_error(format!("invalid authority: {}", e)))
+            .map_err(|e| UUriError::validation_error(format!("invalid authority: {e}")))
             .and_then(|auth| Self::verify_parsed_authority(&auth))
     }
 
@@ -720,28 +719,22 @@ impl UUri {
     pub fn verify_no_wildcards(&self) -> Result<(), UUriError> {
         if self.has_wildcard_authority() {
             Err(UUriError::validation_error(format!(
-                "Authority must not contain wildcard character [{}]",
-                WILDCARD_AUTHORITY
+                "Authority must not contain wildcard character [{WILDCARD_AUTHORITY}]"
             )))
         } else if self.has_wildcard_entity_instance() {
             Err(UUriError::validation_error(format!(
-                "Entity instance ID must not be set to wildcard value [{:#X}]",
-                WILDCARD_ENTITY_INSTANCE
-            )))
+                "Entity instance ID must not be set to wildcard value [{WILDCARD_ENTITY_INSTANCE:#X}]")))
         } else if self.has_wildcard_entity_type() {
             Err(UUriError::validation_error(format!(
-                "Entity type ID must not be set to wildcard value [{:#X}]",
-                WILDCARD_ENTITY_TYPE
+                "Entity type ID must not be set to wildcard value [{WILDCARD_ENTITY_TYPE:#X}]"
             )))
         } else if self.has_wildcard_version() {
             Err(UUriError::validation_error(format!(
-                "Entity version must not be set to wildcard value [{:#X}]",
-                WILDCARD_ENTITY_VERSION
+                "Entity version must not be set to wildcard value [{WILDCARD_ENTITY_VERSION:#X}]"
             )))
         } else if self.has_wildcard_resource_id() {
             Err(UUriError::validation_error(format!(
-                "Resource ID must not be set to wildcard value [{:#X}]",
-                WILDCARD_RESOURCE_ID
+                "Resource ID must not be set to wildcard value [{WILDCARD_RESOURCE_ID:#X}]"
             )))
         } else {
             Ok(())
@@ -794,9 +787,7 @@ impl UUri {
     pub fn verify_rpc_method(&self) -> Result<(), UUriError> {
         if !self.is_rpc_method() {
             Err(UUriError::validation_error(format!(
-                "Resource ID must be a value from ]{:#X}, {:#X}[",
-                RESOURCE_ID_RESPONSE, RESOURCE_ID_MIN_EVENT
-            )))
+                "Resource ID must be a value from ]{RESOURCE_ID_RESPONSE:#X}, {RESOURCE_ID_MIN_EVENT:#X}[")))
         } else {
             self.verify_no_wildcards()
         }
@@ -861,8 +852,7 @@ impl UUri {
     pub fn verify_rpc_response(&self) -> Result<(), UUriError> {
         if !self.is_rpc_response() {
             Err(UUriError::validation_error(format!(
-                "Resource ID must be {:#X}",
-                RESOURCE_ID_RESPONSE
+                "Resource ID must be {RESOURCE_ID_RESPONSE:#X}"
             )))
         } else {
             self.verify_no_wildcards()
@@ -909,8 +899,7 @@ impl UUri {
     pub fn verify_event(&self) -> Result<(), UUriError> {
         if !self.is_event() {
             Err(UUriError::validation_error(format!(
-                "Resource ID must be >= {:#X}",
-                RESOURCE_ID_MIN_EVENT
+                "Resource ID must be >= {RESOURCE_ID_MIN_EVENT:#X}"
             )))
         } else {
             self.verify_no_wildcards()

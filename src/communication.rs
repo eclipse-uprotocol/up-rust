@@ -88,7 +88,7 @@ impl Display for RegistrationError {
                 "the underlying transport implementation does not support the push delivery method",
             ),
             RegistrationError::InvalidFilter(msg) => {
-                f.write_fmt(format_args!("invalid filter(s): {}", msg))
+                f.write_fmt(format_args!("invalid filter(s): {msg}"))
             }
             RegistrationError::Unknown(status) => f.write_fmt(format_args!(
                 "error un-/registering listener: {}",

@@ -37,7 +37,7 @@ impl Display for PubSubError {
         match self {
             PubSubError::InvalidArgument(s) => f.write_str(s.as_str()),
             PubSubError::PublishError(s) => {
-                f.write_fmt(format_args!("failed to publish message: {}", s))
+                f.write_fmt(format_args!("failed to publish message: {s}"))
             }
         }
     }

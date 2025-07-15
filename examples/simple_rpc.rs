@@ -74,7 +74,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
     {
         Err(ServiceInvocationError::InvalidArgument(msg)) => {
-            println!("service returned expected error: {}", msg)
+            println!("service returned expected error: {msg}")
         }
         _ => panic!("expected service to return an Invalid Argument error"),
     }

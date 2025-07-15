@@ -19,10 +19,11 @@ use crate::{
     core::usubscription::{
         usubscription_uri, FetchSubscribersRequest, FetchSubscribersResponse,
         FetchSubscriptionsRequest, FetchSubscriptionsResponse, NotificationsRequest,
-        NotificationsResponse, SubscriptionRequest, SubscriptionResponse, USubscription,
-        UnsubscribeRequest, UnsubscribeResponse, RESOURCE_ID_FETCH_SUBSCRIBERS,
-        RESOURCE_ID_FETCH_SUBSCRIPTIONS, RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS,
-        RESOURCE_ID_SUBSCRIBE, RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS, RESOURCE_ID_UNSUBSCRIBE,
+        NotificationsResponse, ResetRequest, ResetResponse, SubscriptionRequest,
+        SubscriptionResponse, USubscription, UnsubscribeRequest, UnsubscribeResponse,
+        RESOURCE_ID_FETCH_SUBSCRIBERS, RESOURCE_ID_FETCH_SUBSCRIPTIONS,
+        RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS, RESOURCE_ID_RESET, RESOURCE_ID_SUBSCRIBE,
+        RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS, RESOURCE_ID_UNSUBSCRIBE,
     },
     UStatus,
 };
@@ -132,6 +133,17 @@ impl USubscription for RpcClientUSubscription {
                 usubscription_uri(RESOURCE_ID_FETCH_SUBSCRIBERS),
                 Self::default_call_options(),
                 fetch_subscribers_request,
+            )
+            .await
+            .map_err(UStatus::from)
+    }
+
+    async fn reset(&self, reset_request: ResetRequest) -> Result<ResetResponse, UStatus> {
+        self.rpc_client
+            .invoke_proto_method::<_, ResetResponse>(
+                usubscription_uri(RESOURCE_ID_RESET),
+                Self::default_call_options(),
+                reset_request,
             )
             .await
             .map_err(UStatus::from)
@@ -458,5 +470,51 @@ mod tests {
             .unregister_for_notifications(request)
             .await
             .is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_reset_invokes_rpc_client() {
+        let request = ResetRequest::default();
+
+        let expected_request = request.clone();
+        let mut rpc_client = MockRpcClient::new();
+        let mut seq = Sequence::new();
+        rpc_client
+            .expect_invoke_method()
+            .once()
+            .in_sequence(&mut seq)
+            .withf(|method, _options, payload| {
+                method == &usubscription_uri(RESOURCE_ID_RESET) && payload.is_some()
+            })
+            .return_const(Err(crate::communication::ServiceInvocationError::Internal(
+                "internal error".to_string(),
+            )));
+        rpc_client
+            .expect_invoke_method()
+            .once()
+            .in_sequence(&mut seq)
+            .withf(move |method, _options, payload| {
+                let request = payload
+                    .to_owned()
+                    .unwrap()
+                    .extract_protobuf::<ResetRequest>()
+                    .unwrap();
+
+                request == expected_request && method == &usubscription_uri(RESOURCE_ID_RESET)
+            })
+            .returning(move |_method, _options, _payload| {
+                let response = ResetResponse {
+                    ..Default::default()
+                };
+                Ok(Some(UPayload::try_from_protobuf(response).unwrap()))
+            });
+
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
+
+        assert!(usubscription_client
+            .reset(request.clone())
+            .await
+            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
+        assert!(usubscription_client.reset(request).await.is_ok());
     }
 }

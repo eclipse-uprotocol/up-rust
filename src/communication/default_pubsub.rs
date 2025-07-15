@@ -221,8 +221,7 @@ impl Publisher for SimplePublisher {
                 .await
                 .map_err(PubSubError::PublishError),
             Err(e) => Err(PubSubError::InvalidArgument(format!(
-                "failed to create Publish message from parameters: {}",
-                e
+                "failed to create Publish message from parameters: {e}"
             ))),
         }
     }
