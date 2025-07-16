@@ -77,6 +77,6 @@ impl UPriority {
                         }
                     })
             })
-            .ok_or_else(|| UAttributesError::parsing_error(format!("unknown priority [{}]", prio)))
+            .ok_or_else(|| UAttributesError::parsing_error(format!("unknown priority [{prio}]")))
     }
 }

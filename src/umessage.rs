@@ -34,13 +34,12 @@ impl std::fmt::Display for UMessageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AttributesValidationError(e) => f.write_fmt(format_args!(
-                "Builder state is not consistent with message type: {}",
-                e
+                "Builder state is not consistent with message type: {e}"
             )),
             Self::DataSerializationError(e) => {
-                f.write_fmt(format_args!("Failed to serialize payload: {}", e))
+                f.write_fmt(format_args!("Failed to serialize payload: {e}"))
             }
-            Self::PayloadError(e) => f.write_fmt(format_args!("UMessage payload error: {}", e)),
+            Self::PayloadError(e) => f.write_fmt(format_args!("UMessage payload error: {e}")),
         }
     }
 }

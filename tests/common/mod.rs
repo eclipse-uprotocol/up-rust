@@ -33,7 +33,7 @@ impl CustomTckOpts {
     #[allow(dead_code)]
     pub(crate) fn get_junit_out_file(&self, tck_test_name: &str) -> Option<File> {
         self.junit_out_folder.as_ref().map(|path| {
-            fs::File::create(format!("{}/tck-{}-results.xml", path, tck_test_name))
+            fs::File::create(format!("{path}/tck-{tck_test_name}-results.xml"))
                 .expect("failed to create JUnit report file")
         })
     }

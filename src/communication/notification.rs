@@ -36,7 +36,7 @@ impl Display for NotificationError {
         match self {
             NotificationError::InvalidArgument(s) => f.write_str(s.as_str()),
             NotificationError::NotifyError(s) => {
-                f.write_fmt(format_args!("failed to send notification: {}", s))
+                f.write_fmt(format_args!("failed to send notification: {s}"))
             }
         }
     }

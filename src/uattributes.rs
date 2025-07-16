@@ -50,8 +50,8 @@ impl UAttributesError {
 impl std::fmt::Display for UAttributesError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ValidationError(e) => f.write_fmt(format_args!("Validation failure: {}", e)),
-            Self::ParsingError(e) => f.write_fmt(format_args!("Parsing error: {}", e)),
+            Self::ValidationError(e) => f.write_fmt(format_args!("Validation failure: {e}")),
+            Self::ParsingError(e) => f.write_fmt(format_args!("Parsing error: {e}")),
         }
     }
 }

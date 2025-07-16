@@ -56,7 +56,7 @@ impl UMessageType {
                     })
             })
             .ok_or_else(|| {
-                UAttributesError::parsing_error(format!("unknown message type: {}", type_string))
+                UAttributesError::parsing_error(format!("unknown message type: {type_string}"))
             })
     }
 }

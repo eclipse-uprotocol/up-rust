@@ -19,9 +19,9 @@ use mockall::automock;
 pub use crate::up_core_api::usubscription::{
     fetch_subscriptions_request::Request, subscription_status::State, EventDeliveryConfig,
     FetchSubscribersRequest, FetchSubscribersResponse, FetchSubscriptionsRequest,
-    FetchSubscriptionsResponse, NotificationsRequest, NotificationsResponse, SubscribeAttributes,
-    SubscriberInfo, Subscription, SubscriptionRequest, SubscriptionResponse, SubscriptionStatus,
-    UnsubscribeRequest, UnsubscribeResponse, Update,
+    FetchSubscriptionsResponse, NotificationsRequest, NotificationsResponse, ResetRequest,
+    ResetResponse, SubscribeAttributes, SubscriberInfo, Subscription, SubscriptionRequest,
+    SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest, UnsubscribeResponse, Update,
 };
 
 use crate::{UStatus, UUri};
@@ -130,6 +130,8 @@ pub const RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS: u16 = 0x0006;
 pub const RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS: u16 = 0x0007;
 /// The resource identifier of uSubscription's _fetch subscribers_ operation.
 pub const RESOURCE_ID_FETCH_SUBSCRIBERS: u16 = 0x0008;
+/// The resource identifier of uSubscription's _reset_ operation.
+pub const RESOURCE_ID_RESET: u16 = 0x0009;
 
 /// The resource identifier of uSubscription's _subscription change_ topic.
 pub const RESOURCE_ID_SUBSCRIPTION_CHANGE: u16 = 0x8000;
@@ -161,7 +163,7 @@ pub fn usubscription_uri(resource_id: u16) -> UUri {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait USubscription: Send + Sync {
-    /// Subscribe to a topic, using a [`SubscriptionRequest`]
+    /// Subscribes to a topic, using a [`SubscriptionRequest`]
     ///
     /// # Parameters
     ///
@@ -175,7 +177,7 @@ pub trait USubscription: Send + Sync {
         subscription_request: SubscriptionRequest,
     ) -> Result<SubscriptionResponse, UStatus>;
 
-    /// Unsubscribe to a topic, using an [`UnsubscribeRequest`]
+    /// Unsubscribes from a topic, using an [`UnsubscribeRequest`]
     ///
     /// # Parameters
     ///
@@ -186,7 +188,7 @@ pub trait USubscription: Send + Sync {
     /// * [`UStatus`] detailing if unsubscription was successful and if not why not
     async fn unsubscribe(&self, unsubscribe_request: UnsubscribeRequest) -> Result<(), UStatus>;
 
-    /// Fetch all subscriptions for a given topic or subscriber contained inside a [`FetchSubscriptionsRequest`]
+    /// Fetches all subscriptions for a given topic or subscriber contained inside a [`FetchSubscriptionsRequest`]
     ///
     /// # Parameters
     ///
@@ -200,7 +202,7 @@ pub trait USubscription: Send + Sync {
         fetch_subscriptions_request: FetchSubscriptionsRequest,
     ) -> Result<FetchSubscriptionsResponse, UStatus>;
 
-    /// Register for notifications relevant to a given topic inside a [`NotificationsRequest`]
+    /// Registers for notifications relevant to a given topic inside a [`NotificationsRequest`]
     /// changing in subscription status.
     ///
     /// # Parameters
@@ -215,7 +217,7 @@ pub trait USubscription: Send + Sync {
         notifications_register_request: NotificationsRequest,
     ) -> Result<(), UStatus>;
 
-    /// Unregister for notifications relevant to a given topic inside a [`NotificationsRequest`]
+    /// Unregisters from notifications relevant to a given topic inside a [`NotificationsRequest`]
     /// changing in subscription status.
     ///
     /// # Parameters
@@ -230,7 +232,7 @@ pub trait USubscription: Send + Sync {
         notifications_unregister_request: NotificationsRequest,
     ) -> Result<(), UStatus>;
 
-    /// Fetch a list of subscribers that are currently subscribed to a given topic in a [`FetchSubscribersRequest`]
+    /// Fetches a list of subscribers that are currently subscribed to a given topic in a [`FetchSubscribersRequest`]
     ///
     /// # Parameters
     ///
@@ -243,4 +245,11 @@ pub trait USubscription: Send + Sync {
         &self,
         fetch_subscribers_request: FetchSubscribersRequest,
     ) -> Result<FetchSubscribersResponse, UStatus>;
+
+    /// Flushes all stored subscription information, including any persistently stored subscriptions
+    ///
+    /// # Returns
+    ///
+    /// * [`ResetResponse`] with result of the operation
+    async fn reset(&self, reset_request: ResetRequest) -> Result<ResetResponse, UStatus>;
 }

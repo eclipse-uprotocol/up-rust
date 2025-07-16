@@ -37,7 +37,7 @@ impl UPayloadError {
 impl std::fmt::Display for UPayloadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SerializationError(e) => f.write_fmt(format_args!("Serialization error: {}", e)),
+            Self::SerializationError(e) => f.write_fmt(format_args!("Serialization error: {e}")),
             Self::MediatypeProblem => {
                 f.write_fmt(format_args!("Mediatype problem unsupported or malformed"))
             }

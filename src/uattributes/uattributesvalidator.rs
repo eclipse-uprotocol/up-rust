@@ -47,8 +47,7 @@ pub trait UAttributesValidator: Send {
                 mt.to_cloudevent_type()
             ))),
             Err(unknown_code) => Err(UAttributesError::validation_error(format!(
-                "Unknown Message Type code [{}]",
-                unknown_code
+                "Unknown Message Type code [{unknown_code}]"
             ))),
         }
     }
@@ -98,8 +97,7 @@ pub fn validate_rpc_priority(attributes: &UAttributes) -> Result<(), UAttributes
         .enum_value()
         .map_err(|unknown_code| {
             UAttributesError::ValidationError(format!(
-                "RPC message must have a valid priority [{}]",
-                unknown_code
+                "RPC message must have a valid priority [{unknown_code}]"
             ))
         })
         .and_then(|prio| {
@@ -256,9 +254,9 @@ impl UAttributesValidator for PublishValidator {
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         // [impl->dsn~up-attributes-publish-source~1]
         if let Some(source) = attributes.source.as_ref() {
-            source.verify_event().map_err(|e| {
-                UAttributesError::validation_error(format!("Invalid source URI: {}", e))
-            })
+            source
+                .verify_event()
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
         } else {
             Err(UAttributesError::validation_error(
                 "Attributes for a publish message must contain a source URI",
@@ -340,7 +338,7 @@ impl UAttributesValidator for NotificationValidator {
                 ))
             } else {
                 source.verify_no_wildcards().map_err(|e| {
-                    UAttributesError::validation_error(format!("Invalid source URI: {}", e))
+                    UAttributesError::validation_error(format!("Invalid source URI: {e}"))
                 })
             }
         } else {
@@ -368,7 +366,7 @@ impl UAttributesValidator for NotificationValidator {
                 ))
             } else {
                 sink.verify_no_wildcards().map_err(|e| {
-                    UAttributesError::validation_error(format!("Invalid sink URI: {}", e))
+                    UAttributesError::validation_error(format!("Invalid sink URI: {e}"))
                 })
             }
         } else {
@@ -451,9 +449,8 @@ impl UAttributesValidator for RequestValidator {
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         // [impl->dsn~up-attributes-request-source~1]
         if let Some(source) = attributes.source.as_ref() {
-            UUri::verify_rpc_response(source).map_err(|e| {
-                UAttributesError::validation_error(format!("Invalid source URI: {}", e))
-            })
+            UUri::verify_rpc_response(source)
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
         } else {
             Err(UAttributesError::validation_error("Attributes for a request message must contain a reply-to address in the source property"))
         }
@@ -469,7 +466,7 @@ impl UAttributesValidator for RequestValidator {
         // [impl->dsn~up-attributes-request-sink~1]
         if let Some(sink) = attributes.sink.as_ref() {
             UUri::verify_rpc_method(sink)
-                .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {}", e)))
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {e}")))
         } else {
             Err(UAttributesError::validation_error("Attributes for a request message must contain a method-to-invoke in the sink property"))
         }
@@ -574,9 +571,8 @@ impl UAttributesValidator for ResponseValidator {
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         // [impl->dsn~up-attributes-response-source~1]
         if let Some(source) = attributes.source.as_ref() {
-            UUri::verify_rpc_method(source).map_err(|e| {
-                UAttributesError::validation_error(format!("Invalid source URI: {}", e))
-            })
+            UUri::verify_rpc_method(source)
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
         } else {
             Err(UAttributesError::validation_error("Missing Source"))
         }
@@ -593,7 +589,7 @@ impl UAttributesValidator for ResponseValidator {
         // [impl->dsn~up-attributes-response-sink~1]
         if let Some(sink) = &attributes.sink.as_ref() {
             UUri::verify_rpc_response(sink)
-                .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {}", e)))
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid sink URI: {e}")))
         } else {
             Err(UAttributesError::validation_error("Missing Sink"))
         }
