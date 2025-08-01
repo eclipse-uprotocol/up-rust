@@ -51,6 +51,10 @@ impl RequestHandler for EchoOperation {
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const METHOD_RESOURCE_ID: u16 = 0x00a0;
     let uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xa34b, 0x01));
+    // using the LocalTransport here allows us to run the client and server in the same process
+    // without any network communication, which is useful for testing purposes
+    // in a real application, you would use a transport that employs the network to communicate
+    // between the client and server, such as the MQTT5 or the Eclipse Zenoh transport
     let transport = Arc::new(LocalTransport::default());
 
     // create the RpcServer using the local transport
@@ -79,7 +83,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => panic!("expected service to return an Invalid Argument error"),
     }
 
-    // now invoke the operaiton with a message in the request payload
+    // now invoke the operation with a message in the request payload
     let value = StringValue {
         value: "Hello".to_string(),
         ..Default::default()
