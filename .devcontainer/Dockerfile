@@ -44,7 +44,3 @@ USER ${USERNAME}
 
 # Install cargo cli tools
 RUN cargo install cargo-nextest cargo-deny cargo-tarpaulin --locked
-
-# Install cargo tools for cross compilation
-RUN rustup target add aarch64-unknown-linux-gnu \
-    && rustup toolchain install stable-aarch64-unknown-linux-gnu 
