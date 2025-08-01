@@ -35,6 +35,10 @@ impl UListener for ConsolePrinter {
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const ORIGIN_RESOURCE_ID: u16 = 0xb4c1;
     let uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xa34b, 0x01));
+    // using the LocalTransport here allows us to run the client and server in the same process
+    // without any network communication, which is useful for testing purposes
+    // in a real application, you would use a transport that employs the network to communicate
+    // between the client and server, such as the MQTT5 or the Eclipse Zenoh transport
     let transport = Arc::new(LocalTransport::default());
     let publisher = SimplePublisher::new(transport.clone(), uri_provider.clone());
     let listener = Arc::new(ConsolePrinter {});
