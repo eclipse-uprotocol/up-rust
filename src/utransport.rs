@@ -185,7 +185,7 @@ impl TryFrom<&UUri> for StaticUriProvider {
 ///
 /// Implementations contain the details for what should occur when a message is received.
 ///
-/// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l1/README.adoc)
+/// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.6/up-l1/README.adoc)
 /// for details.
 // [impl->dsn~ulistener-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
@@ -211,7 +211,7 @@ pub trait UListener: Send + Sync {
 /// Implementations contain the details for connecting to the underlying transport technology and
 /// sending [`UMessage`]s using the configured technology.
 ///
-/// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l1/README.adoc)
+/// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.6/up-l1/README.adoc)
 /// for details.
 // [impl->dsn~utransport-declaration~1]
 #[async_trait]
@@ -221,7 +221,7 @@ pub trait UTransport: Send + Sync {
     /// # Arguments
     ///
     /// * `message` - The message to send. The `type`, `source` and `sink` properties of the
-    ///   [UAttributes](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/basics/uattributes.adoc) contained
+    ///   [UAttributes](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.6/basics/uattributes.adoc) contained
     ///   in the message determine the addressing semantics.
     ///
     /// # Errors
@@ -256,7 +256,7 @@ pub trait UTransport: Send + Sync {
     /// Registers a listener to be called for messages.
     ///
     /// The listener will be invoked for each message that matches the given source and sink filter patterns
-    /// according to the rules defined by the [UUri specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/basics/uri.adoc).
+    /// according to the rules defined by the [UUri specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.6/basics/uri.adoc).
     ///
     /// This default implementation returns an error with [`UCode::UNIMPLEMENTED`].
     ///

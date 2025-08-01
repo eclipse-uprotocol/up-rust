@@ -30,7 +30,7 @@ name = "up-rust"
 readme = "README.md"
 repository = "https://github.com/eclipse-uprotocol/up-rust"
 rust-version = "1.82"
-version = "0.6.0"
+version = "0.7.0"
 
 [features]
 default = ["communication"]
@@ -60,7 +60,7 @@ protobuf-codegen = { version = "3.7.2" }
 protoc-bin-vendored = { version = "3.1" }
 
 [dev-dependencies]
-clap = { version = "4.5.40" }
+clap = { version = "4.5.42" }
 cucumber = { version = "0.21.1", features = ["output-junit"] }
 hex = { version = "0.4.3" }
 mockall = { version = "0.13.1" }

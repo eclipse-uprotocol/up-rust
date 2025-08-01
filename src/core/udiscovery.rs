@@ -52,7 +52,7 @@ pub fn udiscovery_uri(resource_id: u16) -> UUri {
 
 /// The uProtocol Application Layer client interface to the uDiscovery service.
 ///
-/// Please refer to the [uDiscovery service specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.5/up-l3/udiscovery/v3/client.adoc)
+/// Please refer to the [uDiscovery service specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.6/up-l3/udiscovery/v3/client.adoc)
 /// for details.
 #[cfg_attr(test, automock)]
 #[async_trait]
