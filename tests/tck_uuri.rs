@@ -19,7 +19,9 @@ use up_rust::UUri;
 
 mod common;
 
-const FEATURES_GLOB_PATTERN: &str = "up-spec/basics/uuri_*.feature";
+// TODO: Change back to official location when local changes are available from upstream up-spec
+// const FEATURES_GLOB_PATTERN: &str = "up-spec/basics/uuri_*.feature";
+const FEATURES_GLOB_PATTERN: &str = "tests/features/uuri_*.feature";
 
 #[derive(cucumber::World, Default, Debug)]
 struct UUriWorld {
@@ -29,7 +31,7 @@ struct UUriWorld {
     error: Option<Box<dyn std::error::Error>>,
 }
 
-#[given(expr = "a URI string {word}")]
+#[given(expr = "a URI string {string}")]
 async fn with_uri_string(w: &mut UUriWorld, uri_string: String) {
     w.uri = uri_string;
 }
