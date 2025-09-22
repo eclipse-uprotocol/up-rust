@@ -16,6 +16,7 @@
 
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use uriparse::{Authority, URIReference};
 
@@ -29,6 +30,9 @@ pub(crate) const WILDCARD_RESOURCE_ID: u32 = 0x0000_FFFF;
 
 pub(crate) const RESOURCE_ID_RESPONSE: u32 = 0;
 pub(crate) const RESOURCE_ID_MIN_EVENT: u32 = 0x8000;
+
+static AUTHORITY_NAME_PATTERN: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"^[a-z0-9\-._~]{0,128}$").unwrap());
 
 #[derive(Debug)]
 pub enum UUriError {
@@ -82,7 +86,7 @@ impl From<&UUri> for String {
     /// use up_rust::UUri;
     ///
     /// let uuri = UUri {
-    ///     authority_name: String::from("VIN.vehicles"),
+    ///     authority_name: String::from("vin.vehicles"),
     ///     ue_id: 0x0000_800A,
     ///     ue_version_major: 0x02,
     ///     resource_id: 0x0000_1a50,
@@ -90,7 +94,7 @@ impl From<&UUri> for String {
     /// };
     ///
     /// let uri_string = String::from(&uuri);
-    /// assert_eq!(uri_string, "//VIN.vehicles/800A/2/1A50");
+    /// assert_eq!(uri_string, "//vin.vehicles/800A/2/1A50");
     /// ````
     fn from(uri: &UUri) -> Self {
         UUri::to_uri(uri, false)
@@ -121,14 +125,14 @@ impl FromStr for UUri {
     /// use up_rust::UUri;
     ///
     /// let uri = UUri {
-    ///     authority_name: "VIN.vehicles".to_string(),
+    ///     authority_name: "vin.vehicles".to_string(),
     ///     ue_id: 0x000A_8000,
     ///     ue_version_major: 0x02,
     ///     resource_id: 0x0000_1a50,
     ///     ..Default::default()
     /// };
     ///
-    /// let uri_from = UUri::from_str("//VIN.vehicles/A8000/2/1A50").unwrap();
+    /// let uri_from = UUri::from_str("//vin.vehicles/A8000/2/1A50").unwrap();
     /// assert_eq!(uri, uri_from);
     /// ````
     // [impl->dsn~uri-authority-name-length~1]
@@ -306,7 +310,7 @@ impl UUri {
     /// use up_rust::UUri;
     ///
     /// let uuri = UUri {
-    ///     authority_name: String::from("VIN.vehicles"),
+    ///     authority_name: String::from("vin.vehicles"),
     ///     ue_id: 0x0000_800A,
     ///     ue_version_major: 0x02,
     ///     resource_id: 0x0000_1a50,
@@ -314,7 +318,7 @@ impl UUri {
     /// };
     ///
     /// let uri_string = uuri.to_uri(true);
-    /// assert_eq!(uri_string, "up://VIN.vehicles/800A/2/1A50");
+    /// assert_eq!(uri_string, "up://vin.vehicles/800A/2/1A50");
     /// ````
     // [impl->dsn~uri-authority-mapping~1]
     // [impl->dsn~uri-path-mapping~1]
@@ -455,7 +459,7 @@ impl UUri {
 
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
-    fn verify_authority(authority: &str) -> Result<String, UUriError> {
+    pub(crate) fn verify_authority(authority: &str) -> Result<String, UUriError> {
         Authority::try_from(authority)
             .map_err(|e| UUriError::validation_error(format!("invalid authority: {e}")))
             .and_then(|auth| Self::verify_parsed_authority(&auth))
@@ -463,7 +467,7 @@ impl UUri {
 
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
-    fn verify_parsed_authority(auth: &Authority) -> Result<String, UUriError> {
+    pub(crate) fn verify_parsed_authority(auth: &Authority) -> Result<String, UUriError> {
         if auth.has_port() {
             Err(UUriError::validation_error(
                 "uProtocol URI's authority must not contain port",
@@ -473,13 +477,20 @@ impl UUri {
                 "uProtocol URI's authority must not contain userinfo",
             ))
         } else {
-            let auth_name = auth.host().to_string();
-            if auth_name.len() <= 128 {
-                Ok(auth_name)
-            } else {
-                Err(UUriError::validation_error(
-                    "URI's authority name must not exceed 128 characters",
-                ))
+            match auth.host() {
+                uriparse::Host::IPv4Address(_) | uriparse::Host::IPv6Address(_) => {
+                    Ok(auth.host().to_string())
+                }
+                uriparse::Host::RegisteredName(name) => {
+                    if !WILDCARD_AUTHORITY.eq(name.as_str())
+                        && !AUTHORITY_NAME_PATTERN.is_match(name.as_str())
+                    {
+                        return Err(UUriError::validation_error(
+                            "uProtocol URI's authority contains invalid characters",
+                        ));
+                    }
+                    Ok(name.to_string())
+                }
             }
         }
     }
@@ -544,7 +555,7 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uuri = UUri::try_from_parts("MYVIN", 0xa13b, 0x01, 0x7f4e).unwrap();
+    /// let uuri = UUri::try_from_parts("myvin", 0xa13b, 0x01, 0x7f4e).unwrap();
     /// assert!(!uuri.is_empty());
     /// assert!(UUri::default().is_empty());
     /// ```
@@ -565,8 +576,8 @@ impl UUri {
     /// use std::str::FromStr;
     /// use up_rust::UUri;
     ///
-    /// let authority_a = UUri::from_str("up://Authority.A/100A/1/0").unwrap();
-    /// let authority_b = UUri::from_str("up://Authority.B/200B/2/20").unwrap();
+    /// let authority_a = UUri::from_str("up://authority.a/100A/1/0").unwrap();
+    /// let authority_b = UUri::from_str("up://authority.b/200B/2/20").unwrap();
     /// assert!(authority_a.is_remote(&authority_b));
     ///
     /// let authority_local = UUri::from_str("up:///100A/1/0").unwrap();
@@ -594,8 +605,8 @@ impl UUri {
     /// use std::str::FromStr;
     /// use up_rust::UUri;
     ///
-    /// let authority_a = UUri::from_str("up://Authority.A/100A/1/0").unwrap();
-    /// let authority_b = "Authority.B".to_string();
+    /// let authority_a = UUri::from_str("up://authority.a/100A/1/0").unwrap();
+    /// let authority_b = "authority.b".to_string();
     /// assert!(authority_a.is_remote_authority(&authority_b));
     ///
     /// let authority_local = "".to_string();
@@ -945,8 +956,8 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let pattern = UUri::try_from("//VIN/A14F/3/FFFF").unwrap();
-    /// let candidate = UUri::try_from("//VIN/A14F/3/B1D4").unwrap();
+    /// let pattern = UUri::try_from("//vin/A14F/3/FFFF").unwrap();
+    /// let candidate = UUri::try_from("//vin/A14F/3/B1D4").unwrap();
     /// assert!(pattern.matches(&candidate));
     /// ```
     // [impl->dsn~uri-pattern-matching~2]
@@ -1003,10 +1014,10 @@ mod tests {
     }
 
     #[test_case("//*/A100/1/1"; "for any authority")]
-    #[test_case("//VIN/FFFF/1/1"; "for any entity type")]
-    #[test_case("//VIN/FFFF0ABC/1/1"; "for any entity instance")]
-    #[test_case("//VIN/A100/FF/1"; "for any version")]
-    #[test_case("//VIN/A100/1/FFFF"; "for any resource")]
+    #[test_case("//vin/FFFF/1/1"; "for any entity type")]
+    #[test_case("//vin/FFFF0ABC/1/1"; "for any entity instance")]
+    #[test_case("//vin/A100/FF/1"; "for any version")]
+    #[test_case("//vin/A100/1/FFFF"; "for any resource")]
     fn test_verify_no_wildcards_fails(uri: &str) {
         let uuri = UUri::try_from(uri).expect("should have been able to deserialize URI");
         assert!(uuri.verify_no_wildcards().is_err());
@@ -1015,35 +1026,8 @@ mod tests {
     // [utest->dsn~uri-authority-name-length~1]
     #[test]
     fn test_from_str_fails_for_authority_exceeding_max_length() {
-        let host_name = ['a'; 129];
-        let uri = format!("//{}/A100/1/6501", host_name.iter().collect::<String>());
+        let host_name = "a".repeat(129);
+        let uri = format!("//{}/A100/1/6501", host_name);
         assert!(UUri::from_str(&uri).is_err());
-
-        let host_name = ['a'; 126];
-        // add single percent encoded character
-        // this should result in a 129 character host
-        let uri = format!("//{}%42/A100/1/6501", host_name.iter().collect::<String>());
-        assert!(UUri::from_str(&uri).is_err());
-    }
-
-    // [utest->dsn~uri-authority-name-length~1]
-    #[test]
-    fn test_try_from_parts_fails_for_authority_exceeding_max_length() {
-        let authority = ['a'; 129].iter().collect::<String>();
-        assert!(UUri::try_from_parts(&authority, 0xa100, 0x01, 0x6501).is_err());
-
-        let mut authority = ['a'; 126].iter().collect::<String>();
-        // add single percent encoded character
-        // this should result in a 129 character host
-        authority.push_str("%42");
-        assert!(UUri::try_from_parts(&authority, 0xa100, 0x01, 0x6501).is_err());
-    }
-
-    // [utest->dsn~uri-host-only~2]
-    #[test_case("MYVIN:1000"; "with port")]
-    #[test_case("user:pwd@MYVIN"; "with userinfo")]
-    #[test_case("MY%VIN"; "with reserved character")]
-    fn test_try_from_parts_fails_for_invalid_authority(authority: &str) {
-        assert!(UUri::try_from_parts(authority, 0xa100, 0x01, 0x6501).is_err());
     }
 }

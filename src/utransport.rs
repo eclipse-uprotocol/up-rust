@@ -36,7 +36,20 @@ pub fn verify_filter_criteria(
     source_filter: &UUri,
     sink_filter: Option<&UUri>,
 ) -> Result<(), UStatus> {
+    UUri::check_validity(source_filter).map_err(|err| {
+        UStatus::fail_with_code(
+            UCode::INVALID_ARGUMENT,
+            format!("invalid source filter URI: {err}"),
+        )
+    })?;
     if let Some(sink_filter_uuri) = sink_filter {
+        UUri::check_validity(sink_filter_uuri).map_err(|err| {
+            UStatus::fail_with_code(
+                UCode::INVALID_ARGUMENT,
+                format!("invalid sink filter URI: {err}"),
+            )
+        })?;
+
         if sink_filter_uuri.is_notification_destination()
             && source_filter.is_notification_destination()
         {
@@ -589,20 +602,72 @@ mod tests {
     }
 
     #[test_case::test_case(
-        "//vehicle1/AA/1/0",
+        "//vehicle1/AA/1/FFFF",
+        Some("//vehicle2/BB/1/FFFF");
+        "source and sink both having wildcard resource ID")]
+    #[test_case::test_case(
+        "//vehicle1/AA/1/9000",
         Some("//vehicle2/BB/1/0");
-        "source and sink both having resource ID 0")]
+        "sending notification")]
     #[test_case::test_case(
-        "//vehicle1/AA/1/CC",
-        Some("//vehicle2/BB/1/1A");
-        "sink is RPC but source has invalid resource ID")]
+        "//vehicle1/AA/1/0",
+        Some("//vehicle2/BB/1/1");
+        "RPC method invocation")]
     #[test_case::test_case(
-        "//vehicle1/AA/1/CC",
+        "//vehicle1/AA/1/FFFF",
+        Some("//vehicle2/BB/1/1");
+        "receiving RPC requests using wildcard resource ID")]
+    #[test_case::test_case(
+        "//vehicle1/AA/1/0",
+        Some("//vehicle2/BB/1/1");
+        "receiving RPC requests using default resource ID")]
+    #[test_case::test_case(
+        "//vehicle1/AA/1/9000",
         None;
-        "sink is empty but source has non-topic resource ID")]
-    fn test_verify_filter_criteria_fails_for(source: &str, sink: Option<&str>) {
+        "receiving events published to specific topic")]
+    #[test_case::test_case(
+        "//vehicle1/AA/1/FFFF",
+        None;
+        "receiving events published to any topic")]
+    fn test_verify_filter_criteria_succeeds_for(source: &str, sink: Option<&str>) {
         let source_filter = UUri::from_str(source).expect("invalid source URI");
         let sink_filter = sink.map(|s| UUri::from_str(s).expect("invalid sink URI"));
+        assert!(verify_filter_criteria(&source_filter, sink_filter.as_ref()).is_ok());
+    }
+
+    #[test_case::test_case(
+        UUri::from_str("//vehicle1/AA/1/0").unwrap(),
+        Some(UUri::from_str("//vehicle2/BB/1/0").unwrap());
+        "source and sink both having resource ID 0")]
+    #[test_case::test_case(
+        UUri::from_str("//vehicle1/AA/1/CC").unwrap(),
+        Some(UUri::from_str("//vehicle2/BB/1/1A").unwrap());
+        "sink is RPC but source has invalid resource ID")]
+    #[test_case::test_case(
+        UUri::from_str("//vehicle1/AA/1/CC").unwrap(),
+        None;
+        "sink is empty but source has non-topic resource ID")]
+    #[test_case::test_case(
+        UUri {
+            authority_name: "VEHICLE1".to_string(),
+            ue_id: 0x00AA,
+            ue_version_major: 0x01,
+            resource_id: 0x9000,
+            ..Default::default()
+        },
+        None;
+        "source has upper-case authority")]
+    #[test_case::test_case(
+        UUri::from_str("//vehicle1/AA/1/9000").unwrap(),
+        Some(UUri {
+            authority_name: "VEHICLE2".to_string(),
+            ue_id: 0x00BB,
+            ue_version_major: 0x01,
+            resource_id: 0x0000,
+            ..Default::default()
+        });
+        "sink has upper-case authority")]
+    fn test_verify_filter_criteria_fails_for(source_filter: UUri, sink_filter: Option<UUri>) {
         assert!(verify_filter_criteria(&source_filter, sink_filter.as_ref())
             .is_err_and(|err| matches!(err.get_code(), UCode::INVALID_ARGUMENT)));
     }

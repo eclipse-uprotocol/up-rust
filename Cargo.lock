@@ -1539,6 +1539,7 @@ dependencies = [
  "protobuf-codegen",
  "protoc-bin-vendored",
  "rand",
+ "regex",
  "test-case",
  "thiserror",
  "tokio",
