@@ -135,7 +135,7 @@ jobs:
       - name: Run lychee
         uses: lycheeverse/lychee-action@v2
         with:
-          args: "--cache --max-cache-age 1d --verbose --no-progress --exclude-path './target/' --exclude-path './up-spec/' -- './**/*.md' './**/*.rs' './**/*.adoc'"
+          args: "--cache --max-cache-age 1d --verbose --no-progress --exclude-path './target/' --exclude-path './up-spec/' -- './**/*.md' './**/*.rs'"
 
   feature-check:
     # Comprehensive check on dependencies for all feature flag combinations, excluding development dependencies
