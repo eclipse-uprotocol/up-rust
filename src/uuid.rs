@@ -129,6 +129,11 @@ impl UUID {
     pub(crate) fn build_for_timestamp(duration_since_unix_epoch: Duration) -> UUID {
         let timestamp_millis = u64::try_from(duration_since_unix_epoch.as_millis())
             .expect("system time is set to a time too far in the future");
+        Self::build_for_timestamp_millis(timestamp_millis)
+    }
+
+    // [impl->dsn~uuid-spec~1]
+    pub(crate) fn build_for_timestamp_millis(timestamp_millis: u64) -> UUID {
         // fill upper 48 bits with timestamp
         let mut msb = (timestamp_millis << 16).to_be_bytes();
         // fill remaining bits with random bits
