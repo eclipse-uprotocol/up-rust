@@ -30,7 +30,7 @@ name = "up-rust"
 readme = "README.md"
 repository = "https://github.com/eclipse-uprotocol/up-rust"
 rust-version = "1.82"
-version = "0.7.0"
+version = "0.7.1"
 
 [features]
 default = ["communication"]
