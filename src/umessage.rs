@@ -21,7 +21,9 @@ pub use umessagebuilder::*;
 
 pub use crate::up_core_api::umessage::UMessage;
 
-use crate::{UAttributesError, UCode, UMessageType, UPayloadFormat, UPriority, UUri, UUID};
+use crate::{
+    UAttributes, UAttributesError, UCode, UMessageType, UPayloadFormat, UPriority, UUri, UUID,
+};
 
 #[derive(Debug)]
 pub enum UMessageError {
@@ -71,11 +73,18 @@ impl From<&str> for UMessageError {
 }
 
 impl UMessage {
+    /// Get this message's attributes.
+    pub fn attributes(&self) -> Option<&UAttributes> {
+        self.attributes.as_ref()
+    }
+    /// Gets this message's attributes.
+    pub fn attributes_unchecked(&self) -> &UAttributes {
+        self.attributes().expect("message has no attributes")
+    }
+
     /// Gets this message's type.
     pub fn type_(&self) -> Option<UMessageType> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.type_.enum_value().ok())
+        self.attributes().and_then(UAttributes::type_)
     }
 
     /// Gets this message's type.
@@ -84,14 +93,12 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn type_unchecked(&self) -> UMessageType {
-        self.type_().expect("message has no type")
+        self.attributes_unchecked().type_unchecked()
     }
 
     /// Gets this message's identifier.
     pub fn id(&self) -> Option<&UUID> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.id.as_ref())
+        self.attributes().and_then(UAttributes::id)
     }
 
     /// Gets this message's identifier.
@@ -100,14 +107,12 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn id_unchecked(&self) -> &UUID {
-        self.id().expect("message has no ID")
+        self.attributes_unchecked().id_unchecked()
     }
 
     /// Gets this message's source address.
     pub fn source(&self) -> Option<&UUri> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.source.as_ref())
+        self.attributes().and_then(UAttributes::source)
     }
 
     /// Gets this message's source address.
@@ -116,14 +121,12 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn source_unchecked(&self) -> &UUri {
-        self.source().expect("message has no source")
+        self.attributes_unchecked().source_unchecked()
     }
 
     /// Gets this message's sink address.
     pub fn sink(&self) -> Option<&UUri> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.sink.as_ref())
+        self.attributes().and_then(UAttributes::sink)
     }
 
     /// Gets this message's sink address.
@@ -132,21 +135,12 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn sink_unchecked(&self) -> &UUri {
-        self.sink().expect("message has no sink")
+        self.attributes_unchecked().sink_unchecked()
     }
 
     /// Gets this message's priority.
     pub fn priority(&self) -> Option<UPriority> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.priority.enum_value().ok())
-            .map(|prio| {
-                if prio == UPriority::UPRIORITY_UNSPECIFIED {
-                    crate::uattributes::UPRIORITY_DEFAULT
-                } else {
-                    prio
-                }
-            })
+        self.attributes().and_then(UAttributes::priority)
     }
 
     /// Gets this message's priority.
@@ -155,15 +149,12 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn priority_unchecked(&self) -> UPriority {
-        self.priority().expect("message has no priority")
+        self.attributes_unchecked().priority_unchecked()
     }
 
     /// Gets this message's commstatus.
     pub fn commstatus(&self) -> Option<UCode> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.commstatus)
-            .and_then(|v| v.enum_value().ok())
+        self.attributes().and_then(UAttributes::commstatus)
     }
 
     /// Gets this message's commstatus.
@@ -172,7 +163,7 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn commstatus_unchecked(&self) -> UCode {
-        self.commstatus().expect("message has no commstatus")
+        self.attributes_unchecked().commstatus_unchecked()
     }
 
     /// Gets this message's time-to-live.
@@ -181,7 +172,7 @@ impl UMessage {
     ///
     /// the time-to-live in milliseconds.
     pub fn ttl(&self) -> Option<u32> {
-        self.attributes.as_ref().and_then(|attribs| attribs.ttl)
+        self.attributes().and_then(UAttributes::ttl)
     }
 
     /// Gets this message's time-to-live.
@@ -194,35 +185,27 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn ttl_unchecked(&self) -> u32 {
-        self.ttl().expect("message has no time-to-live")
+        self.attributes_unchecked().ttl_unchecked()
     }
 
     /// Gets this message's permission level.
     pub fn permission_level(&self) -> Option<u32> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.permission_level)
+        self.attributes().and_then(UAttributes::permission_level)
     }
 
     /// Gets this message's token.
     pub fn token(&self) -> Option<&String> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.token.as_ref())
+        self.attributes().and_then(UAttributes::token)
     }
 
     /// Gets this message's traceparent.
     pub fn traceparent(&self) -> Option<&String> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.traceparent.as_ref())
+        self.attributes().and_then(UAttributes::traceparent)
     }
 
     /// Gets this message's request identifier.
     pub fn request_id(&self) -> Option<&UUID> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.reqid.as_ref())
+        self.attributes().and_then(UAttributes::request_id)
     }
 
     /// Gets this message's request identifier.
@@ -231,14 +214,12 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn request_id_unchecked(&self) -> &UUID {
-        self.request_id().expect("message has no request ID")
+        self.attributes_unchecked().request_id_unchecked()
     }
 
     /// Gets this message's payload format.
     pub fn payload_format(&self) -> Option<UPayloadFormat> {
-        self.attributes
-            .as_ref()
-            .and_then(|attribs| attribs.payload_format.enum_value().ok())
+        self.attributes().and_then(UAttributes::payload_format)
     }
 
     /// Gets this message's payload format.
@@ -247,8 +228,7 @@ impl UMessage {
     ///
     /// if the property has no value.
     pub fn payload_format_unchecked(&self) -> UPayloadFormat {
-        self.payload_format()
-            .expect("message has no payload format")
+        self.attributes_unchecked().payload_format_unchecked()
     }
 
     /// Checks if this is a Publish message.
@@ -269,9 +249,7 @@ impl UMessage {
     /// assert!(msg.is_publish());
     /// ```
     pub fn is_publish(&self) -> bool {
-        self.attributes
-            .as_ref()
-            .is_some_and(|attribs| attribs.is_publish())
+        self.attributes().is_some_and(UAttributes::is_publish)
     }
 
     /// Checks if this is an RPC Request message.
@@ -292,9 +270,7 @@ impl UMessage {
     /// assert!(msg.is_request());
     /// ```
     pub fn is_request(&self) -> bool {
-        self.attributes
-            .as_ref()
-            .is_some_and(|attribs| attribs.is_request())
+        self.attributes().is_some_and(UAttributes::is_request)
     }
 
     /// Checks if this is an RPC Response message.
@@ -315,9 +291,7 @@ impl UMessage {
     /// assert!(msg.is_response());
     /// ```
     pub fn is_response(&self) -> bool {
-        self.attributes
-            .as_ref()
-            .is_some_and(|attribs| attribs.is_response())
+        self.attributes().is_some_and(UAttributes::is_response)
     }
 
     /// Checks if this is a Notification message.
@@ -338,9 +312,7 @@ impl UMessage {
     /// assert!(msg.is_notification());
     /// ```
     pub fn is_notification(&self) -> bool {
-        self.attributes
-            .as_ref()
-            .is_some_and(|attribs| attribs.is_notification())
+        self.attributes().is_some_and(UAttributes::is_notification)
     }
 
     /// Deserializes this message's protobuf payload into a type.
@@ -356,7 +328,7 @@ impl UMessage {
     /// payload cannot be deserialized into the target type.
     pub fn extract_protobuf<T: MessageFull + Default>(&self) -> Result<T, UMessageError> {
         if let Some(payload) = self.payload.as_ref() {
-            let payload_format = self.attributes.payload_format.enum_value_or_default();
+            let payload_format = self.payload_format().unwrap_or_default();
             deserialize_protobuf_bytes(payload, &payload_format)
         } else {
             Err(UMessageError::PayloadError(
