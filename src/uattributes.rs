@@ -21,7 +21,7 @@ pub use uattributesvalidator::*;
 pub use upriority::*;
 
 pub use crate::up_core_api::uattributes::*;
-use crate::UUID;
+use crate::{UCode, UUri, UUID};
 
 pub(crate) const UPRIORITY_DEFAULT: UPriority = UPriority::UPRIORITY_CS1;
 
@@ -59,6 +59,424 @@ impl std::fmt::Display for UAttributesError {
 impl std::error::Error for UAttributesError {}
 
 impl UAttributes {
+    /// Gets the type of message these are the attributes of.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.type_(), Some(UMessageType::UMESSAGE_TYPE_PUBLISH));
+    /// ```
+    pub fn type_(&self) -> Option<UMessageType> {
+        self.type_.enum_value().ok()
+    }
+
+    /// Gets the type of message these are the attributes of.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UMessageType};
+    ///
+    /// let attribs = UAttributes {
+    ///   type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.type_unchecked(), UMessageType::UMESSAGE_TYPE_PUBLISH);
+    /// ```
+    pub fn type_unchecked(&self) -> UMessageType {
+        self.type_().expect("message has no type")
+    }
+
+    /// Gets the identifier of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUID};
+    ///
+    /// let msg_id = UUID::build();
+    /// let attribs = UAttributes {
+    ///   id: Some(msg_id.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.id(), Some(&msg_id));
+    /// ```
+    pub fn id(&self) -> Option<&UUID> {
+        self.id.as_ref()
+    }
+
+    /// Gets the identifier of the message these attributes belong to.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUID};
+    ///
+    /// let msg_id = UUID::build();
+    /// let attribs = UAttributes {
+    ///   id: Some(msg_id.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.id_unchecked(), &msg_id);
+    /// ```
+    pub fn id_unchecked(&self) -> &UUID {
+        self.id().expect("message has no ID")
+    }
+
+    /// Gets the source address of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUri};
+    ///
+    /// let src = UUri::try_from_parts("vehicle", 0xaabb, 0x01, 0x9000).unwrap();
+    /// let attribs = UAttributes {
+    ///   source: Some(src.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.source(), Some(&src));
+    /// ```
+    pub fn source(&self) -> Option<&UUri> {
+        self.source.as_ref()
+    }
+
+    /// Gets the source address of the message these attributes belong to.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUri};
+    ///
+    /// let src = UUri::try_from_parts("vehicle", 0xaabb, 0x01, 0x9000).unwrap();
+    /// let attribs = UAttributes {
+    ///   source: Some(src.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.source_unchecked(), &src);
+    /// ```
+    pub fn source_unchecked(&self) -> &UUri {
+        self.source().expect("message has no source")
+    }
+
+    /// Gets the sink address of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUri};
+    ///
+    /// let sink = UUri::try_from_parts("vehicle", 0xaabb, 0x01, 0x9000).unwrap();
+    /// let attribs = UAttributes {
+    ///   sink: Some(sink.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.sink(), Some(&sink));
+    /// ```
+    pub fn sink(&self) -> Option<&UUri> {
+        self.sink.as_ref()
+    }
+
+    /// Gets the sink address of the message these attributes belong to.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUri};
+    ///
+    /// let sink = UUri::try_from_parts("vehicle", 0xaabb, 0x01, 0x9000).unwrap();
+    /// let attribs = UAttributes {
+    ///   sink: Some(sink.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.sink_unchecked(), &sink);
+    /// ```
+    pub fn sink_unchecked(&self) -> &UUri {
+        self.sink().expect("message has no sink")
+    }
+
+    /// Gets the priority of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UPriority};
+    ///
+    /// let attribs = UAttributes {
+    ///   priority: UPriority::UPRIORITY_CS2.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.priority(), Some(UPriority::UPRIORITY_CS2));
+    /// ```
+    pub fn priority(&self) -> Option<UPriority> {
+        self.priority.enum_value().ok().map(|prio| {
+            if prio == UPriority::UPRIORITY_UNSPECIFIED {
+                crate::uattributes::UPRIORITY_DEFAULT
+            } else {
+                prio
+            }
+        })
+    }
+
+    /// Gets the priority of the message these attributes belong to.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UPriority};
+    ///
+    /// let attribs = UAttributes {
+    ///   priority: UPriority::UPRIORITY_CS2.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.priority_unchecked(), UPriority::UPRIORITY_CS2);
+    /// ```
+    pub fn priority_unchecked(&self) -> UPriority {
+        self.priority().expect("message has no priority")
+    }
+
+    /// Gets the commstatus of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UCode};
+    ///
+    /// let attribs = UAttributes {
+    ///   commstatus: Some(UCode::OK.into()),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.commstatus(), Some(UCode::OK));
+    /// ```
+    pub fn commstatus(&self) -> Option<UCode> {
+        self.commstatus.and_then(|v| v.enum_value().ok())
+    }
+
+    /// Gets the commstatus of the message these attributes belong to.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UCode};
+    ///
+    /// let attribs = UAttributes {
+    ///   commstatus: Some(UCode::OK.into()),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.commstatus_unchecked(), UCode::OK);
+    /// ```
+    pub fn commstatus_unchecked(&self) -> UCode {
+        self.commstatus().expect("message has no commstatus")
+    }
+
+    /// Gets the time-to-live of the message these attributes belong to.
+    ///
+    /// # Returns
+    ///
+    /// the time-to-live in milliseconds.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes};
+    ///
+    /// let attribs = UAttributes {
+    ///   ttl: Some(10_000),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.ttl(), Some(10_000));
+    /// ```
+    pub fn ttl(&self) -> Option<u32> {
+        self.ttl
+    }
+
+    /// Gets the time-to-live of the message these attributes belong to.
+    ///
+    /// # Returns
+    ///
+    /// the time-to-live in milliseconds.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes};
+    ///
+    /// let attribs = UAttributes {
+    ///   ttl: Some(10_000),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.ttl_unchecked(), 10_000);
+    /// ```
+    pub fn ttl_unchecked(&self) -> u32 {
+        self.ttl().expect("message has no time-to-live")
+    }
+
+    /// Gets the permission level of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes};
+    ///
+    /// let attribs = UAttributes {
+    ///   permission_level: Some(10),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.permission_level(), Some(10));
+    /// ```
+    pub fn permission_level(&self) -> Option<u32> {
+        self.permission_level
+    }
+
+    /// Gets the token of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes};
+    ///
+    /// let token = "my_token".to_string();
+    /// let attribs = UAttributes {
+    ///   token: Some(token.clone()),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.token(), Some(&token));
+    /// ```
+    pub fn token(&self) -> Option<&String> {
+        self.token.as_ref()
+    }
+
+    /// Gets the traceparent of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes};
+    ///
+    /// let traceparent = "my_traceparent".to_string();
+    /// let attribs = UAttributes {
+    ///   traceparent: Some(traceparent.clone()),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.traceparent(), Some(&traceparent));
+    /// ```
+    pub fn traceparent(&self) -> Option<&String> {
+        self.traceparent.as_ref()
+    }
+
+    /// Gets the request identifier of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUID};
+    ///
+    /// let req_id = UUID::build();
+    /// let attribs = UAttributes {
+    ///   reqid: Some(req_id.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.request_id(), Some(&req_id));
+    /// ```
+    pub fn request_id(&self) -> Option<&UUID> {
+        self.reqid.as_ref()
+    }
+
+    /// Gets the request identifier of the message these attributes belong to.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UUID};
+    ///
+    /// let req_id = UUID::build();
+    /// let attribs = UAttributes {
+    ///   reqid: Some(req_id.clone()).into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.request_id_unchecked(), &req_id);
+    /// ```
+    pub fn request_id_unchecked(&self) -> &UUID {
+        self.request_id().expect("message has no request ID")
+    }
+
+    /// Gets the payload format of the message these attributes belong to.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UPayloadFormat};
+    ///
+    /// let attribs = UAttributes {
+    ///   payload_format: UPayloadFormat::UPAYLOAD_FORMAT_JSON.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.payload_format(), Some(UPayloadFormat::UPAYLOAD_FORMAT_JSON));
+    /// ```
+    pub fn payload_format(&self) -> Option<UPayloadFormat> {
+        self.payload_format.enum_value().ok()
+    }
+
+    /// Gets the payload format of the message these attributes belong to.
+    ///
+    /// # Panics
+    ///
+    /// if the property has no value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use up_rust::{UAttributes, UPayloadFormat};
+    ///
+    /// let attribs = UAttributes {
+    ///   payload_format: UPayloadFormat::UPAYLOAD_FORMAT_JSON.into(),
+    ///   ..Default::default()
+    /// };
+    /// assert_eq!(attribs.payload_format_unchecked(), UPayloadFormat::UPAYLOAD_FORMAT_JSON);
+    /// ```
+    pub fn payload_format_unchecked(&self) -> UPayloadFormat {
+        self.payload_format()
+            .expect("message has no payload format")
+    }
+
     /// Checks if a given priority class is the default priority class.
     ///
     /// Messages that do not have a priority class set explicity, are assigned to
