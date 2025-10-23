@@ -1,11 +1,11 @@
 # Eclipse uProtocol Rust library
 
-This is the [uProtocol v1.6.0-alpha.6 Language Library](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/v1.6.0-alpha.6/languages.adoc) for the Rust programming language.
+This is the [uProtocol v1.6.0-alpha.7 Language Library](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/v1.6.0-alpha.7/languages.adoc) for the Rust programming language.
 
 The crate can be used to
 
-* implement uEntities that communicate with each other using the uProtocol [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.6/up-l2/api.adoc) over one of the supported transport protocols.
-* implement support for an additional transport protocol by means of implementing the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.6/up-l1/README.adoc).
+* implement uEntities that communicate with each other using the uProtocol [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l2/api.adoc) over one of the supported transport protocols.
+* implement support for an additional transport protocol by means of implementing the [Transport Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l1/README.adoc).
 
 ## Using the Crate
 <!--
@@ -17,7 +17,7 @@ The crate needs to be added to the `[dependencies]` section of the `Cargo.toml` 
 
 ```toml
 [dependencies]
-up-rust = { version = "0.7" }
+up-rust = { version = "0.8" }
 ```
 
 Most developers will want to use the Communication Level API and its default implementation which are provided by the `communication` module. Please refer to the [examples](./examples/) for inspiration how to use this crate.
@@ -32,7 +32,7 @@ Covers:
 First, the repository needs to be cloned using:
 
 ```sh
-git clone --recurse-submodules git@github.com:eclipse-uprotocol/up-rust
+git clone --recurse-submodules https://github.com/eclipse-uprotocol/up-rust.git
 ```
 
 The `--recurse-submodules` parameter is important to make sure that the git submodule referring to the uProtocol type definitions is being initialized in the workspace. The proto3 files contained in that submodule define uProtocol's basic types and are being compiled into Rust code as part of the build process.
