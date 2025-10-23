@@ -139,7 +139,7 @@ impl FromStr for UUri {
     // [impl->dsn~uri-scheme~1]
     // [impl->dsn~uri-host-only~2]
     // [impl->dsn~uri-authority-mapping~1]
-    // [impl->dsn~uri-path-mapping~1]
+    // [impl->dsn~uri-path-mapping~2]
     // [impl->req~uri-serialization~1]
     fn from_str(uri: &str) -> Result<Self, Self::Err> {
         if uri.is_empty() {
@@ -321,7 +321,7 @@ impl UUri {
     /// assert_eq!(uri_string, "up://vin.vehicles/800A/2/1A50");
     /// ````
     // [impl->dsn~uri-authority-mapping~1]
-    // [impl->dsn~uri-path-mapping~1]
+    // [impl->dsn~uri-path-mapping~2]
     // [impl->req~uri-serialization~1]
     pub fn to_uri(&self, include_scheme: bool) -> String {
         let mut output = String::default();
