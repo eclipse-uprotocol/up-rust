@@ -19,9 +19,7 @@ use up_rust::UUri;
 
 mod common;
 
-// TODO: Change back to official location when local changes are available from upstream up-spec
-// const FEATURES_GLOB_PATTERN: &str = "up-spec/basics/uuri_*.feature";
-const FEATURES_GLOB_PATTERN: &str = "tests/features/uuri_*.feature";
+const FEATURES_GLOB_PATTERN: &str = "up-spec/basics/uuri_*.feature";
 
 #[derive(cucumber::World, Default, Debug)]
 struct UUriWorld {
@@ -146,7 +144,7 @@ async fn assert_uuri_does_not_match_pattern(w: &mut UUriWorld, pattern: String) 
 // [utest->dsn~uri-scheme~1]
 // [utest->dsn~uri-host-only~2]
 // [utest->dsn~uri-authority-mapping~1]
-// [utest->dsn~uri-path-mapping~1]
+// [utest->dsn~uri-path-mapping~2]
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     common::run::<UUriWorld>(FEATURES_GLOB_PATTERN, "uuri").await
