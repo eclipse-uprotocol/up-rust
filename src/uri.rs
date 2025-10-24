@@ -1030,4 +1030,16 @@ mod tests {
         let uri = format!("//{}/A100/1/6501", host_name);
         assert!(UUri::from_str(&uri).is_err());
     }
+
+    // [utest->dsn~uri-path-mapping~2]
+    #[test]
+    fn test_from_str_accepts_lowercase_hex_encoding() {
+        let result = UUri::try_from("up://vin/ffff0abc/a1/bcd1");
+        assert!(result.is_ok_and(|uuri| {
+            uuri.authority_name == "vin"
+                && uuri.ue_id == 0xFFFF0ABC
+                && uuri.ue_version_major == 0xA1
+                && uuri.resource_id == 0xBCD1
+        }));
+    }
 }
