@@ -58,7 +58,7 @@ uuid-simd = { version = "0.8", default-features = false, features = ["std", "det
 
 [build-dependencies]
 protobuf-codegen = { version = "3.7.2" }
-protoc-bin-vendored = { version = "3.1" }
+protoc-bin-vendored = { version = "3.2" }
 
 [dev-dependencies]
 clap = { version = "4.5.50" }
