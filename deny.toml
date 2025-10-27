@@ -28,6 +28,3 @@ skip-tree = [
     { crate = "protobuf-codegen", reason = "this is only needed/used during the build process" },
     { crate = "windows-sys", reason = "a foundational crate for many that bumps far too frequently to ever have a shared version" },
 ]
-
-[advisories]
-ignore = [{ id = "RUSTSEC-2025-0023", reason = "this crate does not use tokio::sync::broadcast" }]
