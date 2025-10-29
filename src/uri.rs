@@ -457,9 +457,26 @@ impl UUri {
         (self.resource_id & WILDCARD_RESOURCE_ID) as u16
     }
 
+    /// Verifies that the given authority name complies with the UUri specification.
+    ///
+    /// # Arguments
+    ///
+    /// * `authority` - The authority name to verify.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the authority name is invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// assert!(UUri::verify_authority("my.vin").is_ok());
+    /// ```
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
-    pub(crate) fn verify_authority(authority: &str) -> Result<String, UUriError> {
+    pub fn verify_authority(authority: &str) -> Result<String, UUriError> {
         Authority::try_from(authority)
             .map_err(|e| UUriError::validation_error(format!("invalid authority: {e}")))
             .and_then(|auth| Self::verify_parsed_authority(&auth))
