@@ -51,6 +51,7 @@ For user convenience, all of these modules export their types on up_rust top-lev
   implementations.
 * `test-util` provides some useful mock implementations for testing. In particular, provides mock implementations of UTransport and Communication Layer API traits which make implementing unit tests a lot easier.
 * `util` provides some useful helper structs. In particular, provides a local, in-memory UTransport for exchanging messages within a single process. This transport is also used by the examples illustrating usage of the Communication Layer API.
+* `symphony` enables support for implementing an [Eclipse Symphony](https://github.com/eclipse-symphony) Target Provider as a uService exposed via the Communication Layer API's `RpcServer`.
 
 ## References
 
@@ -70,6 +71,9 @@ pub mod communication;
 
 #[cfg(feature = "util")]
 pub mod local_transport;
+
+#[cfg(feature = "symphony")]
+pub mod symphony;
 
 mod uattributes;
 pub use uattributes::{
