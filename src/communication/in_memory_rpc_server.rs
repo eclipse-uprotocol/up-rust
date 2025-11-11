@@ -40,13 +40,18 @@ impl RequestListener {
         let mut response_builder =
             UMessageBuilder::response_for_request(request_message.attributes_unchecked());
 
-        let request_message_id = request_message.id_unchecked().clone();
+        let request_message_id = request_message.id_unchecked().to_hyphenated_string();
         let request_timeout = request_message.ttl_unchecked();
         let payload_format = request_message.payload_format().unwrap_or_default();
         let payload = request_message.payload;
         let request_payload = payload.map(|data| UPayload::new(data, payload_format));
 
-        debug!(ttl = request_timeout, id = %request_message_id, "processing RPC request");
+        debug!(
+            ttl = request_timeout,
+            id = request_message_id,
+            resource_id = resource_id,
+            "processing RPC request"
+        );
 
         let invocation_result_future = request_handler_clone.handle_request(
             resource_id,

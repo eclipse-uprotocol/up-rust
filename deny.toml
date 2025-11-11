@@ -16,7 +16,7 @@
 
 # If you add a license in the following section also consider changing about.toml
 [licenses]
-allow = ["Apache-2.0", "MIT"]
+allow = ["Apache-2.0", "ISC", "MIT"]
 private = { ignore = true }
 exceptions = [{ name = "unicode-ident", allow = ["Unicode-3.0"] }]
 unused-allowed-license = "deny"
