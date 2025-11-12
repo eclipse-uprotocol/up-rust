@@ -17,7 +17,7 @@ The crate needs to be added to the `[dependencies]` section of the `Cargo.toml` 
 
 ```toml
 [dependencies]
-up-rust = { version = "0.8" }
+up-rust = { version = "0.9" }
 ```
 
 Most developers will want to use the Communication Level API and its default implementation which are provided by the `communication` module. Please refer to the [examples](./examples/) for inspiration how to use this crate.
