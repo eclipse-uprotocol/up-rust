@@ -324,18 +324,9 @@ impl<T: DeploymentTarget> RequestHandler for ApplyOperation<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use serde_json::json;
-    use tokio::sync::Notify;
 
-    use crate::{
-        communication::{
-            CallOptions, InMemoryRpcClient, InMemoryRpcServer, MockRpcServerImpl, RpcClient,
-        },
-        local_transport::LocalTransport,
-        StaticUriProvider, UUri,
-    };
+    use crate::{communication::MockRpcServerImpl, UUri};
 
     use super::*;
 
@@ -352,84 +343,99 @@ mod tests {
         assert!(
             register_target_provider_endpoints(&rpc_server, Arc::new(deployment_target))
                 .await
-                .is_err()
+                .is_err_and(|e| matches!(
+                    e.downcast_ref(),
+                    Some(crate::communication::RegistrationError::MaxListenersExceeded)
+                ))
         );
     }
 
     #[tokio::test]
+    async fn test_register_target_provider_endpoints_succeeds() {
+        let mut rpc_server = MockRpcServerImpl::new();
+        rpc_server
+            .expect_do_register_endpoint()
+            .returning(|_, _, _| Ok(()));
+        let deployment_target = MockDeploymentTarget::new();
+
+        assert!(
+            register_target_provider_endpoints(&rpc_server, Arc::new(deployment_target))
+                .await
+                .is_ok()
+        );
+    }
+
+    fn create_method_uri(resource_id: u16) -> UUri {
+        UUri::try_from_parts("authority", 0x10AA2, 0x01, resource_id)
+            .expect("failed to create method URI")
+    }
+
+    fn create_request_attributes(resource_id: u16) -> UAttributes {
+        UAttributes {
+            source: Some(
+                UUri::try_from_parts("authority", 0x10AA1, 0x01, 0x0000)
+                    .expect("failed to create source URI"),
+            )
+            .into(),
+            sink: Some(create_method_uri(resource_id)).into(),
+            ..UAttributes::default()
+        }
+    }
+
+    #[tokio::test]
     async fn test_endpoints_delegate_to_deployment_target() {
-        let transport = Arc::new(LocalTransport::default());
-
-        let get_method =
-            UUri::try_from_parts("local_authority", 0xAAA1, 0x01, METHOD_GET_RESOURCE_ID)
-                .expect("failed to create get method URI");
-        let update_method =
-            UUri::try_from_parts("local_authority", 0xAAA1, 0x01, METHOD_UPDATE_RESOURCE_ID)
-                .expect("failed to create update method URI");
-        let delete_method =
-            UUri::try_from_parts("local_authority", 0xAAA1, 0x01, METHOD_DELETE_RESOURCE_ID)
-                .expect("failed to create delete method URI");
-        let uri_provider =
-            StaticUriProvider::try_from(&get_method).expect("failed to create URI provider");
-        let rpc_server = InMemoryRpcServer::new(transport.clone(), Arc::new(uri_provider));
-
         let mut mock_target = MockDeploymentTarget::default();
-        let get_notify = Arc::new(Notify::new());
-        let cloned_get_notify = get_notify.clone();
-        mock_target.expect_get().returning(move |_, _| {
-            cloned_get_notify.notify_one();
-            Ok(vec![])
+        mock_target
+            .expect_get()
+            .once()
+            .returning(move |_, _| Ok(vec![]));
+        mock_target
+            .expect_update()
+            .once()
+            .returning(move |_, _| Ok(HashMap::new()));
+        mock_target
+            .expect_delete()
+            .once()
+            .returning(move |_, _| Ok(HashMap::new()));
+        let target = Arc::new(mock_target);
+        let get_op = Arc::new(GetOperation {
+            target: target.clone(),
         });
-        let update_notify = Arc::new(Notify::new());
-        let cloned_update_notify = update_notify.clone();
-        mock_target.expect_update().returning(move |_, _| {
-            cloned_update_notify.notify_one();
-            Ok(HashMap::new())
+        let apply_op = Arc::new(ApplyOperation {
+            target: target.clone(),
         });
-        let delete_notify = Arc::new(Notify::new());
-        let cloned_delete_notify = delete_notify.clone();
-        mock_target.expect_delete().returning(move |_, _| {
-            cloned_delete_notify.notify_one();
-            Ok(HashMap::new())
-        });
-        register_target_provider_endpoints(&rpc_server, Arc::new(mock_target))
-            .await
-            .expect("failed to register endpoints");
 
-        let rpc_client = InMemoryRpcClient::new(
-            transport.clone(),
-            Arc::new(StaticUriProvider::new("local_authority", 0xAAA2, 0x01)),
-        )
-        .await
-        .expect("failed to create RPC client");
-
-        let request_payload = json!({
+        let request_data = json!({
             "deployment": DeploymentSpec::empty(),
             "components": []
         });
         let payload = UPayload::new(
-            serde_json::to_vec(&request_payload).expect("failed to create request payload"),
+            serde_json::to_vec(&request_data).expect("failed to create request payload"),
             UPayloadFormat::UPAYLOAD_FORMAT_JSON,
         );
-        let call_options = CallOptions::for_rpc_request(0x1000, None, None, None);
-        rpc_client
-            .invoke_method(get_method, call_options.clone(), Some(payload.clone()))
+        assert!(get_op
+            .handle_request(
+                METHOD_GET_RESOURCE_ID,
+                &create_request_attributes(METHOD_GET_RESOURCE_ID),
+                Some(payload.clone()),
+            )
             .await
-            .expect("Get invocation failed");
-        rpc_client
-            .invoke_method(update_method, call_options.clone(), Some(payload.clone()))
+            .is_ok());
+        assert!(apply_op
+            .handle_request(
+                METHOD_UPDATE_RESOURCE_ID,
+                &create_request_attributes(METHOD_UPDATE_RESOURCE_ID),
+                Some(payload.clone()),
+            )
             .await
-            .expect("Update invocation failed");
-        rpc_client
-            .invoke_method(delete_method, call_options, Some(payload))
+            .is_ok());
+        assert!(apply_op
+            .handle_request(
+                METHOD_DELETE_RESOURCE_ID,
+                &create_request_attributes(METHOD_DELETE_RESOURCE_ID),
+                Some(payload.clone()),
+            )
             .await
-            .expect("Delete invocation failed");
-
-        tokio::try_join!(
-            tokio::time::timeout(Duration::from_secs(2), get_notify.notified()),
-            tokio::time::timeout(Duration::from_secs(2), update_notify.notified()),
-            tokio::time::timeout(Duration::from_secs(2), delete_notify.notified()),
-        )
-        .expect("failed to receive notification from deployment target");
+            .is_ok());
     }
 }
