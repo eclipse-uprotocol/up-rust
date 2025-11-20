@@ -75,7 +75,7 @@ jobs:
               exit 0
             fi
             awk -v s="$START" -v e="$END" -v n="$NEW" '
-              $0==s { print; getline; print n; next }
+              $0==s { print; getline; print n; while (getline && $0!=e); print e; next }
               { print }
             ' "$README" > README.tmp && mv README.tmp "$README"
           else
