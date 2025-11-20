@@ -35,7 +35,7 @@ jobs:
       - name: Get latest up-spec tag (including pre-releases)
         id: latest
         run: |
-          TAGS=$(curl -s https://api.github.com/repos/eclipse-uprotocol/up-spec/tags | jq -r '.[].name')
+          TAGS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/eclipse-uprotocol/up-spec/tags | jq -r '.[].name')
           if [ -z "$TAGS" ]; then
             echo "Failed to retrieve tags"
             exit 1
