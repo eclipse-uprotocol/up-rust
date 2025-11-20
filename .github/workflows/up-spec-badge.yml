@@ -1,0 +1,94 @@
+name: Update up-spec compatibility badge
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Fetch tags for up-spec submodule
+        run: |
+          git -C up-spec fetch --tags || true
+
+      - name: Determine current up-spec tag
+        id: current
+        run: |
+          if CUR=$(git -C up-spec describe --tags --exact-match 2>/dev/null); then
+            echo "current_tag=$CUR" >> $GITHUB_OUTPUT
+          else
+            CUR=$(git -C up-spec describe --tags --abbrev=0 2>/dev/null || echo "unknown")
+            echo "current_tag=$CUR" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get latest up-spec tag (including pre-releases)
+        id: latest
+        run: |
+          TAGS=$(curl -s https://api.github.com/repos/eclipse-uprotocol/up-spec/tags | jq -r '.[].name')
+          if [ -z "$TAGS" ]; then
+            echo "Failed to retrieve tags"
+            exit 1
+          fi
+          # Sort semver with pre-release awareness (simple approach).
+          LATEST=$(printf "%s\n" $TAGS | sort -V | tail -n1)
+          echo "latest_tag=$LATEST" >> $GITHUB_OUTPUT
+
+      - name: Decide badge color
+        id: color
+        run: |
+          if [ "${{ steps.current.outputs.current_tag }}" = "${{ steps.latest.outputs.latest_tag }}" ]; then
+            echo "color=green" >> $GITHUB_OUTPUT
+          else
+            echo "color=red" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build badge line
+        id: badge
+        run: |
+          CUR=${{ steps.current.outputs.current_tag }}
+          COLOR=${{ steps.color.outputs.color }}
+          BADGE_URL="https://img.shields.io/badge/up--spec-${CUR//-/%2D}-${COLOR}"
+          LINK_URL="https://github.com/eclipse-uprotocol/up-spec/tree/${CUR}"
+          echo "badge_line=[![up-spec](${BADGE_URL})](${LINK_URL})" >> $GITHUB_OUTPUT
+
+      - name: Update README
+        run: |
+          README="README.md"
+          START="<!-- up-spec-badge-start -->"
+          END="<!-- up-spec-badge-end -->"
+          NEW="${{ steps.badge.outputs.badge_line }}"
+          if grep -q "$START" "$README"; then
+            EXISTING=$(awk "/$START/{getline; print}" "$README")
+            if [ "$EXISTING" = "$NEW" ]; then
+              echo "No change needed."
+              exit 0
+            fi
+            awk -v s="$START" -v e="$END" -v n="$NEW" '
+              $0==s { print; getline; print n; next }
+              { print }
+            ' "$README" > README.tmp && mv README.tmp "$README"
+          else
+            printf "%s\n%s\n%s\n\n" "$START" "$NEW" "$END" | cat - "$README" > README.tmp && mv README.tmp "$README"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "chore: update up-spec compatibility badge" || echo "Nothing to commit"
+          git push || echo "Push skipped (likely not on main)."
+
+      - name: Summary
+        run: |
+          echo "Current: ${{ steps.current.outputs.current_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "Latest:  ${{ steps.latest.outputs.latest_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "Color:   ${{ steps.color.outputs.color }}" >> $GITHUB_STEP_SUMMARY
