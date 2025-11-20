@@ -1,7 +1,7 @@
 # Eclipse uProtocol Rust library
 
 <!-- up-spec-badge-start -->
-[![up-spec](https://img.shields.io/badge/up--spec-v1.2.3--beta.4-green)](https://github.com/eclipse-uprotocol/up-spec/tree/v1.2.3-beta.4)
+[![up-spec](https://img.shields.io/badge/up--spec-v1.6.0--alpha.7-green)](https://github.com/eclipse-uprotocol/up-spec/tree/v1.6.0-alpha.7)
 <!-- up-spec-badge-end -->
 
 
