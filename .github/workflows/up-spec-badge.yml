@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   badge:
+    if: github.event.head_commit.author.name != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with submodules)
