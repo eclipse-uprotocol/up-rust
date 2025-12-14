@@ -38,17 +38,17 @@ jobs:
 
       - name: check up-spec version
         id: check-up-spec-version
-        uses: eclipse-uprotocol/ci-cd/.github/actions/check-spec-version@main
+        uses: xerner/ci-cd/.github/actions/check-spec-version@main
 
       - name: create up-spec version badge
-        uses: eclipse-uprotocol/ci-cd/.github/actions/create-spec-version-badge@main
+        uses: xerner/ci-cd/.github/actions/create-spec-version-badge@main
         with:
           current-version: ${{ steps.check-up-spec-version.outputs.current-version }}
           latest-version: ${{ steps.check-up-spec-version.outputs.latest-version }}
           is-latest: ${{ steps.check-up-spec-version.outputs.is-latest }}
 
       - name: create up-spec compliance badge
-        uses: eclipse-uprotocol/ci-cd/.github/actions/create-spec-compliance-badge@main
+        uses: xerner/ci-cd/.github/actions/create-spec-compliance-badge@main
         with:
           oft-exit-code: ${{ needs.spec-compliance.outputs.oft-exit-code }}
 
