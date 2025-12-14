@@ -1,0 +1,67 @@
+# ********************************************************************************
+#  Copyright (c) 2025 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+
+name: Create README badges
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  spec-compliance:
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@main
+    with:
+      env-file-suffix: "oft-current"
+
+  create-readme-badges:
+    name: Create README badges
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs: 
+      - spec-compliance
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: check up-spec version
+        id: check-up-spec-version
+        uses: eclipse-uprotocol/ci-cd/.github/actions/check-spec-version@main
+
+      - name: create up-spec version badge
+        uses: eclipse-uprotocol/ci-cd/.github/actions/create-spec-version-badge@main
+        with:
+          current-version: ${{ steps.check-up-spec-version.outputs.current-version }}
+          latest-version: ${{ steps.check-up-spec-version.outputs.latest-version }}
+          is-latest: ${{ steps.check-up-spec-version.outputs.is-latest }}
+
+      - name: create up-spec compliance badge
+        uses: eclipse-uprotocol/ci-cd/.github/actions/create-spec-compliance-badge@main
+        with:
+          oft-exit-code: ${{ needs.spec-compliance.outputs.oft-exit-code }}
+
+      - name: Commit badge
+        continue-on-error: true
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add ".github/badges"
+          git commit -m "Add/Update badges" || echo "No changes to commit"
+
+      - name: Push badge commit
+        uses: ad-m/github-push-action@master
+        if: ${{ success() }}
+        with:
+          branch: ${{ github.head_ref }}
