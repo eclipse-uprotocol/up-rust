@@ -139,7 +139,7 @@ impl FromStr for UUri {
     // [impl->dsn~uri-scheme~1]
     // [impl->dsn~uri-host-only~2]
     // [impl->dsn~uri-authority-mapping~1]
-    // [impl->dsn~uri-path-mapping~1]
+    // [impl->dsn~uri-path-mapping~2]
     // [impl->req~uri-serialization~1]
     fn from_str(uri: &str) -> Result<Self, Self::Err> {
         if uri.is_empty() {
@@ -321,7 +321,7 @@ impl UUri {
     /// assert_eq!(uri_string, "up://vin.vehicles/800A/2/1A50");
     /// ````
     // [impl->dsn~uri-authority-mapping~1]
-    // [impl->dsn~uri-path-mapping~1]
+    // [impl->dsn~uri-path-mapping~2]
     // [impl->req~uri-serialization~1]
     pub fn to_uri(&self, include_scheme: bool) -> String {
         let mut output = String::default();
@@ -457,9 +457,26 @@ impl UUri {
         (self.resource_id & WILDCARD_RESOURCE_ID) as u16
     }
 
+    /// Verifies that the given authority name complies with the UUri specification.
+    ///
+    /// # Arguments
+    ///
+    /// * `authority` - The authority name to verify.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the authority name is invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUri;
+    ///
+    /// assert!(UUri::verify_authority("my.vin").is_ok());
+    /// ```
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
-    pub(crate) fn verify_authority(authority: &str) -> Result<String, UUriError> {
+    pub fn verify_authority(authority: &str) -> Result<String, UUriError> {
         Authority::try_from(authority)
             .map_err(|e| UUriError::validation_error(format!("invalid authority: {e}")))
             .and_then(|auth| Self::verify_parsed_authority(&auth))
@@ -1029,5 +1046,17 @@ mod tests {
         let host_name = "a".repeat(129);
         let uri = format!("//{}/A100/1/6501", host_name);
         assert!(UUri::from_str(&uri).is_err());
+    }
+
+    // [utest->dsn~uri-path-mapping~2]
+    #[test]
+    fn test_from_str_accepts_lowercase_hex_encoding() {
+        let result = UUri::try_from("up://vin/ffff0abc/a1/bcd1");
+        assert!(result.is_ok_and(|uuri| {
+            uuri.authority_name == "vin"
+                && uuri.ue_id == 0xFFFF0ABC
+                && uuri.ue_version_major == 0xA1
+                && uuri.resource_id == 0xBCD1
+        }));
     }
 }

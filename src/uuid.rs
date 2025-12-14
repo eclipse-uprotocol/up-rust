@@ -11,6 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use bytes::{Buf, Bytes};
 use rand::RngCore;
 use std::time::{Duration, SystemTime};
 use std::{hash::Hash, str::FromStr};
@@ -283,6 +284,89 @@ impl Hash for UUID {
     }
 }
 
+impl TryFrom<Vec<u8>> for UUID {
+    type Error = UuidConversionError;
+
+    /// Creates a UUID from a byte vector.
+    ///
+    /// # Arguments
+    ///
+    /// `value` - the byte vector
+    ///
+    /// # Returns
+    ///
+    /// a uProtocol UUID with the given timestamp and random values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error
+    /// * if the given vector does not have a length of 16 bytes, or
+    /// * if the given bytes contain an invalid version and/or variant identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::UUID;
+    ///
+    /// // timestamp = 1, ver = 0b0111, variant = 0b10
+    /// let bytes: Vec<u8> = vec![
+    ///     0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x70, 0x00,
+    ///     0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    /// ];
+    /// let conversion_attempt = UUID::try_from(bytes);
+    /// assert!(conversion_attempt.is_ok());
+    /// let uuid = conversion_attempt.unwrap();
+    /// assert!(uuid.is_uprotocol_uuid());
+    /// assert_eq!(uuid.get_time(), Some(0x1_u64));
+    /// ```
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        let mut buf: Bytes = value.into();
+        if buf.len() != 16 {
+            return Err(UuidConversionError::new(
+                "byte vector length is not 16 bytes",
+            ));
+        }
+        UUID::from_u64_pair(buf.get_u64(), buf.get_u64())
+    }
+}
+
+impl From<UUID> for Vec<u8> {
+    fn from(value: UUID) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl From<&UUID> for Vec<u8> {
+    /// Serializes this UUID to a byte vector.
+    ///
+    /// # Returns
+    ///
+    /// a byte vector containing the 16 bytes of this UUID in big-endian order.
+    ///
+    /// # Examples
+    ////
+    /// ```rust
+    /// use up_rust::UUID;
+    ///
+    /// // timestamp = 1, ver = 0b0111
+    /// let msb = 0x0000000000017000_u64;
+    /// // variant = 0b10, random = 0x0010101010101a1a
+    /// let lsb = 0x8010101010101a1a_u64;
+    /// let uuid = UUID { msb, lsb, ..Default::default() };
+    /// let bytes: Vec<u8> = uuid.into();
+    /// assert_eq!(bytes, vec![
+    ///     0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x70, 0x00,
+    ///     0x80, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1a, 0x1a,
+    /// ]);
+    /// ```
+    fn from(value: &UUID) -> Self {
+        let mut bytes = Vec::with_capacity(16);
+        bytes.extend_from_slice(&value.msb.to_be_bytes());
+        bytes.extend_from_slice(&value.lsb.to_be_bytes());
+        bytes
+    }
+}
+
 impl From<UUID> for String {
     fn from(value: UUID) -> Self {
         Self::from(&value)
@@ -390,6 +474,13 @@ mod tests {
         let uuid = conversion_attempt.unwrap();
         assert!(uuid.is_uprotocol_uuid());
         assert_eq!(uuid.get_time(), Some(0x1_u64));
+    }
+
+    #[test]
+    fn test_try_from_vec_fails() {
+        // not 16 bytes
+        let bytes: Vec<u8> = vec![0x00, 0x00, 0x00, 0x00];
+        assert!(UUID::try_from(bytes).is_err());
     }
 
     #[test]

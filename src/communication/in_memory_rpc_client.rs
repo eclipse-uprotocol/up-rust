@@ -24,30 +24,22 @@ use tokio::time::timeout;
 use tracing::{debug, info};
 
 use crate::{
-    LocalUriProvider, UCode, UListener, UMessage, UMessageBuilder, UMessageType, UStatus,
-    UTransport, UUri, UUID,
+    LocalUriProvider, UCode, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri, UUID,
 };
 
 use super::{
     build_message, CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload,
 };
 
+/// Handles an RPC Response message received from the transport layer.
 fn handle_response_message(response: UMessage) -> Result<Option<UPayload>, ServiceInvocationError> {
-    let Some(attribs) = response.attributes.as_ref() else {
-        return Err(ServiceInvocationError::InvalidArgument(
-            "response message does not contain attributes".to_string(),
-        ));
-    };
-
-    match attribs.commstatus.map(|v| v.enum_value_or_default()) {
+    match response.commstatus() {
         Some(UCode::OK) | None => {
             // successful invocation
-            response.payload.map_or(Ok(None), |payload| {
-                Ok(Some(UPayload::new(
-                    payload,
-                    attribs.payload_format.enum_value_or_default(),
-                )))
-            })
+            let payload_format = response.payload_format().unwrap_or_default();
+            Ok(response
+                .payload
+                .map(|payload| UPayload::new(payload, payload_format)))
         }
         Some(code) => {
             // try to extract UStatus from response payload
@@ -86,15 +78,20 @@ impl ResponseListener {
         }
     }
 
-    fn handle_response(&self, reqid: &UUID, response_message: UMessage) {
-        let Ok(mut pending_requests) = self.pending_requests.lock() else {
-            info!(
-                request_id = reqid.to_hyphenated_string(),
-                "failed to process response message, cannot acquire lock for pending requests map"
-            );
-            return;
+    fn handle_response(&self, response_message: UMessage) {
+        let reqid = response_message.request_id_unchecked().clone();
+        let response_sender = {
+            // drop lock as soon as possible
+            let Ok(mut pending_requests) = self.pending_requests.lock() else {
+                info!(
+                    request_id = reqid.to_hyphenated_string(),
+                    "failed to process response message, cannot acquire lock for pending requests map"
+                );
+                return;
+            };
+            pending_requests.remove(&reqid)
         };
-        if let Some(sender) = pending_requests.remove(reqid) {
+        if let Some(sender) = response_sender {
             if let Err(_e) = sender.send(response_message) {
                 // channel seems to be closed already
                 debug!(
@@ -133,27 +130,15 @@ impl ResponseListener {
 #[async_trait]
 impl UListener for ResponseListener {
     async fn on_receive(&self, msg: UMessage) {
-        let message_type = msg
-            .attributes
-            .get_or_default()
-            .type_
-            .enum_value_or_default();
-        if message_type != UMessageType::UMESSAGE_TYPE_RESPONSE {
-            debug!(
-                message_type = message_type.to_cloudevent_type(),
-                "service provider replied with message that is not an RPC Response"
-            );
-            return;
-        }
-
-        if let Some(reqid) = msg
-            .attributes
-            .as_ref()
-            .and_then(|attribs| attribs.reqid.clone().into_option())
-        {
-            self.handle_response(&reqid, msg);
+        // it is sufficient to check if the message is a response
+        // because the transport implementation forwards valid UMessages only
+        if msg.is_response() {
+            self.handle_response(msg);
         } else {
-            debug!("ignoring malformed response message not containing request ID");
+            debug!(
+                message_type = msg.type_unchecked().to_cloudevent_type(),
+                "ignoring non-response message received by RPC client"
+            );
         }
     }
 }
@@ -616,14 +601,5 @@ mod tests {
         // THEN the invocation times out
         assert!(response.is_err_and(|e| { matches!(e, ServiceInvocationError::DeadlineExceeded) }));
         assert!(!client.contains_pending_request(&message_id));
-    }
-
-    #[test]
-    fn test_handle_response_message_fails_for_missing_attributes() {
-        let response_msg = UMessage {
-            ..Default::default()
-        };
-        let result = handle_response_message(response_msg);
-        assert!(result.is_err_and(|e| matches!(e, ServiceInvocationError::InvalidArgument(_))));
     }
 }

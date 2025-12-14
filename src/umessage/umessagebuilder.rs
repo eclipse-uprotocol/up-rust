@@ -574,7 +574,7 @@ impl UMessageBuilder {
     ///
     /// # Examples
     ///
-    /// ## Not setting `id` explicitly with [`UMessageBuilder::with_message_id()']
+    /// ## Not setting `id` explicitly with [`UMessageBuilder::with_message_id`]
     ///
     /// The recommended way to use the `UMessageBuilder`.
     ///
@@ -593,9 +593,9 @@ impl UMessageBuilder {
     /// # }
     /// ```
     ///
-    /// ## Setting `id` explicitly with [`UMessageBuilder::with_message_id()']
+    /// ## Setting `id` explicitly with [`UMessageBuilder::with_message_id`]
     ///
-    /// Note that explicitly using [`UMessageBuilder::with_message_id()'] is not required as shown
+    /// Note that explicitly using [`UMessageBuilder::with_message_id`] is not required as shown
     /// above.
     ///
     /// ```rust
