@@ -1,5 +1,8 @@
 # Eclipse uProtocol Rust library
 
+[![badge](.github/badges/spec-version.svg)](https://github.com/eclipse-uprotocol/up-spec)
+[![badge](.github/badges/spec-compliance.svg)](https://github.com/eclipse-uprotocol/up-spec)
+
 This is the [uProtocol v1.6.0-alpha.7 Language Library](https://github.com/eclipse-uprotocol/uprotocol-spec/blob/v1.6.0-alpha.7/languages.adoc) for the Rust programming language.
 
 The crate can be used to
