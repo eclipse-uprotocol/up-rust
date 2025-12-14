@@ -34,7 +34,9 @@ jobs:
     needs: 
       - spec-compliance
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
+        with:
+            submodules: "recursive"
 
       - name: check up-spec version
         id: check-up-spec-version
