@@ -34,10 +34,6 @@ jobs:
     needs: 
       - spec-compliance
     steps:
-      - uses: actions/checkout@v4
-        with:
-            submodules: true
-
       - name: check up-spec version
         id: check-up-spec-version
         uses: xerner/ci-cd/.github/actions/check-spec-version@main
