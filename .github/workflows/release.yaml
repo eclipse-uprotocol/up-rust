@@ -75,6 +75,7 @@ jobs:
         with:
           name: license-report
           path: dist/license/
+
       - name: Upload license report to release
         uses: svenstaro/upload-release-action@v2
         id: upload_license_report
@@ -90,6 +91,7 @@ jobs:
         with:
           name: tracing-report-html
           path: dist/tracing/
+          
       - name: Upload requirements tracing report to release
         uses: svenstaro/upload-release-action@v2
         id: upload_requirements_tracing_report
