@@ -1,6 +1,6 @@
 # Notices for Eclipse uProtocol Rust Language Library
 
-This content is produced and maintained by the [Eclipse uProtocol project](https://eclipse-uprotocol.github.io).
+This content is produced and maintained by the [Eclipse uProtocol project](https://uprotocol.org).
 
 ## Trademarks
 
