@@ -14,7 +14,7 @@
 # Comprehensive combination of checks, linting, feature-checks, testing to be run on merge and on PR
 # Upload test results for potential re-use in publication workflow, returns the corresponding download URL as an output on workflow_call
 
-name: Cargo
+name: Default checks
 
 on:
   push:
@@ -32,7 +32,7 @@ on:
     outputs:
       test_results_url:
         description: "URL of the test results artifact"
-        value: ${{ jobs.nextest.outputs.test_results_url }}
+        value: ${{ jobs.test.outputs.test_results_url }}
   workflow_dispatch:
 
 concurrency:
@@ -48,12 +48,9 @@ jobs:
   deny:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: "recursive"
+    - uses: actions/checkout@v6
     - uses: EmbarkStudios/cargo-deny-action@v2
       with: 
-        rust-version: ${{ env.RUST_TOOLCHAIN }}
         command: check
         arguments: --all-features
 
@@ -61,11 +58,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: "recursive"
-    - uses: dtolnay/rust-toolchain@master
-      with: 
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
         toolchain: ${{ env.RUST_TOOLCHAIN }}
     - name: Run cargo check
       run: |
@@ -75,11 +72,9 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          submodules: "recursive"
-      - uses: dtolnay/rust-toolchain@master
-        with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt
       - name: Run cargo fmt
@@ -90,11 +85,11 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
-      - uses: dtolnay/rust-toolchain@master
-        with: 
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: clippy
       - name: Run cargo clippy
@@ -108,11 +103,11 @@ jobs:
     env:
       RUSTDOCFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
-      - uses: dtolnay/rust-toolchain@master
-        with: 
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Run rustdoc
         run: |
@@ -122,11 +117,11 @@ jobs:
     # check links contained in markdown, asciidoc and source code files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
       - name: Restore lychee cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .lycheecache
           key: cache-lychee-${{ github.sha }}
@@ -138,21 +133,23 @@ jobs:
           args: "--cache --max-cache-age 1d --verbose --no-progress --exclude-path './target/' --exclude-path './up-spec/' -- './**/*.md' './**/*.rs'"
 
   feature-check:
-    # Comprehensive check on dependencies for all feature flag combinations, excluding development dependencies
-    needs: check
+    # Comprehensive check for feature flag combinations, excluding development dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
-      - uses: dtolnay/rust-toolchain@master
-        with: 
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-hack
       - name: Run cargo hack powerset
         run: |
-          cargo hack check --feature-powerset --no-dev-deps
+          cargo hack check \
+            --no-dev-deps \
+            --feature-powerset \
+            --group-features default,communication,usubscription,udiscovery,utwin,symphony \
+            --depth 2
 
   # [impl->req~up-language-ci-test~1]
   test:
@@ -164,11 +161,11 @@ jobs:
       matrix:
         feature-flags: ["", "--no-default-features", "--all-features"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
-      - uses: dtolnay/rust-toolchain@master
-        with: 
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Run lib tests
@@ -186,7 +183,7 @@ jobs:
       - name: Upload all-features test results artifact
         id: test_results
         if: matrix.feature-flags == '--all-features'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           # include all test result files
