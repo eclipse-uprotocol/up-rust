@@ -4,7 +4,7 @@ The standard _Code of Conduct_ that all Eclipse projects must adhere to is defin
 
 - [Eclipse Code of Conduct](https://raw.githubusercontent.com/eclipse/.github/master/CODE_OF_CONDUCT.md)
 - [Eclipse Foundation Handbook](https://www.eclipse.org/projects/handbook/)
-- [Eclipse Committer Due Diligence Guidelines](https://www.eclipse.org/legal/committerguidelines.php)
+- [Eclipse Committer Due Diligence Guidelines](https://www.eclipse.org/legal/committer-guidelines/)
 
 We (the committers) aim to run this project in an open and fair manner where contributions are encouraged from all companies and individuals. We aim for high quality, well documented and tested software that can be used in production environments.  
 

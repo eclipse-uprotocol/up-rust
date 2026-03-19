@@ -243,7 +243,7 @@ impl UUID {
     /// # Returns
     ///
     /// `true` if this UUID meets the formal requirements defined by the
-    /// [uProtocol spec](https://github.com/eclipse-uprotocol/uprotocol-spec).
+    /// [uProtocol spec](https://github.com/eclipse-uprotocol/up-spec).
     ///
     /// # Examples
     ///
