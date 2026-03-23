@@ -35,7 +35,7 @@ jobs:
   requirements-tracing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
       - name: Fast-Forward to HEAD revision of uProtocol Spec main branch
@@ -49,10 +49,11 @@ jobs:
           cd "${{ github.workspace }}"
 
       - name: "Determine OpenFastTrace file patterns from .env file"
-        uses: xom9ikk/dotenv@v2.3.0
+        uses: falti/dotenv-action@v1.2.0
         with:
-          mode: "oft-latest"
-          load-mode: strict
+          path: .env.oft-latest
+          export-variables: true
+          keys-case: bypass
 
       # run OpenFastTrace first because the action will always succeed and produce
       # a tracing report
@@ -65,11 +66,9 @@ jobs:
 
       # now try to build and run the tests which may fail if incompatible changes
       # have been introduced into the uProtocol Core API
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@nextest
       - name: Run tests
         run: |
           # We need to use standard "cargo test" here because nextest cannot execute

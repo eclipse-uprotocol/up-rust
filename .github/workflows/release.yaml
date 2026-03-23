@@ -59,19 +59,20 @@ jobs:
       - licenses
     permissions: write-all
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
 
       - name: "Determine uProtocol Specification file patterns from .env file"
-        uses: xom9ikk/dotenv@v2.3.0
+        uses: falti/dotenv-action@v1.2.0
         with:
-          mode: oft-current
-          load-mode: strict
+          path: .env.oft-current
+          export-variables: true
+          keys-case: bypass
 
       # License report - we later need the download_url output of the upload step
       - name: Download license report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: license-report
           path: dist/license/
@@ -86,7 +87,7 @@ jobs:
 
       # Requirements Tracing report - we later need the download_url output of the upload step
       - name: Download requirements tracing report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: tracing-report-html
           path: dist/tracing/
@@ -101,7 +102,7 @@ jobs:
 
       # Test results - we later need the download_url output of the upload step
       - name: Download test report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: test-results
           path: dist/tests/
@@ -116,7 +117,7 @@ jobs:
 
       # Test coverage - we later need the download_url output of the upload step
       - name: Download test coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: code-coverage-html
           path: dist/codecov/
@@ -183,7 +184,7 @@ jobs:
     env: 
       CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: "recursive"
 
