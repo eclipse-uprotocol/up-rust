@@ -25,9 +25,6 @@ concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
-env:
-  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
-
 jobs:
   check-msrv:
     uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-msrv.yaml@main
