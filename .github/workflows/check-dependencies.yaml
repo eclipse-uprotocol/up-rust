@@ -31,7 +31,7 @@ jobs:
     name: "Check 3rd party licenses"
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Determine 3rd party dependencies
       working-directory: ${{github.workspace}}
       run: |
