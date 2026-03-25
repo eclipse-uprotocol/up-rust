@@ -27,28 +27,28 @@ concurrency:
 
 jobs:
   check-msrv:
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-msrv.yaml@main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-msrv.yaml@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
 
   check-latest-deps:
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-latest-deps.yaml@main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-verify-latest-deps.yaml@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
 
   deny:
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-deny-check.yaml@main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-deny-check.yaml@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
     with:
       arguments: --all-features --locked --exclude-dev
 
   # [impl->req~up-language-ci-test~1]
   test-all-features:
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-test-featurematrix.yaml@main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-test-featurematrix.yaml@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
 
   x-build:
     # The jury is still out on whether this actually adds any value, besides simply being possible...
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-x-build.yaml@main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-x-build.yaml@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
 
   coverage:
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-coverage.yaml@main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/rust-coverage.yaml@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
 
   current-spec-compliance:
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/requirements-tracing.yaml@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
     with:
       env-file-suffix: "oft-current"
