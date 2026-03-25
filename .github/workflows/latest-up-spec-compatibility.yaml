@@ -35,7 +35,7 @@ jobs:
   requirements-tracing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: "recursive"
       - name: Fast-Forward to HEAD revision of uProtocol Spec main branch
@@ -49,7 +49,7 @@ jobs:
           cd "${{ github.workspace }}"
 
       - name: "Determine OpenFastTrace file patterns from .env file"
-        uses: falti/dotenv-action@v1.2.0
+        uses: falti/dotenv-action@73fafca04177425fd3e0a0849257015ae9d42034 # v1.2.0
         with:
           path: .env.oft-latest
           export-variables: true
@@ -59,14 +59,14 @@ jobs:
       # a tracing report
       - name: Run OpenFastTrace
         id: run-oft
-        uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@main
+        uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@c9fb74b20429e69c15021c64dcf343447a2f46a2 # main
         with:
           file-patterns: "${{ env.OFT_FILE_PATTERNS }}"
           tags: "${{ env.OFT_TAGS_}}"
 
       # now try to build and run the tests which may fail if incompatible changes
       # have been introduced into the uProtocol Core API
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Run tests
