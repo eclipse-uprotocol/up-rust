@@ -38,7 +38,20 @@ impl RequestHandler for EchoOperation {
         request_payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError> {
         if let Some(req_payload) = request_payload {
-            Ok(Some(req_payload))
+            let msg = req_payload.extract_protobuf::<StringValue>().map_err(|_| {
+                ServiceInvocationError::InvalidArgument(
+                    "request payload is not a StringValue".to_string(),
+                )
+            })?;
+            println!("service received request with payload: {}", msg.value);
+            let value = StringValue {
+                value: format!("Hello, {}!", msg.value),
+                ..Default::default()
+            };
+            let res_payload = UPayload::try_from_protobuf(value).map_err(|e| {
+                ServiceInvocationError::Internal(format!("failed to convert response payload: {e}"))
+            })?;
+            Ok(Some(res_payload))
         } else {
             Err(ServiceInvocationError::InvalidArgument(
                 "request has no payload".to_string(),
@@ -85,7 +98,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // now invoke the operation with a message in the request payload
     let value = StringValue {
-        value: "Hello".to_string(),
+        value: "Peter".to_string(),
         ..Default::default()
     };
     let payload = UPayload::try_from_protobuf(value)?;

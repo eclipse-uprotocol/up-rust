@@ -184,19 +184,19 @@ impl UListener for SubscriptionChangeListener {
 }
 
 /// A [`Publisher`] that uses the uProtocol Transport Layer API for publishing events to topics.
-pub struct SimplePublisher {
-    transport: Arc<dyn UTransport>,
-    uri_provider: Arc<dyn LocalUriProvider>,
+pub struct SimplePublisher<T, P> {
+    transport: Arc<T>,
+    uri_provider: Arc<P>,
 }
 
-impl SimplePublisher {
+impl<T: UTransport, P: LocalUriProvider> SimplePublisher<T, P> {
     /// Creates a new client.
     ///
     /// # Arguments
     ///
     /// * `transport` - The transport to use for sending messages.
     /// * `uri_provider` - The service to use for creating the event messages' _sink_ address.
-    pub fn new(transport: Arc<dyn UTransport>, uri_provider: Arc<dyn LocalUriProvider>) -> Self {
+    pub fn new(transport: Arc<T>, uri_provider: Arc<P>) -> Self {
         SimplePublisher {
             transport,
             uri_provider,
@@ -205,7 +205,7 @@ impl SimplePublisher {
 }
 
 #[async_trait]
-impl Publisher for SimplePublisher {
+impl<T: UTransport, P: LocalUriProvider> Publisher for SimplePublisher<T, P> {
     async fn publish(
         &self,
         resource_id: u16,
@@ -242,15 +242,16 @@ impl Publisher for SimplePublisher {
 /// about the new subscription and a (client provided) subscription change handler is registered with the
 /// listener. When a subscription change notification arrives from the USubscription service, the corresponding
 /// handler is being looked up and invoked.
-pub struct InMemorySubscriber {
-    transport: Arc<dyn UTransport>,
-    _uri_provider: Arc<dyn LocalUriProvider>,
-    usubscription: Arc<dyn USubscription>,
-    notifier: Arc<dyn Notifier>,
+pub struct InMemorySubscriber<T, S, N> {
+    transport: Arc<T>,
+    usubscription: Arc<S>,
+    notifier: Arc<N>,
     subscription_change_listener: Arc<SubscriptionChangeListener>,
 }
 
-impl InMemorySubscriber {
+impl<T: UTransport + 'static, P: LocalUriProvider + 'static>
+    InMemorySubscriber<T, RpcClientUSubscription, SimpleNotifier<T, P>>
+{
     /// Creates a new Subscriber for a given transport.
     ///
     /// The subscriber keeps track of subscription change handlers in memory only.
@@ -260,24 +261,22 @@ impl InMemorySubscriber {
     /// # Errors
     ///
     /// Returns an error if the Notifier cannot register a listener for notifications from the USubscription service.
-    pub async fn new(
-        transport: Arc<dyn UTransport>,
-        uri_provider: Arc<dyn LocalUriProvider>,
-    ) -> Result<Self, RegistrationError> {
+    pub async fn new(transport: Arc<T>, uri_provider: Arc<P>) -> Result<Self, RegistrationError> {
         let rpc_client = InMemoryRpcClient::new(transport.clone(), uri_provider.clone())
             .await
             .map(Arc::new)?;
         let usubscription_client = Arc::new(RpcClientUSubscription::new(rpc_client));
         let notifier = Arc::new(SimpleNotifier::new(transport.clone(), uri_provider.clone()));
-        Self::for_clients(transport, uri_provider, usubscription_client, notifier).await
+        Self::for_clients(transport, usubscription_client, notifier).await
     }
+}
 
+impl<T: UTransport, S: USubscription, N: Notifier> InMemorySubscriber<T, S, N> {
     /// Creates a new Subscriber for given clients.
     ///
     /// # Arguments
     ///
     /// * `transport` - The transport to use for registering the event listeners for subscribed topics.
-    /// * `uri-provider` - The service to use for creating topic addresses.
     /// * `usubscription` - The client to use for interacting with the (local) USubscription service.
     /// * `notifier` - The client to use for registering the listener for subscription updates from USubscription.
     ///
@@ -285,10 +284,9 @@ impl InMemorySubscriber {
     ///
     /// Returns an error if the Notifier cannot register a listener for notifications from the USubscription service.
     pub async fn for_clients(
-        transport: Arc<dyn UTransport>,
-        uri_provider: Arc<dyn LocalUriProvider>,
-        usubscription: Arc<dyn USubscription>,
-        notifier: Arc<dyn Notifier>,
+        transport: Arc<T>,
+        usubscription: Arc<S>,
+        notifier: Arc<N>,
     ) -> Result<Self, RegistrationError> {
         // register a generic listener for subscription updates
         // whenever a uE later tries to subscribe to a topic, it can provide an optional callback for
@@ -304,7 +302,6 @@ impl InMemorySubscriber {
             .await?;
         Ok(InMemorySubscriber {
             transport,
-            _uri_provider: uri_provider,
             usubscription,
             notifier,
             subscription_change_listener,
@@ -400,7 +397,7 @@ impl InMemorySubscriber {
 }
 
 #[async_trait]
-impl Subscriber for InMemorySubscriber {
+impl<T: UTransport, U: USubscription, N: Notifier> Subscriber for InMemorySubscriber<T, U, N> {
     async fn subscribe(
         &self,
         topic_filter: &UUri,
@@ -459,11 +456,11 @@ mod tests {
         StaticUriProvider, UAttributes, UCode, UMessageType, UPriority, UStatus, UUri, UUID,
     };
 
-    fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
+    fn new_uri_provider() -> Arc<StaticUriProvider> {
         Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
     }
 
-    fn succeeding_notifier() -> Arc<dyn Notifier> {
+    fn succeeding_notifier() -> Arc<MockNotifier> {
         let mut notifier = MockNotifier::new();
         notifier
             .expect_start_listening()
@@ -586,7 +583,6 @@ mod tests {
         // WHEN trying to create a Subscriber for this Notifier
         let creation_attempt = InMemorySubscriber::for_clients(
             Arc::new(MockTransport::new()),
-            new_uri_provider(),
             Arc::new(MockUSubscription::new()),
             Arc::new(notifier),
         )
@@ -612,7 +608,6 @@ mod tests {
 
         let subscriber = InMemorySubscriber {
             transport: Arc::new(MockTransport::new()),
-            _uri_provider: new_uri_provider(),
             usubscription: Arc::new(MockUSubscription::new()),
             notifier: Arc::new(notifier),
             subscription_change_listener,
@@ -682,7 +677,6 @@ mod tests {
         // and a Subscriber using that USubscription client
         let subscriber = InMemorySubscriber::for_clients(
             Arc::new(transport),
-            new_uri_provider(),
             Arc::new(usubscription_client),
             succeeding_notifier(),
         )
@@ -752,7 +746,6 @@ mod tests {
         // and a Subscriber using that USubscription client, Notifier and transport
         let subscriber = InMemorySubscriber::for_clients(
             Arc::new(transport),
-            new_uri_provider(),
             Arc::new(usubscription_client),
             succeeding_notifier(),
         )
@@ -834,7 +827,6 @@ mod tests {
         // and a Subscriber using that USubscription client, Notifier and transport
         let subscriber = InMemorySubscriber::for_clients(
             Arc::new(transport),
-            new_uri_provider(),
             Arc::new(usubscription_client),
             succeeding_notifier(),
         )
@@ -891,7 +883,6 @@ mod tests {
         // and a Subscriber using that USubscription client, Notifier and transport
         let subscriber = InMemorySubscriber::for_clients(
             Arc::new(transport),
-            new_uri_provider(),
             Arc::new(usubscription_client),
             succeeding_notifier(),
         )
@@ -928,7 +919,6 @@ mod tests {
         // and a Subscriber using that USubscription client, Notifier and transport
         let subscriber = InMemorySubscriber::for_clients(
             Arc::new(transport),
-            new_uri_provider(),
             Arc::new(usubscription_client),
             succeeding_notifier(),
         )
@@ -975,7 +965,6 @@ mod tests {
         // and a Subscriber using that USubscription client, Notifier and transport
         let subscriber = InMemorySubscriber::for_clients(
             Arc::new(transport),
-            new_uri_provider(),
             Arc::new(usubscription_client),
             succeeding_notifier(),
         )
@@ -1031,7 +1020,6 @@ mod tests {
         // and a Subscriber using that USubscription client, Notifier and transport
         let subscriber = InMemorySubscriber::for_clients(
             Arc::new(transport),
-            new_uri_provider(),
             Arc::new(usubscription_client),
             succeeding_notifier(),
         )
