@@ -65,7 +65,7 @@ protobuf-codegen = { version = "3.7.2" }
 protoc-bin-vendored = { version = "3.2" }
 
 [dev-dependencies]
-clap = { version = "4.5.51" }
+clap = { version = "4.5.60" }
 cucumber = { version = "0.21.1", features = ["output-junit"] }
 hex = { version = "0.4.3" }
 mockall = { version = "0.13.1" }
