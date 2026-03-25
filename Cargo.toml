@@ -46,7 +46,7 @@ symphony = ["communication", "dep:serde", "dep:serde_json", "dep:symphony"]
 [dependencies]
 async-trait = { version = "0.1" }
 bytes = { version = "1.11.1" }
-mediatype = "0.20"
+mediatype = "0.21"
 mockall = { version = "0.13", optional = true }
 protobuf = { version = "3.7.2", features = ["with-bytes"] }
 rand = { version = "0.9" }
