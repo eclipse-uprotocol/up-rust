@@ -156,13 +156,13 @@ impl UListener for ResponseListener {
 /// implementation and a response handler is created and registered with the listener.
 /// When an RPC Response message arrives from the service, the corresponding handler is being looked
 /// up and invoked.
-pub struct InMemoryRpcClient {
-    transport: Arc<dyn UTransport>,
-    uri_provider: Arc<dyn LocalUriProvider>,
+pub struct InMemoryRpcClient<T, P> {
+    transport: Arc<T>,
+    uri_provider: Arc<P>,
     response_listener: Arc<ResponseListener>,
 }
 
-impl InMemoryRpcClient {
+impl<T: UTransport, P: LocalUriProvider> InMemoryRpcClient<T, P> {
     /// Creates a new RPC client for a given transport.
     ///
     /// # Arguments
@@ -174,10 +174,7 @@ impl InMemoryRpcClient {
     ///
     /// Returns an error if the generic RPC Response listener could not be
     /// registered with the given transport.
-    pub async fn new(
-        transport: Arc<dyn UTransport>,
-        uri_provider: Arc<dyn LocalUriProvider>,
-    ) -> Result<Self, RegistrationError> {
+    pub async fn new(transport: Arc<T>, uri_provider: Arc<P>) -> Result<Self, RegistrationError> {
         let response_listener = Arc::new(ResponseListener {
             pending_requests: Mutex::new(HashMap::new()),
         });
@@ -204,7 +201,7 @@ impl InMemoryRpcClient {
 }
 
 #[async_trait]
-impl RpcClient for InMemoryRpcClient {
+impl<T: UTransport, P: LocalUriProvider> RpcClient for InMemoryRpcClient<T, P> {
     async fn invoke_method(
         &self,
         method: UUri,
@@ -282,7 +279,7 @@ mod tests {
 
     use crate::{utransport::MockTransport, StaticUriProvider, UMessageBuilder, UPriority, UUri};
 
-    fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
+    fn new_uri_provider() -> Arc<StaticUriProvider> {
         Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
     }
 

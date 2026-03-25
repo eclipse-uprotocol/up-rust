@@ -26,19 +26,19 @@ use super::{
 
 /// A [`Notifier`] that uses the uProtocol Transport Layer API to send and receive
 /// notifications to/from (other) uEntities.
-pub struct SimpleNotifier {
-    transport: Arc<dyn UTransport>,
-    uri_provider: Arc<dyn LocalUriProvider>,
+pub struct SimpleNotifier<T, P> {
+    transport: Arc<T>,
+    uri_provider: Arc<P>,
 }
 
-impl SimpleNotifier {
+impl<T: UTransport, P: LocalUriProvider> SimpleNotifier<T, P> {
     /// Creates a new Notifier for a given transport.
     ///
     /// # Arguments
     ///
     /// * `transport` - The uProtocol Transport Layer implementation to use for sending and receiving notification messages.
     /// * `uri_provider` - The helper for creating URIs that represent local resources.
-    pub fn new(transport: Arc<dyn UTransport>, uri_provider: Arc<dyn LocalUriProvider>) -> Self {
+    pub fn new(transport: Arc<T>, uri_provider: Arc<P>) -> Self {
         SimpleNotifier {
             transport,
             uri_provider,
@@ -47,7 +47,7 @@ impl SimpleNotifier {
 }
 
 #[async_trait]
-impl Notifier for SimpleNotifier {
+impl<T: UTransport, P: LocalUriProvider> Notifier for SimpleNotifier<T, P> {
     async fn notify(
         &self,
         resource_id: u16,
@@ -111,7 +111,7 @@ mod tests {
         StaticUriProvider, UCode, UPriority, UStatus, UUri, UUID,
     };
 
-    fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
+    fn new_uri_provider() -> Arc<StaticUriProvider> {
         Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
     }
 

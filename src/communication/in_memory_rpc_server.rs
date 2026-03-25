@@ -28,12 +28,12 @@ use crate::{
 
 use super::{RegistrationError, RequestHandler, RpcServer, ServiceInvocationError, UPayload};
 
-struct RequestListener {
+struct RequestListener<T: UTransport> {
     request_handler: Arc<dyn RequestHandler>,
-    transport: Arc<dyn UTransport>,
+    transport: Arc<T>,
 }
 
-impl RequestListener {
+impl<T: UTransport> RequestListener<T> {
     async fn process_valid_request(&self, resource_id: u16, request_message: UMessage) {
         let transport_clone = self.transport.clone();
         let request_handler_clone = self.request_handler.clone();
@@ -93,7 +93,7 @@ impl RequestListener {
 }
 
 #[async_trait]
-impl UListener for RequestListener {
+impl<T: UTransport> UListener for RequestListener<T> {
     async fn on_receive(&self, msg: UMessage) {
         if msg.is_request() {
             // cannot fail because inbound messages are validated at the transport layer already
@@ -117,15 +117,15 @@ impl UListener for RequestListener {
 /// the given request handler and registered with the underlying transport. The listener is also
 /// mapped to the endpoint's method resource ID in order to prevent registration of multiple
 /// request handlers for the same method.
-pub struct InMemoryRpcServer {
-    transport: Arc<dyn UTransport>,
-    uri_provider: Arc<dyn LocalUriProvider>,
+pub struct InMemoryRpcServer<T, P> {
+    transport: Arc<T>,
+    uri_provider: Arc<P>,
     request_listeners: tokio::sync::Mutex<HashMap<u16, Arc<dyn UListener>>>,
 }
 
-impl InMemoryRpcServer {
+impl<T: UTransport, P: LocalUriProvider> InMemoryRpcServer<T, P> {
     /// Creates a new RPC server for a given transport.
-    pub fn new(transport: Arc<dyn UTransport>, uri_provider: Arc<dyn LocalUriProvider>) -> Self {
+    pub fn new(transport: Arc<T>, uri_provider: Arc<P>) -> Self {
         InMemoryRpcServer {
             transport,
             uri_provider,
@@ -161,7 +161,7 @@ impl InMemoryRpcServer {
 }
 
 #[async_trait]
-impl RpcServer for InMemoryRpcServer {
+impl<T: UTransport + 'static, P: LocalUriProvider> RpcServer for InMemoryRpcServer<T, P> {
     async fn register_endpoint(
         &self,
         origin_filter: Option<&UUri>,
@@ -244,7 +244,7 @@ mod tests {
         UAttributes, UCode, UUri, UUID,
     };
 
-    fn new_uri_provider() -> Arc<dyn LocalUriProvider> {
+    fn new_uri_provider() -> Arc<StaticUriProvider> {
         Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
     }
 
