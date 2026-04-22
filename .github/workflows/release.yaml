@@ -153,7 +153,7 @@ jobs:
 
       - name: Gets latest created release info
         id: latest_release_info
-        uses: joutvhu/get-release@9a8271732adc3299a22f8ad09b0a67eb3aa836ac # v1.0.3
+        uses: joutvhu/get-release@8c3531bba0d249f5e7c3d7e1954d34db9edf2a90 # v1.0.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
