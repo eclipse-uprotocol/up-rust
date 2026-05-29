@@ -11,8 +11,6 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use protobuf::Enum;
-
 use crate::{UAttributes, UMessageType, UPriority, UUri};
 
 use crate::UAttributesError;
@@ -40,35 +38,14 @@ pub trait UAttributesValidator: Send {
     /// Returns an error if [`UAttributes::type_`] does not match the type returned by [`UAttributesValidator::message_type`].
     fn validate_type(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let expected_type = self.message_type();
-        match attributes.type_.enum_value() {
-            Ok(mt) if mt == expected_type => Ok(()),
-            Ok(mt) => Err(UAttributesError::validation_error(format!(
-                "Wrong Message Type [{}]",
-                mt.to_cloudevent_type()
-            ))),
-            Err(unknown_code) => Err(UAttributesError::validation_error(format!(
-                "Unknown Message Type code [{unknown_code}]"
-            ))),
-        }
-    }
-
-    /// Verifies that a set of attributes contains a valid message ID.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if [`UAttributes::id`] does not contain a [valid uProtocol UUID](`crate::UUID::is_uprotocol_uuid`).
-    fn validate_id(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        // [impl->dsn~up-attributes-id~1]
-        if attributes
-            .id
-            .as_ref()
-            .is_some_and(|id| id.is_uprotocol_uuid())
-        {
+        if expected_type == attributes.type_() {
             Ok(())
         } else {
-            Err(UAttributesError::validation_error(
-                "Attributes must contain valid uProtocol UUID in id property",
-            ))
+            Err(UAttributesError::validation_error(format!(
+                "Wrong Message Type [expected {}, got {}]",
+                expected_type.to_cloudevent_type(),
+                attributes.type_().to_cloudevent_type()
+            )))
         }
     }
 
@@ -93,15 +70,12 @@ pub trait UAttributesValidator: Send {
 /// If [`UAttributes::priority`] contains a value that is less [`UPriority::UPRIORITY_CS4`].
 pub fn validate_rpc_priority(attributes: &UAttributes) -> Result<(), UAttributesError> {
     attributes
-        .priority
-        .enum_value()
-        .map_err(|unknown_code| {
-            UAttributesError::ValidationError(format!(
-                "RPC message must have a valid priority [{unknown_code}]"
-            ))
+        .priority()
+        .ok_or_else(|| {
+            UAttributesError::ValidationError("RPC message must have a priority".to_string())
         })
         .and_then(|prio| {
-            if prio.value() < UPriority::UPRIORITY_CS4.value() {
+            if prio < UPriority::CS4 {
                 Err(UAttributesError::ValidationError(
                     "RPC message must have a priority of at least CS4".to_string(),
                 ))
@@ -125,21 +99,17 @@ impl UAttributesValidators {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUID, UUri};
+    /// use up_rust::{UAttributesValidators, UMessageBuilder, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
-    /// let attributes = UAttributes {
-    ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-    ///    id: Some(UUID::build()).into(),
-    ///    source: Some(topic).into(),
-    ///    ..Default::default()
-    /// };
+    /// let msg = UMessageBuilder::publish(topic).build()?;
     /// let validator = UAttributesValidators::Publish.validator();
-    /// assert!(validator.validate(&attributes).is_ok());
+    /// assert!(validator.validate(msg.attributes()).is_ok());
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn validator(&self) -> Box<dyn UAttributesValidator> {
         match self {
             UAttributesValidators::Publish => Box::new(PublishValidator),
@@ -154,23 +124,19 @@ impl UAttributesValidators {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUID, UUri};
+    /// use up_rust::{UAttributesValidators, UMessageBuilder, UMessageType, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
-    /// let attributes = UAttributes {
-    ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-    ///    id: Some(UUID::build()).into(),
-    ///    source: Some(topic).into(),
-    ///    ..Default::default()
-    /// };
-    /// let validator = UAttributesValidators::get_validator_for_attributes(&attributes);
-    /// assert!(validator.validate(&attributes).is_ok());
+    /// let msg = UMessageBuilder::publish(topic).build()?;
+    /// let validator = UAttributesValidators::get_validator_for_attributes(msg.attributes());
+    /// assert!(validator.validate(msg.attributes()).is_ok());
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn get_validator_for_attributes(attributes: &UAttributes) -> Box<dyn UAttributesValidator> {
-        Self::get_validator(attributes.type_.enum_value_or_default())
+        Self::get_validator(attributes.type_())
     }
 
     /// Gets a validator that can be used to check attributes of a given type of message.
@@ -178,29 +144,23 @@ impl UAttributesValidators {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UAttributesValidators, UMessageBuilder, UMessageType, UUID, UUri};
+    /// use up_rust::{UAttributesValidators, UMessageBuilder, UMessageType, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
-    /// let attributes = UAttributes {
-    ///    type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-    ///    id: Some(UUID::build()).into(),
-    ///    source: Some(topic).into(),
-    ///    ..Default::default()
-    /// };
-    /// let validator = UAttributesValidators::get_validator(UMessageType::UMESSAGE_TYPE_PUBLISH);
-    /// assert!(validator.validate(&attributes).is_ok());
+    /// let msg = UMessageBuilder::publish(topic).build()?;
+    /// let validator = UAttributesValidators::get_validator(UMessageType::Publish);
+    /// assert!(validator.validate(msg.attributes()).is_ok());
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn get_validator(message_type: UMessageType) -> Box<dyn UAttributesValidator> {
         match message_type {
-            UMessageType::UMESSAGE_TYPE_REQUEST => Box::new(RequestValidator),
-            UMessageType::UMESSAGE_TYPE_RESPONSE => Box::new(ResponseValidator),
-            UMessageType::UMESSAGE_TYPE_NOTIFICATION => Box::new(NotificationValidator),
-            UMessageType::UMESSAGE_TYPE_UNSPECIFIED | UMessageType::UMESSAGE_TYPE_PUBLISH => {
-                Box::new(PublishValidator)
-            }
+            UMessageType::Publish => Box::new(PublishValidator),
+            UMessageType::Notification => Box::new(NotificationValidator),
+            UMessageType::Request => Box::new(RequestValidator),
+            UMessageType::Response => Box::new(ResponseValidator),
         }
     }
 }
@@ -210,7 +170,7 @@ pub struct PublishValidator;
 
 impl UAttributesValidator for PublishValidator {
     fn message_type(&self) -> UMessageType {
-        UMessageType::UMESSAGE_TYPE_PUBLISH
+        UMessageType::Publish
     }
 
     /// Checks if a given set of attributes complies with the rules specified for
@@ -221,13 +181,11 @@ impl UAttributesValidator for PublishValidator {
     /// Returns an error if any of the following checks fail for the given attributes:
     ///
     /// * [`UAttributesValidator::validate_type`]
-    /// * [`UAttributesValidator::validate_id`]
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
             self.validate_type(attributes),
-            self.validate_id(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
         ]
@@ -250,20 +208,14 @@ impl UAttributesValidator for PublishValidator {
     ///
     /// Returns an error
     ///
-    /// * if the attributes do not contain a source URI, or
     /// * if the source URI contains any wildcards, or
     /// * if the source URI has a resource ID of 0.
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         // [impl->dsn~up-attributes-publish-source~1]
-        if let Some(source) = attributes.source.as_ref() {
-            source
-                .verify_event()
-                .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
-        } else {
-            Err(UAttributesError::validation_error(
-                "Attributes for a publish message must contain a source URI",
-            ))
-        }
+        attributes
+            .source()
+            .verify_event()
+            .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
     }
 
     /// Verifies that attributes for a publish message do not contain a sink URI.
@@ -288,7 +240,7 @@ pub struct NotificationValidator;
 
 impl UAttributesValidator for NotificationValidator {
     fn message_type(&self) -> UMessageType {
-        UMessageType::UMESSAGE_TYPE_NOTIFICATION
+        UMessageType::Notification
     }
 
     /// Checks if a given set of attributes complies with the rules specified for
@@ -299,13 +251,11 @@ impl UAttributesValidator for NotificationValidator {
     /// Returns an error if any of the following checks fail for the given attributes:
     ///
     /// * [`UAttributesValidator::validate_type`]
-    /// * [`UAttributesValidator::validate_id`]
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
             self.validate_type(attributes),
-            self.validate_id(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
         ]
@@ -333,20 +283,15 @@ impl UAttributesValidator for NotificationValidator {
     /// * if the source URI contains any wildcards.
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         // [impl->dsn~up-attributes-notification-source~1]
-        if let Some(source) = attributes.source.as_ref() {
-            if source.is_rpc_response() {
-                Err(UAttributesError::validation_error(
-                    "Origin must not be an RPC response URI",
-                ))
-            } else {
-                source.verify_no_wildcards().map_err(|e| {
-                    UAttributesError::validation_error(format!("Invalid source URI: {e}"))
-                })
-            }
-        } else {
+        let source = attributes.source();
+        if source.is_rpc_response() {
             Err(UAttributesError::validation_error(
-                "Attributes must contain a source URI",
+                "Origin must not be an RPC response URI",
             ))
+        } else {
+            source
+                .verify_no_wildcards()
+                .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
         }
     }
 
@@ -404,7 +349,7 @@ impl RequestValidator {
 
 impl UAttributesValidator for RequestValidator {
     fn message_type(&self) -> UMessageType {
-        UMessageType::UMESSAGE_TYPE_REQUEST
+        UMessageType::Request
     }
 
     /// Checks if a given set of attributes complies with the rules specified for
@@ -415,7 +360,6 @@ impl UAttributesValidator for RequestValidator {
     /// Returns an error if any of the following checks fail for the given attributes:
     ///
     /// * [`UAttributesValidator::validate_type`]
-    /// * [`UAttributesValidator::validate_id`]
     /// * [`RequestValidator::validate_ttl`]
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
@@ -423,7 +367,6 @@ impl UAttributesValidator for RequestValidator {
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
             self.validate_type(attributes),
-            self.validate_id(attributes),
             self.validate_ttl(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
@@ -450,12 +393,10 @@ impl UAttributesValidator for RequestValidator {
     /// [`UUri::verify_rpc_response`].
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         // [impl->dsn~up-attributes-request-source~1]
-        if let Some(source) = attributes.source.as_ref() {
-            UUri::verify_rpc_response(source)
-                .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
-        } else {
-            Err(UAttributesError::validation_error("Attributes for a request message must contain a reply-to address in the source property"))
-        }
+        attributes
+            .source()
+            .verify_rpc_response()
+            .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
     }
 
     /// Verifies that attributes for a message representing an RPC request indicate the method to invoke.
@@ -479,51 +420,23 @@ impl UAttributesValidator for RequestValidator {
 pub struct ResponseValidator;
 
 impl ResponseValidator {
-    /// Verifies that the attributes contain a valid request ID.
+    /// Verifies that the attributes contain a request ID.
     ///
     /// # Errors
     ///
-    /// Returns an error if [`UAttributes::reqid`] is empty or contains a value which is not
-    /// a [valid uProtocol UUID](`crate::UUID::is_uprotocol_uuid`).
+    /// Returns an error if the attributes do not contain a request ID.
     pub fn validate_reqid(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if !attributes
-            .reqid
-            .as_ref()
-            .is_some_and(|id| id.is_uprotocol_uuid())
-        {
-            Err(UAttributesError::validation_error(
-                "Request ID is not a valid uProtocol UUID",
-            ))
+        if attributes.reqid.as_ref().is_none() {
+            Err(UAttributesError::validation_error("Request ID is missing"))
         } else {
             Ok(())
         }
-    }
-
-    /// Verifies that a set of attributes contains a valid communication status.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if [`UAttributes::commstatus`] does not contain a value that is a `UCode`.
-    pub fn validate_commstatus(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
-        if let Some(status) = attributes.commstatus {
-            match status.enum_value() {
-                Ok(_) => {
-                    return Ok(());
-                }
-                Err(e) => {
-                    return Err(UAttributesError::validation_error(format!(
-                        "Invalid Communication Status code: {e}"
-                    )));
-                }
-            }
-        }
-        Ok(())
     }
 }
 
 impl UAttributesValidator for ResponseValidator {
     fn message_type(&self) -> UMessageType {
-        UMessageType::UMESSAGE_TYPE_RESPONSE
+        UMessageType::Response
     }
 
     /// Checks if a given set of attributes complies with the rules specified for
@@ -534,20 +447,16 @@ impl UAttributesValidator for ResponseValidator {
     /// Returns an error if any of the following checks fail for the given attributes:
     ///
     /// * [`UAttributesValidator::validate_type`]
-    /// * [`UAttributesValidator::validate_id`]
     /// * [`UAttributesValidator::validate_source`]
     /// * [`UAttributesValidator::validate_sink`]
     /// * [`ResponseValidator::validate_reqid`]
-    /// * [`ResponseValidator::validate_commstatus`]
     /// * `validate_rpc_priority`
     fn validate(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         let error_message = vec![
             self.validate_type(attributes),
-            self.validate_id(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
             self.validate_reqid(attributes),
-            self.validate_commstatus(attributes),
             validate_rpc_priority(attributes),
         ]
         .into_iter()
@@ -572,12 +481,10 @@ impl UAttributesValidator for ResponseValidator {
     /// [`UUri::verify_rpc_method`].
     fn validate_source(&self, attributes: &UAttributes) -> Result<(), UAttributesError> {
         // [impl->dsn~up-attributes-response-source~1]
-        if let Some(source) = attributes.source.as_ref() {
-            UUri::verify_rpc_method(source)
-                .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
-        } else {
-            Err(UAttributesError::validation_error("Missing Source"))
-        }
+        attributes
+            .source()
+            .verify_rpc_method()
+            .map_err(|e| UAttributesError::validation_error(format!("Invalid source URI: {e}")))
     }
 
     /// Verifies that attributes for a message representing an RPC response contain a valid
@@ -600,41 +507,15 @@ impl UAttributesValidator for ResponseValidator {
 
 #[cfg(test)]
 mod tests {
-    use protobuf::EnumOrUnknown;
     use test_case::test_case;
 
     use super::*;
-    use crate::{UCode, UPriority, UUri, UUID};
+    use crate::{uattributes::TokenString, UCode, UPriority, UUri, UUID};
 
-    #[test]
-    fn test_validate_type_fails_for_unknown_type_code() {
-        let attributes = UAttributes {
-            type_: EnumOrUnknown::from_i32(20),
-            ..Default::default()
-        };
-        assert!(UAttributesValidators::Publish
-            .validator()
-            .validate_type(&attributes)
-            .is_err());
-        assert!(UAttributesValidators::Notification
-            .validator()
-            .validate_type(&attributes)
-            .is_err());
-        assert!(UAttributesValidators::Request
-            .validator()
-            .validate_type(&attributes)
-            .is_err());
-        assert!(UAttributesValidators::Response
-            .validator()
-            .validate_type(&attributes)
-            .is_err());
-    }
-
-    #[test_case(UMessageType::UMESSAGE_TYPE_UNSPECIFIED, UMessageType::UMESSAGE_TYPE_PUBLISH; "succeeds for Unspecified message")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_PUBLISH, UMessageType::UMESSAGE_TYPE_PUBLISH; "succeeds for Publish message")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_NOTIFICATION, UMessageType::UMESSAGE_TYPE_NOTIFICATION; "succeeds for Notification message")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_REQUEST, UMessageType::UMESSAGE_TYPE_REQUEST; "succeeds for Request message")]
-    #[test_case(UMessageType::UMESSAGE_TYPE_RESPONSE, UMessageType::UMESSAGE_TYPE_RESPONSE; "succeeds for Response message")]
+    #[test_case(UMessageType::Publish, UMessageType::Publish; "succeeds for Publish message")]
+    #[test_case(UMessageType::Notification, UMessageType::Notification; "succeeds for Notification message")]
+    #[test_case(UMessageType::Request, UMessageType::Request; "succeeds for Request message")]
+    #[test_case(UMessageType::Response, UMessageType::Response; "succeeds for Response message")]
     fn test_get_validator_returns_matching_validator(
         message_type: UMessageType,
         expected_validator_type: UMessageType,
@@ -644,44 +525,31 @@ mod tests {
         assert_eq!(validator.message_type(), expected_validator_type);
     }
 
-    #[test_case(Some(UUID::build()), Some(publish_topic()), None, None, true; "succeeds for topic only")]
+    #[test_case(publish_topic(), None, None, true; "succeeds for topic only")]
     // [utest->dsn~up-attributes-publish-sink~1]
-    #[test_case(Some(UUID::build()), Some(publish_topic()), Some(destination()), None, false; "fails for message containing destination")]
-    #[test_case(Some(UUID::build()), Some(publish_topic()), None, Some(100), true; "succeeds for valid attributes")]
+    #[test_case(publish_topic(), Some(destination()), None, false; "fails for message containing destination")]
+    #[test_case(publish_topic(), None, Some(100), true; "succeeds for valid attributes")]
     // [utest->dsn~up-attributes-publish-source~1]
-    #[test_case(Some(UUID::build()), None, None, None, false; "fails for missing topic")]
-    // [utest->dsn~up-attributes-publish-source~1]
-    #[test_case(Some(UUID::build()), Some(UUri { resource_id: 0x54, ..Default::default()}), None, None, false; "fails for invalid topic")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(None, Some(publish_topic()), None, None, false; "fails for missing message ID")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(
-        Some(UUID {
-            // invalid UUID version (not 0b1000 but 0b1010)
-            msb: 0x000000000001C000u64,
-            lsb: 0x8000000000000000u64,
-            ..Default::default()
-        }),
-        Some(publish_topic()),
-        None,
-        None,
-        false;
-        "fails for invalid message id")]
+    #[test_case(method_to_invoke(), None, None, false; "fails for invalid topic")]
     fn test_validate_attributes_for_publish_message(
-        id: Option<UUID>,
-        source: Option<UUri>,
+        source: UUri,
         sink: Option<UUri>,
         ttl: Option<u32>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-            id: id.into(),
-            priority: UPriority::UPRIORITY_CS1.into(),
-            source: source.into(),
-            sink: sink.into(),
+            commstatus: None,
+            id: UUID::build(),
+            payload_format: None,
+            permission_level: None,
+            priority: UPriority::CS1.into(),
+            reqid: None,
+            sink,
+            source,
+            token: None,
+            traceparent: None,
             ttl,
-            ..Default::default()
+            type_: UMessageType::Publish,
         };
         let validator = UAttributesValidators::Publish.validator();
         let status = validator.validate(&attributes);
@@ -703,46 +571,32 @@ mod tests {
     }
 
     // [utest->dsn~up-attributes-notification-sink~1]
-    #[test_case(Some(UUID::build()), Some(origin()), None, None, false; "fails for missing destination")]
-    #[test_case(Some(UUID::build()), Some(origin()), Some(destination()), None, true; "succeeds for both origin and destination")]
-    #[test_case(Some(UUID::build()), Some(origin()), Some(destination()), Some(100), true; "succeeds for valid attributes")]
+    #[test_case(origin(), None, None, false; "fails for missing destination")]
+    #[test_case(origin(), Some(destination()), None, true; "succeeds for both origin and destination")]
+    #[test_case(origin(), Some(destination()), Some(100), true; "succeeds for valid attributes")]
     // [utest->dsn~up-attributes-notification-source~1]
-    #[test_case(Some(UUID::build()), None, Some(destination()), None, false; "fails for missing origin")]
-    // [utest->dsn~up-attributes-notification-source~1]
-    #[test_case(Some(UUID::build()), Some(UUri::default()), Some(destination()), None, false; "fails for invalid origin")]
+    #[test_case(reply_to_address(), Some(destination()), None, false; "fails for invalid origin")]
     // [utest->dsn~up-attributes-notification-sink~1]
-    #[test_case(Some(UUID::build()), Some(origin()), Some(UUri { ue_id: 0xabcd, ue_version_major: 0x01, resource_id: 0x0011, ..Default::default() }), None, false; "fails for invalid destination")]
-    #[test_case(Some(UUID::build()), None, None, None, false; "fails for neither origin nor destination")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(None, Some(origin()), Some(destination()), None, false; "fails for missing message ID")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(
-        Some(UUID {
-            // invalid UUID version (not 0b1000 but 0b1010)
-            msb: 0x000000000001C000u64,
-            lsb: 0x8000000000000000u64,
-            ..Default::default()
-        }),
-        Some(origin()),
-        Some(destination()),
-        None,
-        false;
-        "fails for invalid message id")]
+    #[test_case(origin(), Some(method_to_invoke()), None, false; "fails for invalid destination")]
     fn test_validate_attributes_for_notification_message(
-        id: Option<UUID>,
-        source: Option<UUri>,
+        source: UUri,
         sink: Option<UUri>,
         ttl: Option<u32>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
-            id: id.into(),
-            priority: UPriority::UPRIORITY_CS1.into(),
-            source: source.into(),
-            sink: sink.into(),
+            commstatus: None,
+            id: UUID::build(),
+            payload_format: None,
+            permission_level: None,
+            priority: UPriority::CS1.into(),
+            reqid: None,
+            sink,
+            source,
+            token: None,
+            traceparent: None,
             ttl,
-            ..Default::default()
+            type_: UMessageType::Notification,
         };
         let validator = UAttributesValidators::Notification.validator();
         let status = validator.validate(&attributes);
@@ -763,62 +617,44 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for mandatory attributes")]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), true; "succeeds for valid attributes")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(None, Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), Some(String::from("token")), false; "fails for missing message ID")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(
-        Some(UUID {
-            // invalid UUID version (not 0b1000 but 0b1010)
-            msb: 0x000000000001C000u64,
-            lsb: 0x8000000000000000u64,
-            ..Default::default()
-        }),
-        Some(method_to_invoke()),
-        Some(reply_to_address()),
-        None,
-        Some(2000),
-        Some(UPriority::UPRIORITY_CS4),
-        None,
-        false;
-        "fails for invalid message id")]
+    #[test_case(Some(method_to_invoke()), reply_to_address(), None, Some(2000), Some(UPriority::CS4), None, true; "succeeds for mandatory attributes")]
+    #[test_case(Some(method_to_invoke()), reply_to_address(), Some(1), Some(2000), Some(UPriority::CS4), Some("token"), true; "succeeds for valid attributes")]
     // [utest->dsn~up-attributes-request-source~1]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), None, None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing reply-to-address")]
-    // [utest->dsn~up-attributes-request-source~1]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(UUri { resource_id: 0x0001, ..Default::default()}), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid reply-to-address")]
+    #[test_case(Some(method_to_invoke()), origin(), None, Some(2000), Some(UPriority::CS4), None, false; "fails for invalid reply-to-address")]
     // [utest->dsn~up-attributes-request-sink~1]
-    #[test_case(Some(UUID::build()), None, Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing method-to-invoke")]
+    #[test_case(None, reply_to_address(), None, Some(2000), Some(UPriority::CS4), None, false; "fails for missing method-to-invoke")]
     // [utest->dsn~up-attributes-request-sink~1]
-    #[test_case(Some(UUID::build()), Some(UUri::default()), Some(reply_to_address()), None, Some(2000), Some(UPriority::UPRIORITY_CS4), None, false; "fails for invalid method-to-invoke")]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), None, None, false; "fails for missing priority")]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS3), None, false; "fails for invalid priority")]
+    #[test_case(Some(destination()), reply_to_address(), None, Some(2000), Some(UPriority::CS4), None, false; "fails for invalid method-to-invoke")]
+    #[test_case(Some(method_to_invoke()), reply_to_address(), Some(1), Some(2000), None, None, false; "fails for missing priority")]
+    #[test_case(Some(method_to_invoke()), reply_to_address(), Some(1), Some(2000), Some(UPriority::CS3), None, false; "fails for invalid priority")]
     // [utest->dsn~up-attributes-request-ttl~1]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, None, Some(UPriority::UPRIORITY_CS4), None, false; "fails for missing ttl")]
+    #[test_case(Some(method_to_invoke()), reply_to_address(), Some(1), None, Some(UPriority::CS4), None, false; "fails for missing ttl")]
     // [utest->dsn~up-attributes-request-ttl~1]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), None, Some(0), Some(UPriority::UPRIORITY_CS4), None, false; "fails for ttl = 0")]
-    #[test_case(Some(UUID::build()), Some(method_to_invoke()), Some(reply_to_address()), Some(1), Some(2000), Some(UPriority::UPRIORITY_CS4), None, true; "succeeds for valid permission level")]
+    #[test_case(Some(method_to_invoke()), reply_to_address(), Some(1), Some(0), Some(UPriority::CS4), None, false; "fails for ttl = 0")]
+    #[test_case(Some(method_to_invoke()), reply_to_address(), Some(1), Some(2000), Some(UPriority::CS4), None, true; "succeeds for valid permission level")]
     #[allow(clippy::too_many_arguments)]
     fn test_validate_attributes_for_rpc_request_message(
-        id: Option<UUID>,
         method_to_invoke: Option<UUri>,
-        reply_to_address: Option<UUri>,
+        reply_to_address: UUri,
         perm_level: Option<u32>,
         ttl: Option<u32>,
         priority: Option<UPriority>,
-        token: Option<String>,
+        token: Option<&str>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
-            id: id.into(),
-            priority: priority.unwrap_or(UPriority::UPRIORITY_UNSPECIFIED).into(),
-            source: reply_to_address.into(),
-            sink: method_to_invoke.into(),
+            commstatus: None,
+            id: UUID::build(),
+            payload_format: None,
             permission_level: perm_level,
+            priority,
+            reqid: None,
+            sink: method_to_invoke,
+            source: reply_to_address,
+            token: token.map(TokenString::from),
+            traceparent: None,
             ttl,
-            token,
-            ..Default::default()
+            type_: UMessageType::Request,
         };
         let status = UAttributesValidators::Request
             .validator()
@@ -840,77 +676,43 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for mandatory attributes")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid attributes")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(None, Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS4), false; "fails for missing message ID")]
-    // [utest->dsn~up-attributes-id~1]
-    #[test_case(
-        Some(UUID {
-            // invalid UUID version (not 0b1000 but 0b1010)
-            msb: 0x000000000001C000u64,
-            lsb: 0x8000000000000000u64,
-            ..Default::default()
-        }),
-        Some(reply_to_address()),
-        Some(method_to_invoke()),
-        Some(UUID::build()),
-        None,
-        None,
-        Some(UPriority::UPRIORITY_CS4),
-        false;
-        "fails for invalid message id")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), Some(UUID::build()), None, None, Some(UPriority::CS4), true; "succeeds for mandatory attributes")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), Some(UUID::build()), Some(UCode::Cancelled), Some(100), Some(UPriority::CS4), true; "succeeds for valid attributes")]
     // [utest->dsn~up-attributes-response-sink~1]
-    #[test_case(Some(UUID::build()), None, Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing reply-to-address")]
+    #[test_case(None, method_to_invoke(), Some(UUID::build()), None, None, Some(UPriority::CS4), false; "fails for missing reply-to-address")]
     // [utest->dsn~up-attributes-response-sink~1]
-    #[test_case(Some(UUID::build()), Some(UUri { resource_id: 0x0001, ..Default::default()}), Some(method_to_invoke()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid reply-to-address")]
+    #[test_case(Some(origin()), method_to_invoke(), Some(UUID::build()), None, None, Some(UPriority::CS4), false; "fails for invalid reply-to-address")]
     // [utest->dsn~up-attributes-response-source~1]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), None, Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing invoked-method")]
-    // [utest->dsn~up-attributes-response-source~1]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(UUri::default()), Some(UUID::build()), None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid invoked-method")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), None, Some(UPriority::UPRIORITY_CS4), true; "succeeds for valid commstatus")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from_i32(-42)), None, Some(UPriority::UPRIORITY_CS4), false; "fails for invalid commstatus")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), None, Some(100), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl > 0)")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), None, Some(0), Some(UPriority::UPRIORITY_CS4), true; "succeeds for ttl = 0")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), None, false; "fails for missing priority")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), Some(UUID::build()), Some(EnumOrUnknown::from(UCode::CANCELLED)), Some(100), Some(UPriority::UPRIORITY_CS3), false; "fails for invalid priority")]
-    #[test_case(Some(UUID::build()), Some(reply_to_address()), Some(method_to_invoke()), None, None, None, Some(UPriority::UPRIORITY_CS4), false; "fails for missing request id")]
-    #[test_case(
-        Some(UUID::build()),
-        Some(reply_to_address()),
-        Some(method_to_invoke()),
-        Some(UUID {
-            // invalid UUID version (not 0b1000 but 0b1010)
-            msb: 0x000000000001C000u64,
-            lsb: 0x8000000000000000u64,
-            ..Default::default()
-        }),
-        None,
-        None,
-        Some(UPriority::UPRIORITY_CS4),
-        false;
-        "fails for invalid request id")]
+    #[test_case(Some(reply_to_address()), origin(), Some(UUID::build()), None, None, Some(UPriority::CS4), false; "fails for invalid invoked-method")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), Some(UUID::build()), Some(UCode::Cancelled), None, Some(UPriority::CS4), true; "succeeds for valid commstatus")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), Some(UUID::build()), None, Some(100), Some(UPriority::CS4), true; "succeeds for ttl > 0)")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), Some(UUID::build()), None, Some(0), Some(UPriority::CS4), true; "succeeds for ttl = 0")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), Some(UUID::build()), Some(UCode::Cancelled), Some(100), None, false; "fails for missing priority")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), Some(UUID::build()), Some(UCode::Cancelled), Some(100), Some(UPriority::CS3), false; "fails for invalid priority")]
+    #[test_case(Some(reply_to_address()), method_to_invoke(), None, None, None, Some(UPriority::CS4), false; "fails for missing request id")]
     #[allow(clippy::too_many_arguments)]
     fn test_validate_attributes_for_rpc_response_message(
-        id: Option<UUID>,
         reply_to_address: Option<UUri>,
-        invoked_method: Option<UUri>,
+        invoked_method: UUri,
         reqid: Option<UUID>,
-        commstatus: Option<EnumOrUnknown<UCode>>,
+        commstatus: Option<UCode>,
         ttl: Option<u32>,
         priority: Option<UPriority>,
         expected_result: bool,
     ) {
         let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_RESPONSE.into(),
-            id: id.into(),
-            priority: priority.unwrap_or(UPriority::UPRIORITY_UNSPECIFIED).into(),
-            reqid: reqid.into(),
-            source: invoked_method.into(),
-            sink: reply_to_address.into(),
             commstatus,
+            id: UUID::build(),
+            payload_format: None,
+            permission_level: None,
+            priority,
+            reqid,
+            sink: reply_to_address,
+            source: invoked_method,
+            token: None,
+            traceparent: None,
             ttl,
-            ..Default::default()
+            type_: UMessageType::Response,
         };
         let status = UAttributesValidators::Response
             .validator()
@@ -933,52 +735,27 @@ mod tests {
     }
 
     fn publish_topic() -> UUri {
-        UUri {
-            authority_name: String::from("vcu.someVin"),
-            ue_id: 0x0000_5410,
-            ue_version_major: 0x01,
-            resource_id: 0xa010,
-            ..Default::default()
-        }
+        UUri::try_from_parts("vcu.somevin", 0x0000_5410, 0x01, 0xa010)
+            .expect("failed to create publish topic URI")
     }
 
     fn origin() -> UUri {
-        UUri {
-            authority_name: String::from("vcu.someVin"),
-            ue_id: 0x0000_3c00,
-            ue_version_major: 0x02,
-            resource_id: 0x9a00,
-            ..Default::default()
-        }
+        UUri::try_from_parts("vcu.somevin", 0x0000_3c00, 0x02, 0x9a00)
+            .expect("failed to create origin URI")
     }
 
     fn destination() -> UUri {
-        UUri {
-            authority_name: String::from("vcu.someVin"),
-            ue_id: 0x0000_3d07,
-            ue_version_major: 0x01,
-            resource_id: 0x0000,
-            ..Default::default()
-        }
+        UUri::try_from_parts("vcu.somevin", 0x0000_3d07, 0x01, 0x0000)
+            .expect("failed to create destination URI")
     }
 
     fn reply_to_address() -> UUri {
-        UUri {
-            authority_name: String::from("vcu.someVin"),
-            ue_id: 0x0000_010b,
-            ue_version_major: 0x01,
-            resource_id: 0x0000,
-            ..Default::default()
-        }
+        UUri::try_from_parts("vcu.somevin", 0x0000_010b, 0x01, 0x0000)
+            .expect("failed to create reply-to-address URI")
     }
 
     fn method_to_invoke() -> UUri {
-        UUri {
-            authority_name: String::from("vcu.someVin"),
-            ue_id: 0x0000_03ae,
-            ue_version_major: 0x01,
-            resource_id: 0x00e2,
-            ..Default::default()
-        }
+        UUri::try_from_parts("vcu.somevin", 0x0000_03ae, 0x01, 0x00e2)
+            .expect("failed to create method-to-invoke URI")
     }
 }

@@ -55,7 +55,7 @@ pub enum ServiceInvocationError {
     ResourceExhausted(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to publish a message.
     #[error("unknown error: {0}")]
-    RpcError(UStatus),
+    RpcError(Box<UStatus>),
     /// Indicates that the calling uE could not be authenticated properly.
     #[error("unauthenticated")]
     Unauthenticated,
@@ -69,27 +69,38 @@ pub enum ServiceInvocationError {
 
 impl From<UStatus> for ServiceInvocationError {
     fn from(value: UStatus) -> Self {
-        match value.code.enum_value() {
-            Ok(UCode::ALREADY_EXISTS) => ServiceInvocationError::AlreadyExists(value.get_message()),
-            Ok(UCode::DEADLINE_EXCEEDED) => ServiceInvocationError::DeadlineExceeded,
-            Ok(UCode::FAILED_PRECONDITION) => {
-                ServiceInvocationError::FailedPrecondition(value.get_message())
+        match value.get_code() {
+            UCode::AlreadyExists => {
+                ServiceInvocationError::AlreadyExists(value.get_message().to_string())
             }
-            Ok(UCode::INTERNAL) => ServiceInvocationError::Internal(value.get_message()),
-            Ok(UCode::INVALID_ARGUMENT) => {
-                ServiceInvocationError::InvalidArgument(value.get_message())
+            UCode::DeadlineExceeded => ServiceInvocationError::DeadlineExceeded,
+            UCode::FailedPrecondition => {
+                ServiceInvocationError::FailedPrecondition(value.get_message().to_string())
             }
-            Ok(UCode::NOT_FOUND) => ServiceInvocationError::NotFound(value.get_message()),
-            Ok(UCode::PERMISSION_DENIED) => {
-                ServiceInvocationError::PermissionDenied(value.get_message())
+            UCode::Internal => ServiceInvocationError::Internal(value.get_message().to_string()),
+            UCode::InvalidArgument => {
+                ServiceInvocationError::InvalidArgument(value.get_message().to_string())
             }
-            Ok(UCode::RESOURCE_EXHAUSTED) => {
-                ServiceInvocationError::ResourceExhausted(value.get_message())
+            UCode::NotFound => ServiceInvocationError::NotFound(value.get_message().to_string()),
+            UCode::PermissionDenied => {
+                ServiceInvocationError::PermissionDenied(value.get_message().to_string())
             }
-            Ok(UCode::UNAUTHENTICATED) => ServiceInvocationError::Unauthenticated,
-            Ok(UCode::UNAVAILABLE) => ServiceInvocationError::Unavailable(value.get_message()),
-            Ok(UCode::UNIMPLEMENTED) => ServiceInvocationError::Unimplemented(value.get_message()),
-            _ => ServiceInvocationError::RpcError(value),
+            UCode::ResourceExhausted => {
+                ServiceInvocationError::ResourceExhausted(value.get_message().to_string())
+            }
+            UCode::Unauthenticated => ServiceInvocationError::Unauthenticated,
+            UCode::Unavailable => {
+                ServiceInvocationError::Unavailable(value.get_message().to_string())
+            }
+            UCode::Unimplemented => {
+                ServiceInvocationError::Unimplemented(value.get_message().to_string())
+            }
+            UCode::Ok
+            | UCode::Cancelled
+            | UCode::Unknown
+            | UCode::Aborted
+            | UCode::OutOfRange
+            | UCode::DataLoss => ServiceInvocationError::RpcError(Box::from(value)),
         }
     }
 }
@@ -98,35 +109,35 @@ impl From<ServiceInvocationError> for UStatus {
     fn from(value: ServiceInvocationError) -> Self {
         match value {
             ServiceInvocationError::AlreadyExists(msg) => {
-                UStatus::fail_with_code(UCode::ALREADY_EXISTS, msg)
+                UStatus::fail_with_code(UCode::AlreadyExists, msg)
             }
             ServiceInvocationError::DeadlineExceeded => {
-                UStatus::fail_with_code(UCode::DEADLINE_EXCEEDED, "request timed out")
+                UStatus::fail_with_code(UCode::DeadlineExceeded, "request timed out")
             }
             ServiceInvocationError::FailedPrecondition(msg) => {
-                UStatus::fail_with_code(UCode::FAILED_PRECONDITION, msg)
+                UStatus::fail_with_code(UCode::FailedPrecondition, msg)
             }
-            ServiceInvocationError::Internal(msg) => UStatus::fail_with_code(UCode::INTERNAL, msg),
+            ServiceInvocationError::Internal(msg) => UStatus::fail_with_code(UCode::Internal, msg),
             ServiceInvocationError::InvalidArgument(msg) => {
-                UStatus::fail_with_code(UCode::INVALID_ARGUMENT, msg)
+                UStatus::fail_with_code(UCode::InvalidArgument, msg)
             }
-            ServiceInvocationError::NotFound(msg) => UStatus::fail_with_code(UCode::NOT_FOUND, msg),
+            ServiceInvocationError::NotFound(msg) => UStatus::fail_with_code(UCode::NotFound, msg),
             ServiceInvocationError::PermissionDenied(msg) => {
-                UStatus::fail_with_code(UCode::PERMISSION_DENIED, msg)
+                UStatus::fail_with_code(UCode::PermissionDenied, msg)
             }
             ServiceInvocationError::ResourceExhausted(msg) => {
-                UStatus::fail_with_code(UCode::RESOURCE_EXHAUSTED, msg)
+                UStatus::fail_with_code(UCode::ResourceExhausted, msg)
             }
             ServiceInvocationError::Unauthenticated => {
-                UStatus::fail_with_code(UCode::UNAUTHENTICATED, "client must authenticate")
+                UStatus::fail_with_code(UCode::Unauthenticated, "client must authenticate")
             }
             ServiceInvocationError::Unavailable(msg) => {
-                UStatus::fail_with_code(UCode::UNAVAILABLE, msg)
+                UStatus::fail_with_code(UCode::Unavailable, msg)
             }
             ServiceInvocationError::Unimplemented(msg) => {
-                UStatus::fail_with_code(UCode::UNIMPLEMENTED, msg)
+                UStatus::fail_with_code(UCode::Unimplemented, msg)
             }
-            _ => UStatus::fail_with_code(UCode::UNKNOWN, "unknown"),
+            _ => UStatus::fail_with_code(UCode::Unknown, "unknown"),
         }
     }
 }
@@ -345,8 +356,8 @@ mod tests {
             .expect_invoke_method()
             .once()
             .returning(|_method, _options, _payload| {
-                let error = UStatus::fail_with_code(UCode::INTERNAL, "internal error");
-                let response_payload = UPayload::try_from_protobuf(error).unwrap();
+                let error = UStatus::fail_with_code(UCode::Internal, "internal error");
+                let response_payload = UPayload::try_from_protobuf_mappable(error).unwrap();
                 Ok(Some(response_payload))
             });
         let client: Arc<dyn RpcClient> = Arc::new(rpc_client);

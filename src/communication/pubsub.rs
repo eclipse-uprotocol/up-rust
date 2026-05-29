@@ -28,7 +28,7 @@ pub enum PubSubError {
     /// Indicates that the given message cannot be sent because it is not a [valid Publish message](crate::PublishValidator).
     InvalidArgument(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to publish a message.
-    PublishError(UStatus),
+    PublishError(Box<UStatus>),
 }
 
 #[cfg(not(tarpaulin_include))]

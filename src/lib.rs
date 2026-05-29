@@ -75,6 +75,8 @@ pub mod local_transport;
 #[cfg(feature = "symphony")]
 pub mod symphony;
 
+use protobuf::{well_known_types::any::Any, Message, MessageFull};
+
 mod uattributes;
 pub use uattributes::{
     NotificationValidator, PublishValidator, RequestValidator, ResponseValidator, UAttributes,
@@ -102,8 +104,8 @@ pub use utransport::{MockLocalUriProvider, MockTransport, MockUListener};
 mod uuid;
 pub use uuid::UUID;
 
-// protoc-generated stubs, see build.rs
-mod up_core_api {
+// protoc-generated types, see build.rs
+pub mod up_core_api {
     include!(concat!(env!("OUT_DIR"), "/uprotocol/mod.rs"));
 }
 
@@ -111,3 +113,93 @@ mod up_core_api {
 // pub use up_core_api::file;
 // pub use up_core_api::uprotocol_options;
 pub mod core;
+
+#[derive(Debug, Clone)]
+pub struct SerializationError(String);
+
+impl From<protobuf::Error> for SerializationError {
+    fn from(value: protobuf::Error) -> Self {
+        SerializationError(value.to_string())
+    }
+}
+
+impl std::fmt::Display for SerializationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for SerializationError {}
+
+pub trait ProtobufMappable: Sized {
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError>;
+    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError>;
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError>;
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError>;
+}
+
+impl<T: MessageFull> ProtobufMappable for T {
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
+        Ok(T::parse_from_bytes(proto)?)
+    }
+
+    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
+        let any = Any::parse_from_bytes(proto)?;
+        match any.unpack() {
+            Ok(Some(v)) => Ok(v),
+            Ok(None) => Err(SerializationError(
+                "cannot unpack protobuf, type mismatch".to_string(),
+            )),
+            Err(e) => Err(SerializationError::from(e)),
+        }
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
+        T::write_to_bytes(self).map_err(SerializationError::from)
+    }
+
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
+        Any::pack(self)
+            .and_then(|any| any.write_to_bytes())
+            .map_err(SerializationError::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use protobuf::well_known_types::{timestamp::Timestamp, wrappers::StringValue};
+
+    #[test]
+    fn test_write_to_protobuf_bytes_works_for_message_full() {
+        let payload = StringValue {
+            value: "hello".to_string(),
+            ..Default::default()
+        };
+        let bytes = payload.write_to_protobuf_bytes().unwrap();
+        let deserialized = StringValue::parse_from_protobuf_bytes(&bytes).unwrap();
+        assert_eq!(deserialized.value, "hello");
+    }
+
+    #[test]
+    fn test_write_to_packed_protobuf_bytes_works_for_message_full() {
+        let payload = StringValue {
+            value: "hello".to_string(),
+            ..Default::default()
+        };
+        let bytes = payload.write_to_packed_protobuf_bytes().unwrap();
+        let deserialized = StringValue::parse_from_packed_protobuf_bytes(&bytes).unwrap();
+        assert_eq!(deserialized.value, "hello");
+    }
+
+    #[test]
+    fn test_parse_from_packed_protobuf_bytes_fails_for_wrong_message_type() {
+        let payload = StringValue {
+            value: "hello".to_string(),
+            ..Default::default()
+        };
+        let bytes = payload.write_to_packed_protobuf_bytes().unwrap();
+        assert!(Timestamp::parse_from_packed_protobuf_bytes(&bytes)
+            .is_err_and(|e| { matches!(e, SerializationError(_)) }));
+    }
+}

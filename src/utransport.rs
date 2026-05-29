@@ -13,13 +13,12 @@
 
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-use std::num::TryFromIntError;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::{UCode, UMessage, UStatus, UUri};
+use crate::{UCode, UMessage, UStatus, UUri, UUriError};
 
 /// Verifies that given UUris can be used as source and sink filter UUris
 /// for registering listeners.
@@ -29,47 +28,34 @@ use crate::{UCode, UMessage, UStatus, UUri};
 ///
 /// # Errors
 ///
-/// Returns a [`UStatus`] with a [`UCode::INVALID_ARGUMENT`] and a corresponding detail
+/// Returns a [`UStatus`] with a [`UCode::InvalidArgument`] and a corresponding detail
 /// message, if any of the given UUris cannot be used as filter criteria.
 ///
 pub fn verify_filter_criteria(
     source_filter: &UUri,
     sink_filter: Option<&UUri>,
-) -> Result<(), UStatus> {
-    UUri::check_validity(source_filter).map_err(|err| {
-        UStatus::fail_with_code(
-            UCode::INVALID_ARGUMENT,
-            format!("invalid source filter URI: {err}"),
-        )
-    })?;
+) -> Result<(), Box<UStatus>> {
     if let Some(sink_filter_uuri) = sink_filter {
-        UUri::check_validity(sink_filter_uuri).map_err(|err| {
-            UStatus::fail_with_code(
-                UCode::INVALID_ARGUMENT,
-                format!("invalid sink filter URI: {err}"),
-            )
-        })?;
-
         if sink_filter_uuri.is_notification_destination()
             && source_filter.is_notification_destination()
         {
-            return Err(UStatus::fail_with_code(
-                UCode::INVALID_ARGUMENT,
+            return Err(Box::from(UStatus::fail_with_code(
+                UCode::InvalidArgument,
                 "source and sink filters must not both have resource ID 0",
-            ));
+            )));
         }
         if sink_filter_uuri.is_rpc_method()
             && !source_filter.has_wildcard_resource_id()
             && !source_filter.is_notification_destination()
         {
-            return Err(UStatus::fail_with_code(
-                UCode::INVALID_ARGUMENT,
-                "source filter must either have the wildcard resource ID or resource ID 0, if sink filter matches RPC method resource ID"));
+            return Err(Box::from(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "source filter must either have the wildcard resource ID or resource ID 0, if sink filter matches RPC method resource ID")));
         }
     } else if !source_filter.has_wildcard_resource_id() && !source_filter.is_event() {
-        return Err(UStatus::fail_with_code(
-            UCode::INVALID_ARGUMENT,
-            "source filter must either have the wildcard resource ID or a resource ID from topic range, if sink filter is empty"));
+        return Err(Box::from(UStatus::fail_with_code(
+            UCode::InvalidArgument,
+            "source filter must either have the wildcard resource ID or a resource ID from topic range, if sink filter is empty")));
     }
     // everything else might match valid messages
     Ok(())
@@ -110,30 +96,26 @@ impl StaticUriProvider {
     /// ```rust
     /// use up_rust::{LocalUriProvider, StaticUriProvider};
     ///
-    /// let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05);
+    /// let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05).unwrap();
     /// assert_eq!(provider.get_authority(), "my-vehicle");
     /// ```
-    pub fn new(authority: impl Into<String>, entity_id: u32, major_version: u8) -> Self {
-        let local_uri = UUri {
-            authority_name: authority.into(),
-            ue_id: entity_id,
-            ue_version_major: major_version as u32,
-            resource_id: 0x0000,
-            ..Default::default()
-        };
-        StaticUriProvider { local_uri }
+    pub fn new(
+        authority: impl Into<String>,
+        entity_id: u32,
+        major_version: u8,
+    ) -> Result<Self, UUriError> {
+        UUri::try_from_parts(authority.into().as_str(), entity_id, major_version, 0x0000)
+            .map(|local_uri| StaticUriProvider { local_uri })
     }
 }
 
 impl LocalUriProvider for StaticUriProvider {
     fn get_authority(&self) -> String {
-        self.local_uri.authority_name.clone()
+        self.local_uri.authority_name().to_owned()
     }
 
     fn get_resource_uri(&self, resource_id: u16) -> UUri {
-        let mut uri = self.local_uri.clone();
-        uri.resource_id = resource_id as u32;
-        uri
+        self.local_uri.clone_with_resource_id(resource_id)
     }
 
     fn get_source_uri(&self) -> UUri {
@@ -141,15 +123,13 @@ impl LocalUriProvider for StaticUriProvider {
     }
 }
 
-impl TryFrom<UUri> for StaticUriProvider {
-    type Error = TryFromIntError;
-    fn try_from(value: UUri) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
+impl From<UUri> for StaticUriProvider {
+    fn from(value: UUri) -> Self {
+        Self::from(&value)
     }
 }
 
-impl TryFrom<&UUri> for StaticUriProvider {
-    type Error = TryFromIntError;
+impl From<&UUri> for StaticUriProvider {
     /// Creates a URI provider from a UUri.
     ///
     /// # Arguments
@@ -157,40 +137,20 @@ impl TryFrom<&UUri> for StaticUriProvider {
     /// * `source_uri` - The UUri to take the entity's authority, entity ID and version information from.
     ///   The UUri's resource ID is ignored.
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the given UUri's major version property is not a `u8`.
-    ///
     /// # Examples
     ///
     /// ```rust
     /// use up_rust::{LocalUriProvider, StaticUriProvider, UUri};
     ///
-    /// let source_uri = UUri::try_from("//my-vehicle/4210/5/0").unwrap();
-    /// assert!(StaticUriProvider::try_from(&source_uri).is_ok());
+    /// let source_uri = UUri::try_from("//my-vehicle/4210/5/1000").unwrap();
+    /// let provider = StaticUriProvider::from(&source_uri);
+    /// assert_eq!(provider.get_authority(), "my-vehicle");
+    /// assert_eq!(provider.get_source_uri(), source_uri.clone_with_resource_id(0x0000));
     /// ```
-    ///
-    /// ## Invalid Major Version
-    ///
-    /// ```rust
-    /// use up_rust::{LocalUriProvider, StaticUriProvider, UUri};
-    ///
-    /// let uuri_with_invalid_version = UUri {
-    ///   authority_name: "".to_string(),
-    ///   ue_id: 0x5430,
-    ///   ue_version_major: 0x1234, // not a u8
-    ///   resource_id: 0x0000,
-    ///   ..Default::default()
-    /// };
-    /// assert!(StaticUriProvider::try_from(uuri_with_invalid_version).is_err());
-    /// ```
-    fn try_from(source_uri: &UUri) -> Result<Self, Self::Error> {
-        let major_version = u8::try_from(source_uri.ue_version_major)?;
-        Ok(StaticUriProvider::new(
-            &source_uri.authority_name,
-            source_uri.ue_id,
-            major_version,
-        ))
+    fn from(source_uri: &UUri) -> Self {
+        StaticUriProvider {
+            local_uri: source_uri.clone_with_resource_id(0x0000),
+        }
     }
 }
 
@@ -244,7 +204,7 @@ pub trait UTransport: Send + Sync {
 
     /// Receives a message from the transport.
     ///
-    /// This default implementation returns an error with [`UCode::UNIMPLEMENTED`].
+    /// This default implementation returns an error with [`UCode::Unimplemented`].
     ///
     /// # Arguments
     ///
@@ -261,7 +221,7 @@ pub trait UTransport: Send + Sync {
         _sink_filter: Option<&UUri>,
     ) -> Result<UMessage, UStatus> {
         Err(UStatus::fail_with_code(
-            UCode::UNIMPLEMENTED,
+            UCode::Unimplemented,
             "not implemented",
         ))
     }
@@ -271,7 +231,7 @@ pub trait UTransport: Send + Sync {
     /// The listener will be invoked for each message that matches the given source and sink filter patterns
     /// according to the rules defined by the [UUri specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/basics/uri.adoc).
     ///
-    /// This default implementation returns an error with [`UCode::UNIMPLEMENTED`].
+    /// This default implementation returns an error with [`UCode::Unimplemented`].
     ///
     /// # Arguments
     ///
@@ -291,7 +251,7 @@ pub trait UTransport: Send + Sync {
         _listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus> {
         Err(UStatus::fail_with_code(
-            UCode::UNIMPLEMENTED,
+            UCode::Unimplemented,
             "not implemented",
         ))
     }
@@ -301,7 +261,7 @@ pub trait UTransport: Send + Sync {
     /// The listener will no longer be called for any (matching) messages after this function has
     /// returned successfully.
     ///
-    /// This default implementation returns an error with [`UCode::UNIMPLEMENTED`].
+    /// This default implementation returns an error with [`UCode::Unimplemented`].
     ///
     /// # Arguments
     ///
@@ -319,7 +279,7 @@ pub trait UTransport: Send + Sync {
         _listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus> {
         Err(UStatus::fail_with_code(
-            UCode::UNIMPLEMENTED,
+            UCode::Unimplemented,
             "not implemented",
         ))
     }
@@ -390,6 +350,7 @@ impl ComparableListener {
         Self { listener }
     }
     /// Gets a clone of the wrapped reference to the listener.
+    #[must_use]
     pub fn into_inner(&self) -> Arc<dyn UListener> {
         self.listener.clone()
     }
@@ -444,7 +405,7 @@ impl Debug for ComparableListener {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ComparableListener, UListener, UMessage};
+    use crate::{ComparableListener, UListener, UMessage, UMessageBuilder};
     use std::{
         hash::{DefaultHasher, Hash, Hasher},
         ops::Deref,
@@ -456,56 +417,76 @@ mod tests {
 
     #[test]
     fn test_static_uri_provider_get_source() {
-        let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05);
+        let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05)
+            .expect("failed to create URI provider");
         let source_uri = provider.get_source_uri();
-        assert_eq!(source_uri.authority_name, "my-vehicle");
-        assert_eq!(source_uri.ue_id, 0x4210);
-        assert_eq!(source_uri.ue_version_major, 0x05);
-        assert_eq!(source_uri.resource_id, 0x0000);
+        assert_eq!(source_uri.authority_name(), "my-vehicle");
+        assert_eq!(source_uri.uentity_type_id(), 0x4210);
+        assert_eq!(source_uri.uentity_major_version(), 0x05);
+        assert_eq!(source_uri.resource_id(), 0x0000);
     }
 
     #[test]
     fn test_static_uri_provider_get_resource() {
-        let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05);
+        let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05)
+            .expect("failed to create URI provider");
         let resource_uri = provider.get_resource_uri(0x1234);
-        assert_eq!(resource_uri.authority_name, "my-vehicle");
-        assert_eq!(resource_uri.ue_id, 0x4210);
-        assert_eq!(resource_uri.ue_version_major, 0x05);
-        assert_eq!(resource_uri.resource_id, 0x1234);
+        assert_eq!(resource_uri.authority_name(), "my-vehicle");
+        assert_eq!(resource_uri.uentity_type_id(), 0x4210);
+        assert_eq!(resource_uri.uentity_major_version(), 0x05);
+        assert_eq!(resource_uri.resource_id(), 0x1234);
     }
 
     #[tokio::test]
     async fn test_deref_returns_wrapped_listener() {
+        let empty_message = UMessageBuilder::publish(
+            UUri::try_from_parts("my-vehicle", 0x4210, 0x05, 0x9000)
+                .expect("failed to create topic"),
+        )
+        .build()
+        .expect("failed to build message");
         let mut mock_listener = MockUListener::new();
         mock_listener.expect_on_receive().once().return_const(());
         let listener_one = Arc::new(mock_listener);
         let comparable_listener_one = ComparableListener::new(listener_one);
         comparable_listener_one
             .deref()
-            .on_receive(UMessage::default())
+            .on_receive(empty_message)
             .await;
     }
 
     #[tokio::test]
     async fn test_to_inner_returns_reference_to_wrapped_listener() {
+        let empty_message = UMessageBuilder::publish(
+            UUri::try_from_parts("my-vehicle", 0x4210, 0x05, 0x9000)
+                .expect("failed to create topic"),
+        )
+        .build()
+        .expect("failed to build message");
         let mut mock_listener = MockUListener::new();
         mock_listener.expect_on_receive().once().return_const(());
         let listener_one = Arc::new(mock_listener);
         let comparable_listener_one = ComparableListener::new(listener_one);
         comparable_listener_one
             .into_inner()
-            .on_receive(UMessage::default())
+            .on_receive(empty_message)
             .await;
     }
 
     #[tokio::test]
     async fn test_eq_and_hash_are_consistent_for_comparable_listeners_wrapping_same_listener() {
+        let empty_message = UMessageBuilder::publish(
+            UUri::try_from_parts("my-vehicle", 0x4210, 0x05, 0x9000)
+                .expect("failed to create topic"),
+        )
+        .build()
+        .expect("failed to build message");
         let mut mock_listener = MockUListener::new();
         mock_listener.expect_on_receive().times(2).return_const(());
         let listener_one = Arc::new(mock_listener);
         let listener_two = listener_one.clone();
-        listener_one.on_receive(UMessage::default()).await;
-        listener_two.on_receive(UMessage::default()).await;
+        listener_one.on_receive(empty_message.clone()).await;
+        listener_two.on_receive(empty_message.clone()).await;
         let comparable_listener_one = ComparableListener::new(listener_one);
         let comparable_listener_two = ComparableListener::new(listener_two);
         assert!(&comparable_listener_one.eq(&comparable_listener_two));
@@ -522,6 +503,13 @@ mod tests {
     #[tokio::test]
     async fn test_eq_and_hash_are_consistent_for_comparable_listeners_wrapping_different_listeners()
     {
+        let empty_message = UMessageBuilder::publish(
+            UUri::try_from_parts("my-vehicle", 0x4210, 0x05, 0x9000)
+                .expect("failed to create topic"),
+        )
+        .build()
+        .expect("failed to build message");
+
         let mut mock_listener_one = MockUListener::new();
         mock_listener_one
             .expect_on_receive()
@@ -534,8 +522,8 @@ mod tests {
             .once()
             .return_const(());
         let listener_two = Arc::new(mock_listener_two);
-        listener_one.on_receive(UMessage::default()).await;
-        listener_two.on_receive(UMessage::default()).await;
+        listener_one.on_receive(empty_message.clone()).await;
+        listener_two.on_receive(empty_message.clone()).await;
         let comparable_listener_one = ComparableListener::new(listener_one);
         let comparable_listener_two = ComparableListener::new(listener_two);
         assert!(!&comparable_listener_one.eq(&comparable_listener_two));
@@ -565,15 +553,15 @@ mod tests {
         assert!(transport
             .receive(&UUri::any(), None)
             .await
-            .is_err_and(|e| e.get_code() == UCode::UNIMPLEMENTED));
+            .is_err_and(|e| e.get_code() == UCode::Unimplemented));
         assert!(transport
             .register_listener(&UUri::any(), None, listener.clone())
             .await
-            .is_err_and(|e| e.get_code() == UCode::UNIMPLEMENTED));
+            .is_err_and(|e| e.get_code() == UCode::Unimplemented));
         assert!(transport
             .unregister_listener(&UUri::any(), None, listener)
             .await
-            .is_err_and(|e| e.get_code() == UCode::UNIMPLEMENTED));
+            .is_err_and(|e| e.get_code() == UCode::Unimplemented));
     }
 
     #[test]
@@ -647,28 +635,8 @@ mod tests {
         UUri::from_str("//vehicle1/AA/1/CC").unwrap(),
         None;
         "sink is empty but source has non-topic resource ID")]
-    #[test_case::test_case(
-        UUri {
-            authority_name: "VEHICLE1".to_string(),
-            ue_id: 0x00AA,
-            ue_version_major: 0x01,
-            resource_id: 0x9000,
-            ..Default::default()
-        },
-        None;
-        "source has upper-case authority")]
-    #[test_case::test_case(
-        UUri::from_str("//vehicle1/AA/1/9000").unwrap(),
-        Some(UUri {
-            authority_name: "VEHICLE2".to_string(),
-            ue_id: 0x00BB,
-            ue_version_major: 0x01,
-            resource_id: 0x0000,
-            ..Default::default()
-        });
-        "sink has upper-case authority")]
     fn test_verify_filter_criteria_fails_for(source_filter: UUri, sink_filter: Option<UUri>) {
         assert!(verify_filter_criteria(&source_filter, sink_filter.as_ref())
-            .is_err_and(|err| matches!(err.get_code(), UCode::INVALID_ARGUMENT)));
+            .is_err_and(|err| matches!(err.get_code(), UCode::InvalidArgument)));
     }
 }
