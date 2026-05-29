@@ -85,8 +85,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         up_rust::symphony::METHOD_DELETE_RESOURCE_ID,
     )
     .expect("failed to create delete method URI");
-    let uri_provider =
-        StaticUriProvider::try_from(&get_method).expect("failed to create URI provider");
+    let uri_provider = StaticUriProvider::from(&get_method);
     let rpc_server = InMemoryRpcServer::new(transport.clone(), Arc::new(uri_provider));
 
     let get_notify = Arc::new(Notify::new());
@@ -104,7 +103,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let rpc_client = InMemoryRpcClient::new(
         transport.clone(),
-        Arc::new(StaticUriProvider::new("local_authority", 0xAAA2, 0x01)),
+        Arc::new(StaticUriProvider::new("local_authority", 0xAAA2, 0x01)?),
     )
     .await
     .expect("failed to create RPC client");
@@ -115,7 +114,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     let payload = UPayload::new(
         serde_json::to_vec(&request_payload).expect("failed to create request payload"),
-        UPayloadFormat::UPAYLOAD_FORMAT_JSON,
+        UPayloadFormat::Json,
     );
     let call_options = CallOptions::for_rpc_request(0x1000, None, None, None);
     rpc_client

@@ -15,11 +15,7 @@ use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 
-pub use crate::up_core_api::udiscovery::{
-    FindServicesRequest, FindServicesResponse, GetServiceTopicsRequest, GetServiceTopicsResponse,
-    ServiceTopicInfo,
-};
-use crate::{UStatus, UUri};
+use crate::{UCode, UStatus, UUri};
 
 /// The uEntity (type) identifier of the uDiscovery service.
 pub const UDISCOVERY_TYPE_ID: u32 = 0x0000_0001;
@@ -30,24 +26,70 @@ pub const RESOURCE_ID_FIND_SERVICES: u16 = 0x0001;
 /// The resource identifier of uDiscovery's _get service topics_ operation.
 pub const RESOURCE_ID_GET_SERVICE_TOPICS: u16 = 0x0002;
 
-/// Gets a UUri referring to one of the local uDiscovery service's resources.
-///
-/// # Examples
-///
-/// ```rust
-/// use up_rust::core::udiscovery;
-///
-/// let uuri = udiscovery::udiscovery_uri(udiscovery::RESOURCE_ID_FIND_SERVICES);
-/// assert_eq!(uuri.resource_id, 0x0001);
-/// ```
-pub fn udiscovery_uri(resource_id: u16) -> UUri {
-    UUri::try_from_parts(
-        "",
-        UDISCOVERY_TYPE_ID,
-        UDISCOVERY_VERSION_MAJOR,
-        resource_id,
-    )
-    .unwrap()
+type MessageTypeString = String;
+
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct TopicInfo {
+    pub(crate) topic: UUri,
+    pub(crate) message_type: MessageTypeString,
+    pub(crate) permission_level: Option<u32>,
+    pub(crate) ttl: u32,
+}
+
+impl TopicInfo {
+    /// Gets the topic URI.
+    pub fn topic(&self) -> &UUri {
+        &self.topic
+    }
+
+    /// Gets the message type string.
+    pub fn message_type(&self) -> &str {
+        self.message_type.as_str()
+    }
+
+    /// Gets the permission level, if any.
+    pub fn permission_level(&self) -> Option<u32> {
+        self.permission_level
+    }
+
+    /// Gets the time-to-live (TTL) value in seconds.
+    pub fn ttl(&self) -> u32 {
+        self.ttl
+    }
+}
+
+impl TryFrom<&crate::up_core_api::udiscovery::ServiceTopicInfo> for TopicInfo {
+    type Error = UStatus;
+
+    fn try_from(
+        value: &crate::up_core_api::udiscovery::ServiceTopicInfo,
+    ) -> Result<Self, Self::Error> {
+        let Some(topic_proto) = value.topic.as_ref() else {
+            return Err(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "Service returned invalid ServiceTopicInfo: no topic",
+            ));
+        };
+        let Ok(topic) = UUri::try_from(topic_proto) else {
+            return Err(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "Service returned invalid ServiceTopicInfo: malformed topic URI",
+            ));
+        };
+        let Some(uservice_topic) = value.info.as_ref() else {
+            return Err(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "Service returned invalid ServiceTopicInfo: no info object",
+            ));
+        };
+        Ok(TopicInfo {
+            topic,
+            message_type: uservice_topic.message.clone(),
+            permission_level: uservice_topic.permission_level,
+            ttl: value.ttl,
+        })
+    }
 }
 
 /// The uProtocol Application Layer client interface to the uDiscovery service.
@@ -84,5 +126,5 @@ pub trait UDiscovery: Send + Sync {
         &self,
         topic_pattern: UUri,
         recursive: bool,
-    ) -> Result<Vec<ServiceTopicInfo>, UStatus>;
+    ) -> Result<Vec<TopicInfo>, UStatus>;
 }

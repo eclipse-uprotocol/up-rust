@@ -133,8 +133,8 @@ pub trait DeploymentTarget: Send + Sync {
 fn extract_request_data(
     request_payload: Option<UPayload>,
 ) -> Result<Value, ServiceInvocationError> {
-    let Some(req_payload) = request_payload
-        .filter(|req_payload| req_payload.payload_format() == UPayloadFormat::UPAYLOAD_FORMAT_JSON)
+    let Some(req_payload) =
+        request_payload.filter(|req_payload| req_payload.payload_format() == UPayloadFormat::Json)
     else {
         return Err(ServiceInvocationError::InvalidArgument(
             "request has no JSON payload".to_string(),
@@ -162,7 +162,7 @@ impl<T: DeploymentTarget> RequestHandler for GetOperation<T> {
         message_attributes: &UAttributes,
         request_payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError> {
-        let source_uri = message_attributes.source_unchecked().to_uri(true);
+        let source_uri = message_attributes.source().to_uri(true);
         if tracing::enabled!(Level::DEBUG) {
             debug!(source = source_uri, "processing GET request");
         }
@@ -241,10 +241,7 @@ impl<T: DeploymentTarget> RequestHandler for GetOperation<T> {
                 serde_json::to_string_pretty(&result).expect("failed to serialize Value")
             );
         }
-        let response_payload = UPayload::new(
-            serialized_response_data,
-            UPayloadFormat::UPAYLOAD_FORMAT_JSON,
-        );
+        let response_payload = UPayload::new(serialized_response_data, UPayloadFormat::Json);
         Ok(Some(response_payload))
     }
 }
@@ -261,7 +258,7 @@ impl<T: DeploymentTarget> RequestHandler for ApplyOperation<T> {
         message_attributes: &UAttributes,
         request_payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError> {
-        let source_uri = message_attributes.source_unchecked().to_uri(true);
+        let source_uri = message_attributes.source().to_uri(true);
         let sink_uri = message_attributes.sink_unchecked().to_uri(true);
         if tracing::enabled!(Level::DEBUG) {
             debug!(source = source_uri, method = sink_uri, "processing request",);
@@ -364,10 +361,7 @@ impl<T: DeploymentTarget> RequestHandler for ApplyOperation<T> {
             ServiceInvocationError::Internal("failed to create response payload".to_string())
         })?;
 
-        let response_payload = UPayload::new(
-            serialized_response_data,
-            UPayloadFormat::UPAYLOAD_FORMAT_JSON,
-        );
+        let response_payload = UPayload::new(serialized_response_data, UPayloadFormat::Json);
         Ok(Some(response_payload))
     }
 }
@@ -376,7 +370,7 @@ impl<T: DeploymentTarget> RequestHandler for ApplyOperation<T> {
 mod tests {
     use serde_json::json;
 
-    use crate::{communication::MockRpcServerImpl, UUri};
+    use crate::{communication::MockRpcServerImpl, UUri, UUID};
 
     use super::*;
 
@@ -422,13 +416,19 @@ mod tests {
 
     fn create_request_attributes(resource_id: u16) -> UAttributes {
         UAttributes {
-            source: Some(
-                UUri::try_from_parts("authority", 0x10AA1, 0x01, 0x0000)
-                    .expect("failed to create source URI"),
-            )
-            .into(),
-            sink: Some(create_method_uri(resource_id)).into(),
-            ..UAttributes::default()
+            commstatus: None,
+            id: UUID::build(),
+            source: UUri::try_from_parts("authority", 0x10AA1, 0x01, 0x0000)
+                .expect("failed to create source URI"),
+            sink: Some(create_method_uri(resource_id)),
+            payload_format: Some(UPayloadFormat::Json),
+            type_: crate::UMessageType::Request,
+            priority: Some(crate::UPriority::CS4),
+            permission_level: None,
+            ttl: Some(5000),
+            traceparent: None,
+            token: None,
+            reqid: None,
         }
     }
 
@@ -461,7 +461,7 @@ mod tests {
         });
         let payload = UPayload::new(
             serde_json::to_vec(&request_data).expect("failed to create request payload"),
-            UPayloadFormat::UPAYLOAD_FORMAT_JSON,
+            UPayloadFormat::Json,
         );
         assert!(get_op
             .handle_request(

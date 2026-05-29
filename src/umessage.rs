@@ -15,20 +15,24 @@ mod umessagebuilder;
 mod umessagetype;
 
 use bytes::Bytes;
-use protobuf::{well_known_types::any::Any, Enum, Message, MessageFull};
+use protobuf::{well_known_types::any::Any, Message};
 
 pub use umessagebuilder::*;
+pub use umessagetype::*;
 
-pub use crate::up_core_api::umessage::UMessage;
-
+use crate::up_core_api::uattributes::UAttributes as UAttributesProto;
+use crate::up_core_api::umessage::UMessage as UMessageProto;
 use crate::{
-    UAttributes, UAttributesError, UCode, UMessageType, UPayloadFormat, UPriority, UUri, UUID,
+    ProtobufMappable, SerializationError, UAttributes, UAttributesError, UCode, UPayloadFormat,
+    UPriority, UUri, UUID,
 };
+
+pub(crate) type PayloadVec = Vec<u8>;
 
 #[derive(Debug)]
 pub enum UMessageError {
     AttributesValidationError(UAttributesError),
-    DataSerializationError(protobuf::Error),
+    DataSerializationError(SerializationError),
     PayloadError(String),
 }
 
@@ -54,9 +58,15 @@ impl From<UAttributesError> for UMessageError {
     }
 }
 
+impl From<SerializationError> for UMessageError {
+    fn from(value: SerializationError) -> Self {
+        Self::DataSerializationError(value)
+    }
+}
+
 impl From<protobuf::Error> for UMessageError {
     fn from(value: protobuf::Error) -> Self {
-        Self::DataSerializationError(value)
+        Self::DataSerializationError(value.into())
     }
 }
 
@@ -72,61 +82,52 @@ impl From<&str> for UMessageError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+pub struct UMessage {
+    attributes: UAttributes,
+    payload: Option<PayloadVec>,
+}
+
 impl UMessage {
+    pub(crate) fn new(
+        attributes: UAttributes,
+        payload: Option<Bytes>,
+    ) -> Result<Self, UMessageError> {
+        Ok(UMessage {
+            attributes,
+            payload: payload.map(|p| p.to_vec()),
+        })
+    }
+
     /// Get this message's attributes.
-    pub fn attributes(&self) -> Option<&UAttributes> {
-        self.attributes.as_ref()
-    }
-    /// Gets this message's attributes.
-    pub fn attributes_unchecked(&self) -> &UAttributes {
-        self.attributes().expect("message has no attributes")
+    #[must_use]
+    pub fn attributes(&self) -> &UAttributes {
+        &self.attributes
     }
 
     /// Gets this message's type.
-    pub fn type_(&self) -> Option<UMessageType> {
-        self.attributes().and_then(UAttributes::type_)
-    }
-
-    /// Gets this message's type.
-    ///
-    /// # Panics
-    ///
-    /// if the property has no value.
-    pub fn type_unchecked(&self) -> UMessageType {
-        self.attributes_unchecked().type_unchecked()
+    #[must_use]
+    pub fn type_(&self) -> UMessageType {
+        self.attributes().type_()
     }
 
     /// Gets this message's identifier.
-    pub fn id(&self) -> Option<&UUID> {
-        self.attributes().and_then(UAttributes::id)
-    }
-
-    /// Gets this message's identifier.
-    ///
-    /// # Panics
-    ///
-    /// if the property has no value.
-    pub fn id_unchecked(&self) -> &UUID {
-        self.attributes_unchecked().id_unchecked()
+    #[must_use]
+    pub fn id(&self) -> &UUID {
+        self.attributes().id()
     }
 
     /// Gets this message's source address.
-    pub fn source(&self) -> Option<&UUri> {
-        self.attributes().and_then(UAttributes::source)
-    }
-
-    /// Gets this message's source address.
-    ///
-    /// # Panics
-    ///
-    /// if the property has no value.
-    pub fn source_unchecked(&self) -> &UUri {
-        self.attributes_unchecked().source_unchecked()
+    #[must_use]
+    pub fn source(&self) -> &UUri {
+        self.attributes().source()
     }
 
     /// Gets this message's sink address.
+    #[must_use]
     pub fn sink(&self) -> Option<&UUri> {
-        self.attributes().and_then(UAttributes::sink)
+        self.attributes().sink()
     }
 
     /// Gets this message's sink address.
@@ -134,13 +135,15 @@ impl UMessage {
     /// # Panics
     ///
     /// if the property has no value.
+    #[must_use]
     pub fn sink_unchecked(&self) -> &UUri {
-        self.attributes_unchecked().sink_unchecked()
+        self.attributes().sink_unchecked()
     }
 
     /// Gets this message's priority.
+    #[must_use]
     pub fn priority(&self) -> Option<UPriority> {
-        self.attributes().and_then(UAttributes::priority)
+        self.attributes().priority()
     }
 
     /// Gets this message's priority.
@@ -148,13 +151,15 @@ impl UMessage {
     /// # Panics
     ///
     /// if the property has no value.
+    #[must_use]
     pub fn priority_unchecked(&self) -> UPriority {
-        self.attributes_unchecked().priority_unchecked()
+        self.attributes().priority_unchecked()
     }
 
     /// Gets this message's commstatus.
+    #[must_use]
     pub fn commstatus(&self) -> Option<UCode> {
-        self.attributes().and_then(UAttributes::commstatus)
+        self.attributes().commstatus()
     }
 
     /// Gets this message's commstatus.
@@ -162,8 +167,9 @@ impl UMessage {
     /// # Panics
     ///
     /// if the property has no value.
+    #[must_use]
     pub fn commstatus_unchecked(&self) -> UCode {
-        self.attributes_unchecked().commstatus_unchecked()
+        self.attributes().commstatus_unchecked()
     }
 
     /// Gets this message's time-to-live.
@@ -171,8 +177,9 @@ impl UMessage {
     /// # Returns
     ///
     /// the time-to-live in milliseconds.
+    #[must_use]
     pub fn ttl(&self) -> Option<u32> {
-        self.attributes().and_then(UAttributes::ttl)
+        self.attributes().ttl()
     }
 
     /// Gets this message's time-to-live.
@@ -184,28 +191,33 @@ impl UMessage {
     /// # Panics
     ///
     /// if the property has no value.
+    #[must_use]
     pub fn ttl_unchecked(&self) -> u32 {
-        self.attributes_unchecked().ttl_unchecked()
+        self.attributes().ttl_unchecked()
     }
 
     /// Gets this message's permission level.
+    #[must_use]
     pub fn permission_level(&self) -> Option<u32> {
-        self.attributes().and_then(UAttributes::permission_level)
+        self.attributes().permission_level()
     }
 
     /// Gets this message's token.
-    pub fn token(&self) -> Option<&String> {
-        self.attributes().and_then(UAttributes::token)
+    #[must_use]
+    pub fn token(&self) -> Option<&str> {
+        self.attributes().token()
     }
 
     /// Gets this message's traceparent.
-    pub fn traceparent(&self) -> Option<&String> {
-        self.attributes().and_then(UAttributes::traceparent)
+    #[must_use]
+    pub fn traceparent(&self) -> Option<&str> {
+        self.attributes().traceparent()
     }
 
     /// Gets this message's request identifier.
+    #[must_use]
     pub fn request_id(&self) -> Option<&UUID> {
-        self.attributes().and_then(UAttributes::request_id)
+        self.attributes().request_id()
     }
 
     /// Gets this message's request identifier.
@@ -213,13 +225,15 @@ impl UMessage {
     /// # Panics
     ///
     /// if the property has no value.
+    #[must_use]
     pub fn request_id_unchecked(&self) -> &UUID {
-        self.attributes_unchecked().request_id_unchecked()
+        self.attributes().request_id_unchecked()
     }
 
     /// Gets this message's payload format.
+    #[must_use]
     pub fn payload_format(&self) -> Option<UPayloadFormat> {
-        self.attributes().and_then(UAttributes::payload_format)
+        self.attributes().payload_format()
     }
 
     /// Gets this message's payload format.
@@ -227,8 +241,14 @@ impl UMessage {
     /// # Panics
     ///
     /// if the property has no value.
+    #[must_use]
     pub fn payload_format_unchecked(&self) -> UPayloadFormat {
-        self.attributes_unchecked().payload_format_unchecked()
+        self.attributes().payload_format_unchecked()
+    }
+
+    #[must_use]
+    pub fn payload(&self) -> Option<&[u8]> {
+        self.payload.as_deref()
     }
 
     /// Checks if this is a Publish message.
@@ -236,20 +256,16 @@ impl UMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    /// use up_rust::{UMessageBuilder, UUri};
     ///
-    /// let attribs = UAttributes {
-    ///   type_: UMessageType::UMESSAGE_TYPE_PUBLISH.into(),
-    ///   ..Default::default()
-    /// };
-    /// let msg = UMessage {
-    ///   attributes: Some(attribs).into(),
-    ///   ..Default::default()
-    /// };
+    /// let msg = UMessageBuilder::publish(
+    ///   UUri::try_from_parts("origin", 0xabcd, 0x01, 0x9000).unwrap(),
+    /// ).build().unwrap();
     /// assert!(msg.is_publish());
     /// ```
+    #[must_use]
     pub fn is_publish(&self) -> bool {
-        self.attributes().is_some_and(UAttributes::is_publish)
+        self.attributes().is_publish()
     }
 
     /// Checks if this is an RPC Request message.
@@ -257,20 +273,18 @@ impl UMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    /// use up_rust::{UMessageBuilder, UUID, UUri};
     ///
-    /// let attribs = UAttributes {
-    ///   type_: UMessageType::UMESSAGE_TYPE_REQUEST.into(),
-    ///   ..Default::default()
-    /// };
-    /// let msg = UMessage {
-    ///   attributes: Some(attribs).into(),
-    ///   ..Default::default()
-    /// };
+    /// let msg = UMessageBuilder::request(
+    ///   UUri::try_from_parts("server", 0x1234, 0x01, 0x1000).unwrap(),
+    ///   UUri::try_from_parts("client", 0xabcd, 0x01, 0x0000).unwrap(),
+    ///   5000,
+    /// ).build().unwrap();
     /// assert!(msg.is_request());
     /// ```
+    #[must_use]
     pub fn is_request(&self) -> bool {
-        self.attributes().is_some_and(UAttributes::is_request)
+        self.attributes().is_request()
     }
 
     /// Checks if this is an RPC Response message.
@@ -278,20 +292,18 @@ impl UMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    /// use up_rust::{UMessageBuilder, UUID, UUri};
     ///
-    /// let attribs = UAttributes {
-    ///   type_: UMessageType::UMESSAGE_TYPE_RESPONSE.into(),
-    ///   ..Default::default()
-    /// };
-    /// let msg = UMessage {
-    ///   attributes: Some(attribs).into(),
-    ///   ..Default::default()
-    /// };
+    /// let msg = UMessageBuilder::response(
+    ///   UUri::try_from_parts("client", 0xabcd, 0x01, 0x0000).unwrap(),
+    ///   UUID::build(),
+    ///   UUri::try_from_parts("server", 0x1234, 0x01, 0x1000).unwrap(),
+    /// ).build().unwrap();
     /// assert!(msg.is_response());
     /// ```
+    #[must_use]
     pub fn is_response(&self) -> bool {
-        self.attributes().is_some_and(UAttributes::is_response)
+        self.attributes().is_response()
     }
 
     /// Checks if this is a Notification message.
@@ -299,20 +311,17 @@ impl UMessage {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{UAttributes, UMessage, UMessageType};
+    /// use up_rust::{UMessageBuilder, UUri};
     ///
-    /// let attribs = UAttributes {
-    ///   type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
-    ///   ..Default::default()
-    /// };
-    /// let msg = UMessage {
-    ///   attributes: Some(attribs).into(),
-    ///   ..Default::default()
-    /// };
+    /// let msg = UMessageBuilder::notification(
+    ///   UUri::try_from_parts("origin", 0xabcd, 0x01, 0x9000).unwrap(),
+    ///   UUri::try_from_parts("dest", 0x1234, 0x01, 0x0000).unwrap(),
+    /// ).build().unwrap();
     /// assert!(msg.is_notification());
     /// ```
+    #[must_use]
     pub fn is_notification(&self) -> bool {
-        self.attributes().is_some_and(UAttributes::is_notification)
+        self.attributes().is_notification()
     }
 
     /// Deserializes this message's protobuf payload into a type.
@@ -323,12 +332,12 @@ impl UMessage {
     ///
     /// # Errors
     ///
-    /// Returns an error if the message payload format is neither [UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF]
-    /// nor [UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY] or if the bytes in the
+    /// Returns an error if the message payload format is neither [UPayloadFormat::Protobuf] nor
+    /// [UPayloadFormat::ProtobufWrappedInAny] or if the bytes in the
     /// payload cannot be deserialized into the target type.
-    pub fn extract_protobuf<T: MessageFull + Default>(&self) -> Result<T, UMessageError> {
+    pub fn extract_protobuf<T: ProtobufMappable>(&self) -> Result<T, UMessageError> {
         if let Some(payload) = self.payload.as_ref() {
-            let payload_format = self.payload_format().unwrap_or_default();
+            let payload_format = self.payload_format().unwrap_or(UPayloadFormat::Unspecified);
             deserialize_protobuf_bytes(payload, &payload_format)
         } else {
             Err(UMessageError::PayloadError(
@@ -355,38 +364,90 @@ impl UMessage {
 ///
 /// Returns an error if the payload format is unsupported or if the data can not be deserialized
 /// into the target type based on the given format.
-pub(crate) fn deserialize_protobuf_bytes<T: MessageFull + Default>(
-    payload: &Bytes,
+pub(crate) fn deserialize_protobuf_bytes<T: ProtobufMappable>(
+    payload: &[u8],
     payload_format: &UPayloadFormat,
 ) -> Result<T, UMessageError> {
     match payload_format {
-        UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF => {
-            T::parse_from_tokio_bytes(payload).map_err(UMessageError::DataSerializationError)
+        UPayloadFormat::Protobuf => {
+            T::parse_from_protobuf_bytes(payload).map_err(UMessageError::DataSerializationError)
         }
-        UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY => {
-            Any::parse_from_tokio_bytes(payload)
-                .map_err(UMessageError::DataSerializationError)
-                .and_then(|any| match any.unpack() {
-                    Ok(Some(v)) => Ok(v),
-                    Ok(None) => Err(UMessageError::PayloadError(
-                        "cannot deserialize payload, message type mismatch".to_string(),
-                    )),
-                    Err(e) => Err(UMessageError::DataSerializationError(e)),
-                })
-        }
-        UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED
-        | UPayloadFormat::UPAYLOAD_FORMAT_JSON
-        | UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP
-        | UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP_TLV
-        | UPayloadFormat::UPAYLOAD_FORMAT_RAW
-        | UPayloadFormat::UPAYLOAD_FORMAT_TEXT
-        | UPayloadFormat::UPAYLOAD_FORMAT_SHM => {
+        UPayloadFormat::ProtobufWrappedInAny => T::parse_from_packed_protobuf_bytes(payload)
+            .map_err(UMessageError::DataSerializationError),
+        UPayloadFormat::Unspecified
+        | UPayloadFormat::Json
+        | UPayloadFormat::Raw
+        | UPayloadFormat::Shm
+        | UPayloadFormat::Someip
+        | UPayloadFormat::SomeipTlv
+        | UPayloadFormat::Text => {
             let detail_msg = payload_format.to_media_type().map_or_else(
-                || format!("Unknown payload format: {}", payload_format.value()),
+                || format!("Unknown payload format: {}", *payload_format as i32),
                 |mt| format!("Invalid/unsupported payload format: {mt}"),
             );
             Err(UMessageError::from(detail_msg))
         }
+    }
+}
+
+impl From<&UMessage> for UMessageProto {
+    fn from(value: &UMessage) -> Self {
+        let attributes = UAttributesProto::from(&value.attributes);
+        UMessageProto {
+            attributes: Some(attributes).into(),
+            payload: value
+                .payload
+                .as_ref()
+                .map(|p| Bytes::copy_from_slice(p.as_slice())),
+            ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<&UMessageProto> for UMessage {
+    type Error = UMessageError;
+    fn try_from(value: &UMessageProto) -> Result<Self, Self::Error> {
+        let attributes = value.attributes.as_ref().map_or_else(
+            || {
+                Err(UAttributesError::validation_error(
+                    "UMessageProto missing attributes",
+                ))
+            },
+            UAttributes::try_from,
+        )?;
+        UMessage::new(attributes, value.payload.clone())
+    }
+}
+
+impl ProtobufMappable for UMessage {
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
+        let proto = UMessageProto::parse_from_bytes(proto)?;
+        UMessage::try_from(&proto).map_err(|e| SerializationError(e.to_string()))
+    }
+
+    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
+        Any::parse_from_bytes(proto)
+            .map_err(|err| crate::SerializationError(err.to_string()))
+            .and_then(|any| match any.unpack::<UMessageProto>() {
+                Ok(Some(umessage_proto)) => UMessage::try_from(&umessage_proto)
+                    .map_err(|e| crate::SerializationError(e.to_string())),
+                Ok(None) => Err(crate::SerializationError(
+                    "Protobuf Any does not contain UMessage".to_string(),
+                )),
+                Err(e) => Err(crate::SerializationError(format!(
+                    "Protobuf Any unpack error: {e}"
+                ))),
+            })
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
+        Ok(UMessageProto::from(self).write_to_bytes()?)
+    }
+
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
+        Any::pack(&UMessageProto::from(self))
+            .map_err(|e| crate::SerializationError(format!("Failed to pack UMessage: {e}")))
+            .and_then(|any| any.write_to_protobuf_bytes())
     }
 }
 
@@ -397,7 +458,7 @@ mod test {
     use protobuf::well_known_types::{any::Any, duration::Duration, wrappers::StringValue};
     use test_case::test_case;
 
-    use crate::{UAttributes, UStatus};
+    use crate::{UStatus, UUri};
 
     use super::*;
 
@@ -405,19 +466,23 @@ mod test {
     fn test_deserialize_protobuf_bytes_succeeds() {
         let mut data = StringValue::new();
         data.value = "hello world".to_string();
-        let any = Any::pack(&data.clone()).unwrap();
-        let buf: Bytes = any.write_to_bytes().unwrap().into();
 
         let result = deserialize_protobuf_bytes::<StringValue>(
-            &buf,
-            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
+            &data
+                .write_to_bytes()
+                .expect("Failed to write protobuf bytes"),
+            &UPayloadFormat::Protobuf,
         );
         assert!(result.is_ok_and(|v| v.value == *"hello world"));
 
-        let result = deserialize_protobuf_bytes::<StringValue>(
-            &data.write_to_bytes().unwrap().into(),
-            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF,
-        );
+        let any = Any::pack(&data).expect("Failed to pack Any");
+        let buf: Bytes = any
+            .write_to_bytes()
+            .expect("Failed to write protobuf bytes")
+            .into();
+
+        let result =
+            deserialize_protobuf_bytes::<StringValue>(&buf, &UPayloadFormat::ProtobufWrappedInAny);
         assert!(result.is_ok_and(|v| v.value == *"hello world"));
     }
 
@@ -427,22 +492,20 @@ mod test {
         data.value = "hello world".to_string();
         let any = Any::pack(&data).unwrap();
         let buf: Bytes = any.write_to_bytes().unwrap().into();
-        let result = deserialize_protobuf_bytes::<UStatus>(
-            &buf,
-            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
-        );
-        assert!(result.is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
+        let result =
+            deserialize_protobuf_bytes::<UStatus>(&buf, &UPayloadFormat::ProtobufWrappedInAny);
+        assert!(result.is_err_and(|e| matches!(e, UMessageError::DataSerializationError(_))));
     }
 
-    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_JSON; "JSON format")]
-    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_RAW; "RAW format")]
-    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_SHM; "SHM format")]
-    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP; "SOMEIP format")]
-    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_SOMEIP_TLV; "SOMEIP TLV format")]
-    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_TEXT; "TEXT format")]
-    #[test_case(UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED; "UNSPECIFIED format")]
+    #[test_case(UPayloadFormat::Json; "JSON format")]
+    #[test_case(UPayloadFormat::Raw; "RAW format")]
+    #[test_case(UPayloadFormat::Shm; "SHM format")]
+    #[test_case(UPayloadFormat::Someip; "SOMEIP format")]
+    #[test_case(UPayloadFormat::SomeipTlv; "SOMEIP TLV format")]
+    #[test_case(UPayloadFormat::Text; "TEXT format")]
+    #[test_case(UPayloadFormat::Unspecified; "UNSPECIFIED format")]
     fn test_deserialize_protobuf_bytes_fails_for_(format: UPayloadFormat) {
-        let result = deserialize_protobuf_bytes::<UStatus>(&"hello".into(), &format);
+        let result = deserialize_protobuf_bytes::<UStatus>("hello".as_bytes(), &format);
         assert!(result.is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
     }
 
@@ -455,8 +518,8 @@ mod test {
         };
         let buf = any.write_to_bytes().unwrap();
         let result = deserialize_protobuf_bytes::<Duration>(
-            &buf.into(),
-            &UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
+            buf.as_slice(),
+            &UPayloadFormat::ProtobufWrappedInAny,
         );
         assert!(result.is_err_and(|e| matches!(e, UMessageError::DataSerializationError(_))))
     }
@@ -467,18 +530,11 @@ mod test {
             value: "hello".to_string(),
             ..Default::default()
         };
-        let buf = Any::pack(&payload)
-            .and_then(|a| a.write_to_bytes())
-            .unwrap();
-        let msg = UMessage {
-            attributes: Some(UAttributes {
-                payload_format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY.into(),
-                ..Default::default()
-            })
-            .into(),
-            payload: Some(buf.into()),
-            ..Default::default()
-        };
+        let topic =
+            UUri::try_from_parts("local", 0xabcd, 0x01, 0x9000).expect("failed to create topic");
+        let msg = UMessageBuilder::publish(topic)
+            .build_with_protobuf_payload(&payload)
+            .expect("failed to create message");
         assert!(msg
             .extract_protobuf::<StringValue>()
             .is_ok_and(|v| v.value == *"hello"));
@@ -486,14 +542,11 @@ mod test {
 
     #[test]
     fn extract_payload_fails_for_no_payload() {
-        let msg = UMessage {
-            attributes: Some(UAttributes {
-                payload_format: UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY.into(),
-                ..Default::default()
-            })
-            .into(),
-            ..Default::default()
-        };
+        let topic =
+            UUri::try_from_parts("local", 0xabcd, 0x01, 0x9000).expect("failed to create topic");
+        let msg = UMessageBuilder::publish(topic)
+            .build()
+            .expect("failed to create message");
         assert!(msg
             .extract_protobuf::<StringValue>()
             .is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));

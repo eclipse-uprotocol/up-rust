@@ -14,16 +14,33 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::up_core_api::{
+    udiscovery::{
+        FindServicesRequest, FindServicesResponse, GetServiceTopicsRequest,
+        GetServiceTopicsResponse,
+    },
+    uri::UUri as UUriProto,
+};
 use crate::{
     core::udiscovery::{
-        udiscovery_uri, FindServicesRequest, FindServicesResponse, GetServiceTopicsRequest,
-        GetServiceTopicsResponse, ServiceTopicInfo, UDiscovery, RESOURCE_ID_FIND_SERVICES,
-        RESOURCE_ID_GET_SERVICE_TOPICS,
+        TopicInfo, UDiscovery, RESOURCE_ID_FIND_SERVICES, RESOURCE_ID_GET_SERVICE_TOPICS,
+        UDISCOVERY_TYPE_ID, UDISCOVERY_VERSION_MAJOR,
     },
     UStatus, UUri,
 };
 
 use super::{CallOptions, RpcClient};
+
+/// Gets a UUri referring to one of the _local_ uDiscovery service's resources.
+fn udiscovery_uri(resource_id: u16) -> UUri {
+    UUri::try_from_parts(
+        "",
+        UDISCOVERY_TYPE_ID,
+        UDISCOVERY_VERSION_MAJOR,
+        resource_id,
+    )
+    .unwrap()
+}
 
 /// A [`UDiscovery`] client implementation for invoking operations of a local uDiscovery service.
 ///
@@ -55,7 +72,7 @@ impl UDiscovery for RpcClientUDiscovery {
         recursive: bool,
     ) -> Result<Vec<UUri>, UStatus> {
         let request_message = FindServicesRequest {
-            uri: Some(uri_pattern).into(),
+            uri: Some(UUriProto::from(&uri_pattern)).into(),
             recursive,
             ..Default::default()
         };
@@ -67,10 +84,13 @@ impl UDiscovery for RpcClientUDiscovery {
             )
             .await
             .map(|response_message| {
-                response_message
-                    .uris
-                    .as_ref()
-                    .map_or(vec![], |batch| batch.uris.to_owned())
+                response_message.uris.as_ref().map_or(vec![], |batch| {
+                    batch
+                        .uris
+                        .iter()
+                        .filter_map(|uri| UUri::try_from(uri).ok())
+                        .collect()
+                })
             })
             .map_err(UStatus::from)
     }
@@ -79,9 +99,9 @@ impl UDiscovery for RpcClientUDiscovery {
         &self,
         topic_pattern: UUri,
         recursive: bool,
-    ) -> Result<Vec<ServiceTopicInfo>, UStatus> {
+    ) -> Result<Vec<TopicInfo>, UStatus> {
         let request_message = GetServiceTopicsRequest {
-            topic: Some(topic_pattern).into(),
+            topic: Some(UUriProto::from(&topic_pattern)).into(),
             recursive,
             ..Default::default()
         };
@@ -92,7 +112,13 @@ impl UDiscovery for RpcClientUDiscovery {
                 request_message,
             )
             .await
-            .map(|response_message| response_message.topics.to_owned())
+            .map(|response_message| {
+                response_message
+                    .topics
+                    .iter()
+                    .filter_map(|topic| TopicInfo::try_from(topic).ok())
+                    .collect()
+            })
             .map_err(UStatus::from)
     }
 }
@@ -104,16 +130,17 @@ mod tests {
     use super::*;
     use crate::{
         communication::{rpc::MockRpcClient, UPayload},
-        up_core_api::uri::UUriBatch,
+        up_core_api::{udiscovery::ServiceTopicInfo, uoptions::UServiceTopic, uri::UUriBatch},
         UCode, UUri,
     };
     use std::sync::Arc;
 
     #[tokio::test]
     async fn test_find_services_invokes_rpc_client() {
-        let service_pattern_uri = UUri::try_from_parts("other", 0xFFFF_D5A3, 0x01, 0xFFFF).unwrap();
+        let service_pattern_uri = UUri::try_from_parts("other", 0xFFFF_D5A3, 0x01, 0xFFFF)
+            .expect("failed to create service pattern URI");
         let request = FindServicesRequest {
-            uri: Some(service_pattern_uri.clone()).into(),
+            uri: Some(UUriProto::from(&service_pattern_uri)).into(),
             ..Default::default()
         };
         let expected_request = request.clone();
@@ -144,8 +171,13 @@ mod tests {
             .returning(move |_method, _options, _payload| {
                 let response = FindServicesResponse {
                     uris: Some(UUriBatch {
-                        uris: vec![UUri::try_from_parts("other", 0x0004_D5A3, 0x01, 0xD3FE)
-                            .expect("failed to create query result")],
+                        uris: vec![UUriProto {
+                            authority_name: "other".to_string(),
+                            ue_id: 0x0004_D5A3,
+                            ue_version_major: 0x01,
+                            resource_id: 0xD3FE,
+                            ..Default::default()
+                        }],
                         ..Default::default()
                     })
                     .into(),
@@ -159,7 +191,7 @@ mod tests {
         assert!(udiscovery_client
             .find_services(service_pattern_uri.clone(), false)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
+            .is_err_and(|e| e.get_code() == UCode::Internal));
         assert!(udiscovery_client
             .find_services(service_pattern_uri.clone(), false)
             .await
@@ -170,9 +202,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_service_topics_invokes_rpc_client() {
-        let topic_pattern_uri = UUri::try_from_parts("*", 0xFFFF_D5A3, 0x01, 0xFFFF).unwrap();
+        let topic_pattern_uri = UUri::try_from_parts("*", 0xFFFF_D5A3, 0x01, 0xFFFF)
+            .expect("failed to create topic pattern URI");
         let request = GetServiceTopicsRequest {
-            topic: Some(topic_pattern_uri.clone()).into(),
+            topic: Some((&topic_pattern_uri).into()).into(),
             ..Default::default()
         };
         let expected_request = request.clone();
@@ -203,13 +236,22 @@ mod tests {
             })
             .returning(move |_method, _options, _payload| {
                 let topic_info = ServiceTopicInfo {
-                    topic: Some(
-                        UUri::try_from_parts("other", 0x0004_D5A3, 0x01, 0xD3FE)
-                            .expect("failed to create query result"),
-                    )
+                    topic: Some(UUriProto {
+                        authority_name: "other".to_string(),
+                        ue_id: 0x0004_D5A3,
+                        ue_version_major: 0x01,
+                        resource_id: 0xD3FE,
+                        ..Default::default()
+                    })
+                    .into(),
+                    info: Some(UServiceTopic {
+                        id: 0x9000,
+                        name: "TestTopic".to_string(),
+                        message: "TestTopicMessage".to_string(),
+                        ..Default::default()
+                    })
                     .into(),
                     ttl: 600,
-                    info: None.into(),
                     ..Default::default()
                 };
                 let response = GetServiceTopicsResponse {
@@ -224,12 +266,11 @@ mod tests {
         assert!(udiscovery_client
             .get_service_topics(topic_pattern_uri.clone(), false)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
+            .is_err_and(|e| e.get_code() == UCode::Internal));
         assert!(udiscovery_client
             .get_service_topics(topic_pattern_uri.clone(), false)
             .await
             .is_ok_and(|result| result.len() == 1
-                && topic_pattern_uri
-                    .matches(result.first().and_then(|r| r.topic.as_ref()).unwrap())));
+                && topic_pattern_uri.matches(result.first().map(|r| r.topic()).unwrap())));
     }
 }
