@@ -38,13 +38,16 @@ impl<T: UTransport> RequestListener<T> {
         let transport_clone = self.transport.clone();
         let request_handler_clone = self.request_handler.clone();
         let mut response_builder =
-            UMessageBuilder::response_for_request(request_message.attributes_unchecked());
+            UMessageBuilder::response_for_request(request_message.attributes());
 
-        let request_message_id = request_message.id_unchecked().to_hyphenated_string();
+        let request_message_id = request_message.id().to_hyphenated_string();
         let request_timeout = request_message.ttl_unchecked();
-        let payload_format = request_message.payload_format().unwrap_or_default();
-        let payload = request_message.payload;
-        let request_payload = payload.map(|data| UPayload::new(data, payload_format));
+        let payload_format = request_message
+            .payload_format()
+            .unwrap_or(crate::UPayloadFormat::Unspecified);
+        let request_payload = request_message
+            .payload()
+            .map(|data| UPayload::new(data, payload_format));
 
         debug!(
             ttl = request_timeout,
@@ -55,7 +58,7 @@ impl<T: UTransport> RequestListener<T> {
 
         let invocation_result_future = request_handler_clone.handle_request(
             resource_id,
-            &request_message.attributes,
+            request_message.attributes(),
             request_payload,
         );
         let outcome = tokio::time::timeout(
@@ -82,7 +85,10 @@ impl<T: UTransport> RequestListener<T> {
         match response {
             Ok(response_message) => {
                 if let Err(e) = transport_clone.send(response_message).await {
-                    info!(ucode = e.code.value(), "failed to send response message");
+                    info!(
+                        ucode = e.get_code().value(),
+                        "failed to send response message"
+                    );
                 }
             }
             Err(e) => {
@@ -101,7 +107,7 @@ impl<T: UTransport> UListener for RequestListener<T> {
             self.process_valid_request(method_id, msg).await;
         } else {
             debug!(
-                message_type = msg.type_unchecked().to_cloudevent_type(),
+                message_type = msg.type_().to_cloudevent_type(),
                 "ignoring non-request message received by RPC server"
             );
         }
@@ -245,7 +251,10 @@ mod tests {
     };
 
     fn new_uri_provider() -> Arc<StaticUriProvider> {
-        Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
+        Arc::new(
+            StaticUriProvider::new("", 0x0005, 0x02)
+                .expect("should have been able to create URI provider"),
+        )
     }
 
     #[test_case(None, 0x4A10; "for empty origin filter")]
@@ -264,7 +273,7 @@ mod tests {
                                 sink_filter: &Option<&UUri>,
                                 _listener: &Arc<dyn UListener>| {
             source_filter == &expected_source_filter
-                && sink_filter.is_some_and(|uri| uri.resource_id == resource_id as u32)
+                && sink_filter.is_some_and(|uri| uri.resource_id() == resource_id)
         };
         transport
             .expect_do_register_listener()
@@ -392,7 +401,7 @@ mod tests {
             .once()
             .withf(move |resource_id, message_attributes, request_payload| {
                 if let Some(pl) = request_payload {
-                    let message_source = message_attributes.source.as_ref().unwrap();
+                    let message_source = message_attributes.source();
                     let msg: StringValue = pl.extract_protobuf().unwrap();
                     msg.value == *"Hello"
                         && *resource_id == 0x7000_u16
@@ -418,7 +427,7 @@ mod tests {
                     && response_message.is_response()
                     && response_message
                         .commstatus()
-                        .is_none_or(|code| code == UCode::OK)
+                        .is_none_or(|code| code == UCode::Ok)
                     && response_message.request_id_unchecked() == &message_id_clone
             })
             .returning(move |_msg| {
@@ -466,7 +475,7 @@ mod tests {
             .once()
             .withf(move |response_message| {
                 let error: UStatus = response_message.extract_protobuf().unwrap();
-                error.get_code() == UCode::NOT_FOUND
+                error.get_code() == UCode::NotFound
                     && response_message.is_response()
                     && response_message.commstatus_unchecked() == error.get_code()
                     && response_message.request_id_unchecked() == &message_id_clone
@@ -528,7 +537,7 @@ mod tests {
             .once()
             .withf(move |response_message| {
                 let error: UStatus = response_message.extract_protobuf().unwrap();
-                error.get_code() == UCode::DEADLINE_EXCEEDED
+                error.get_code() == UCode::DeadlineExceeded
                     && response_message.is_response()
                     && response_message.commstatus_unchecked() == error.get_code()
                     && response_message.request_id_unchecked() == &message_id_clone

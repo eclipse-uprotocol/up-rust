@@ -14,18 +14,21 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use protobuf::{well_known_types::timestamp::Timestamp, Enum};
 
 use crate::{
     core::usubscription::{
-        usubscription_uri, FetchSubscribersRequest, FetchSubscribersResponse,
-        FetchSubscriptionsRequest, FetchSubscriptionsResponse, NotificationsRequest,
-        NotificationsResponse, ResetRequest, ResetResponse, SubscriptionRequest,
-        SubscriptionResponse, USubscription, UnsubscribeRequest, UnsubscribeResponse,
+        usubscription_uri, ResetReason, SubscriptionInfo, SubscriptionStatus, USubscription,
         RESOURCE_ID_FETCH_SUBSCRIBERS, RESOURCE_ID_FETCH_SUBSCRIPTIONS,
         RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS, RESOURCE_ID_RESET, RESOURCE_ID_SUBSCRIBE,
         RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS, RESOURCE_ID_UNSUBSCRIBE,
     },
-    UStatus,
+    up_core_api::usubscription::{
+        FetchSubscribersResponse, FetchSubscriptionsRequest, FetchSubscriptionsResponse,
+        NotificationsResponse, ResetResponse, SubscribeAttributes, SubscriptionRequest,
+        SubscriptionResponse, UnsubscribeRequest, UnsubscribeResponse,
+    },
+    UCode, UStatus, UUri,
 };
 
 use super::{CallOptions, RpcClient};
@@ -52,12 +55,55 @@ impl RpcClientUSubscription {
     }
 }
 
+impl RpcClientUSubscription {
+    async fn fetch_subscriptions(
+        &self,
+        fetch_subscriptions_request: FetchSubscriptionsRequest,
+    ) -> Result<Vec<SubscriptionInfo>, UStatus> {
+        let response = self
+            .rpc_client
+            .invoke_proto_method::<_, FetchSubscriptionsResponse>(
+                usubscription_uri(RESOURCE_ID_FETCH_SUBSCRIPTIONS),
+                Self::default_call_options(),
+                fetch_subscriptions_request,
+            )
+            .await
+            .map_err(UStatus::from)?;
+        let mut result = Vec::new();
+        for subscription in &response.subscriptions {
+            let info = SubscriptionInfo::try_from(subscription)?;
+            result.push(info);
+        }
+        Ok(result)
+    }
+}
+
 #[async_trait]
 impl USubscription for RpcClientUSubscription {
     async fn subscribe(
         &self,
-        subscription_request: SubscriptionRequest,
-    ) -> Result<SubscriptionResponse, UStatus> {
+        topic: &UUri,
+        expiration: Option<u64>,
+        min_sample_period: Option<u32>,
+    ) -> Result<SubscriptionStatus, UStatus> {
+        let subscription_request = SubscriptionRequest {
+            topic: Some(topic.into()).into(),
+            attributes: match (expiration, min_sample_period) {
+                (None, None) => None.into(),
+                _ => Some(SubscribeAttributes {
+                    expire: expiration
+                        .map(|ts| Timestamp {
+                            seconds: ts as i64,
+                            ..Default::default()
+                        })
+                        .into(),
+                    sample_period_ms: min_sample_period,
+                    ..Default::default()
+                })
+                .into(),
+            },
+            ..Default::default()
+        };
         self.rpc_client
             .invoke_proto_method::<_, SubscriptionResponse>(
                 usubscription_uri(RESOURCE_ID_SUBSCRIBE),
@@ -65,10 +111,25 @@ impl USubscription for RpcClientUSubscription {
                 subscription_request,
             )
             .await
+            .and_then(|response| {
+                Ok(response.status.as_ref().map_or_else(
+                    || {
+                        Err(UStatus::fail_with_code(
+                            UCode::InvalidArgument,
+                            "uSubscription returned invalid response: no subscription status",
+                        ))
+                    },
+                    |status| Ok(SubscriptionStatus::from(status)),
+                )?)
+            })
             .map_err(UStatus::from)
     }
 
-    async fn unsubscribe(&self, unsubscribe_request: UnsubscribeRequest) -> Result<(), UStatus> {
+    async fn unsubscribe(&self, topic: &UUri) -> Result<(), UStatus> {
+        let unsubscribe_request = UnsubscribeRequest {
+            topic: Some(topic.into()).into(),
+            ..Default::default()
+        };
         self.rpc_client
             .invoke_proto_method::<_, UnsubscribeResponse>(
                 usubscription_uri(RESOURCE_ID_UNSUBSCRIBE),
@@ -80,24 +141,46 @@ impl USubscription for RpcClientUSubscription {
             .map_err(UStatus::from)
     }
 
-    async fn fetch_subscriptions(
+    async fn fetch_subscriptions_by_topic(
         &self,
-        fetch_subscriptions_request: FetchSubscriptionsRequest,
-    ) -> Result<FetchSubscriptionsResponse, UStatus> {
-        self.rpc_client
-            .invoke_proto_method::<_, FetchSubscriptionsResponse>(
-                usubscription_uri(RESOURCE_ID_FETCH_SUBSCRIPTIONS),
-                Self::default_call_options(),
-                fetch_subscriptions_request,
-            )
-            .await
-            .map_err(UStatus::from)
+        topic: &UUri,
+    ) -> Result<Vec<SubscriptionInfo>, UStatus> {
+        let fetch_subscriptions_request =
+            crate::up_core_api::usubscription::FetchSubscriptionsRequest {
+                request: Some(
+                    crate::up_core_api::usubscription::fetch_subscriptions_request::Request::Topic(
+                        topic.into(),
+                    ),
+                ),
+                ..Default::default()
+            };
+        self.fetch_subscriptions(fetch_subscriptions_request).await
     }
 
-    async fn register_for_notifications(
+    async fn fetch_subscriptions_by_subscriber(
         &self,
-        notifications_register_request: NotificationsRequest,
-    ) -> Result<(), UStatus> {
+        subscriber: &UUri,
+    ) -> Result<Vec<SubscriptionInfo>, UStatus> {
+        let subscriber_info = crate::up_core_api::usubscription::SubscriberInfo {
+            uri: Some(subscriber.into()).into(),
+            ..Default::default()
+        };
+        let fetch_subscriptions_request =
+            crate::up_core_api::usubscription::FetchSubscriptionsRequest {
+                request: Some(
+                    crate::up_core_api::usubscription::fetch_subscriptions_request::Request::Subscriber(subscriber_info),
+                ),
+                ..Default::default()
+            };
+        self.fetch_subscriptions(fetch_subscriptions_request).await
+    }
+
+    async fn register_for_notifications(&self, topic: &UUri) -> Result<(), UStatus> {
+        let notifications_register_request =
+            crate::up_core_api::usubscription::NotificationsRequest {
+                topic: Some(topic.into()).into(),
+                ..Default::default()
+            };
         self.rpc_client
             .invoke_proto_method::<_, NotificationsResponse>(
                 usubscription_uri(RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS),
@@ -109,10 +192,12 @@ impl USubscription for RpcClientUSubscription {
             .map_err(UStatus::from)
     }
 
-    async fn unregister_for_notifications(
-        &self,
-        notifications_unregister_request: NotificationsRequest,
-    ) -> Result<(), UStatus> {
+    async fn unregister_for_notifications(&self, topic: &UUri) -> Result<(), UStatus> {
+        let notifications_unregister_request =
+            crate::up_core_api::usubscription::NotificationsRequest {
+                topic: Some(topic.into()).into(),
+                ..Default::default()
+            };
         self.rpc_client
             .invoke_proto_method::<_, NotificationsResponse>(
                 usubscription_uri(RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS),
@@ -124,21 +209,70 @@ impl USubscription for RpcClientUSubscription {
             .map_err(UStatus::from)
     }
 
-    async fn fetch_subscribers(
-        &self,
-        fetch_subscribers_request: FetchSubscribersRequest,
-    ) -> Result<FetchSubscribersResponse, UStatus> {
-        self.rpc_client
+    async fn fetch_subscribers(&self, topic: &UUri) -> Result<Vec<UUri>, UStatus> {
+        let fetch_subscribers_request =
+            crate::up_core_api::usubscription::FetchSubscribersRequest {
+                topic: Some(topic.into()).into(),
+                ..Default::default()
+            };
+        let response = self
+            .rpc_client
             .invoke_proto_method::<_, FetchSubscribersResponse>(
                 usubscription_uri(RESOURCE_ID_FETCH_SUBSCRIBERS),
                 Self::default_call_options(),
                 fetch_subscribers_request,
             )
-            .await
-            .map_err(UStatus::from)
+            .await?;
+        let mut result = vec![];
+        for subscriber_info in &response.subscribers {
+            let uri = subscriber_info
+                .uri
+                .as_ref()
+                .ok_or_else(|| {
+                    UStatus::fail_with_code(
+                        UCode::InvalidArgument,
+                        "uSubscription returned invalid response: missing subscriber URI",
+                    )
+                })
+                .and_then(|uri_proto| {
+                    UUri::try_from(uri_proto).map_err(|_e| {
+                        UStatus::fail_with_code(
+                            UCode::InvalidArgument,
+                            "uSubscription returned invalid response: invalid subscriber URI",
+                        )
+                    })
+                })?;
+            result.push(uri);
+        }
+        Ok(result)
     }
 
-    async fn reset(&self, reset_request: ResetRequest) -> Result<ResetResponse, UStatus> {
+    async fn reset(
+        &self,
+        reason: ResetReason,
+        message: Option<String>,
+        before: Option<u64>,
+    ) -> Result<(), UStatus> {
+        let code =
+            crate::up_core_api::usubscription::reset_request::reason::Code::from_i32(reason as i32)
+                .ok_or_else(|| {
+                    UStatus::fail_with_code(UCode::InvalidArgument, "invalid reset reason")
+                })?;
+        let reset_request = crate::up_core_api::usubscription::ResetRequest {
+            reason: Some(crate::up_core_api::usubscription::reset_request::Reason {
+                code: code.into(),
+                message,
+                ..Default::default()
+            })
+            .into(),
+            before: before
+                .map(|b| Timestamp {
+                    seconds: b as i64,
+                    ..Default::default()
+                })
+                .into(),
+            ..Default::default()
+        };
         self.rpc_client
             .invoke_proto_method::<_, ResetResponse>(
                 usubscription_uri(RESOURCE_ID_RESET),
@@ -146,6 +280,7 @@ impl USubscription for RpcClientUSubscription {
                 reset_request,
             )
             .await
+            .map(|_response| ())
             .map_err(UStatus::from)
     }
 }
@@ -157,7 +292,10 @@ mod tests {
     use super::*;
     use crate::{
         communication::{rpc::MockRpcClient, UPayload},
-        core::usubscription::{Request, SubscriptionResponse},
+        up_core_api::usubscription::{
+            fetch_subscriptions_request::Request, FetchSubscribersRequest, NotificationsRequest,
+            ResetRequest,
+        },
         UCode, UUri,
     };
     use std::sync::Arc;
@@ -165,11 +303,10 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_invokes_rpc_client() {
         let topic = UUri::try_from_parts("other", 0xd5a3, 0x01, 0xd3fe).unwrap();
-        let request = SubscriptionRequest {
-            topic: Some(topic).into(),
+        let expected_request = SubscriptionRequest {
+            topic: Some((&topic).into()).into(),
             ..Default::default()
         };
-        let expected_request = request.clone();
         let mut rpc_client = MockRpcClient::new();
         let mut seq = Sequence::new();
         rpc_client
@@ -196,6 +333,11 @@ mod tests {
             })
             .returning(move |_method, _options, _payload| {
                 let response = SubscriptionResponse {
+                    status: Some(crate::up_core_api::usubscription::SubscriptionStatus {
+                        state: crate::up_core_api::usubscription::subscription_status::State::SUBSCRIBED
+                            .into(),
+                        ..Default::default()
+                    }).into(),
                     ..Default::default()
                 };
                 Ok(Some(UPayload::try_from_protobuf(response).unwrap()))
@@ -204,20 +346,22 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .subscribe(request.clone())
+            .subscribe(&topic, None, None)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
-        assert!(usubscription_client.subscribe(request).await.is_ok());
+            .is_err_and(|e| e.get_code() == UCode::Internal));
+        assert!(usubscription_client
+            .subscribe(&topic, None, None)
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
     async fn test_unsubscribe_invokes_rpc_client() {
         let topic = UUri::try_from_parts("other", 0xd5a3, 0x01, 0xd3fe).unwrap();
-        let request = UnsubscribeRequest {
-            topic: Some(topic).into(),
+        let expected_request = UnsubscribeRequest {
+            topic: Some((&topic).into()).into(),
             ..Default::default()
         };
-        let expected_request = request.clone();
         let mut rpc_client = MockRpcClient::new();
         let mut seq = Sequence::new();
         rpc_client
@@ -252,20 +396,19 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .unsubscribe(request.clone())
+            .unsubscribe(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
-        assert!(usubscription_client.unsubscribe(request).await.is_ok());
+            .is_err_and(|e| e.get_code() == UCode::Internal));
+        assert!(usubscription_client.unsubscribe(&topic).await.is_ok());
     }
 
     #[tokio::test]
     async fn test_fetch_subscriptions_invokes_rpc_client() {
         let topic = UUri::try_from_parts("other", 0xd5a3, 0x01, 0xd3fe).unwrap();
-        let request = FetchSubscriptionsRequest {
-            request: Some(Request::Topic(topic)),
+        let expected_request = FetchSubscriptionsRequest {
+            request: Some(Request::Topic((&topic).into())),
             ..Default::default()
         };
-        let expected_request = request.clone();
         let mut rpc_client = MockRpcClient::new();
         let mut seq = Sequence::new();
         rpc_client
@@ -302,11 +445,11 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .fetch_subscriptions(request.clone())
+            .fetch_subscriptions_by_topic(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
+            .is_err_and(|e| e.get_code() == UCode::Internal));
         assert!(usubscription_client
-            .fetch_subscriptions(request)
+            .fetch_subscriptions_by_topic(&topic)
             .await
             .is_ok());
     }
@@ -314,11 +457,10 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_subscribers_invokes_rpc_client() {
         let topic = UUri::try_from_parts("other", 0xd5a3, 0x01, 0xd3fe).unwrap();
-        let request = FetchSubscribersRequest {
-            topic: Some(topic).into(),
+        let expected_request = FetchSubscribersRequest {
+            topic: Some((&topic).into()).into(),
             ..Default::default()
         };
-        let expected_request = request.clone();
         let mut rpc_client = MockRpcClient::new();
         let mut seq = Sequence::new();
         rpc_client
@@ -355,23 +497,19 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .fetch_subscribers(request.clone())
+            .fetch_subscribers(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
-        assert!(usubscription_client
-            .fetch_subscribers(request)
-            .await
-            .is_ok());
+            .is_err_and(|e| e.get_code() == UCode::Internal));
+        assert!(usubscription_client.fetch_subscribers(&topic).await.is_ok());
     }
 
     #[tokio::test]
     async fn test_register_for_notifications_invokes_rpc_client() {
         let topic = UUri::try_from_parts("other", 0xd5a3, 0x01, 0xd3fe).unwrap();
-        let request = NotificationsRequest {
-            topic: Some(topic).into(),
+        let expected_request = NotificationsRequest {
+            topic: Some((&topic).into()).into(),
             ..Default::default()
         };
-        let expected_request = request.clone();
         let mut rpc_client = MockRpcClient::new();
         let mut seq = Sequence::new();
         rpc_client
@@ -409,11 +547,11 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .register_for_notifications(request.clone())
+            .register_for_notifications(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
+            .is_err_and(|e| e.get_code() == UCode::Internal));
         assert!(usubscription_client
-            .register_for_notifications(request)
+            .register_for_notifications(&topic)
             .await
             .is_ok());
     }
@@ -421,11 +559,10 @@ mod tests {
     #[tokio::test]
     async fn test_unregister_for_notifications_invokes_rpc_client() {
         let topic = UUri::try_from_parts("other", 0xd5a3, 0x01, 0xd3fe).unwrap();
-        let request = NotificationsRequest {
-            topic: Some(topic).into(),
+        let expected_request = NotificationsRequest {
+            topic: Some((&topic).into()).into(),
             ..Default::default()
         };
-        let expected_request = request.clone();
         let mut rpc_client = MockRpcClient::new();
         let mut seq = Sequence::new();
         rpc_client
@@ -463,20 +600,26 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .unregister_for_notifications(request.clone())
+            .unregister_for_notifications(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
+            .is_err_and(|e| e.get_code() == UCode::Internal));
         assert!(usubscription_client
-            .unregister_for_notifications(request)
+            .unregister_for_notifications(&topic)
             .await
             .is_ok());
     }
 
     #[tokio::test]
     async fn test_reset_invokes_rpc_client() {
-        let request = ResetRequest::default();
-
-        let expected_request = request.clone();
+        let expected_request = ResetRequest {
+            reason: Some(crate::up_core_api::usubscription::reset_request::Reason {
+                code: crate::up_core_api::usubscription::reset_request::reason::Code::UNSPECIFIED
+                    .into(),
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        };
         let mut rpc_client = MockRpcClient::new();
         let mut seq = Sequence::new();
         rpc_client
@@ -512,9 +655,12 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .reset(request.clone())
+            .reset(ResetReason::Unspecified, None, None)
             .await
-            .is_err_and(|e| e.get_code() == UCode::INTERNAL));
-        assert!(usubscription_client.reset(request).await.is_ok());
+            .is_err_and(|e| e.get_code() == UCode::Internal));
+        assert!(usubscription_client
+            .reset(ResetReason::Unspecified, None, None)
+            .await
+            .is_ok());
     }
 }

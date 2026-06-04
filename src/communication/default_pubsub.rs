@@ -23,9 +23,7 @@ use async_trait::async_trait;
 use tracing::{debug, info};
 
 use crate::{
-    core::usubscription::{
-        self, State, SubscriptionRequest, USubscription, UnsubscribeRequest, Update,
-    },
+    core::usubscription::{self, SubscriptionInfo, SubscriptionStatus, USubscription},
     LocalUriProvider, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri,
 };
 
@@ -88,9 +86,11 @@ impl SubscriptionChangeListener {
         subscription_change_handler: Arc<dyn SubscriptionChangeHandler>,
     ) -> Result<(), RegistrationError> {
         let Ok(mut handlers) = self.subscription_change_handlers.write() else {
-            return Err(RegistrationError::Unknown(UStatus::fail_with_code(
-                crate::UCode::INTERNAL,
-                "failed to acquire write lock for handler map",
+            return Err(RegistrationError::Unknown(Box::from(
+                UStatus::fail_with_code(
+                    crate::UCode::Internal,
+                    "failed to acquire write lock for handler map",
+                ),
             )));
         };
         let handler_to_add = ComparableSubscriptionChangeHandler::new(subscription_change_handler);
@@ -120,10 +120,10 @@ impl SubscriptionChangeListener {
         self.subscription_change_handlers
             .write()
             .map_err(|_e| {
-                RegistrationError::Unknown(UStatus::fail_with_code(
-                    crate::UCode::INTERNAL,
+                RegistrationError::Unknown(Box::from(UStatus::fail_with_code(
+                    crate::UCode::Internal,
                     "failed to acquire write lock for handler map",
-                ))
+                )))
             })
             .map(|mut handlers| {
                 handlers.remove(topic);
@@ -139,10 +139,10 @@ impl SubscriptionChangeListener {
         self.subscription_change_handlers
             .write()
             .map_err(|_e| {
-                RegistrationError::Unknown(UStatus::fail_with_code(
-                    crate::UCode::INTERNAL,
+                RegistrationError::Unknown(Box::from(UStatus::fail_with_code(
+                    crate::UCode::Internal,
                     "failed to acquire write lock for handler map",
-                ))
+                )))
             })
             .map(|mut handlers| {
                 handlers.clear();
@@ -163,22 +163,23 @@ impl UListener for SubscriptionChangeListener {
         if !msg.is_notification() {
             return;
         }
-        let Ok(subscription_update) = msg.extract_protobuf::<Update>() else {
+        let Ok(subscription_update) =
+            msg.extract_protobuf::<crate::up_core_api::usubscription::Update>()
+        else {
             debug!("ignoring notification that does not contain subscription update");
             return;
         };
-        let Some(topic) = subscription_update.topic.as_ref() else {
+        let Ok(subscription_info) = SubscriptionInfo::try_from(&subscription_update) else {
+            debug!("ignoring notification that does not contain valid subscription update");
             return;
         };
-        let Some(status) = subscription_update.status.as_ref() else {
-            return;
-        };
+        let topic = subscription_info.topic().to_owned();
 
         let Ok(handlers) = self.subscription_change_handlers.read() else {
             return;
         };
-        if let Some(handler) = handlers.get(topic) {
-            handler.on_subscription_change(topic.to_owned(), status.to_owned());
+        if let Some(handler) = handlers.get(&topic) {
+            handler.on_subscription_change(topic, subscription_info.status().to_owned());
         }
     }
 }
@@ -219,6 +220,7 @@ impl<T: UTransport, P: LocalUriProvider> Publisher for SimplePublisher<T, P> {
                 .transport
                 .send(publish_message)
                 .await
+                .map_err(Box::from)
                 .map_err(PubSubError::PublishError),
             Err(e) => Err(PubSubError::InvalidArgument(format!(
                 "failed to create Publish message from parameters: {e}"
@@ -329,54 +331,52 @@ impl<T: UTransport, S: USubscription, N: Notifier> InMemorySubscriber<T, S, N> {
         &self,
         topic: &UUri,
         subscription_change_handler: Option<Arc<dyn SubscriptionChangeHandler>>,
-    ) -> Result<State, RegistrationError> {
-        let subscription_request = SubscriptionRequest {
-            topic: Some(topic.to_owned()).into(),
-            ..Default::default()
-        };
-        match self.usubscription.subscribe(subscription_request).await {
-            Ok(response) => match response.status.state.enum_value() {
-                Ok(state) if state == State::SUBSCRIBED || state == State::SUBSCRIBE_PENDING => {
-                    if let Some(handler) = subscription_change_handler.clone() {
-                        self.subscription_change_listener
-                            .add_handler(topic.to_owned(), handler)?;
-                    }
-                    Ok(state)
+    ) -> Result<SubscriptionStatus, RegistrationError> {
+        match self.usubscription.subscribe(topic, None, None).await {
+            Ok(state)
+                if state == SubscriptionStatus::Subscribed
+                    || state == SubscriptionStatus::SubscribePending =>
+            {
+                if let Some(handler) = subscription_change_handler.clone() {
+                    self.subscription_change_listener
+                        .add_handler(topic.to_owned(), handler)?;
                 }
-                _ => {
-                    debug!(topic = %topic, "failed to subscribe to topic: {}", response.status.message);
-                    Err(RegistrationError::Unknown(UStatus::fail_with_code(
-                        crate::UCode::FAILED_PRECONDITION,
-                        response.status.message.to_owned(),
-                    )))
-                }
-            },
+                Ok(state)
+            }
+            Ok(_) => {
+                debug!(topic = %topic, "failed to subscribe to topic");
+                Err(RegistrationError::Unknown(Box::from(
+                    UStatus::fail_with_code(
+                        crate::UCode::FailedPrecondition,
+                        "failed to subscribe to topic",
+                    ),
+                )))
+            }
             Err(e) => {
                 info!(topic = %topic, "error invoking USubscription service: {}", e);
-                Err(RegistrationError::Unknown(UStatus::fail_with_code(
-                    crate::UCode::INTERNAL,
-                    "failed to invoke USubscription service",
+                Err(RegistrationError::Unknown(Box::from(
+                    UStatus::fail_with_code(
+                        crate::UCode::Internal,
+                        "failed to invoke USubscription service",
+                    ),
                 )))
             }
         }
     }
 
     async fn invoke_unsubscribe(&self, topic: &UUri) -> Result<(), RegistrationError> {
-        let request = UnsubscribeRequest {
-            ..Default::default()
-        };
         self.usubscription
-            .unsubscribe(request)
+            .unsubscribe(topic)
             .await
             .map(|_| {
                 let _ = self.subscription_change_listener.remove_handler(topic);
             })
             .map_err(|e| {
                 info!(topic = %topic, "error invoking USubscription service: {}", e);
-                RegistrationError::Unknown(UStatus::fail_with_code(
-                    crate::UCode::INTERNAL,
+                RegistrationError::Unknown(Box::from(UStatus::fail_with_code(
+                    crate::UCode::Internal,
                     "failed to invoke USubscription service",
-                ))
+                )))
             })
     }
 
@@ -448,16 +448,17 @@ mod tests {
 
     use mockall::Sequence;
     use protobuf::well_known_types::wrappers::StringValue;
-    use usubscription::{MockUSubscription, SubscriptionResponse, SubscriptionStatus};
+    use usubscription::{MockUSubscription, SubscriptionStatus};
 
     use crate::{
         communication::{notification::MockNotifier, pubsub::MockSubscriptionChangeHandler},
+        up_core_api::usubscription::Update,
         utransport::{MockTransport, MockUListener},
-        StaticUriProvider, UAttributes, UCode, UMessageType, UPriority, UStatus, UUri, UUID,
+        StaticUriProvider, UCode, UMessageType, UPriority, UStatus, UUri, UUID,
     };
 
     fn new_uri_provider() -> Arc<StaticUriProvider> {
-        Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
+        Arc::new(StaticUriProvider::new("", 0x0005, 0x02).expect("failed to create URI provider"))
     }
 
     fn succeeding_notifier() -> Arc<MockNotifier> {
@@ -500,10 +501,10 @@ mod tests {
         transport
             .expect_do_send()
             .once()
-            .withf(move |msg| msg.id_unchecked() == &expected_message_id)
+            .withf(move |msg| msg.id() == &expected_message_id)
             .returning(|_msg| {
                 Err(UStatus::fail_with_code(
-                    UCode::UNAVAILABLE,
+                    UCode::Unavailable,
                     "transport not available",
                 ))
             });
@@ -534,8 +535,8 @@ mod tests {
                 };
                 payload.value == *"Hello"
                     && message.is_publish()
-                    && message.id_unchecked() == &expected_message_id
-                    && message.priority_unchecked() == UPriority::UPRIORITY_CS3
+                    && message.id() == &expected_message_id
+                    && message.priority_unchecked() == UPriority::CS3
                     && message.ttl_unchecked() == 5_000
             })
             .returning(|_msg| Ok(()));
@@ -546,7 +547,7 @@ mod tests {
         let call_options = CallOptions::for_publish(
             Some(5_000),
             Some(message_id.clone()),
-            Some(crate::UPriority::UPRIORITY_CS3),
+            Some(crate::UPriority::CS3),
         );
         let payload = StringValue {
             value: "Hello".to_string(),
@@ -575,9 +576,8 @@ mod tests {
         notifier
             .expect_start_listening()
             .once()
-            .return_const(Err(RegistrationError::Unknown(UStatus::fail_with_code(
-                UCode::UNAVAILABLE,
-                "not available",
+            .return_const(Err(RegistrationError::Unknown(Box::from(
+                UStatus::fail_with_code(UCode::Unavailable, "not available"),
             ))));
 
         // WHEN trying to create a Subscriber for this Notifier
@@ -634,42 +634,12 @@ mod tests {
             .expect_subscribe()
             .once()
             .in_sequence(&mut seq)
-            .return_const(Err(UStatus::fail_with_code(
-                UCode::UNAVAILABLE,
-                "not connected",
-            )));
+            .returning(|_, _, _| Err(UStatus::fail_with_code(UCode::Unavailable, "not connected")));
         usubscription_client
             .expect_subscribe()
             .once()
             .in_sequence(&mut seq)
-            .return_const({
-                let response = SubscriptionResponse {
-                    status: Some(SubscriptionStatus {
-                        state: State::UNSUBSCRIBED.into(),
-                        message: "unsupported topic".to_string(),
-                        ..Default::default()
-                    })
-                    .into(),
-                    ..Default::default()
-                };
-                Ok(response)
-            });
-        usubscription_client
-            .expect_subscribe()
-            .once()
-            .in_sequence(&mut seq)
-            .return_const({
-                let response = SubscriptionResponse {
-                    status: Some(SubscriptionStatus {
-                        message: "unknown state".to_string(),
-                        ..Default::default()
-                    })
-                    .into(),
-                    ..Default::default()
-                };
-                Ok(response)
-            });
-
+            .return_const(Ok(SubscriptionStatus::Unsubscribed));
         // and a transport
         let mut transport = MockTransport::new();
         transport.expect_do_register_listener().never();
@@ -702,13 +672,6 @@ mod tests {
 
         // and the second attempt fails as well
         assert!(subscribe_attempt.is_err_and(|e| matches!(e, RegistrationError::Unknown(_))));
-
-        let subscribe_attempt = subscriber
-            .subscribe(&topic, listener_ref.clone(), None)
-            .await;
-
-        // and the third attempt fails as well
-        assert!(subscribe_attempt.is_err_and(|e| matches!(e, RegistrationError::Unknown(_))));
     }
 
     #[tokio::test]
@@ -719,18 +682,7 @@ mod tests {
         usubscription_client
             .expect_subscribe()
             .times(2)
-            .returning(|request| {
-                let response = SubscriptionResponse {
-                    topic: request.topic.clone(),
-                    status: Some(SubscriptionStatus {
-                        state: State::SUBSCRIBED.into(),
-                        ..Default::default()
-                    })
-                    .into(),
-                    ..Default::default()
-                };
-                Ok(response)
-            });
+            .return_const(Ok(SubscriptionStatus::Subscribed));
 
         // and a transport
         let mut transport = MockTransport::new();
@@ -739,7 +691,7 @@ mod tests {
             .expect_do_register_listener()
             .once()
             .return_const(Err(UStatus::fail_with_code(
-                UCode::UNAVAILABLE,
+                UCode::Unavailable,
                 "not connected",
             )));
 
@@ -788,18 +740,7 @@ mod tests {
         usubscription_client
             .expect_subscribe()
             .times(2)
-            .returning(|request| {
-                let response = SubscriptionResponse {
-                    topic: request.topic.clone(),
-                    status: Some(SubscriptionStatus {
-                        state: State::SUBSCRIBED.into(),
-                        ..Default::default()
-                    })
-                    .into(),
-                    ..Default::default()
-                };
-                Ok(response)
-            });
+            .return_const(Ok(SubscriptionStatus::Subscribed));
 
         // and a transport
         let mut transport = MockTransport::new();
@@ -810,7 +751,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .return_const(Err(UStatus::fail_with_code(
-                UCode::UNAVAILABLE,
+                UCode::Unavailable,
                 "not connected",
             )));
         // but succeeds on the second attempt
@@ -819,9 +760,9 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .returning(move |_source_filter, _sink_filter, listener| {
-                captured_listener_tx
-                    .send(listener)
-                    .map_err(|_e| UStatus::fail("cannot capture listener"))
+                captured_listener_tx.send(listener).map_err(|_e| {
+                    UStatus::fail_with_code(UCode::Internal, "cannot capture listener")
+                })
             });
 
         // and a Subscriber using that USubscription client, Notifier and transport
@@ -876,7 +817,7 @@ mod tests {
             .expect_do_unregister_listener()
             .once()
             .return_const(Err(UStatus::fail_with_code(
-                UCode::NOT_FOUND,
+                UCode::NotFound,
                 "no such listener",
             )));
 
@@ -906,7 +847,7 @@ mod tests {
         usubscription_client
             .expect_unsubscribe()
             .once()
-            .return_const(Err(UStatus::fail_with_code(UCode::UNAVAILABLE, "unknown")));
+            .return_const(Err(UStatus::fail_with_code(UCode::Unavailable, "unknown")));
 
         // and a transport
         let mut transport = MockTransport::new();
@@ -1007,7 +948,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .return_const(Err(UStatus::fail_with_code(
-                UCode::UNAVAILABLE,
+                UCode::Unavailable,
                 "not connected",
             )));
         // but succeeds on the second attempt
@@ -1050,78 +991,93 @@ mod tests {
     }
 
     fn message_with_wrong_type(msg_type: UMessageType) -> UMessage {
-        let attributes = UAttributes {
-            type_: msg_type.into(),
-            ..Default::default()
-        };
-        UMessage {
-            attributes: Some(attributes).into(),
-            ..Default::default()
+        match msg_type {
+            UMessageType::Publish => UMessageBuilder::publish(
+                UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
+                    .expect("should have been able to create URI"),
+            )
+            .build()
+            .expect("should have been able to create publish message"),
+            UMessageType::Notification => UMessageBuilder::notification(
+                UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
+                    .expect("should have been able to create origin URI"),
+                UUri::try_from_parts("other", 0x1a9b, 0x01, 0x0000)
+                    .expect("should have been able to create destination URI"),
+            )
+            .build()
+            .expect("should have been able to create notification message"),
+            UMessageType::Request => UMessageBuilder::request(
+                UUri::try_from_parts("other", 0x1a9a, 0x01, 0x0100)
+                    .expect("should have been able to create method-to-invoke URI"),
+                UUri::try_from_parts("other", 0x1a9b, 0x01, 0x0000)
+                    .expect("should have been able to create reply-to-address URI"),
+                5000,
+            )
+            .build()
+            .expect("should have been able to create request message"),
+            UMessageType::Response => UMessageBuilder::response(
+                UUri::try_from_parts("other", 0x1a9b, 0x01, 0x0000)
+                    .expect("should have been able to create reply-to-address URI"),
+                UUID::build(),
+                UUri::try_from_parts("other", 0x1a9a, 0x01, 0x0100)
+                    .expect("should have been able to create method-to-invoke URI"),
+            )
+            .build()
+            .expect("should have been able to create response message"),
         }
     }
 
     fn notification_with_wrong_payload() -> UMessage {
-        let payload = UPayload::try_from_protobuf(StringValue::new())
-            .expect("should have been able to create protobuf");
-        let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
-            payload_format: payload.payload_format().into(),
-            ..Default::default()
-        };
-        UMessage {
-            attributes: Some(attributes).into(),
-            payload: Some(payload.payload()),
-            ..Default::default()
-        }
+        UMessageBuilder::notification(
+            UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
+                .expect("should have been able to create origin URI"),
+            UUri::try_from_parts("other", 0x1a9b, 0x01, 0x0000)
+                .expect("should have been able to create destination URI"),
+        )
+        .build_with_protobuf_payload(&StringValue::new())
+        .expect("should have been able to create notification with payload")
     }
 
     fn status_update_without_topic() -> UMessage {
-        let status = SubscriptionStatus {
-            state: State::SUBSCRIBED.into(),
+        let status = crate::up_core_api::usubscription::SubscriptionStatus {
+            state: crate::up_core_api::usubscription::subscription_status::State::SUBSCRIBED.into(),
             ..Default::default()
         };
         let update = Update {
             status: Some(status).into(),
             ..Default::default()
         };
-        let payload =
-            UPayload::try_from_protobuf(update).expect("should have been able to create protobuf");
-        let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
-            payload_format: payload.payload_format().into(),
-            ..Default::default()
-        };
-
-        UMessage {
-            attributes: Some(attributes).into(),
-            payload: Some(payload.payload()),
-            ..Default::default()
-        }
+        UMessageBuilder::notification(
+            UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
+                .expect("should have been able to create origin URI"),
+            UUri::try_from_parts("other", 0x1a9b, 0x01, 0x0000)
+                .expect("should have been able to create destination URI"),
+        )
+        .build_with_protobuf_payload(&update)
+        .expect("should have been able to create notification with payload")
     }
 
     fn status_update_without_status() -> UMessage {
+        let topic = UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
+            .expect("should have been able to create topic URI");
+        let proto_topic = crate::up_core_api::uri::UUri::from(&topic);
         let update = Update {
-            topic: Some(UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100).unwrap()).into(),
+            topic: Some(proto_topic).into(),
             ..Default::default()
         };
-        let payload =
-            UPayload::try_from_protobuf(update).expect("should have been able to create protobuf");
-        let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
-            payload_format: payload.payload_format().into(),
-            ..Default::default()
-        };
-
-        UMessage {
-            attributes: Some(attributes).into(),
-            payload: Some(payload.payload()),
-            ..Default::default()
-        }
+        UMessageBuilder::notification(
+            UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
+                .expect("should have been able to create origin URI"),
+            UUri::try_from_parts("other", 0x1a9b, 0x01, 0x0000)
+                .expect("should have been able to create destination URI"),
+        )
+        .build_with_protobuf_payload(&update)
+        .expect("should have been able to create notification with payload")
     }
 
-    #[test_case::test_case(message_with_wrong_type(UMessageType::UMESSAGE_TYPE_PUBLISH); "Publish messages")]
-    #[test_case::test_case(message_with_wrong_type(UMessageType::UMESSAGE_TYPE_REQUEST); "Request messages")]
-    #[test_case::test_case(message_with_wrong_type(UMessageType::UMESSAGE_TYPE_RESPONSE); "Response messages")]
+    #[test_case::test_case(message_with_wrong_type(UMessageType::Publish); "Publish messages")]
+    #[test_case::test_case(message_with_wrong_type(UMessageType::Request); "Request messages")]
+    #[test_case::test_case(message_with_wrong_type(UMessageType::Response); "Response messages")]
     #[test_case::test_case(notification_with_wrong_payload(); "wrong payload")]
     #[test_case::test_case(status_update_without_topic(); "status without topic")]
     #[test_case::test_case(status_update_without_status(); "update without status")]
@@ -1141,29 +1097,30 @@ mod tests {
 
     #[tokio::test]
     async fn test_subscription_change_listener_invokes_handler_for_subscribed_topic() {
+        let subscriber = UUri::try_from_parts("local", 0x2000, 0x01, 0x0000)
+            .expect("should have been able to create subscriber URI");
         let topic = UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100).unwrap();
-        let status = SubscriptionStatus {
-            state: State::SUBSCRIBED.into(),
+        let status = crate::up_core_api::usubscription::SubscriptionStatus {
+            state: crate::up_core_api::usubscription::subscription_status::State::SUBSCRIBED.into(),
             ..Default::default()
         };
         let update = Update {
-            topic: Some(topic.clone()).into(),
+            topic: Some((&topic).into()).into(),
+            subscriber: Some(crate::up_core_api::usubscription::SubscriberInfo {
+                uri: Some((&subscriber).into()).into(),
+                ..Default::default()
+            })
+            .into(),
             status: Some(status.clone()).into(),
             ..Default::default()
         };
-        let payload =
-            UPayload::try_from_protobuf(update).expect("should have been able to create protobuf");
-        let attributes = UAttributes {
-            type_: UMessageType::UMESSAGE_TYPE_NOTIFICATION.into(),
-            payload_format: payload.payload_format().into(),
-            ..Default::default()
-        };
-
-        let notification = UMessage {
-            attributes: Some(attributes).into(),
-            payload: Some(payload.payload()),
-            ..Default::default()
-        };
+        let subscription_change_notification = UMessageBuilder::notification(
+            UUri::try_from_parts("local", 0x0000, 0x01, 0x8000)
+                .expect("should have been able to create uSubscription service URI"),
+            subscriber.clone(),
+        )
+        .build_with_protobuf_payload(&update)
+        .expect("should have been able to create notification with payload");
 
         let expected_topic = topic.clone();
         let mut handler = MockSubscriptionChangeHandler::new();
@@ -1171,7 +1128,7 @@ mod tests {
             .expect_on_subscription_change()
             .once()
             .withf(move |topic, updated_status| {
-                topic == &expected_topic && updated_status == &status
+                topic == &expected_topic && *updated_status == SubscriptionStatus::from(&status)
             })
             .return_const(());
 
@@ -1180,6 +1137,6 @@ mod tests {
             .add_handler(topic, Arc::new(handler))
             .expect("should have been able to register listener");
 
-        listener.on_receive(notification).await;
+        listener.on_receive(subscription_change_notification).await;
     }
 }

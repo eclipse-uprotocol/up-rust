@@ -27,7 +27,7 @@ pub enum NotificationError {
     /// Indicates that the given message cannot be sent because it is not a [valid Notification message](crate::NotificationValidator).
     InvalidArgument(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to send a notification.
-    NotifyError(UStatus),
+    NotifyError(Box<UStatus>),
 }
 
 #[cfg(not(tarpaulin_include))]

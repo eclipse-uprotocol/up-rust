@@ -65,6 +65,7 @@ impl<T: UTransport, P: LocalUriProvider> Notifier for SimpleNotifier<T, P> {
         self.transport
             .send(msg)
             .await
+            .map_err(Box::from)
             .map_err(NotificationError::NotifyError)
     }
 
@@ -112,7 +113,7 @@ mod tests {
     };
 
     fn new_uri_provider() -> Arc<StaticUriProvider> {
-        Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
+        Arc::new(StaticUriProvider::new("", 0x0005, 0x02).expect("failed to create URI Provider"))
     }
 
     #[tokio::test]
@@ -201,11 +202,11 @@ mod tests {
                     return false;
                 };
                 message.is_notification()
-                    && message.id_unchecked() == &expected_message_id
-                    && message.source_unchecked() == &expected_source
+                    && message.id() == &expected_message_id
+                    && message.source() == &expected_source
                     && message.sink_unchecked() == &expected_sink
                     && message.ttl_unchecked() == 10_000
-                    && message.priority_unchecked() == UPriority::UPRIORITY_CS2
+                    && message.priority_unchecked() == UPriority::CS2
                     && payload.value == *"Hello"
             })
             .return_const(Ok(()));
@@ -214,11 +215,8 @@ mod tests {
         let mut v = StringValue::new();
         v.value = "Hello".to_string();
         let payload = UPayload::try_from_protobuf(v).unwrap();
-        let options = CallOptions::for_notification(
-            Some(10_000),
-            Some(message_id),
-            Some(UPriority::UPRIORITY_CS2),
-        );
+        let options =
+            CallOptions::for_notification(Some(10_000), Some(message_id), Some(UPriority::CS2));
         let result = notifier
             .notify(0xB10F, &destination, options, Some(payload))
             .await;
@@ -234,7 +232,7 @@ mod tests {
             .expect_do_send()
             .once()
             .return_const(Err(UStatus::fail_with_code(
-                crate::UCode::UNAVAILABLE,
+                crate::UCode::Unavailable,
                 "connection lost",
             )));
         let notifier = SimpleNotifier::new(Arc::new(transport), uri_provider);
@@ -242,7 +240,7 @@ mod tests {
         let options = CallOptions::for_notification(None, None, None);
         let result = notifier.notify(0xB10F, &destination, options, None).await;
         assert!(result.is_err_and(|e| match e {
-            NotificationError::NotifyError(status) => status.get_code() == UCode::UNAVAILABLE,
+            NotificationError::NotifyError(status) => status.get_code() == UCode::Unavailable,
             _ => false,
         }));
     }

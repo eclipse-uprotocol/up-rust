@@ -11,7 +11,6 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use bytes::Bytes;
 use protobuf::{well_known_types::any::Any, Message, MessageFull};
 use std::{error::Error, fmt::Display};
 
@@ -37,7 +36,7 @@ pub use usubscription_client::RpcClientUSubscription;
 
 use crate::{
     umessage::{self, UMessageError},
-    UCode, UMessage, UMessageBuilder, UPayloadFormat, UPriority, UStatus, UUID,
+    ProtobufMappable, UCode, UMessage, UMessageBuilder, UPayloadFormat, UPriority, UStatus, UUID,
 };
 
 mod default_notifier;
@@ -69,7 +68,7 @@ pub enum RegistrationError {
     /// Indicates that some of the given filters are inappropriate in this context.
     InvalidFilter(String),
     /// Indicates a generic error.
-    Unknown(UStatus),
+    Unknown(Box<UStatus>),
 }
 
 impl Display for RegistrationError {
@@ -102,18 +101,32 @@ impl Error for RegistrationError {}
 
 impl From<UStatus> for RegistrationError {
     fn from(value: UStatus) -> Self {
-        match value.code.enum_value() {
-            Ok(UCode::ALREADY_EXISTS) => RegistrationError::AlreadyExists,
-            Ok(UCode::NOT_FOUND) => RegistrationError::NoSuchListener,
-            Ok(UCode::RESOURCE_EXHAUSTED) => RegistrationError::MaxListenersExceeded,
-            Ok(UCode::UNIMPLEMENTED) => RegistrationError::PushDeliveryMethodNotSupported,
-            Ok(UCode::INVALID_ARGUMENT) => RegistrationError::InvalidFilter(value.get_message()),
-            _ => RegistrationError::Unknown(value),
+        match value.get_code() {
+            UCode::AlreadyExists => RegistrationError::AlreadyExists,
+            UCode::NotFound => RegistrationError::NoSuchListener,
+            UCode::ResourceExhausted => RegistrationError::MaxListenersExceeded,
+            UCode::Unimplemented => RegistrationError::PushDeliveryMethodNotSupported,
+            UCode::InvalidArgument => {
+                RegistrationError::InvalidFilter(value.get_message().to_string())
+            }
+            UCode::Ok
+            | UCode::Cancelled
+            | UCode::Unknown
+            | UCode::DeadlineExceeded
+            | UCode::PermissionDenied
+            | UCode::Unauthenticated
+            | UCode::FailedPrecondition
+            | UCode::Aborted
+            | UCode::OutOfRange
+            | UCode::Internal
+            | UCode::Unavailable
+            | UCode::DataLoss => RegistrationError::Unknown(Box::from(value)),
         }
     }
 }
 
 /// General options that clients might want to specify when sending a uProtocol message.
+#[must_use = "CallOptions should be used when sending messages to specify message parameters"]
 #[derive(Clone, Debug, PartialEq)]
 pub struct CallOptions {
     ttl: u32,
@@ -141,12 +154,13 @@ impl CallOptions {
     /// ```rust
     /// use up_rust::{UPriority, UUID, communication::CallOptions};
     ///
-    /// let uuid = UUID::new();
-    /// let options = CallOptions::for_rpc_request(15_000, Some(uuid.clone()), Some("token".to_string()), Some(UPriority::UPRIORITY_CS6));
+    /// let uuid = UUID::build();
+    /// let token = String::from("token");
+    /// let options = CallOptions::for_rpc_request(15_000, Some(uuid.clone()), Some(token.clone()), Some(UPriority::CS6));
     /// assert_eq!(options.ttl(), 15_000);
-    /// assert_eq!(options.message_id(), Some(uuid));
-    /// assert_eq!(options.token(), Some("token".to_string()));
-    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS6));
+    /// assert_eq!(options.message_id(), Some(&uuid));
+    /// assert_eq!(options.token(), Some(&token));
+    /// assert_eq!(options.priority(), Some(UPriority::CS6));
     /// ```
     pub fn for_rpc_request(
         ttl: u32,
@@ -179,11 +193,11 @@ impl CallOptions {
     /// ```rust
     /// use up_rust::{UPriority, UUID, communication::CallOptions};
     ///
-    /// let uuid = UUID::new();
-    /// let options = CallOptions::for_notification(Some(15_000), Some(uuid.clone()), Some(UPriority::UPRIORITY_CS2));
+    /// let uuid = UUID::build();
+    /// let options = CallOptions::for_notification(Some(15_000), Some(uuid.clone()), Some(UPriority::CS2));
     /// assert_eq!(options.ttl(), 15_000);
-    /// assert_eq!(options.message_id(), Some(uuid));
-    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS2));
+    /// assert_eq!(options.message_id(), Some(&uuid));
+    /// assert_eq!(options.priority(), Some(UPriority::CS2));
     /// ```
     pub fn for_notification(
         ttl: Option<u32>,
@@ -215,11 +229,11 @@ impl CallOptions {
     /// ```rust
     /// use up_rust::{UPriority, UUID, communication::CallOptions};
     ///
-    /// let uuid = UUID::new();
-    /// let options = CallOptions::for_publish(Some(15_000), Some(uuid.clone()), Some(UPriority::UPRIORITY_CS2));
+    /// let uuid = UUID::build();
+    /// let options = CallOptions::for_publish(Some(15_000), Some(uuid.clone()), Some(UPriority::CS2));
     /// assert_eq!(options.ttl(), 15_000);
-    /// assert_eq!(options.message_id(), Some(uuid));
-    /// assert_eq!(options.priority(), Some(UPriority::UPRIORITY_CS2));
+    /// assert_eq!(options.message_id(), Some(&uuid));
+    /// assert_eq!(options.priority(), Some(UPriority::CS2));
     /// ```
     pub fn for_publish(
         ttl: Option<u32>,
@@ -240,13 +254,13 @@ impl CallOptions {
     }
 
     /// Gets the identifier to use for the message.
-    pub fn message_id(&self) -> Option<UUID> {
-        self.message_id.clone()
+    pub fn message_id(&self) -> Option<&UUID> {
+        self.message_id.as_ref()
     }
 
     /// Gets the token to use for authenticating to infrastructure and service endpoints.
-    pub fn token(&self) -> Option<String> {
-        self.token.clone()
+    pub fn token(&self) -> Option<&String> {
+        self.token.as_ref()
     }
 
     /// Gets the message's priority.
@@ -259,7 +273,7 @@ impl CallOptions {
 #[derive(Clone, Debug, PartialEq)]
 pub struct UPayload {
     payload_format: UPayloadFormat,
-    payload: Bytes,
+    payload: Vec<u8>,
 }
 
 impl UPayload {
@@ -272,11 +286,11 @@ impl UPayload {
     /// use up_rust::communication::UPayload;
     ///
     /// let data: Vec<u8> = vec![0x00_u8, 0x01_u8, 0x02_u8];
-    /// let payload = UPayload::new(data, UPayloadFormat::UPAYLOAD_FORMAT_RAW);
-    /// assert_eq!(payload.payload_format(), UPayloadFormat::UPAYLOAD_FORMAT_RAW);
+    /// let payload = UPayload::new(data, UPayloadFormat::Raw);
+    /// assert_eq!(payload.payload_format(), UPayloadFormat::Raw);
     /// assert_eq!(payload.payload().len(), 3);
     /// ```
-    pub fn new<T: Into<Bytes>>(payload: T, payload_format: UPayloadFormat) -> Self {
+    pub fn new<T: Into<Vec<u8>>>(payload: T, payload_format: UPayloadFormat) -> Self {
         UPayload {
             payload_format,
             payload: payload.into(),
@@ -300,7 +314,7 @@ impl UPayload {
     /// let mut data = StringValue::new();
     /// data.value = "hello world".to_string();
     /// assert!(UPayload::try_from_protobuf(data).is_ok_and(|pl|
-    ///     pl.payload_format() == UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY
+    ///     pl.payload_format() == UPayloadFormat::ProtobufWrappedInAny
     ///         && pl.payload().len() > 0));
     /// ```
     pub fn try_from_protobuf<M>(message: M) -> Result<Self, UMessageError>
@@ -309,8 +323,18 @@ impl UPayload {
     {
         Any::pack(&message)
             .and_then(|any| any.write_to_bytes())
-            .map(|buf| UPayload::new(buf, UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY))
-            .map_err(UMessageError::DataSerializationError)
+            .map(|buf| UPayload::new(buf, UPayloadFormat::ProtobufWrappedInAny))
+            .map_err(UMessageError::from)
+    }
+
+    pub fn try_from_protobuf_mappable<M>(message: M) -> Result<Self, UMessageError>
+    where
+        M: ProtobufMappable,
+    {
+        message
+            .write_to_packed_protobuf_bytes()
+            .map(|buf| UPayload::new(buf, UPayloadFormat::ProtobufWrappedInAny))
+            .map_err(UMessageError::from)
     }
 
     /// Gets the payload format.
@@ -325,7 +349,8 @@ impl UPayload {
     /// Gets the payload data.
     ///
     /// Note that this consumes the payload.
-    pub fn payload(self) -> Bytes {
+    #[must_use]
+    pub fn payload(self) -> Vec<u8> {
         self.payload
     }
 
