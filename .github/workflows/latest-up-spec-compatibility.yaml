@@ -59,7 +59,7 @@ jobs:
       # a tracing report
       - name: Run OpenFastTrace
         id: run-oft
-        uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@fcaf488b5d152c290a3a8dca2463a5c1dec65acd # main
+        uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@fcaf488b5d152c290a3a8dca2463a5c1dec65acd
         with:
           file-patterns: "${{ env.OFT_FILE_PATTERNS }}"
           tags: "${{ env.OFT_TAGS_}}"
