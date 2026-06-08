@@ -23,14 +23,11 @@ use async_trait::async_trait;
 use tracing::{debug, info};
 
 use crate::{
-    core::usubscription::{self, SubscriptionInfo, SubscriptionStatus, USubscription},
-    LocalUriProvider, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri,
-};
-
-use super::{
-    apply_common_options, build_message, pubsub::SubscriptionChangeHandler, CallOptions,
-    InMemoryRpcClient, Notifier, PubSubError, Publisher, RegistrationError, RpcClientUSubscription,
-    SimpleNotifier, Subscriber, UPayload,
+    communication::{
+        Notifier, RegistrationError, Subscriber, SubscriptionChangeHandler, SubscriptionStatus,
+    },
+    core::usubscription::{self, SubscriptionInfo, USubscription},
+    UListener, UMessage, UStatus, UTransport, UUri,
 };
 
 #[derive(Clone)]
@@ -184,51 +181,6 @@ impl UListener for SubscriptionChangeListener {
     }
 }
 
-/// A [`Publisher`] that uses the uProtocol Transport Layer API for publishing events to topics.
-pub struct SimplePublisher<T, P> {
-    transport: Arc<T>,
-    uri_provider: Arc<P>,
-}
-
-impl<T: UTransport, P: LocalUriProvider> SimplePublisher<T, P> {
-    /// Creates a new client.
-    ///
-    /// # Arguments
-    ///
-    /// * `transport` - The transport to use for sending messages.
-    /// * `uri_provider` - The service to use for creating the event messages' _sink_ address.
-    pub fn new(transport: Arc<T>, uri_provider: Arc<P>) -> Self {
-        SimplePublisher {
-            transport,
-            uri_provider,
-        }
-    }
-}
-
-#[async_trait]
-impl<T: UTransport, P: LocalUriProvider> Publisher for SimplePublisher<T, P> {
-    async fn publish(
-        &self,
-        resource_id: u16,
-        call_options: CallOptions,
-        payload: Option<UPayload>,
-    ) -> Result<(), PubSubError> {
-        let mut builder = UMessageBuilder::publish(self.uri_provider.get_resource_uri(resource_id));
-        apply_common_options(call_options, &mut builder);
-        match build_message(&mut builder, payload) {
-            Ok(publish_message) => self
-                .transport
-                .send(publish_message)
-                .await
-                .map_err(Box::from)
-                .map_err(PubSubError::PublishError),
-            Err(e) => Err(PubSubError::InvalidArgument(format!(
-                "failed to create Publish message from parameters: {e}"
-            ))),
-        }
-    }
-}
-
 /// A [`Subscriber`] which keeps all information about registered subscription change handlers in memory.
 ///
 /// The subscriber requires a (client) implementation of [`USubscription`] in order to inform the local
@@ -251,24 +203,36 @@ pub struct InMemorySubscriber<T, S, N> {
     subscription_change_listener: Arc<SubscriptionChangeListener>,
 }
 
-impl<T: UTransport + 'static, P: LocalUriProvider + 'static>
-    InMemorySubscriber<T, RpcClientUSubscription, SimpleNotifier<T, P>>
+#[cfg(feature = "up-l2-notifier")]
+impl<T: UTransport + 'static, P: crate::LocalUriProvider + 'static>
+    InMemorySubscriber<
+        T,
+        crate::core::usubscription::RpcClientUSubscription,
+        crate::communication::SimpleNotifier<T, P>,
+    >
 {
     /// Creates a new Subscriber for a given transport.
     ///
     /// The subscriber keeps track of subscription change handlers in memory only.
-    /// This function uses the given transport to create an [`RpcClientUSubscription`] and a [`SimpleNotifier`]
-    /// and then delegate to [`Self::for_clients`] to create the Subscriber.
+    /// This function uses the given transport to create an [`crate::core::usubscription::RpcClientUSubscription`]
+    /// and a [`crate::communication::SimpleNotifier`] and then delegate to [`Self::for_clients`]
+    /// to create the Subscriber.
     ///
     /// # Errors
     ///
     /// Returns an error if the Notifier cannot register a listener for notifications from the USubscription service.
     pub async fn new(transport: Arc<T>, uri_provider: Arc<P>) -> Result<Self, RegistrationError> {
-        let rpc_client = InMemoryRpcClient::new(transport.clone(), uri_provider.clone())
-            .await
-            .map(Arc::new)?;
-        let usubscription_client = Arc::new(RpcClientUSubscription::new(rpc_client));
-        let notifier = Arc::new(SimpleNotifier::new(transport.clone(), uri_provider.clone()));
+        let rpc_client =
+            crate::communication::InMemoryRpcClient::new(transport.clone(), uri_provider.clone())
+                .await
+                .map(Arc::new)?;
+        let usubscription_client = Arc::new(
+            crate::core::usubscription::RpcClientUSubscription::new(rpc_client),
+        );
+        let notifier = Arc::new(crate::communication::SimpleNotifier::new(
+            transport.clone(),
+            uri_provider.clone(),
+        ));
         Self::for_clients(transport, usubscription_client, notifier).await
     }
 }
@@ -448,18 +412,14 @@ mod tests {
 
     use mockall::Sequence;
     use protobuf::well_known_types::wrappers::StringValue;
-    use usubscription::{MockUSubscription, SubscriptionStatus};
+    use usubscription::MockUSubscription;
 
     use crate::{
         communication::{notification::MockNotifier, pubsub::MockSubscriptionChangeHandler},
         up_core_api::usubscription::Update,
         utransport::{MockTransport, MockUListener},
-        StaticUriProvider, UCode, UMessageType, UPriority, UStatus, UUri, UUID,
+        UCode, UMessageBuilder, UMessageType, UStatus, UUri, UUID,
     };
-
-    fn new_uri_provider() -> Arc<StaticUriProvider> {
-        Arc::new(StaticUriProvider::new("", 0x0005, 0x02).expect("failed to create URI provider"))
-    }
 
     fn succeeding_notifier() -> Arc<MockNotifier> {
         let mut notifier = MockNotifier::new();
@@ -468,104 +428,6 @@ mod tests {
             .once()
             .return_const(Ok(()));
         Arc::new(notifier)
-    }
-
-    #[tokio::test]
-    async fn test_publish_fails_for_invalid_topic() {
-        // GIVEN a publisher
-        let uri_provider = new_uri_provider();
-        let mut transport = MockTransport::new();
-
-        transport.expect_do_send().never();
-        let publisher = SimplePublisher::new(Arc::new(transport), uri_provider);
-
-        // WHEN publishing to an invalid topic
-        let options = CallOptions::for_publish(None, None, None);
-        let publish_result = publisher
-            // resource ID for topic must be >= 0x8000
-            .publish(0x1000, options, None)
-            .await;
-
-        // THEN publishing fails with an InvalidArgument error
-        assert!(publish_result.is_err_and(|e| matches!(e, PubSubError::InvalidArgument(_msg))));
-    }
-
-    #[tokio::test]
-    async fn test_publish_fails_with_transport_error() {
-        let message_id = UUID::build();
-        // GIVEN a publisher
-        let uri_provider = new_uri_provider();
-        let mut transport = MockTransport::new();
-        // that is not connected to the underlying messaging infrastructure
-        let expected_message_id = message_id.clone();
-        transport
-            .expect_do_send()
-            .once()
-            .withf(move |msg| msg.id() == &expected_message_id)
-            .returning(|_msg| {
-                Err(UStatus::fail_with_code(
-                    UCode::Unavailable,
-                    "transport not available",
-                ))
-            });
-        let publisher = SimplePublisher::new(Arc::new(transport), uri_provider);
-
-        // WHEN publishing to a valid topic
-        let options = CallOptions::for_publish(None, Some(message_id), None);
-        let publish_result = publisher.publish(0x9A00, options, None).await;
-
-        // THEN publishing fails with a PublishError
-        assert!(publish_result.is_err_and(|e| matches!(e, PubSubError::PublishError(_status))));
-    }
-
-    #[tokio::test]
-    async fn test_publish_succeeds() {
-        // GIVEN a publisher
-        let uri_provider = new_uri_provider();
-        let mut transport = MockTransport::new();
-        let message_id = UUID::build();
-        let expected_message_id = message_id.clone();
-
-        transport
-            .expect_do_send()
-            .once()
-            .withf(move |message| {
-                let Ok(payload) = message.extract_protobuf::<StringValue>() else {
-                    return false;
-                };
-                payload.value == *"Hello"
-                    && message.is_publish()
-                    && message.id() == &expected_message_id
-                    && message.priority_unchecked() == UPriority::CS3
-                    && message.ttl_unchecked() == 5_000
-            })
-            .returning(|_msg| Ok(()));
-
-        let publisher = SimplePublisher::new(Arc::new(transport), uri_provider);
-
-        // WHEN publishing some data to a valid topic
-        let call_options = CallOptions::for_publish(
-            Some(5_000),
-            Some(message_id.clone()),
-            Some(crate::UPriority::CS3),
-        );
-        let payload = StringValue {
-            value: "Hello".to_string(),
-            ..Default::default()
-        };
-        let publish_result = publisher
-            .publish(
-                0x9A00,
-                call_options,
-                Some(
-                    UPayload::try_from_protobuf(payload)
-                        .expect("should have been able to create message payload"),
-                ),
-            )
-            .await;
-
-        // THEN a corresponding Publish message has been sent via the transport
-        assert!(publish_result.is_ok());
     }
 
     #[tokio::test]
@@ -1100,18 +962,18 @@ mod tests {
         let subscriber = UUri::try_from_parts("local", 0x2000, 0x01, 0x0000)
             .expect("should have been able to create subscriber URI");
         let topic = UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100).unwrap();
-        let status = crate::up_core_api::usubscription::SubscriptionStatus {
+        let status_proto = crate::up_core_api::usubscription::SubscriptionStatus {
             state: crate::up_core_api::usubscription::subscription_status::State::SUBSCRIBED.into(),
             ..Default::default()
         };
-        let update = Update {
+        let update_proto = Update {
             topic: Some((&topic).into()).into(),
             subscriber: Some(crate::up_core_api::usubscription::SubscriberInfo {
                 uri: Some((&subscriber).into()).into(),
                 ..Default::default()
             })
             .into(),
-            status: Some(status.clone()).into(),
+            status: Some(status_proto.clone()).into(),
             ..Default::default()
         };
         let subscription_change_notification = UMessageBuilder::notification(
@@ -1119,7 +981,7 @@ mod tests {
                 .expect("should have been able to create uSubscription service URI"),
             subscriber.clone(),
         )
-        .build_with_protobuf_payload(&update)
+        .build_with_protobuf_payload(&update_proto)
         .expect("should have been able to create notification with payload");
 
         let expected_topic = topic.clone();
@@ -1128,7 +990,10 @@ mod tests {
             .expect_on_subscription_change()
             .once()
             .withf(move |topic, updated_status| {
-                topic == &expected_topic && *updated_status == SubscriptionStatus::from(&status)
+                topic == &expected_topic
+                    && *updated_status
+                        == SubscriptionStatus::try_from(&status_proto)
+                            .expect("should have been able to convert status proto")
             })
             .return_const(());
 

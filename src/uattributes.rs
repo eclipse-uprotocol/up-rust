@@ -12,21 +12,19 @@
  ********************************************************************************/
 
 mod uattributesvalidator;
+mod umessagetype;
 mod upayloadformat;
 mod upriority;
 
 use std::time::SystemTime;
 
-use protobuf::{well_known_types::any::Any, Message};
-
-pub use crate::umessage::UMessageType;
 pub use uattributesvalidator::*;
+pub use umessagetype::UMessageType;
 pub use upayloadformat::*;
 pub use upriority::*;
 
-use crate::up_core_api::uattributes::UAttributes as UAttributesProto;
 use crate::uuid::UuidConversionError;
-use crate::{ProtobufMappable, UCode, UUri, UUriError, UUID};
+use crate::{UCode, UUri, UUriError, UUID};
 
 pub(crate) const UPRIORITY_DEFAULT: UPriority = UPriority::CS1;
 pub(crate) type TokenString = String;
@@ -668,138 +666,145 @@ impl UAttributes {
     }
 }
 
-impl From<&UAttributes> for UAttributesProto {
-    fn from(value: &UAttributes) -> Self {
-        use crate::up_core_api::uattributes::UPayloadFormat as UPayloadFormatProto;
-        use crate::up_core_api::uattributes::UPriority as UPriorityProto;
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use protobuf::{well_known_types::any::Any, Message};
 
-        UAttributesProto {
-            commstatus: value
-                .commstatus
-                .map(|cs| crate::up_core_api::ucode::UCode::from(cs).into()),
-            id: Some(crate::up_core_api::uuid::UUID::from(&value.id)).into(),
-            type_: crate::up_core_api::uattributes::UMessageType::from(&value.type_).into(),
-            source: Some(crate::up_core_api::uri::UUri::from(&value.source)).into(),
-            sink: value
-                .sink
-                .as_ref()
-                .map(crate::up_core_api::uri::UUri::from)
-                .into(),
-            priority: value
-                .priority
-                .map_or(UPriorityProto::UPRIORITY_UNSPECIFIED, |p| {
-                    UPriorityProto::from(&p)
-                })
-                .into(),
-            ttl: value.ttl,
-            permission_level: value.permission_level,
-            token: value.token().map(|t| t.to_string()),
-            traceparent: value.traceparent().map(|t| t.to_string()),
-            reqid: value
-                .reqid
-                .as_ref()
-                .map(crate::up_core_api::uuid::UUID::from)
-                .into(),
-            payload_format: value
-                .payload_format
-                .map_or(UPayloadFormatProto::UPAYLOAD_FORMAT_UNSPECIFIED, |pf| {
-                    UPayloadFormatProto::from(&pf)
-                })
-                .into(),
-            ..Default::default()
+    use super::*;
+    use crate::up_core_api::uattributes::{
+        UAttributes as UAttributesProto, UMessageType as UMessageTypeProto,
+        UPayloadFormat as UPayloadFormatProto, UPriority as UPriorityProto,
+    };
+    use crate::up_core_api::{
+        ucode::UCode as UCodeProto, uri::UUri as UUriProto, uuid::UUID as UUIDProto,
+    };
+    use crate::ProtobufMappable;
+
+    impl From<&UAttributes> for UAttributesProto {
+        fn from(attribs: &UAttributes) -> Self {
+            UAttributesProto {
+                id: Some(UUIDProto::from(&attribs.id)).into(),
+                type_: UMessageTypeProto::from(&attribs.type_).into(),
+                source: Some(UUriProto::from(&attribs.source)).into(),
+                sink: attribs.sink.as_ref().map(UUriProto::from).into(),
+                priority: attribs
+                    .priority
+                    .map_or(UPriorityProto::UPRIORITY_UNSPECIFIED, |p| {
+                        UPriorityProto::from(&p)
+                    })
+                    .into(),
+                ttl: attribs.ttl,
+                permission_level: attribs.permission_level,
+                reqid: attribs.reqid.as_ref().map(UUIDProto::from).into(),
+                commstatus: attribs.commstatus.map(|cs| UCodeProto::from(cs).into()),
+                token: attribs.token().map(|t| t.to_string()),
+                traceparent: attribs.traceparent().map(|t| t.to_string()),
+                payload_format: attribs
+                    .payload_format
+                    .map_or(UPayloadFormatProto::UPAYLOAD_FORMAT_UNSPECIFIED, |pf| {
+                        UPayloadFormatProto::from(&pf)
+                    })
+                    .into(),
+                ..Default::default()
+            }
         }
     }
-}
 
-impl TryFrom<&UAttributesProto> for UAttributes {
-    type Error = UAttributesError;
+    impl TryFrom<&UAttributesProto> for UAttributes {
+        type Error = UAttributesError;
 
-    fn try_from(value: &UAttributesProto) -> Result<Self, Self::Error> {
-        use crate::up_core_api::uattributes::UPriority as UPriorityProto;
-
-        Ok(UAttributes {
-            commstatus: value
-                .commstatus
-                .map(|cs| UCode::from(cs.enum_value_or_default())),
-            id: UUID::try_from(
-                value
-                    .id
-                    .as_ref()
-                    .ok_or_else(|| UAttributesError::parsing_error("missing message ID"))?,
-            )?,
-            type_: value
-                .type_
-                .enum_value()
-                .map_err(|e| {
-                    UAttributesError::validation_error(format!("unknown message type value: {e}"))
-                })
-                .and_then(UMessageType::try_from)?,
-            source: UUri::try_from(
-                value
-                    .source
-                    .as_ref()
-                    .ok_or_else(|| UAttributesError::parsing_error("missing source URI"))?,
-            )?,
-            sink: match value.sink.as_ref() {
-                Some(s) => Some(UUri::try_from(s)?),
-                None => None,
-            },
-            priority: match value.priority.enum_value() {
-                Ok(UPriorityProto::UPRIORITY_UNSPECIFIED) => None,
-                Ok(p) => Some(UPriority::try_from(p)?),
-                Err(e) => {
-                    return Err(UAttributesError::validation_error(format!(
-                        "unknown priority value: {e}"
-                    )))
-                }
-            },
-            ttl: value.ttl,
-            permission_level: value.permission_level,
-            token: value.token.as_ref().map(|t| t.to_owned()),
-            traceparent: value.traceparent.as_ref().map(|t| t.to_owned()),
-            reqid: match value.reqid.as_ref() {
-                Some(r) => Some(UUID::try_from(r)?),
-                None => None,
-            },
-            payload_format: match value.payload_format.enum_value() {
-                Ok(pf) => Some(UPayloadFormat::try_from(pf)?),
-                Err(e) => {
-                    return Err(UAttributesError::validation_error(format!(
-                        "unknown payload format value: {e}"
-                    )))
-                }
-            },
-        })
-    }
-}
-
-impl ProtobufMappable for UAttributes {
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        let uattributes_proto = UAttributesProto::parse_from_bytes(proto)?;
-        UAttributes::try_from(&uattributes_proto)
-            .map_err(|e| crate::SerializationError(format!("UAttributes conversion error: {e}")))
-    }
-    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        Any::parse_from_bytes(proto)
-            .map_err(|err| crate::SerializationError(err.to_string()))
-            .and_then(|any| match any.unpack::<UAttributesProto>() {
-                Ok(Some(uattributes_proto)) => UAttributes::try_from(&uattributes_proto)
-                    .map_err(|e| crate::SerializationError(e.to_string())),
-                Ok(None) => Err(crate::SerializationError(
-                    "Protobuf Any does not contain UAttributes".to_string(),
-                )),
-                Err(e) => Err(crate::SerializationError(format!(
-                    "Protobuf Any unpack error: {e}"
-                ))),
+        fn try_from(attribs_proto: &UAttributesProto) -> Result<Self, Self::Error> {
+            Ok(UAttributes {
+                commstatus: attribs_proto
+                    .commstatus
+                    .map(|cs| UCode::from(cs.enum_value_or_default())),
+                id: UUID::try_from(
+                    attribs_proto
+                        .id
+                        .as_ref()
+                        .ok_or_else(|| UAttributesError::parsing_error("missing message ID"))?,
+                )?,
+                type_: attribs_proto
+                    .type_
+                    .enum_value()
+                    .map_err(|e| {
+                        UAttributesError::validation_error(format!(
+                            "unknown message type value: {e}"
+                        ))
+                    })
+                    .and_then(UMessageType::try_from)?,
+                source: UUri::try_from(
+                    attribs_proto
+                        .source
+                        .as_ref()
+                        .ok_or_else(|| UAttributesError::parsing_error("missing source URI"))?,
+                )?,
+                sink: match attribs_proto.sink.as_ref() {
+                    Some(s) => Some(UUri::try_from(s)?),
+                    None => None,
+                },
+                priority: match attribs_proto.priority.enum_value() {
+                    Ok(UPriorityProto::UPRIORITY_UNSPECIFIED) => None,
+                    Ok(p) => Some(UPriority::try_from(p)?),
+                    Err(e) => {
+                        return Err(UAttributesError::validation_error(format!(
+                            "unknown priority value: {e}"
+                        )))
+                    }
+                },
+                ttl: attribs_proto.ttl,
+                permission_level: attribs_proto.permission_level,
+                token: attribs_proto.token.as_ref().map(|t| t.to_owned()),
+                traceparent: attribs_proto.traceparent.as_ref().map(|t| t.to_owned()),
+                reqid: match attribs_proto.reqid.as_ref() {
+                    Some(r) => Some(UUID::try_from(r)?),
+                    None => None,
+                },
+                payload_format: match attribs_proto.payload_format.enum_value() {
+                    Ok(pf) => Some(UPayloadFormat::from(pf)),
+                    Err(e) => {
+                        return Err(UAttributesError::validation_error(format!(
+                            "unknown payload format value: {e}"
+                        )))
+                    }
+                },
             })
+        }
     }
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(UAttributesProto::from(self).write_to_bytes()?)
-    }
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Any::pack(&UAttributesProto::from(self))
-            .map_err(|e| crate::SerializationError(format!("Failed to pack UAttributes: {e}")))
-            .and_then(|any| any.write_to_protobuf_bytes())
+
+    impl ProtobufMappable for UAttributes {
+        fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+            let uattributes_proto = UAttributesProto::parse_from_bytes(proto)?;
+            UAttributes::try_from(&uattributes_proto).map_err(|e| {
+                crate::SerializationError::new(format!("UAttributes conversion error: {e}"))
+            })
+        }
+        fn parse_from_packed_protobuf_bytes(
+            proto: &[u8],
+        ) -> Result<Self, crate::SerializationError> {
+            Any::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+                .and_then(|any| match any.unpack::<UAttributesProto>() {
+                    Ok(Some(uattributes_proto)) => UAttributes::try_from(&uattributes_proto)
+                        .map_err(|e| crate::SerializationError::new(e.to_string())),
+                    Ok(None) => Err(crate::SerializationError::new(
+                        "Protobuf Any does not contain UAttributes".to_string(),
+                    )),
+                    Err(e) => Err(crate::SerializationError::new(format!(
+                        "Protobuf Any unpack error: {e}"
+                    ))),
+                })
+        }
+        fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            Ok(UAttributesProto::from(self).write_to_bytes()?)
+        }
+        fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            Any::pack(&UAttributesProto::from(self))
+                .map_err(|e| {
+                    crate::SerializationError::new(format!("Failed to pack UAttributes: {e}"))
+                })
+                .and_then(|any| any.write_to_protobuf_bytes())
+        }
     }
 }
 

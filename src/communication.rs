@@ -11,93 +11,156 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use protobuf::{well_known_types::any::Any, Message, MessageFull};
-use std::{error::Error, fmt::Display};
+/*!
+Traits representing uProtocol's [Communication Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l2/api.adoc) for publishing and subscribing to topics and for invoking RPC methods. Also contains default implementations of the traits employing uProtocol's [Transport & Session Layer API](crate::UTransport).
+*/
 
-pub use default_notifier::SimpleNotifier;
-#[cfg(feature = "usubscription")]
-pub use default_pubsub::{InMemorySubscriber, SimplePublisher};
-pub use in_memory_rpc_client::InMemoryRpcClient;
-pub use in_memory_rpc_server::InMemoryRpcServer;
+use bytes::Bytes;
+use thiserror::Error;
+
+use crate::{UCode, UPayloadFormat, UPriority, UStatus, UUID};
+
+mod notification;
 #[cfg(any(test, feature = "test-util"))]
 pub use notification::MockNotifier;
 pub use notification::{NotificationError, Notifier};
+
+#[cfg(feature = "up-l2-notifier")]
+mod simple_notifier;
+#[cfg(feature = "up-l2-notifier")]
+pub use simple_notifier::SimpleNotifier;
+
+mod pubsub;
 #[cfg(any(test, feature = "test-util"))]
 pub use pubsub::MockSubscriptionChangeHandler;
-#[cfg(feature = "usubscription")]
-pub use pubsub::{PubSubError, Publisher, Subscriber};
+pub use pubsub::{PubSubError, Publisher, Subscriber, SubscriptionChangeHandler};
+
+#[cfg(feature = "up-l2-publisher")]
+mod simple_publisher;
+#[cfg(feature = "up-l2-publisher")]
+pub use simple_publisher::SimplePublisher;
+
+#[cfg(feature = "up-l2-subscriber")]
+mod in_memory_subscriber;
+#[cfg(feature = "up-l2-subscriber")]
+pub use in_memory_subscriber::InMemorySubscriber;
+
+mod rpc;
 #[cfg(any(test, feature = "test-util"))]
 pub use rpc::{MockRequestHandler, MockRpcClient, MockRpcServerImpl};
 pub use rpc::{RequestHandler, RpcClient, RpcServer, ServiceInvocationError};
-#[cfg(feature = "udiscovery")]
-pub use udiscovery_client::RpcClientUDiscovery;
-#[cfg(feature = "usubscription")]
-pub use usubscription_client::RpcClientUSubscription;
 
-use crate::{
-    umessage::{self, UMessageError},
-    ProtobufMappable, UCode, UMessage, UMessageBuilder, UPayloadFormat, UPriority, UStatus, UUID,
-};
-
-mod default_notifier;
-mod default_pubsub;
+#[cfg(feature = "up-l2-rpc-client")]
 mod in_memory_rpc_client;
-mod in_memory_rpc_server;
-mod notification;
-#[cfg(feature = "usubscription")]
-mod pubsub;
-mod rpc;
-#[cfg(feature = "udiscovery")]
-mod udiscovery_client;
-#[cfg(feature = "usubscription")]
-mod usubscription_client;
+#[cfg(feature = "up-l2-rpc-client")]
+pub use in_memory_rpc_client::InMemoryRpcClient;
 
-/// An error indicating a problem with registering or unregistering a message listener.
-#[derive(Clone, Debug)]
-pub enum RegistrationError {
-    /// Indicates that a listener for a given address already exists.
-    AlreadyExists,
-    /// Indicates that the maximum number of listeners supported by the Transport Layer implementation
-    /// has already been registered.
-    MaxListenersExceeded,
-    /// Indicates that no listener is registered for given pattern URIs.
-    NoSuchListener,
-    /// Indicates that the underlying Transport Layer implementation does not support registration and
-    /// notification of message handlers.
-    PushDeliveryMethodNotSupported,
-    /// Indicates that some of the given filters are inappropriate in this context.
-    InvalidFilter(String),
-    /// Indicates a generic error.
-    Unknown(Box<UStatus>),
+#[cfg(feature = "up-l2-rpc-server")]
+mod in_memory_rpc_server;
+#[cfg(feature = "up-l2-rpc-server")]
+pub use in_memory_rpc_server::InMemoryRpcServer;
+
+/// Moves all common call options into the given message builder.
+///
+/// In particular, the following options are moved:
+/// * ttl
+/// * message ID
+/// * priority
+#[cfg(any(feature = "up-l2-notifier", feature = "up-l2-publisher"))]
+pub(crate) fn apply_common_options(
+    call_options: CallOptions,
+    message_builder: &mut crate::UMessageBuilder,
+) {
+    message_builder.with_ttl(call_options.ttl);
+    if let Some(v) = call_options.message_id {
+        message_builder.with_message_id(v);
+    }
+    if let Some(v) = call_options.priority {
+        message_builder.with_priority(v);
+    }
 }
 
-impl Display for RegistrationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RegistrationError::AlreadyExists => {
-                f.write_str("a listener for the given filter criteria already exists")
+/// Creates a message with given payload from a builder.
+#[cfg(any(
+    feature = "up-l2-notifier",
+    feature = "up-l2-publisher",
+    feature = "up-l2-rpc-client",
+    feature = "up-l2-rpc-server"
+))]
+pub(crate) fn build_message(
+    message_builder: &mut crate::UMessageBuilder,
+    payload: Option<UPayload>,
+) -> Result<crate::UMessage, crate::UMessageError> {
+    if let Some(pl) = payload {
+        let format = pl.payload_format();
+        message_builder.build_with_payload(pl.payload, format)
+    } else {
+        message_builder.build()
+    }
+}
+
+/// The current status of a client's subscription to a topic.
+///
+/// The status goes through different stages during its lifecycle as defined in
+/// [uProtocol Specification, section 3.3.5](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l3/usubscription/v3/README.adoc#usubscription-states).
+#[derive(Clone, Debug, PartialEq)]
+#[repr(C)]
+pub enum SubscriptionStatus {
+    Unsubscribed,
+    SubscribePending,
+    Subscribed,
+    UnsubscribePending,
+}
+
+#[cfg(all(feature = "up-core-types", feature = "usubscription"))]
+mod core_types_support {
+    use super::{SubscriptionStatus, UCode, UStatus};
+    use crate::up_core_api::usubscription::subscription_status::State;
+    use crate::up_core_api::usubscription::SubscriptionStatus as SubscriptionStatusProto;
+
+    impl TryFrom<&SubscriptionStatusProto> for SubscriptionStatus {
+        type Error = UStatus;
+
+        fn try_from(status_proto: &SubscriptionStatusProto) -> Result<Self, Self::Error> {
+            let state = status_proto.state.enum_value();
+            match state {
+                Ok(State::UNSUBSCRIBED) => Ok(SubscriptionStatus::Unsubscribed),
+                Ok(State::SUBSCRIBE_PENDING) => Ok(SubscriptionStatus::SubscribePending),
+                Ok(State::SUBSCRIBED) => Ok(SubscriptionStatus::Subscribed),
+                Ok(State::UNSUBSCRIBE_PENDING) => Ok(SubscriptionStatus::UnsubscribePending),
+                Err(v) => Err(UStatus::fail_with_code(
+                    UCode::InvalidArgument,
+                    format!("unknown subscription status {:?}", v),
+                )),
             }
-            RegistrationError::MaxListenersExceeded => {
-                f.write_str("maximum number of listeners has been reached")
-            }
-            RegistrationError::NoSuchListener => {
-                f.write_str("no listener registered for given pattern")
-            }
-            RegistrationError::PushDeliveryMethodNotSupported => f.write_str(
-                "the underlying transport implementation does not support the push delivery method",
-            ),
-            RegistrationError::InvalidFilter(msg) => {
-                f.write_fmt(format_args!("invalid filter(s): {msg}"))
-            }
-            RegistrationError::Unknown(status) => f.write_fmt(format_args!(
-                "error un-/registering listener: {}",
-                status.get_message()
-            )),
         }
     }
 }
 
-impl Error for RegistrationError {}
+/// An error indicating a problem with registering or unregistering a message listener.
+#[derive(Clone, Debug, Error)]
+pub enum RegistrationError {
+    /// Indicates that a listener for a given address already exists.
+    #[error("a listener for the given filter criteria already exists")]
+    AlreadyExists,
+    /// Indicates that the maximum number of listeners supported by the Transport Layer implementation
+    /// has already been registered.
+    #[error("maximum number of listeners has been reached")]
+    MaxListenersExceeded,
+    /// Indicates that no listener is registered for given pattern URIs.
+    #[error("no listener registered for given pattern")]
+    NoSuchListener,
+    /// Indicates that the underlying Transport Layer implementation does not support registration and
+    /// notification of message handlers.
+    #[error("the underlying transport implementation does not support the push delivery method")]
+    PushDeliveryMethodNotSupported,
+    /// Indicates that some of the given filters are inappropriate in this context.
+    #[error("invalid filter(s): {0}")]
+    InvalidFilter(String),
+    /// Indicates a generic error.
+    #[error("error un-/registering listener: {0}")]
+    Unknown(Box<UStatus>),
+}
 
 impl From<UStatus> for RegistrationError {
     fn from(value: UStatus) -> Self {
@@ -107,7 +170,7 @@ impl From<UStatus> for RegistrationError {
             UCode::ResourceExhausted => RegistrationError::MaxListenersExceeded,
             UCode::Unimplemented => RegistrationError::PushDeliveryMethodNotSupported,
             UCode::InvalidArgument => {
-                RegistrationError::InvalidFilter(value.get_message().to_string())
+                RegistrationError::InvalidFilter(value.get_message().unwrap_or("N/A").to_string())
             }
             UCode::Ok
             | UCode::Cancelled
@@ -273,7 +336,7 @@ impl CallOptions {
 #[derive(Clone, Debug, PartialEq)]
 pub struct UPayload {
     payload_format: UPayloadFormat,
-    payload: Vec<u8>,
+    payload: Bytes,
 }
 
 impl UPayload {
@@ -290,14 +353,14 @@ impl UPayload {
     /// assert_eq!(payload.payload_format(), UPayloadFormat::Raw);
     /// assert_eq!(payload.payload().len(), 3);
     /// ```
-    pub fn new<T: Into<Vec<u8>>>(payload: T, payload_format: UPayloadFormat) -> Self {
+    pub fn new<T: Into<Bytes>>(payload: T, payload_format: UPayloadFormat) -> Self {
         UPayload {
             payload_format,
             payload: payload.into(),
         }
     }
 
-    /// Creates a new UPayload from a protobuf message.
+    /// Creates a new UPayload from an object that can be mapped to/from a protobuf.
     ///
     /// The resulting payload will have `UPayloadType::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`.
     ///
@@ -317,24 +380,14 @@ impl UPayload {
     ///     pl.payload_format() == UPayloadFormat::ProtobufWrappedInAny
     ///         && pl.payload().len() > 0));
     /// ```
-    pub fn try_from_protobuf<M>(message: M) -> Result<Self, UMessageError>
+    #[cfg(feature = "protobuf-support")]
+    pub fn try_from_protobuf<T>(obj: T) -> Result<Self, crate::UMessageError>
     where
-        M: MessageFull,
+        T: crate::ProtobufMappable,
     {
-        Any::pack(&message)
-            .and_then(|any| any.write_to_bytes())
+        obj.write_to_packed_protobuf_bytes()
             .map(|buf| UPayload::new(buf, UPayloadFormat::ProtobufWrappedInAny))
-            .map_err(UMessageError::from)
-    }
-
-    pub fn try_from_protobuf_mappable<M>(message: M) -> Result<Self, UMessageError>
-    where
-        M: ProtobufMappable,
-    {
-        message
-            .write_to_packed_protobuf_bytes()
-            .map(|buf| UPayload::new(buf, UPayloadFormat::ProtobufWrappedInAny))
-            .map_err(UMessageError::from)
+            .map_err(crate::UMessageError::from)
     }
 
     /// Gets the payload format.
@@ -347,18 +400,12 @@ impl UPayload {
     }
 
     /// Gets the payload data.
-    ///
-    /// Note that this consumes the payload.
     #[must_use]
-    pub fn payload(self) -> Vec<u8> {
-        self.payload
+    pub fn payload(&self) -> &Bytes {
+        &self.payload
     }
 
-    /// Extracts the protobuf `Message` contained in payload.
-    ///
-    /// This function is used to extract strongly-typed data from a `UPayload` object,
-    /// taking into account the payload format (will only succeed if payload format is
-    /// `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF` or `UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`)
+    /// Extracts the object that is contained in this message's payload.
     ///
     /// # Type Parameters
     ///
@@ -366,13 +413,13 @@ impl UPayload {
     ///
     /// # Returns
     ///
-    /// * `Ok(T)`: The deserialized protobuf `Message` contained in the payload.
+    /// * The deserialized object contained in the payload.
     ///
     /// # Errors
     ///
-    /// * Err(`UMessageError`) if the unpacking process fails, for example if the payload could
-    ///   not be deserialized into the target type `T`.
-    ///
+    /// * Returns an error if the unpacking process fails, for example if the payload format
+    ///   is neither [`UPayloadFormat::Protobuf`] nor [`UPayloadFormat::ProtobufWrappedInAny`],
+    ///   or if the payload could not be deserialized into the target type `T`.
     ///
     /// # Examples
     ///
@@ -387,39 +434,11 @@ impl UPayload {
     /// let string_value: StringValue = payload.extract_protobuf().expect("should be able to extract StringValue from UPayload");
     /// assert_eq!(string_value.value, *"hello world");
     /// ```
-    pub fn extract_protobuf<T: MessageFull + Default>(&self) -> Result<T, UMessageError> {
-        umessage::deserialize_protobuf_bytes(&self.payload, &self.payload_format)
-    }
-}
-
-/// Moves all common call options into the given message builder.
-///
-/// In particular, the following options are moved:
-/// * ttl
-/// * message ID
-/// * priority
-pub(crate) fn apply_common_options(
-    call_options: CallOptions,
-    message_builder: &mut UMessageBuilder,
-) {
-    message_builder.with_ttl(call_options.ttl);
-    if let Some(v) = call_options.message_id {
-        message_builder.with_message_id(v);
-    }
-    if let Some(v) = call_options.priority {
-        message_builder.with_priority(v);
-    }
-}
-
-/// Creates a message with given payload from a builder.
-pub(crate) fn build_message(
-    message_builder: &mut UMessageBuilder,
-    payload: Option<UPayload>,
-) -> Result<UMessage, UMessageError> {
-    if let Some(pl) = payload {
-        let format = pl.payload_format();
-        message_builder.build_with_payload(pl.payload, format)
-    } else {
-        message_builder.build()
+    #[cfg(feature = "protobuf-support")]
+    pub fn extract_protobuf<T>(&self) -> Result<T, crate::UMessageError>
+    where
+        T: crate::ProtobufMappable + Default,
+    {
+        crate::umessage::deserialize_protobuf_bytes(&self.payload, &self.payload_format)
     }
 }

@@ -36,11 +36,10 @@ async fn with_hyphenated_string(w: &mut UUIDWorld, hyphenated_string: String) {
 #[given(expr = "a UUID having MSB {word} and LSB {word}")]
 async fn with_msb_lsb(w: &mut UUIDWorld, msb_hex_string: String, lsb_hex_string: String) {
     w.uuid = Some(
-        UUID::try_from(up_rust::up_core_api::uuid::UUID {
-            msb: common::value_as_u64(msb_hex_string),
-            lsb: common::value_as_u64(lsb_hex_string),
-            ..Default::default()
-        })
+        UUID::from_u64_pair(
+            common::value_as_u64(msb_hex_string),
+            common::value_as_u64(lsb_hex_string),
+        )
         .expect("failed to create UUID from MSB and LSB"),
     );
 }

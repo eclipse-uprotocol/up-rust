@@ -11,23 +11,21 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-mod umessagebuilder;
-mod umessagetype;
-
 use bytes::Bytes;
-use protobuf::{well_known_types::any::Any, Message};
 
 pub use umessagebuilder::*;
-pub use umessagetype::*;
 
-use crate::up_core_api::uattributes::UAttributes as UAttributesProto;
-use crate::up_core_api::umessage::UMessage as UMessageProto;
 use crate::{
-    ProtobufMappable, SerializationError, UAttributes, UAttributesError, UCode, UPayloadFormat,
+    SerializationError, UAttributes, UAttributesError, UCode, UMessageType, UPayloadFormat,
     UPriority, UUri, UUID,
 };
 
-pub(crate) type PayloadVec = Vec<u8>;
+#[cfg(feature = "protobuf-support")]
+use crate::ProtobufMappable;
+
+mod umessagebuilder;
+
+pub(crate) type Payload = Bytes;
 
 #[derive(Debug)]
 pub enum UMessageError {
@@ -64,6 +62,7 @@ impl From<SerializationError> for UMessageError {
     }
 }
 
+#[cfg(feature = "protobuf-support")]
 impl From<protobuf::Error> for UMessageError {
     fn from(value: protobuf::Error) -> Self {
         Self::DataSerializationError(value.into())
@@ -86,7 +85,7 @@ impl From<&str> for UMessageError {
 #[repr(C)]
 pub struct UMessage {
     attributes: UAttributes,
-    payload: Option<PayloadVec>,
+    payload: Option<Payload>,
 }
 
 impl UMessage {
@@ -96,7 +95,7 @@ impl UMessage {
     ) -> Result<Self, UMessageError> {
         Ok(UMessage {
             attributes,
-            payload: payload.map(|p| p.to_vec()),
+            payload,
         })
     }
 
@@ -247,8 +246,8 @@ impl UMessage {
     }
 
     #[must_use]
-    pub fn payload(&self) -> Option<&[u8]> {
-        self.payload.as_deref()
+    pub fn payload(&self) -> Option<Bytes> {
+        self.payload.clone()
     }
 
     /// Checks if this is a Publish message.
@@ -335,6 +334,7 @@ impl UMessage {
     /// Returns an error if the message payload format is neither [UPayloadFormat::Protobuf] nor
     /// [UPayloadFormat::ProtobufWrappedInAny] or if the bytes in the
     /// payload cannot be deserialized into the target type.
+    #[cfg(feature = "protobuf-support")]
     pub fn extract_protobuf<T: ProtobufMappable>(&self) -> Result<T, UMessageError> {
         if let Some(payload) = self.payload.as_ref() {
             let payload_format = self.payload_format().unwrap_or(UPayloadFormat::Unspecified);
@@ -364,6 +364,7 @@ impl UMessage {
 ///
 /// Returns an error if the payload format is unsupported or if the data can not be deserialized
 /// into the target type based on the given format.
+#[cfg(feature = "protobuf-support")]
 pub(crate) fn deserialize_protobuf_bytes<T: ProtobufMappable>(
     payload: &[u8],
     payload_format: &UPayloadFormat,
@@ -390,77 +391,118 @@ pub(crate) fn deserialize_protobuf_bytes<T: ProtobufMappable>(
     }
 }
 
-impl From<&UMessage> for UMessageProto {
-    fn from(value: &UMessage) -> Self {
-        let attributes = UAttributesProto::from(&value.attributes);
-        UMessageProto {
-            attributes: Some(attributes).into(),
-            payload: value
-                .payload
-                .as_ref()
-                .map(|p| Bytes::copy_from_slice(p.as_slice())),
-            ..Default::default()
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use protobuf::{well_known_types::any::Any, Message};
+
+    use super::*;
+    use crate::up_core_api::uattributes::UAttributes as UAttributesProto;
+    use crate::up_core_api::umessage::UMessage as UMessageProto;
+
+    impl From<&UMessage> for UMessageProto {
+        fn from(value: &UMessage) -> Self {
+            let attributes = UAttributesProto::from(&value.attributes);
+            UMessageProto {
+                attributes: Some(attributes).into(),
+                payload: value.payload.clone(),
+                ..Default::default()
+            }
         }
     }
-}
 
-impl TryFrom<&UMessageProto> for UMessage {
-    type Error = UMessageError;
-    fn try_from(value: &UMessageProto) -> Result<Self, Self::Error> {
-        let attributes = value.attributes.as_ref().map_or_else(
-            || {
-                Err(UAttributesError::validation_error(
-                    "UMessageProto missing attributes",
-                ))
-            },
-            UAttributes::try_from,
-        )?;
-        UMessage::new(attributes, value.payload.clone())
-    }
-}
-
-impl ProtobufMappable for UMessage {
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
-        let proto = UMessageProto::parse_from_bytes(proto)?;
-        UMessage::try_from(&proto).map_err(|e| SerializationError(e.to_string()))
+    impl TryFrom<&UMessageProto> for UMessage {
+        type Error = UMessageError;
+        fn try_from(value: &UMessageProto) -> Result<Self, Self::Error> {
+            let attributes = value.attributes.as_ref().map_or_else(
+                || {
+                    Err(UAttributesError::validation_error(
+                        "UMessageProto missing attributes",
+                    ))
+                },
+                UAttributes::try_from,
+            )?;
+            UMessage::new(attributes, value.payload.clone())
+        }
     }
 
-    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
-        Any::parse_from_bytes(proto)
-            .map_err(|err| crate::SerializationError(err.to_string()))
-            .and_then(|any| match any.unpack::<UMessageProto>() {
-                Ok(Some(umessage_proto)) => UMessage::try_from(&umessage_proto)
-                    .map_err(|e| crate::SerializationError(e.to_string())),
-                Ok(None) => Err(crate::SerializationError(
-                    "Protobuf Any does not contain UMessage".to_string(),
-                )),
-                Err(e) => Err(crate::SerializationError(format!(
-                    "Protobuf Any unpack error: {e}"
-                ))),
-            })
-    }
+    impl ProtobufMappable for UMessage {
+        fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
+            let proto = UMessageProto::parse_from_bytes(proto)?;
+            UMessage::try_from(&proto).map_err(|e| SerializationError::new(e.to_string()))
+        }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
-        Ok(UMessageProto::from(self).write_to_bytes()?)
-    }
+        fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, SerializationError> {
+            Any::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+                .and_then(|any| match any.unpack::<UMessageProto>() {
+                    Ok(Some(umessage_proto)) => UMessage::try_from(&umessage_proto)
+                        .map_err(|e| crate::SerializationError::new(e.to_string())),
+                    Ok(None) => Err(crate::SerializationError::new(
+                        "Protobuf Any does not contain UMessage".to_string(),
+                    )),
+                    Err(e) => Err(crate::SerializationError::new(format!(
+                        "Protobuf Any unpack error: {e}"
+                    ))),
+                })
+        }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
-        Any::pack(&UMessageProto::from(self))
-            .map_err(|e| crate::SerializationError(format!("Failed to pack UMessage: {e}")))
-            .and_then(|any| any.write_to_protobuf_bytes())
+        fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
+            Ok(UMessageProto::from(self).write_to_bytes()?)
+        }
+
+        fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, SerializationError> {
+            Any::pack(&UMessageProto::from(self))
+                .map_err(|e| {
+                    crate::SerializationError::new(format!("Failed to pack UMessage: {e}"))
+                })
+                .and_then(|any| any.write_to_protobuf_bytes())
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::io;
-
-    use protobuf::well_known_types::{any::Any, duration::Duration, wrappers::StringValue};
-    use test_case::test_case;
-
-    use crate::{UStatus, UUri};
 
     use super::*;
+
+    #[test]
+    fn test_from_attributes_error() {
+        let attributes_error = UAttributesError::validation_error("failed to validate");
+        let message_error = UMessageError::from(attributes_error);
+        assert!(matches!(
+            message_error,
+            UMessageError::AttributesValidationError(UAttributesError::ValidationError(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_error_msg() {
+        let message_error = UMessageError::from("an error occurred");
+        assert!(matches!(message_error, UMessageError::PayloadError(_)));
+    }
+}
+
+#[cfg(all(test, feature = "protobuf-support"))]
+mod protobuf_support_test {
+    use super::*;
+    use crate::UUri;
+    use protobuf::well_known_types::{
+        any::Any,
+        duration::Duration,
+        wrappers::{DoubleValue, StringValue},
+    };
+    use protobuf::Message;
+    use test_case::test_case;
+
+    #[test]
+    fn test_from_protobuf_error() {
+        let protobuf_error = protobuf::Error::from(std::io::Error::last_os_error());
+        let message_error = UMessageError::from(protobuf_error);
+        assert!(matches!(
+            message_error,
+            UMessageError::DataSerializationError(_)
+        ));
+    }
 
     #[test]
     fn test_deserialize_protobuf_bytes_succeeds() {
@@ -493,7 +535,7 @@ mod test {
         let any = Any::pack(&data).unwrap();
         let buf: Bytes = any.write_to_bytes().unwrap().into();
         let result =
-            deserialize_protobuf_bytes::<UStatus>(&buf, &UPayloadFormat::ProtobufWrappedInAny);
+            deserialize_protobuf_bytes::<DoubleValue>(&buf, &UPayloadFormat::ProtobufWrappedInAny);
         assert!(result.is_err_and(|e| matches!(e, UMessageError::DataSerializationError(_))));
     }
 
@@ -505,7 +547,7 @@ mod test {
     #[test_case(UPayloadFormat::Text; "TEXT format")]
     #[test_case(UPayloadFormat::Unspecified; "UNSPECIFIED format")]
     fn test_deserialize_protobuf_bytes_fails_for_(format: UPayloadFormat) {
-        let result = deserialize_protobuf_bytes::<UStatus>("hello".as_bytes(), &format);
+        let result = deserialize_protobuf_bytes::<StringValue>("hello".as_bytes(), &format);
         assert!(result.is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
     }
 
@@ -550,31 +592,5 @@ mod test {
         assert!(msg
             .extract_protobuf::<StringValue>()
             .is_err_and(|e| matches!(e, UMessageError::PayloadError(_))));
-    }
-
-    #[test]
-    fn test_from_attributes_error() {
-        let attributes_error = UAttributesError::validation_error("failed to validate");
-        let message_error = UMessageError::from(attributes_error);
-        assert!(matches!(
-            message_error,
-            UMessageError::AttributesValidationError(UAttributesError::ValidationError(_))
-        ));
-    }
-
-    #[test]
-    fn test_from_protobuf_error() {
-        let protobuf_error = protobuf::Error::from(io::Error::last_os_error());
-        let message_error = UMessageError::from(protobuf_error);
-        assert!(matches!(
-            message_error,
-            UMessageError::DataSerializationError(_)
-        ));
-    }
-
-    #[test]
-    fn test_from_error_msg() {
-        let message_error = UMessageError::from("an error occurred");
-        assert!(matches!(message_error, UMessageError::PayloadError(_)));
     }
 }

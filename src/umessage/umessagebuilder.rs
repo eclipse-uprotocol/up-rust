@@ -14,10 +14,11 @@
 use bytes::Bytes;
 
 use crate::uattributes::NotificationValidator;
+#[cfg(feature = "protobuf-support")]
+use crate::ProtobufMappable;
 use crate::{
-    ProtobufMappable, PublishValidator, RequestValidator, ResponseValidator, UAttributes,
-    UAttributesValidator, UCode, UMessage, UMessageError, UMessageType, UPayloadFormat, UPriority,
-    UUri, UUID,
+    PublishValidator, RequestValidator, ResponseValidator, UAttributes, UAttributesValidator,
+    UCode, UMessage, UMessageError, UMessageType, UPayloadFormat, UPriority, UUri, UUID,
 };
 
 /// A builder for creating [`UMessage`]s.
@@ -724,22 +725,25 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
+    /// use protobuf::well_known_types::wrappers::StringValue;
     /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
+    /// let payload = StringValue::new();
     /// let request_id = UUID::build();
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
     ///                    .with_comm_status(UCode::InvalidArgument)
-    ///                    .build_with_protobuf_payload(&UStatus::fail_with_code(UCode::InvalidArgument, "failed to parse request"))?;
+    ///                    .build_with_protobuf_payload(&payload)?;
     /// assert!(message.payload().is_some());
     /// assert_eq!(message.payload_format_unchecked(), UPayloadFormat::Protobuf);
     /// # Ok(())
     /// # }
     /// ```
+    #[cfg(feature = "protobuf-support")]
     pub fn build_with_protobuf_payload<T: ProtobufMappable>(
         &mut self,
         payload: &T,
@@ -772,22 +776,25 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
+    /// use protobuf::well_known_types::wrappers::StringValue;
     /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
+    /// let payload = StringValue::new();
     /// let request_id = UUID::build();
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
     ///                    .with_comm_status(UCode::InvalidArgument)
-    ///                    .build_with_wrapped_protobuf_payload(&UStatus::fail_with_code(UCode::InvalidArgument, "failed to parse request"))?;
+    ///                    .build_with_wrapped_protobuf_payload(&payload)?;
     /// assert!(message.payload().is_some());
     /// assert_eq!(message.payload_format_unchecked(), UPayloadFormat::ProtobufWrappedInAny);
     /// # Ok(())
     /// # }
     /// ```
+    #[cfg(feature = "protobuf-support")]
     pub fn build_with_wrapped_protobuf_payload<T: ProtobufMappable>(
         &mut self,
         payload: &T,
@@ -804,6 +811,7 @@ impl UMessageBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "up-core-types")]
     use crate::ProtobufMappable;
 
     use test_case::test_case;
@@ -965,14 +973,17 @@ mod tests {
         // [utest->dsn~up-attributes-payload-format~1]
         assert_eq!(message.payload_format_unchecked(), UPayloadFormat::Text);
 
-        // [utest->req~uattributes-data-model-proto~1]
-        // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_protobuf_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
-            .expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            // [utest->req~uattributes-data-model-proto~1]
+            // [utest->req~umessage-data-model-proto~1]
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 
     #[test]
@@ -1005,14 +1016,17 @@ mod tests {
         // [utest->dsn~up-attributes-payload-format~1]
         assert_eq!(message.payload_format_unchecked(), UPayloadFormat::Text);
 
-        // [utest->req~uattributes-data-model-proto~1]
-        // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_protobuf_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
-            .expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            // [utest->req~uattributes-data-model-proto~1]
+            // [utest->req~umessage-data-model-proto~1]
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 
     #[test]
@@ -1055,12 +1069,15 @@ mod tests {
 
         // [utest->req~uattributes-data-model-proto~1]
         // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_protobuf_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
-            .expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 
     #[test]
@@ -1143,11 +1160,14 @@ mod tests {
 
         // [utest->req~uattributes-data-model-proto~1]
         // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_protobuf_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
-            .expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 }

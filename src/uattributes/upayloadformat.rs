@@ -12,9 +12,8 @@
  ********************************************************************************/
 
 use mediatype::MediaType;
-use protobuf::EnumFull;
 
-use crate::up_core_api::uattributes::UPayloadFormat as UPayloadFormatProto;
+use crate::SerializationError;
 
 #[derive(Debug)]
 pub enum UPayloadError {
@@ -51,15 +50,15 @@ impl std::error::Error for UPayloadError {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub enum UPayloadFormat {
-    Unspecified = UPayloadFormatProto::UPAYLOAD_FORMAT_UNSPECIFIED as isize,
-    Json = UPayloadFormatProto::UPAYLOAD_FORMAT_JSON as isize,
-    Protobuf = UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF as isize,
-    ProtobufWrappedInAny = UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY as isize,
-    Raw = UPayloadFormatProto::UPAYLOAD_FORMAT_RAW as isize,
-    Shm = UPayloadFormatProto::UPAYLOAD_FORMAT_SHM as isize,
-    Someip = UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP as isize,
-    SomeipTlv = UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP_TLV as isize,
-    Text = UPayloadFormatProto::UPAYLOAD_FORMAT_TEXT as isize,
+    Unspecified = 0,
+    ProtobufWrappedInAny = 1,
+    Protobuf = 2,
+    Json = 3,
+    Someip = 4,
+    SomeipTlv = 5,
+    Raw = 6,
+    Text = 7,
+    Shm = 8,
 }
 
 impl UPayloadFormat {
@@ -69,57 +68,22 @@ impl UPayloadFormat {
         *self as i32
     }
 
-    #[must_use]
-    pub fn from_i32(value: i32) -> Option<UPayloadFormat> {
+    pub fn try_from_i32(value: i32) -> Result<UPayloadFormat, SerializationError> {
         match value {
-            0 => Some(UPayloadFormat::Unspecified),
-            1 => Some(UPayloadFormat::ProtobufWrappedInAny),
-            2 => Some(UPayloadFormat::Protobuf),
-            3 => Some(UPayloadFormat::Json),
-            4 => Some(UPayloadFormat::Someip),
-            5 => Some(UPayloadFormat::SomeipTlv),
-            6 => Some(UPayloadFormat::Raw),
-            7 => Some(UPayloadFormat::Text),
-            8 => Some(UPayloadFormat::Shm),
-            _ => None,
-        }
-    }
-}
-
-impl TryFrom<UPayloadFormatProto> for UPayloadFormat {
-    type Error = UPayloadError;
-
-    fn try_from(value: UPayloadFormatProto) -> Result<Self, Self::Error> {
-        match value {
-            UPayloadFormatProto::UPAYLOAD_FORMAT_UNSPECIFIED => Ok(UPayloadFormat::Unspecified),
-            UPayloadFormatProto::UPAYLOAD_FORMAT_JSON => Ok(UPayloadFormat::Json),
-            UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF => Ok(UPayloadFormat::Protobuf),
-            UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY => {
+            x if x == UPayloadFormat::Unspecified as i32 => Ok(UPayloadFormat::Unspecified),
+            x if x == UPayloadFormat::ProtobufWrappedInAny as i32 => {
                 Ok(UPayloadFormat::ProtobufWrappedInAny)
             }
-            UPayloadFormatProto::UPAYLOAD_FORMAT_RAW => Ok(UPayloadFormat::Raw),
-            UPayloadFormatProto::UPAYLOAD_FORMAT_SHM => Ok(UPayloadFormat::Shm),
-            UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP => Ok(UPayloadFormat::Someip),
-            UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP_TLV => Ok(UPayloadFormat::SomeipTlv),
-            UPayloadFormatProto::UPAYLOAD_FORMAT_TEXT => Ok(UPayloadFormat::Text),
-        }
-    }
-}
-
-impl From<&UPayloadFormat> for UPayloadFormatProto {
-    fn from(value: &UPayloadFormat) -> Self {
-        match value {
-            UPayloadFormat::Unspecified => UPayloadFormatProto::UPAYLOAD_FORMAT_UNSPECIFIED,
-            UPayloadFormat::Json => UPayloadFormatProto::UPAYLOAD_FORMAT_JSON,
-            UPayloadFormat::Protobuf => UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF,
-            UPayloadFormat::ProtobufWrappedInAny => {
-                UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY
-            }
-            UPayloadFormat::Raw => UPayloadFormatProto::UPAYLOAD_FORMAT_RAW,
-            UPayloadFormat::Shm => UPayloadFormatProto::UPAYLOAD_FORMAT_SHM,
-            UPayloadFormat::Someip => UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP,
-            UPayloadFormat::SomeipTlv => UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP_TLV,
-            UPayloadFormat::Text => UPayloadFormatProto::UPAYLOAD_FORMAT_TEXT,
+            x if x == UPayloadFormat::Protobuf as i32 => Ok(UPayloadFormat::Protobuf),
+            x if x == UPayloadFormat::Json as i32 => Ok(UPayloadFormat::Json),
+            x if x == UPayloadFormat::Someip as i32 => Ok(UPayloadFormat::Someip),
+            x if x == UPayloadFormat::SomeipTlv as i32 => Ok(UPayloadFormat::SomeipTlv),
+            x if x == UPayloadFormat::Raw as i32 => Ok(UPayloadFormat::Raw),
+            x if x == UPayloadFormat::Text as i32 => Ok(UPayloadFormat::Text),
+            x if x == UPayloadFormat::Shm as i32 => Ok(UPayloadFormat::Shm),
+            _ => Err(SerializationError::new(format!(
+                "unknown payload format code {value}"
+            ))),
         }
     }
 }
@@ -144,28 +108,17 @@ impl UPayloadFormat {
     /// ```
     pub fn from_media_type(media_type_string: &str) -> Result<Self, UPayloadError> {
         if let Ok(media_type) = MediaType::parse(media_type_string) {
-            let descriptor = UPayloadFormatProto::enum_descriptor();
-            return descriptor
-                .values()
-                .find_map(|desc| {
-                    let proto_desc = desc.proto();
-
-                    crate::up_core_api::uoptions::exts::mime_type
-                        .get(proto_desc.options.get_or_default())
-                        .and_then(|mime_type_option_value| {
-                            if let Ok(enum_mime_type) = MediaType::parse(&mime_type_option_value) {
-                                if enum_mime_type.ty == media_type.ty
-                                    && enum_mime_type.subty == media_type.subty
-                                {
-                                    return desc.cast::<UPayloadFormatProto>().and_then(
-                                        |format_proto| UPayloadFormat::try_from(format_proto).ok(),
-                                    );
-                                }
-                            }
-                            None
-                        })
-                })
-                .ok_or(UPayloadError::mediatype_error());
+            match (media_type.ty.as_str(), media_type.subty.as_str()) {
+                ("application", "json") => return Ok(UPayloadFormat::Json),
+                ("application", "protobuf") => return Ok(UPayloadFormat::Protobuf),
+                ("application", "x-protobuf") => return Ok(UPayloadFormat::ProtobufWrappedInAny),
+                ("application", "octet-stream") => return Ok(UPayloadFormat::Raw),
+                ("application", "x-someip") => return Ok(UPayloadFormat::Someip),
+                ("application", "x-someip_tlv") => return Ok(UPayloadFormat::SomeipTlv),
+                ("text", "plain") => return Ok(UPayloadFormat::Text),
+                ("application", "x-shm") => return Ok(UPayloadFormat::Shm),
+                _ => return Err(UPayloadError::mediatype_error()),
+            }
         }
         Err(UPayloadError::mediatype_error())
     }
@@ -186,9 +139,59 @@ impl UPayloadFormat {
     /// ```
     #[must_use]
     pub fn to_media_type(self) -> Option<String> {
-        let desc = UPayloadFormatProto::from(&self).descriptor();
-        let desc_proto = desc.proto();
-        crate::up_core_api::uoptions::exts::mime_type.get(desc_proto.options.get_or_default())
+        match self {
+            UPayloadFormat::Unspecified => None,
+            UPayloadFormat::ProtobufWrappedInAny => Some("application/x-protobuf".to_string()),
+            UPayloadFormat::Protobuf => Some("application/protobuf".to_string()),
+            UPayloadFormat::Json => Some("application/json".to_string()),
+            UPayloadFormat::Someip => Some("application/x-someip".to_string()),
+            UPayloadFormat::SomeipTlv => Some("application/x-someip_tlv".to_string()),
+            UPayloadFormat::Raw => Some("application/octet-stream".to_string()),
+            UPayloadFormat::Text => Some("text/plain".to_string()),
+            UPayloadFormat::Shm => Some("application/x-shm".to_string()),
+        }
+    }
+}
+
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use super::*;
+    use crate::up_core_api::uattributes::UPayloadFormat as UPayloadFormatProto;
+
+    impl From<UPayloadFormatProto> for UPayloadFormat {
+        fn from(value: UPayloadFormatProto) -> Self {
+            match value {
+                UPayloadFormatProto::UPAYLOAD_FORMAT_UNSPECIFIED => UPayloadFormat::Unspecified,
+                UPayloadFormatProto::UPAYLOAD_FORMAT_JSON => UPayloadFormat::Json,
+                UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF => UPayloadFormat::Protobuf,
+                UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY => {
+                    UPayloadFormat::ProtobufWrappedInAny
+                }
+                UPayloadFormatProto::UPAYLOAD_FORMAT_RAW => UPayloadFormat::Raw,
+                UPayloadFormatProto::UPAYLOAD_FORMAT_SHM => UPayloadFormat::Shm,
+                UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP => UPayloadFormat::Someip,
+                UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP_TLV => UPayloadFormat::SomeipTlv,
+                UPayloadFormatProto::UPAYLOAD_FORMAT_TEXT => UPayloadFormat::Text,
+            }
+        }
+    }
+
+    impl From<&UPayloadFormat> for UPayloadFormatProto {
+        fn from(value: &UPayloadFormat) -> Self {
+            match value {
+                UPayloadFormat::Unspecified => UPayloadFormatProto::UPAYLOAD_FORMAT_UNSPECIFIED,
+                UPayloadFormat::Json => UPayloadFormatProto::UPAYLOAD_FORMAT_JSON,
+                UPayloadFormat::Protobuf => UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF,
+                UPayloadFormat::ProtobufWrappedInAny => {
+                    UPayloadFormatProto::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY
+                }
+                UPayloadFormat::Raw => UPayloadFormatProto::UPAYLOAD_FORMAT_RAW,
+                UPayloadFormat::Shm => UPayloadFormatProto::UPAYLOAD_FORMAT_SHM,
+                UPayloadFormat::Someip => UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP,
+                UPayloadFormat::SomeipTlv => UPayloadFormatProto::UPAYLOAD_FORMAT_SOMEIP_TLV,
+                UPayloadFormat::Text => UPayloadFormatProto::UPAYLOAD_FORMAT_TEXT,
+            }
+        }
     }
 }
 

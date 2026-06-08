@@ -11,19 +11,20 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use protobuf::EnumFull;
-
 use crate::uattributes::UAttributesError;
-use crate::up_core_api::uattributes::UMessageType as UMessageTypeProto;
-use crate::up_core_api::uoptions::exts::ce_name;
+
+const CE_TYPE_PUBLISH: &str = "up-pub.v1";
+const CE_TYPE_NOTIFICATION: &str = "up-not.v1";
+const CE_TYPE_REQUEST: &str = "up-req.v1";
+const CE_TYPE_RESPONSE: &str = "up-res.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub enum UMessageType {
-    Publish = UMessageTypeProto::UMESSAGE_TYPE_PUBLISH as isize,
-    Request = UMessageTypeProto::UMESSAGE_TYPE_REQUEST as isize,
-    Response = UMessageTypeProto::UMESSAGE_TYPE_RESPONSE as isize,
-    Notification = UMessageTypeProto::UMESSAGE_TYPE_NOTIFICATION as isize,
+    Publish,
+    Request,
+    Response,
+    Notification,
 }
 
 impl UMessageType {
@@ -34,11 +35,13 @@ impl UMessageType {
     /// The value to use for the *type* property when mapping to a CloudEvent.
     #[must_use]
     pub fn to_cloudevent_type(&self) -> String {
-        let desc = UMessageTypeProto::from(self).descriptor();
-        let desc_proto = desc.proto();
-        ce_name
-            .get(desc_proto.options.get_or_default())
-            .unwrap_or_default()
+        match self {
+            UMessageType::Publish => CE_TYPE_PUBLISH,
+            UMessageType::Request => CE_TYPE_REQUEST,
+            UMessageType::Response => CE_TYPE_RESPONSE,
+            UMessageType::Notification => CE_TYPE_NOTIFICATION,
+        }
+        .to_string()
     }
 
     /// Gets the message type for a CloudEvent type name.
@@ -49,53 +52,48 @@ impl UMessageType {
     /// any of the supported message types.
     pub fn try_from_cloudevent_type<S: Into<String>>(value: S) -> Result<Self, UAttributesError> {
         let type_string = value.into();
-
-        UMessageTypeProto::enum_descriptor()
-            .values()
-            .find_map(|desc| {
-                let proto_desc = desc.proto();
-
-                ce_name
-                    .get(proto_desc.options.get_or_default())
-                    .and_then(|prio_option_value| {
-                        if prio_option_value.eq(type_string.as_str()) {
-                            desc.cast::<UMessageTypeProto>()
-                                .and_then(|v| UMessageType::try_from(v).ok())
-                        } else {
-                            None
-                        }
-                    })
-            })
-            .ok_or_else(|| {
-                UAttributesError::parsing_error(format!("unknown message type: {type_string}"))
-            })
-    }
-}
-
-impl TryFrom<UMessageTypeProto> for UMessageType {
-    type Error = UAttributesError;
-
-    fn try_from(value: UMessageTypeProto) -> Result<Self, Self::Error> {
-        match value {
-            UMessageTypeProto::UMESSAGE_TYPE_PUBLISH => Ok(UMessageType::Publish),
-            UMessageTypeProto::UMESSAGE_TYPE_REQUEST => Ok(UMessageType::Request),
-            UMessageTypeProto::UMESSAGE_TYPE_RESPONSE => Ok(UMessageType::Response),
-            UMessageTypeProto::UMESSAGE_TYPE_NOTIFICATION => Ok(UMessageType::Notification),
+        match type_string.as_str() {
+            CE_TYPE_PUBLISH => Ok(UMessageType::Publish),
+            CE_TYPE_NOTIFICATION => Ok(UMessageType::Notification),
+            CE_TYPE_REQUEST => Ok(UMessageType::Request),
+            CE_TYPE_RESPONSE => Ok(UMessageType::Response),
             _ => Err(UAttributesError::parsing_error(format!(
-                "invalid UMessageType value: {}",
-                value as i32
+                "unknown message type: {type_string}"
             ))),
         }
     }
 }
 
-impl From<&UMessageType> for UMessageTypeProto {
-    fn from(value: &UMessageType) -> Self {
-        match value {
-            UMessageType::Publish => UMessageTypeProto::UMESSAGE_TYPE_PUBLISH,
-            UMessageType::Request => UMessageTypeProto::UMESSAGE_TYPE_REQUEST,
-            UMessageType::Response => UMessageTypeProto::UMESSAGE_TYPE_RESPONSE,
-            UMessageType::Notification => UMessageTypeProto::UMESSAGE_TYPE_NOTIFICATION,
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use super::*;
+    use crate::up_core_api::uattributes::UMessageType as UMessageTypeProto;
+
+    impl TryFrom<UMessageTypeProto> for UMessageType {
+        type Error = UAttributesError;
+
+        fn try_from(proto_message_type: UMessageTypeProto) -> Result<Self, Self::Error> {
+            match proto_message_type {
+                UMessageTypeProto::UMESSAGE_TYPE_PUBLISH => Ok(UMessageType::Publish),
+                UMessageTypeProto::UMESSAGE_TYPE_REQUEST => Ok(UMessageType::Request),
+                UMessageTypeProto::UMESSAGE_TYPE_RESPONSE => Ok(UMessageType::Response),
+                UMessageTypeProto::UMESSAGE_TYPE_NOTIFICATION => Ok(UMessageType::Notification),
+                _ => Err(UAttributesError::parsing_error(format!(
+                    "invalid UMessageType value: {}",
+                    proto_message_type as i32
+                ))),
+            }
+        }
+    }
+
+    impl From<&UMessageType> for UMessageTypeProto {
+        fn from(value: &UMessageType) -> Self {
+            match value {
+                UMessageType::Publish => UMessageTypeProto::UMESSAGE_TYPE_PUBLISH,
+                UMessageType::Request => UMessageTypeProto::UMESSAGE_TYPE_REQUEST,
+                UMessageType::Response => UMessageTypeProto::UMESSAGE_TYPE_RESPONSE,
+                UMessageType::Notification => UMessageTypeProto::UMESSAGE_TYPE_NOTIFICATION,
+            }
         }
     }
 }

@@ -76,14 +76,21 @@ impl CloudEvent {
     }
 
     fn get_sink(&self) -> Result<Option<UUri>, UAttributesError> {
-        self.attributes
-            .get(EXTENSION_NAME_SINK)
-            .map(|v| v.ce_uri_ref())
-            .map_or(Ok(None), |uri| {
-                uri.parse::<UUri>()
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_SINK) {
+            if extension_value.has_ce_uri_ref() {
+                return extension_value
+                    .ce_uri_ref()
+                    .parse::<UUri>()
                     .map(Option::Some)
-                    .map_err(|e| UAttributesError::parsing_error(e.to_string()))
-            })
+                    .map_err(|e| UAttributesError::parsing_error(e.to_string()));
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected URI reference for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_SINK, extension_value
+                )));
+            }
+        }
+        Ok(None)
     }
 
     fn set_sink<T: Into<String>>(&mut self, uri: T) {
@@ -93,25 +100,40 @@ impl CloudEvent {
     }
 
     fn get_priority(&self) -> Result<UPriority, UAttributesError> {
-        self.attributes
-            .get(EXTENSION_NAME_PRIORITY)
-            .map(|v| v.ce_string())
-            .map_or(Ok(crate::uattributes::UPRIORITY_DEFAULT), |v| {
-                UPriority::try_from_priority_code(v)
-            })
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_PRIORITY) {
+            if extension_value.has_ce_string() {
+                return UPriority::try_from_priority_code(extension_value.ce_string());
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected String value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_PRIORITY, extension_value
+                )));
+            }
+        }
+        Ok(crate::uattributes::UPRIORITY_DEFAULT)
     }
 
     fn set_priority(&mut self, priority: UPriority) {
         let mut val = CloudEventAttributeValue::new();
-        val.set_ce_string(priority.to_priority_code());
+        val.set_ce_string(priority.to_priority_code().to_owned());
         self.attributes
             .insert(EXTENSION_NAME_PRIORITY.to_string(), val);
     }
 
-    fn get_ttl(&self) -> Option<u32> {
-        self.attributes
-            .get(EXTENSION_NAME_TTL)
-            .map(|v| v.ce_integer() as u32)
+    fn get_ttl(&self) -> Result<Option<u32>, UAttributesError> {
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_TTL) {
+            if extension_value.has_ce_integer() {
+                return u32::try_from(extension_value.ce_integer())
+                    .map(Option::Some)
+                    .map_err(|_e| UAttributesError::parsing_error(format!("expected unsigned Integer value for {} extension attribute but found {:?}", EXTENSION_NAME_TTL, extension_value)));
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected Integer value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_TTL, extension_value
+                )));
+            }
+        }
+        Ok(None)
     }
 
     fn set_ttl(&mut self, ttl: u32) -> Result<(), UAttributesError> {
@@ -122,10 +144,18 @@ impl CloudEvent {
         Ok(())
     }
 
-    fn get_token(&self) -> Option<String> {
-        self.attributes
-            .get(EXTENSION_NAME_TOKEN)
-            .map(|val| val.ce_string().to_string())
+    fn get_token(&self) -> Result<Option<String>, UAttributesError> {
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_TOKEN) {
+            if extension_value.has_ce_string() {
+                return Ok(Some(extension_value.ce_string().to_string()));
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected String value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_TOKEN, extension_value
+                )));
+            }
+        }
+        Ok(None)
     }
 
     fn set_token<T: Into<String>>(&mut self, token: T) {
@@ -135,10 +165,20 @@ impl CloudEvent {
             .insert(EXTENSION_NAME_TOKEN.to_string(), val);
     }
 
-    fn get_permission_level(&self) -> Option<u32> {
-        self.attributes
-            .get(EXTENSION_NAME_PERMISSION_LEVEL)
-            .map(|v| v.ce_integer() as u32)
+    fn get_permission_level(&self) -> Result<Option<u32>, UAttributesError> {
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_PERMISSION_LEVEL) {
+            if extension_value.has_ce_integer() {
+                return u32::try_from(extension_value.ce_integer())
+                    .map(Option::Some)
+                    .map_err(|_e| UAttributesError::parsing_error(format!("expected unsigned Integer value for {} extension attribute but found {:?}", EXTENSION_NAME_PERMISSION_LEVEL, extension_value)));
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected Integer value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_PERMISSION_LEVEL, extension_value
+                )));
+            }
+        }
+        Ok(None)
     }
 
     fn set_permission_level(&mut self, level: u32) -> Result<(), UAttributesError> {
@@ -151,14 +191,21 @@ impl CloudEvent {
     }
 
     fn get_request_id(&self) -> Result<Option<UUID>, UAttributesError> {
-        self.attributes
-            .get(EXTENSION_NAME_REQUEST_ID)
-            .map(|v| v.ce_string().to_owned())
-            .map_or(Ok(None), |v| {
-                v.parse::<UUID>()
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_REQUEST_ID) {
+            if extension_value.has_ce_string() {
+                return extension_value
+                    .ce_string()
+                    .parse::<UUID>()
                     .map(Option::Some)
-                    .map_err(|e| UAttributesError::parsing_error(e.to_string()))
-            })
+                    .map_err(|e| UAttributesError::parsing_error(e.to_string()));
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected String value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_REQUEST_ID, extension_value
+                )));
+            }
+        }
+        Ok(None)
     }
 
     fn set_request_id(&mut self, id: &UUID) {
@@ -168,11 +215,26 @@ impl CloudEvent {
             .insert(EXTENSION_NAME_REQUEST_ID.to_string(), val);
     }
 
-    fn get_commstatus(&self) -> Option<UCode> {
-        self.attributes
-            .get(EXTENSION_NAME_COMMSTATUS)
-            .map(|val| val.ce_integer())
-            .and_then(UCode::from_i32)
+    fn get_commstatus(&self) -> Result<Option<UCode>, UAttributesError> {
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_COMMSTATUS) {
+            if extension_value.has_ce_integer() {
+                return UCode::try_from_i32(extension_value.ce_integer())
+                    .map(Option::Some)
+                    .map_err(|_e| {
+                        UAttributesError::parsing_error(format!(
+                            "unsupported commstatus code {:?} in {} extension attribute",
+                            extension_value.ce_integer(),
+                            EXTENSION_NAME_COMMSTATUS
+                        ))
+                    });
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected Integer value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_COMMSTATUS, extension_value
+                )));
+            }
+        }
+        Ok(None)
     }
 
     fn set_commstatus(&mut self, status: UCode) {
@@ -184,10 +246,18 @@ impl CloudEvent {
         }
     }
 
-    fn get_traceparent(&self) -> Option<String> {
-        self.attributes
-            .get(EXTENSION_NAME_TRACEPARENT)
-            .map(|val| val.ce_string().to_string())
+    fn get_traceparent(&self) -> Result<Option<String>, UAttributesError> {
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_TRACEPARENT) {
+            if extension_value.has_ce_string() {
+                return Ok(Some(extension_value.ce_string().to_string()));
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected String value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_TRACEPARENT, extension_value
+                )));
+            }
+        }
+        Ok(None)
     }
 
     fn set_traceparent<T: Into<String>>(&mut self, traceparent: T) {
@@ -198,14 +268,23 @@ impl CloudEvent {
     }
 
     fn get_payload_format(&self) -> Result<UPayloadFormat, UAttributesError> {
-        self.attributes
-            .get(EXTENSION_NAME_PFORMAT)
-            .map(|val| val.ce_integer())
-            .map_or(Ok(UPayloadFormat::Unspecified), |format| {
-                UPayloadFormat::from_i32(format).ok_or(UAttributesError::ParsingError(
-                    "unsupported payload format".to_string(),
-                ))
-            })
+        if let Some(extension_value) = self.attributes.get(EXTENSION_NAME_PFORMAT) {
+            if extension_value.has_ce_integer() {
+                return UPayloadFormat::try_from_i32(extension_value.ce_integer()).map_err(|_e| {
+                    UAttributesError::parsing_error(format!(
+                        "unsupported payload format {:?} in {} extension attribute",
+                        extension_value.ce_integer(),
+                        EXTENSION_NAME_PFORMAT
+                    ))
+                });
+            } else {
+                return Err(UAttributesError::parsing_error(format!(
+                    "expected Integer value for {} extension attribute but found {:?}",
+                    EXTENSION_NAME_PFORMAT, extension_value
+                )));
+            }
+        }
+        Ok(UPayloadFormat::Unspecified)
     }
 
     fn set_payload_format(&mut self, format: UPayloadFormat) {
@@ -325,17 +404,17 @@ impl TryFrom<CloudEvent> for UMessage {
         }
 
         let attributes = UAttributes {
-            commstatus: event.get_commstatus(),
+            commstatus: event.get_commstatus()?,
             id: event.get_id()?,
             type_: event.get_type()?,
             source: event.get_source()?,
             sink: event.get_sink()?,
             priority: Some(event.get_priority()?),
-            ttl: event.get_ttl(),
-            permission_level: event.get_permission_level(),
+            ttl: event.get_ttl()?,
+            permission_level: event.get_permission_level()?,
             reqid: event.get_request_id()?,
-            token: event.get_token(),
-            traceparent: event.get_traceparent(),
+            token: event.get_token()?,
+            traceparent: event.get_traceparent()?,
             payload_format: Some(event.get_payload_format()?),
         };
         UAttributesValidators::get_validator_for_attributes(&attributes).validate(&attributes)?;
@@ -402,7 +481,7 @@ mod tests {
             event
                 .attributes
                 .get(EXTENSION_NAME_PRIORITY)
-                .map(|v| v.ce_string().to_owned()),
+                .map(|v| v.ce_string()),
             Some(PRIORITY.to_priority_code())
         );
         assert_eq!(
@@ -485,9 +564,7 @@ mod tests {
 
     #[test]
     fn test_try_from_request_message_succeeds() {
-        let mut payload = StringValue::new();
-        payload.value = "Hello".into();
-
+        let payload = b"Hello";
         let message_id = MESSAGE_ID
             .parse::<UUID>()
             .expect("failed to parse message ID");
@@ -502,7 +579,7 @@ mod tests {
         .with_permission_level(PERMISSION_LEVEL)
         .with_traceparent(TRACEPARENT)
         .with_token(token)
-        .build_with_wrapped_protobuf_payload(&payload)
+        .build_with_payload(payload.as_slice(), UPayloadFormat::Raw)
         .expect("failed to create message");
         let event =
             CloudEvent::try_from(message).expect("failed to create CloudEvent from UMessage");
@@ -531,17 +608,11 @@ mod tests {
                 .attributes
                 .get(EXTENSION_NAME_PFORMAT)
                 .map(|v| v.ce_integer()),
-            Some(UPayloadFormat::ProtobufWrappedInAny.as_i32())
+            Some(UPayloadFormat::Raw.as_i32())
         );
-        assert!(!event.has_binary_data());
+        assert!(!event.has_proto_data());
         assert!(!event.has_text_data());
-        let payload_wrapped_in_any = Any::pack(&payload).expect("failed to wrap payload in Any");
-        assert_eq!(
-            event.proto_data().value,
-            Any::pack(&payload_wrapped_in_any)
-                .expect("failed to pack payload into Any")
-                .value
-        );
+        assert_eq!(event.binary_data(), payload);
     }
 
     #[test]
@@ -648,7 +719,7 @@ mod tests {
         let attribs = umessage.attributes();
         assert_standard_umessage_attributes(attribs, UMessageType::Publish, TOPIC, None);
         assert_eq!(attribs.payload_format_unchecked(), UPayloadFormat::Text);
-        assert_eq!(umessage.payload(), Some("test".as_bytes()))
+        assert_eq!(umessage.payload(), Some("test".as_bytes().into()))
     }
 
     #[test]
@@ -675,7 +746,7 @@ mod tests {
             Some(DESTINATION.to_string()),
         );
         assert_eq!(attribs.payload_format_unchecked(), UPayloadFormat::Json);
-        assert_eq!(umessage.payload(), Some("{\"count\": 5}".as_bytes()))
+        assert_eq!(umessage.payload(), Some("{\"count\": 5}".as_bytes().into()))
     }
 
     #[test]
@@ -720,7 +791,10 @@ mod tests {
             attribs.payload_format_unchecked(),
             UPayloadFormat::Unspecified
         );
-        assert_eq!(umessage.payload(), Some(serialized_payload.as_slice()));
+        assert_eq!(
+            umessage.payload(),
+            Some(Bytes::copy_from_slice(serialized_payload.as_slice()))
+        );
     }
 
     #[test]
@@ -755,6 +829,6 @@ mod tests {
         assert_eq!(attribs.commstatus, None);
         assert_eq!(attribs.reqid, Some(request_id));
         assert_eq!(attribs.payload_format_unchecked(), UPayloadFormat::Protobuf);
-        assert_eq!(umessage.payload(), Some(DATA.as_slice()))
+        assert_eq!(umessage.payload(), Some(DATA.as_slice().into()));
     }
 }

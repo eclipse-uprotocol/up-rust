@@ -150,7 +150,7 @@ jobs:
           cargo hack check \
             --no-dev-deps \
             --feature-powerset \
-            --group-features default,communication,usubscription,udiscovery,utwin,symphony \
+            --group-features communication,usubscription,udiscovery,symphony \
             --depth 2
 
   # [impl->req~up-language-ci-test~1]
@@ -161,7 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature-flags: ["", "--no-default-features", "--all-features"]
+        feature-flags: ["--features up-core-types", "--all-features"]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:

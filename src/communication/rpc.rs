@@ -12,15 +12,13 @@
  ********************************************************************************/
 
 use std::sync::Arc;
-use thiserror::Error;
 
 use async_trait::async_trait;
-use protobuf::MessageFull;
+use thiserror::Error;
 
-use crate::communication::RegistrationError;
 use crate::{UAttributes, UCode, UStatus, UUri};
 
-use super::{CallOptions, UPayload};
+use super::{CallOptions, RegistrationError, UPayload};
 
 /// An error indicating a problem with invoking a (remote) service operation.
 // [impl->dsn~communication-layer-api-declaration~1]
@@ -70,31 +68,35 @@ pub enum ServiceInvocationError {
 impl From<UStatus> for ServiceInvocationError {
     fn from(value: UStatus) -> Self {
         match value.get_code() {
-            UCode::AlreadyExists => {
-                ServiceInvocationError::AlreadyExists(value.get_message().to_string())
-            }
+            UCode::AlreadyExists => ServiceInvocationError::AlreadyExists(
+                value.get_message_or_default("N/A").to_string(),
+            ),
             UCode::DeadlineExceeded => ServiceInvocationError::DeadlineExceeded,
-            UCode::FailedPrecondition => {
-                ServiceInvocationError::FailedPrecondition(value.get_message().to_string())
+            UCode::FailedPrecondition => ServiceInvocationError::FailedPrecondition(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::Internal => {
+                ServiceInvocationError::Internal(value.get_message_or_default("N/A").to_string())
             }
-            UCode::Internal => ServiceInvocationError::Internal(value.get_message().to_string()),
-            UCode::InvalidArgument => {
-                ServiceInvocationError::InvalidArgument(value.get_message().to_string())
+            UCode::InvalidArgument => ServiceInvocationError::InvalidArgument(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::NotFound => {
+                ServiceInvocationError::NotFound(value.get_message_or_default("N/A").to_string())
             }
-            UCode::NotFound => ServiceInvocationError::NotFound(value.get_message().to_string()),
-            UCode::PermissionDenied => {
-                ServiceInvocationError::PermissionDenied(value.get_message().to_string())
-            }
-            UCode::ResourceExhausted => {
-                ServiceInvocationError::ResourceExhausted(value.get_message().to_string())
-            }
+            UCode::PermissionDenied => ServiceInvocationError::PermissionDenied(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::ResourceExhausted => ServiceInvocationError::ResourceExhausted(
+                value.get_message_or_default("N/A").to_string(),
+            ),
             UCode::Unauthenticated => ServiceInvocationError::Unauthenticated,
             UCode::Unavailable => {
-                ServiceInvocationError::Unavailable(value.get_message().to_string())
+                ServiceInvocationError::Unavailable(value.get_message_or_default("N/A").to_string())
             }
-            UCode::Unimplemented => {
-                ServiceInvocationError::Unimplemented(value.get_message().to_string())
-            }
+            UCode::Unimplemented => ServiceInvocationError::Unimplemented(
+                value.get_message_or_default("N/A").to_string(),
+            ),
             UCode::Ok
             | UCode::Cancelled
             | UCode::Unknown
@@ -174,6 +176,7 @@ pub trait RpcClient: Send + Sync {
     ) -> Result<Option<UPayload>, ServiceInvocationError>;
 }
 
+#[cfg(feature = "protobuf-support")]
 impl dyn RpcClient {
     /// Invokes a method on a service using and returning proto-generated `Message` objects.
     ///
@@ -198,8 +201,8 @@ impl dyn RpcClient {
         request_message: T,
     ) -> Result<R, ServiceInvocationError>
     where
-        T: MessageFull,
-        R: MessageFull,
+        T: crate::ProtobufMappable,
+        R: crate::ProtobufMappable + Default,
     {
         let payload = UPayload::try_from_protobuf(request_message)
             .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
@@ -339,13 +342,10 @@ impl RpcServer for MockRpcServerImpl {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "protobuf-support"))]
 mod tests {
-    use std::sync::Arc;
-
-    use protobuf::well_known_types::wrappers::StringValue;
-
     use crate::{communication::CallOptions, UUri};
+    use protobuf::well_known_types::wrappers::{DoubleValue, StringValue};
 
     use super::*;
 
@@ -356,8 +356,7 @@ mod tests {
             .expect_invoke_method()
             .once()
             .returning(|_method, _options, _payload| {
-                let error = UStatus::fail_with_code(UCode::Internal, "internal error");
-                let response_payload = UPayload::try_from_protobuf_mappable(error).unwrap();
+                let response_payload = UPayload::try_from_protobuf(DoubleValue::new()).unwrap();
                 Ok(Some(response_payload))
             });
         let client: Arc<dyn RpcClient> = Arc::new(rpc_client);

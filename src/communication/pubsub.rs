@@ -11,39 +11,27 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::{error::Error, fmt::Display, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use thiserror::Error;
 
-use crate::communication::RegistrationError;
-use crate::core::usubscription::SubscriptionStatus;
-use crate::{UListener, UStatus, UUri};
-
-use super::{CallOptions, UPayload};
+use crate::{
+    communication::{CallOptions, RegistrationError, SubscriptionStatus, UPayload},
+    UListener, UStatus, UUri,
+};
 
 /// An error indicating a problem with publishing a message to a topic.
 // [impl->dsn~communication-layer-api-declaration~1]
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum PubSubError {
     /// Indicates that the given message cannot be sent because it is not a [valid Publish message](crate::PublishValidator).
+    #[error("invalid argument: {0}")]
     InvalidArgument(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to publish a message.
+    #[error("failed to publish message: {0}")]
     PublishError(Box<UStatus>),
 }
-
-#[cfg(not(tarpaulin_include))]
-impl Display for PubSubError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PubSubError::InvalidArgument(s) => f.write_str(s.as_str()),
-            PubSubError::PublishError(s) => {
-                f.write_fmt(format_args!("failed to publish message: {s}"))
-            }
-        }
-    }
-}
-
-impl Error for PubSubError {}
 
 /// A client for publishing messages to a topic.
 ///

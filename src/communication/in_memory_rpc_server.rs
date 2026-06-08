@@ -22,11 +22,12 @@ use async_trait::async_trait;
 use tracing::{debug, info};
 
 use crate::{
-    communication::build_message, LocalUriProvider, UListener, UMessage, UMessageBuilder, UStatus,
-    UTransport, UUri,
+    communication::{
+        build_message, RegistrationError, RequestHandler, RpcServer, ServiceInvocationError,
+        UPayload,
+    },
+    LocalUriProvider, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri,
 };
-
-use super::{RegistrationError, RequestHandler, RpcServer, ServiceInvocationError, UPayload};
 
 struct RequestListener<T: UTransport> {
     request_handler: Arc<dyn RequestHandler>,
@@ -241,7 +242,7 @@ mod tests {
 
     use super::*;
 
-    use protobuf::well_known_types::wrappers::StringValue;
+    // use protobuf::well_known_types::wrappers::StringValue;
     use test_case::test_case;
     use tokio::sync::Notify;
 
@@ -387,10 +388,7 @@ mod tests {
         let mut transport = MockTransport::new();
         let notify = Arc::new(Notify::new());
         let notify_clone = notify.clone();
-        let request_payload = StringValue {
-            value: "Hello".to_string(),
-            ..Default::default()
-        };
+        let value = b"Hello";
         let message_id = UUID::build();
         let message_id_clone = message_id.clone();
         let message_source = UUri::try_from("up://localhost/A100/1/0").unwrap();
@@ -400,30 +398,22 @@ mod tests {
             .expect_handle_request()
             .once()
             .withf(move |resource_id, message_attributes, request_payload| {
-                if let Some(pl) = request_payload {
+                request_payload.as_ref().is_some_and(|pl| {
                     let message_source = message_attributes.source();
-                    let msg: StringValue = pl.extract_protobuf().unwrap();
-                    msg.value == *"Hello"
+                    pl.payload().to_vec().as_slice() == value.as_slice()
                         && *resource_id == 0x7000_u16
                         && *message_source == message_source_clone
-                } else {
-                    false
-                }
+                })
             })
             .returning(|_resource_id, _message_attributes, _request_payload| {
-                let response_payload = UPayload::try_from_protobuf(StringValue {
-                    value: "Hello World".to_string(),
-                    ..Default::default()
-                })
-                .unwrap();
+                let response_payload = UPayload::new(value.as_slice(), crate::UPayloadFormat::Raw);
                 Ok(Some(response_payload))
             });
         transport
             .expect_do_send()
             .once()
             .withf(move |response_message| {
-                let msg: StringValue = response_message.extract_protobuf().unwrap();
-                msg.value == *"Hello World"
+                response_message.payload() == Some(value.as_slice().into())
                     && response_message.is_response()
                     && response_message
                         .commstatus()
@@ -440,7 +430,7 @@ mod tests {
             5_000,
         )
         .with_message_id(message_id)
-        .build_with_protobuf_payload(&request_payload)
+        .build_with_payload(value.as_slice(), crate::UPayloadFormat::Raw)
         .unwrap();
 
         let request_listener = RequestListener {

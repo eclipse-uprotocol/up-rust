@@ -11,6 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+/*!
+Implementation of the [uProtocol URI (UUri) data model](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/basics/uri.adoc).
+A UUri represents a uProtocol resource identifier and is used in various places across the uProtocol specification, e.g., to identify the source and destination of messages or to identify resources that are being accessed via RPC calls.
+*/
+
 // [impl->dsn~uri-data-model-naming~1]
 // [impl->req~uri-data-model-proto~1]
 
@@ -18,11 +23,7 @@ use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use std::sync::LazyLock;
 
-use protobuf::{well_known_types::any::Any, Message};
 use uriparse::{Authority, URIReference};
-
-use crate::up_core_api::uri::UUri as UUriProto;
-use crate::ProtobufMappable;
 
 pub(crate) const WILDCARD_AUTHORITY: &str = "*";
 pub(crate) const WILDCARD_ENTITY_INSTANCE: u32 = 0xFFFF_0000;
@@ -41,9 +42,12 @@ static AUTHORITY_NAME_PATTERN: LazyLock<regex::Regex> = LazyLock::new(|| {
 
 type AuthorityNameString = String;
 
+/// An error indicating a problem with creating or parsing a UUri.
 #[derive(Debug)]
 pub enum UUriError {
+    /// Indicates that a given URI string cannot be parsed into a UUri due to invalid formatting or content.
     SerializationError(String),
+    /// Indicates that a given URI does not comply with the UUri specification.
     ValidationError(String),
 }
 
@@ -74,6 +78,7 @@ impl std::fmt::Display for UUriError {
 
 impl std::error::Error for UUriError {}
 
+/// A URI that represents a uProtocol resource identifier.
 #[derive(Debug, Clone, PartialEq)]
 #[repr(C)]
 pub struct UUri {
@@ -933,66 +938,82 @@ impl UUri {
     }
 }
 
-impl TryFrom<&UUriProto> for UUri {
-    type Error = crate::UUriError;
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use super::*;
+    use crate::up_core_api::uri::UUri as UUriProto;
+    use crate::ProtobufMappable;
+    use protobuf::{well_known_types::any::Any, Message};
 
-    fn try_from(proto: &UUriProto) -> Result<Self, Self::Error> {
-        let version = u8::try_from(proto.ue_version_major).map_err(|_e| {
-            UUriError::validation_error(
-                "uProtocol URI's major version must be an 8 bit unsigned integer".to_string(),
-            )
-        })?;
-        let resource_id = u16::try_from(proto.resource_id).map_err(|_e| {
-            UUriError::validation_error(
-                "uProtocol URI's resource ID must be a 16 bit unsigned integer".to_string(),
-            )
-        })?;
-        UUri::try_from_parts(&proto.authority_name, proto.ue_id, version, resource_id)
-    }
-}
+    impl TryFrom<&UUriProto> for UUri {
+        type Error = crate::UUriError;
 
-impl From<&UUri> for UUriProto {
-    fn from(uuri: &UUri) -> Self {
-        UUriProto {
-            authority_name: uuri.authority_name.as_str().to_string(),
-            ue_id: uuri.ue_id,
-            ue_version_major: uuri.ue_version_major as u32,
-            resource_id: uuri.resource_id as u32,
-            ..Default::default()
+        fn try_from(uuri_proto: &UUriProto) -> Result<Self, Self::Error> {
+            let version = u8::try_from(uuri_proto.ue_version_major).map_err(|_e| {
+                UUriError::validation_error(
+                    "uProtocol URI's major version must be an 8 bit unsigned integer".to_string(),
+                )
+            })?;
+            let resource_id = u16::try_from(uuri_proto.resource_id).map_err(|_e| {
+                UUriError::validation_error(
+                    "uProtocol URI's resource ID must be a 16 bit unsigned integer".to_string(),
+                )
+            })?;
+            UUri::try_from_parts(
+                &uuri_proto.authority_name,
+                uuri_proto.ue_id,
+                version,
+                resource_id,
+            )
         }
     }
-}
 
-impl ProtobufMappable for UUri {
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        let uuri_proto = UUriProto::parse_from_bytes(proto)
-            .map_err(|e| crate::SerializationError(format!("Protobuf decode error: {e}")))?;
-        UUri::try_from(&uuri_proto)
-            .map_err(|e| crate::SerializationError(format!("UUri conversion error: {e}")))
+    impl From<&UUri> for UUriProto {
+        fn from(uuri: &UUri) -> Self {
+            UUriProto {
+                authority_name: uuri.authority_name.as_str().to_string(),
+                ue_id: uuri.ue_id,
+                ue_version_major: uuri.ue_version_major as u32,
+                resource_id: uuri.resource_id as u32,
+                ..Default::default()
+            }
+        }
     }
-    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        Any::parse_from_bytes(proto)
-            .map_err(|err| crate::SerializationError(err.to_string()))
-            .and_then(|any| match any.unpack::<UUriProto>() {
-                Ok(Some(uuri_proto)) => UUri::try_from(&uuri_proto)
-                    .map_err(|e| crate::SerializationError(e.to_string())),
-                Ok(None) => Err(crate::SerializationError(
-                    "Protobuf Any does not contain UUriProto".to_string(),
-                )),
-                Err(e) => Err(crate::SerializationError(format!(
-                    "Protobuf Any unpack error: {e}"
-                ))),
-            })
-    }
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        UUriProto::from(self)
-            .write_to_bytes()
-            .map_err(|e| crate::SerializationError(format!("Protobuf encode error: {e}")))
-    }
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Any::pack(&UUriProto::from(self))
-            .map_err(|e| crate::SerializationError(format!("Failed to pack UUri: {e}")))
-            .and_then(|any| any.write_to_protobuf_bytes())
+
+    impl ProtobufMappable for UUri {
+        fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+            let uuri_proto = UUriProto::parse_from_bytes(proto).map_err(|e| {
+                crate::SerializationError::new(format!("Protobuf decode error: {e}"))
+            })?;
+            UUri::try_from(&uuri_proto)
+                .map_err(|e| crate::SerializationError::new(format!("UUri conversion error: {e}")))
+        }
+        fn parse_from_packed_protobuf_bytes(
+            proto: &[u8],
+        ) -> Result<Self, crate::SerializationError> {
+            Any::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+                .and_then(|any| match any.unpack::<UUriProto>() {
+                    Ok(Some(uuri_proto)) => UUri::try_from(&uuri_proto)
+                        .map_err(|e| crate::SerializationError::new(e.to_string())),
+                    Ok(None) => Err(crate::SerializationError::new(
+                        "Protobuf Any does not contain UUriProto".to_string(),
+                    )),
+                    Err(e) => Err(crate::SerializationError::new(format!(
+                        "Protobuf Any unpack error: {e}"
+                    ))),
+                })
+        }
+        fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            UUriProto::from(self)
+                .write_to_bytes()
+                .map_err(|e| crate::SerializationError::new(format!("Protobuf encode error: {e}")))
+        }
+        fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            Any::pack(&UUriProto::from(self))
+                .map_err(|e| crate::SerializationError::new(format!("Failed to pack UUri: {e}")))
+                .and_then(|any| any.write_to_protobuf_bytes())
+        }
     }
 }
 

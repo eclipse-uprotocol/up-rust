@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -e
 
 echo "Running cargo fmt --check"
 cargo fmt --all --check

@@ -33,22 +33,29 @@ rust-version = "1.88"
 version = "0.10.0-SNAPSHOT"
 
 [features]
-default = ["communication"]
-cloudevents = []
-communication = ["usubscription", "dep:thiserror", "tokio/sync", "tokio/time"]
-udiscovery = []
-usubscription = []
-utwin = []
+default = []
+cloudevents = ["protobuf-support"]
+communication = ["up-l2-notifier", "up-l2-publisher", "up-l2-subscriber", "up-l2-rpc-client", "up-l2-rpc-server"]
+protobuf-support = ["dep:protobuf"]
+symphony = ["up-l2-rpc-server", "dep:serde", "dep:serde_json", "dep:symphony"]
+test-util = ["dep:mockall"]
+up-core-types = ["protobuf-support"]
+up-l2-api = ["dep:thiserror"]
+up-l2-notifier = ["up-l2-api"]
+up-l2-publisher = ["up-l2-api"]
+up-l2-subscriber =["up-l2-api", "usubscription"]
+up-l2-rpc-client = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time"]
+up-l2-rpc-server = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time"]
+udiscovery = ["up-l2-rpc-client"]
+usubscription = ["up-l2-rpc-client"]
 util = ["tokio/sync"]
-test-util = ["mockall"]
-symphony = ["communication", "dep:serde", "dep:serde_json", "dep:symphony"]
 
 [dependencies]
 async-trait = { version = "0.1" }
 bytes = { version = "1.11.1" }
 mediatype = "0.20"
 mockall = { version = "0.13", optional = true }
-protobuf = { version = "3.7.2", features = ["with-bytes"] }
+protobuf = { version = "3.7.2", features = ["with-bytes"], optional = true}
 # https://rustsec.org/advisories/RUSTSEC-2026-0097
 rand = { version = "0.9.3" }
 regex = { version = "1.11" }
@@ -89,12 +96,43 @@ codegen-units = 1
 all-features = true
 
 [package.metadata.cargo-all-features]
-# we currently do not have implementations for these features
-# so there is no need to test compatibility with other features
-denylist = ["udiscovery", "utwin"]
+denylist = ["test-util"]
 skip_feature_sets = [
-    # communication includes usubscription
+    # the features on the left side include the features on the right side,
+    # so there is no need to test them together
+    ["up-core-types", "protobuf-support"],
+    ["cloudevents", "protobuf-support"],
+    ["symphony", "up-l2-rpc-server"],
+    ["symphony", "up-l2-api"],
+    ["communication", "up-l2-notifier"],
+    ["communication", "up-l2-publisher"],
+    ["communication", "up-l2-subscriber"],
+    ["communication", "up-l2-rpc-client"],
+    ["communication", "up-l2-rpc-server"],
+    ["communication", "up-l2-api"],
+    ["communication", "up-core-types"],
+    ["communication", "protobuf-support"],
     ["communication", "usubscription"],
+    ["up-l2-notifier", "up-l2-api"],
+    ["up-l2-publisher", "up-l2-api"],
+    ["up-l2-subscriber", "up-l2-api"],
+    ["up-l2-subscriber", "usubscription"],
+    ["up-l2-subscriber", "up-l2-rpc-client"],
+    ["up-l2-subscriber", "up-core-types"],
+    ["up-l2-rpc-client", "up-l2-api"],
+    ["up-l2-rpc-client", "up-core-types"],
+    ["up-l2-rpc-client", "protobuf-support"],
+    ["up-l2-rpc-server", "up-l2-api"],
+    ["up-l2-rpc-server", "up-core-types"],
+    ["up-l2-rpc-server", "protobuf-support"],
+    ["usubscription", "up-l2-rpc-client"],
+    ["usubscription", "up-l2-api"],
+    ["usubscription", "up-core-types"],
+    ["usubscription", "protobuf-support"],
+    ["udiscovery", "up-l2-rpc-client"],
+    ["udiscovery", "up-l2-api"],
+    ["udiscovery", "up-core-types"],
+    ["udiscovery", "protobuf-support"],
 ]
 # optional dependencies are activated by means of features only
 skip_optional_dependencies = true
@@ -102,15 +140,15 @@ max_combination_size = 3
 
 [[example]]
 name = "simple_notify"
-required-features = ["communication", "util"]
+required-features = ["up-l2-notifier", "util"]
 
 [[example]]
 name = "simple_publish"
-required-features = ["communication", "util"]
+required-features = ["up-l2-publisher", "util"]
 
 [[example]]
 name = "simple_rpc"
-required-features = ["communication", "util"]
+required-features = ["up-l2-rpc-client", "up-l2-rpc-server", "util"]
 
 [[example]]
 name = "symphony_target"
@@ -119,10 +157,12 @@ required-features = ["symphony", "util"]
 [[test]]
 name = "tck_uuri"
 harness = false   # allows Cucumber to print output instead of libtest
+required-features = ["up-core-types"]
 
 [[test]]
 name = "tck_uuid"
 harness = false   # allows Cucumber to print output instead of libtest
+required-features = ["up-core-types"]
 
 [lints.rust]
 # this prevents cargo from complaining about code blocks

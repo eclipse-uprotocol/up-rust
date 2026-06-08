@@ -11,6 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+/*!
+Traits representing uProtocol's [Transport & Session Layer API](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l1/README.adoc) for sending and receiving messages.
+*/
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -61,7 +64,7 @@ pub fn verify_filter_criteria(
     Ok(())
 }
 
-/// A factory for URIs representing this uEntity's resources.
+/// A factory for URIs representing a uEntity's resources.
 ///
 /// Implementations may use arbitrary mechanisms to determine the information that
 /// is necessary for creating URIs, e.g. environment variables, configuration files etc.
@@ -178,14 +181,13 @@ pub trait UListener: Send + Sync {
     async fn on_receive(&self, msg: UMessage);
 }
 
-/// The uProtocol Transport Layer interface that provides a common API for uEntity developers to send and
-/// receive messages.
+/// The uProtocol Transport & Session Layer interface that provides a common API for sending and
+/// receiving messages.
 ///
 /// Implementations contain the details for connecting to the underlying transport technology and
 /// sending [`UMessage`]s using the configured technology.
 ///
-/// Please refer to the [uProtocol Transport Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l1/README.adoc)
-/// for details.
+/// Please refer to the [uProtocol Transport & Session Layer specification](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l1/README.adoc) for details.
 // [impl->dsn~utransport-declaration~1]
 #[async_trait]
 pub trait UTransport: Send + Sync {

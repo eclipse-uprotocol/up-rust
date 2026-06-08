@@ -17,11 +17,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::{LocalUriProvider, UListener, UMessageBuilder, UTransport, UUri};
-
-use super::{
-    apply_common_options, build_message, CallOptions, NotificationError, Notifier,
-    RegistrationError, UPayload,
+use crate::{
+    communication::{
+        apply_common_options, build_message, CallOptions, NotificationError, Notifier,
+        RegistrationError, UPayload,
+    },
+    LocalUriProvider, UListener, UMessageBuilder, UTransport, UUri,
 };
 
 /// A [`Notifier`] that uses the uProtocol Transport Layer API to send and receive
@@ -105,8 +106,6 @@ mod tests {
 
     use super::*;
 
-    use protobuf::well_known_types::wrappers::StringValue;
-
     use crate::{
         utransport::{MockTransport, MockUListener},
         StaticUriProvider, UCode, UPriority, UStatus, UUri, UUID,
@@ -188,6 +187,8 @@ mod tests {
     #[tokio::test]
     async fn test_publish_succeeds() {
         let message_id = UUID::build();
+        let value = b"Hello";
+
         let uri_provider = new_uri_provider();
         let destination = UUri::try_from("up://other-vin/A15B/1/0").unwrap();
         let expected_message_id = message_id.clone();
@@ -198,23 +199,18 @@ mod tests {
             .expect_do_send()
             .once()
             .withf(move |message| {
-                let Ok(payload) = message.extract_protobuf::<StringValue>() else {
-                    return false;
-                };
                 message.is_notification()
                     && message.id() == &expected_message_id
                     && message.source() == &expected_source
                     && message.sink_unchecked() == &expected_sink
                     && message.ttl_unchecked() == 10_000
                     && message.priority_unchecked() == UPriority::CS2
-                    && payload.value == *"Hello"
+                    && message.payload() == Some(value.as_slice().into())
             })
             .return_const(Ok(()));
         let notifier = SimpleNotifier::new(Arc::new(transport), uri_provider);
 
-        let mut v = StringValue::new();
-        v.value = "Hello".to_string();
-        let payload = UPayload::try_from_protobuf(v).unwrap();
+        let payload = UPayload::new(value.as_slice(), crate::UPayloadFormat::Raw);
         let options =
             CallOptions::for_notification(Some(10_000), Some(message_id), Some(UPriority::CS2));
         let result = notifier

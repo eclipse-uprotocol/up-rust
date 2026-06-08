@@ -15,12 +15,8 @@ use std::time::{Duration, SystemTime};
 use std::{hash::Hash, str::FromStr};
 
 use bytes::{Buf, Bytes};
-use protobuf::{well_known_types::any::Any, Message};
 use rand::RngCore;
 use uuid_simd::{AsciiCase, Out};
-
-use crate::up_core_api::uuid::UUID as UUIDProto;
-use crate::ProtobufMappable;
 
 const BITMASK_VERSION: u64 = 0b1111 << 12;
 const VERSION_7: u64 = 0b0111 << 12;
@@ -245,63 +241,75 @@ impl UUID {
     }
 }
 
-impl TryFrom<&UUIDProto> for UUID {
-    type Error = UuidConversionError;
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use super::*;
+    use crate::up_core_api::uuid::UUID as UUIDProto;
+    use crate::ProtobufMappable;
+    use protobuf::{well_known_types::any::Any, Message};
 
-    fn try_from(value: &UUIDProto) -> Result<Self, Self::Error> {
-        UUID::from_u64_pair(value.msb, value.lsb)
-    }
-}
+    impl TryFrom<&UUIDProto> for UUID {
+        type Error = UuidConversionError;
 
-impl TryFrom<UUIDProto> for UUID {
-    type Error = UuidConversionError;
-
-    fn try_from(value: UUIDProto) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
-}
-
-impl From<&UUID> for UUIDProto {
-    fn from(value: &UUID) -> Self {
-        UUIDProto {
-            msb: value.msb,
-            lsb: value.lsb,
-            ..Default::default()
+        fn try_from(value: &UUIDProto) -> Result<Self, Self::Error> {
+            UUID::from_u64_pair(value.msb, value.lsb)
         }
     }
-}
 
-impl ProtobufMappable for UUID {
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        let uuid_proto = UUIDProto::parse_from_bytes(proto)
-            .map_err(|err| crate::SerializationError(err.to_string()))?;
-        UUID::try_from(uuid_proto).map_err(|err| crate::SerializationError(err.to_string()))
+    impl TryFrom<UUIDProto> for UUID {
+        type Error = UuidConversionError;
+
+        fn try_from(value: UUIDProto) -> Result<Self, Self::Error> {
+            Self::try_from(&value)
+        }
     }
 
-    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        Any::parse_from_bytes(proto)
-            .map_err(|err| crate::SerializationError(err.to_string()))
-            .and_then(|any| match any.unpack::<UUIDProto>() {
-                Ok(Some(v)) => {
-                    UUID::try_from(v).map_err(|err| crate::SerializationError(err.to_string()))
-                }
-                Ok(None) => Err(crate::SerializationError(
-                    "cannot unpack UUID, type mismatch".to_string(),
-                )),
-                Err(e) => Err(crate::SerializationError::from(e)),
-            })
+    impl From<&UUID> for UUIDProto {
+        fn from(value: &UUID) -> Self {
+            UUIDProto {
+                msb: value.msb,
+                lsb: value.lsb,
+                ..Default::default()
+            }
+        }
     }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        UUIDProto::from(self)
-            .write_to_bytes()
-            .map_err(|err| crate::SerializationError(err.to_string()))
-    }
+    impl ProtobufMappable for UUID {
+        fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+            let uuid_proto = UUIDProto::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))?;
+            UUID::try_from(uuid_proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+        }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Any::pack(&UUIDProto::from(self))
-            .map_err(|err| crate::SerializationError(format!("Failed to pack UUID: {err}")))
-            .and_then(|any| any.write_to_protobuf_bytes())
+        fn parse_from_packed_protobuf_bytes(
+            proto: &[u8],
+        ) -> Result<Self, crate::SerializationError> {
+            Any::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+                .and_then(|any| match any.unpack::<UUIDProto>() {
+                    Ok(Some(v)) => UUID::try_from(v)
+                        .map_err(|err| crate::SerializationError::new(err.to_string())),
+                    Ok(None) => Err(crate::SerializationError::new(
+                        "cannot unpack UUID, type mismatch",
+                    )),
+                    Err(e) => Err(crate::SerializationError::from(e)),
+                })
+        }
+
+        fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            UUIDProto::from(self)
+                .write_to_bytes()
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+        }
+
+        fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            Any::pack(&UUIDProto::from(self))
+                .map_err(|err| {
+                    crate::SerializationError::new(format!("Failed to pack UUID: {err}"))
+                })
+                .and_then(|any| any.write_to_protobuf_bytes())
+        }
     }
 }
 

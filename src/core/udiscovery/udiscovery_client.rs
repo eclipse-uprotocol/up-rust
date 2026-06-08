@@ -14,22 +14,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::up_core_api::{
-    udiscovery::{
-        FindServicesRequest, FindServicesResponse, GetServiceTopicsRequest,
-        GetServiceTopicsResponse,
-    },
-    uri::UUri as UUriProto,
-};
 use crate::{
+    communication::{CallOptions, RpcClient},
     core::udiscovery::{
         TopicInfo, UDiscovery, RESOURCE_ID_FIND_SERVICES, RESOURCE_ID_GET_SERVICE_TOPICS,
         UDISCOVERY_TYPE_ID, UDISCOVERY_VERSION_MAJOR,
     },
-    UStatus, UUri,
+    up_core_api::{
+        udiscovery::{
+            FindServicesRequest, FindServicesResponse, GetServiceTopicsRequest,
+            GetServiceTopicsResponse, ServiceTopicInfo,
+        },
+        uri::UUri as UUriProto,
+    },
+    UCode, UStatus, UUri,
 };
-
-use super::{CallOptions, RpcClient};
 
 /// Gets a UUri referring to one of the _local_ uDiscovery service's resources.
 fn udiscovery_uri(resource_id: u16) -> UUri {
@@ -40,6 +39,37 @@ fn udiscovery_uri(resource_id: u16) -> UUri {
         resource_id,
     )
     .unwrap()
+}
+
+impl TryFrom<&ServiceTopicInfo> for TopicInfo {
+    type Error = UStatus;
+
+    fn try_from(service_topic_info_proto: &ServiceTopicInfo) -> Result<Self, Self::Error> {
+        let Some(topic_proto) = service_topic_info_proto.topic.as_ref() else {
+            return Err(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "Service returned invalid ServiceTopicInfo: no topic",
+            ));
+        };
+        let Ok(topic) = UUri::try_from(topic_proto) else {
+            return Err(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "Service returned invalid ServiceTopicInfo: malformed topic URI",
+            ));
+        };
+        let Some(uservice_topic) = service_topic_info_proto.info.as_ref() else {
+            return Err(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "Service returned invalid ServiceTopicInfo: no info object",
+            ));
+        };
+        Ok(TopicInfo {
+            topic,
+            message_type: uservice_topic.message.clone(),
+            permission_level: uservice_topic.permission_level,
+            ttl: service_topic_info_proto.ttl,
+        })
+    }
 }
 
 /// A [`UDiscovery`] client implementation for invoking operations of a local uDiscovery service.
@@ -83,14 +113,19 @@ impl UDiscovery for RpcClientUDiscovery {
                 request_message,
             )
             .await
-            .map(|response_message| {
-                response_message.uris.as_ref().map_or(vec![], |batch| {
-                    batch
-                        .uris
-                        .iter()
-                        .filter_map(|uri| UUri::try_from(uri).ok())
-                        .collect()
-                })
+            .and_then(|response_message| {
+                let mut result = vec![];
+                if let Some(uri_batch) = response_message.uris.as_ref() {
+                    for uri in &uri_batch.uris {
+                        result.push(UUri::try_from(uri).map_err(|_| {
+                            UStatus::fail_with_code(
+                                UCode::InvalidArgument,
+                                "Service returned invalid URI in FindServicesResponse",
+                            )
+                        })?);
+                    }
+                }
+                Ok(result)
             })
             .map_err(UStatus::from)
     }
@@ -112,12 +147,12 @@ impl UDiscovery for RpcClientUDiscovery {
                 request_message,
             )
             .await
-            .map(|response_message| {
-                response_message
-                    .topics
-                    .iter()
-                    .filter_map(|topic| TopicInfo::try_from(topic).ok())
-                    .collect()
+            .and_then(|response_message| {
+                let mut result = vec![];
+                for topic in response_message.topics {
+                    result.push(TopicInfo::try_from(&topic)?);
+                }
+                Ok(result)
             })
             .map_err(UStatus::from)
     }
@@ -129,7 +164,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        communication::{rpc::MockRpcClient, UPayload},
+        communication::{MockRpcClient, UPayload},
         up_core_api::{udiscovery::ServiceTopicInfo, uoptions::UServiceTopic, uri::UUriBatch},
         UCode, UUri,
     };

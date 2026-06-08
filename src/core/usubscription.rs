@@ -15,13 +15,12 @@ use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 
-use crate::{
-    up_core_api::usubscription::{
-        reset_request::reason::Code, subscription_status::State,
-        SubscriptionStatus as SubscriptionStatusProto,
-    },
-    UCode, UStatus, UUri,
-};
+use crate::{communication::SubscriptionStatus, UStatus, UUri};
+
+#[cfg(all(feature = "up-l2-rpc-client", feature = "up-core-types"))]
+mod usubscription_client;
+#[cfg(all(feature = "up-l2-rpc-client", feature = "up-core-types"))]
+pub use usubscription_client::RpcClientUSubscription;
 
 /// The uEntity (type) identifier of the uSubscription service.
 pub const USUBSCRIPTION_TYPE_ID: u32 = 0x0000_0000;
@@ -44,27 +43,6 @@ pub const RESOURCE_ID_RESET: u16 = 0x0009;
 
 /// The resource identifier of uSubscription's _subscription change_ topic.
 pub const RESOURCE_ID_SUBSCRIPTION_CHANGE: u16 = 0x8000;
-
-#[derive(Clone, Debug, PartialEq)]
-#[repr(C)]
-pub enum SubscriptionStatus {
-    Unsubscribed = State::UNSUBSCRIBED as isize,
-    SubscribePending = State::SUBSCRIBE_PENDING as isize,
-    Subscribed = State::SUBSCRIBED as isize,
-    UnsubscribePending = State::UNSUBSCRIBE_PENDING as isize,
-}
-
-impl From<&SubscriptionStatusProto> for SubscriptionStatus {
-    fn from(status: &SubscriptionStatusProto) -> Self {
-        let state = status.state.enum_value_or_default();
-        match state {
-            State::UNSUBSCRIBED => SubscriptionStatus::Unsubscribed,
-            State::SUBSCRIBE_PENDING => SubscriptionStatus::SubscribePending,
-            State::SUBSCRIBED => SubscriptionStatus::Subscribed,
-            State::UNSUBSCRIBE_PENDING => SubscriptionStatus::UnsubscribePending,
-        }
-    }
-}
 
 #[derive(Clone, Debug, PartialEq)]
 #[repr(C)]
@@ -124,8 +102,8 @@ impl SubscriptionInfo {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::UUri;
-    /// use up_rust::core::usubscription::{SubscriptionInfo, SubscriptionStatus};
+    /// use up_rust::{communication::SubscriptionStatus, UUri};
+    /// use up_rust::core::usubscription::SubscriptionInfo;
     ///
     /// let subscription_info = SubscriptionInfo::new(
     ///     UUri::try_from("/A100/1/9000").unwrap(),
@@ -142,114 +120,12 @@ impl SubscriptionInfo {
     }
 }
 
-impl TryFrom<&crate::up_core_api::usubscription::Subscription> for SubscriptionInfo {
-    type Error = UStatus;
-    fn try_from(
-        subscription: &crate::up_core_api::usubscription::Subscription,
-    ) -> Result<Self, Self::Error> {
-        let topic = subscription
-            .topic
-            .as_ref()
-            .ok_or(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "topic missing",
-            ))
-            .and_then(|t| {
-                UUri::try_from(t)
-                    .map_err(|_| UStatus::fail_with_code(UCode::InvalidArgument, "invalid topic"))
-            })?;
-        let subscriber = subscription
-            .subscriber
-            .as_ref()
-            .and_then(|s| s.uri.as_ref())
-            .ok_or(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "subscriber missing",
-            ))
-            .and_then(|s| {
-                UUri::try_from(s).map_err(|_| {
-                    UStatus::fail_with_code(UCode::InvalidArgument, "invalid subscriber")
-                })
-            })?;
-        let status = subscription
-            .status
-            .as_ref()
-            .map(SubscriptionStatus::from)
-            .ok_or(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "status missing",
-            ))?;
-        subscription
-            .attributes
-            .as_ref()
-            .ok_or_else(|| UStatus::fail_with_code(UCode::InvalidArgument, "missing attributes"))
-            .map(|attributes| {
-                let expiration = attributes.expire.as_ref().map(|ts| ts.seconds as u64);
-                SubscriptionInfo::new(
-                    topic,
-                    subscriber,
-                    status,
-                    expiration,
-                    attributes.sample_period_ms,
-                )
-            })
-    }
-}
-
-impl TryFrom<&crate::up_core_api::usubscription::Update> for SubscriptionInfo {
-    type Error = UStatus;
-    fn try_from(update: &crate::up_core_api::usubscription::Update) -> Result<Self, Self::Error> {
-        let topic = update
-            .topic
-            .as_ref()
-            .ok_or(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "topic missing",
-            ))
-            .and_then(|t| {
-                UUri::try_from(t)
-                    .map_err(|_| UStatus::fail_with_code(UCode::InvalidArgument, "invalid topic"))
-            })?;
-        let subscriber = update
-            .subscriber
-            .as_ref()
-            .and_then(|s| s.uri.as_ref())
-            .ok_or(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "subscriber missing",
-            ))
-            .and_then(|s| {
-                UUri::try_from(s).map_err(|_| {
-                    UStatus::fail_with_code(UCode::InvalidArgument, "invalid subscriber")
-                })
-            })?;
-        let status =
-            update
-                .status
-                .as_ref()
-                .map(SubscriptionStatus::from)
-                .ok_or(UStatus::fail_with_code(
-                    UCode::InvalidArgument,
-                    "status missing",
-                ))?;
-        let attribs = update.attributes.get_or_default();
-        let expiration = attribs.expire.as_ref().map(|ts| ts.seconds as u64);
-        Ok(SubscriptionInfo::new(
-            topic,
-            subscriber,
-            status,
-            expiration,
-            attribs.sample_period_ms,
-        ))
-    }
-}
-
 #[derive(Debug, PartialEq)]
 #[repr(C)]
 pub enum ResetReason {
-    Unspecified = Code::UNSPECIFIED as isize,
-    FactoryReset = Code::FACTORY_RESET as isize,
-    CorruptedData = Code::CORRUPTED_DATA as isize,
+    Unspecified,
+    FactoryReset,
+    CorruptedData,
 }
 
 /// Gets a UUri referring to one of the local uSubscription service's resources.

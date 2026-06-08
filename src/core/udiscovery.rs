@@ -15,7 +15,12 @@ use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 
-use crate::{UCode, UStatus, UUri};
+use crate::{UStatus, UUri};
+
+#[cfg(all(feature = "up-l2-rpc-client", feature = "up-core-types"))]
+mod udiscovery_client;
+#[cfg(all(feature = "up-l2-rpc-client", feature = "up-core-types"))]
+pub use udiscovery_client::RpcClientUDiscovery;
 
 /// The uEntity (type) identifier of the uDiscovery service.
 pub const UDISCOVERY_TYPE_ID: u32 = 0x0000_0001;
@@ -56,39 +61,6 @@ impl TopicInfo {
     /// Gets the time-to-live (TTL) value in seconds.
     pub fn ttl(&self) -> u32 {
         self.ttl
-    }
-}
-
-impl TryFrom<&crate::up_core_api::udiscovery::ServiceTopicInfo> for TopicInfo {
-    type Error = UStatus;
-
-    fn try_from(
-        value: &crate::up_core_api::udiscovery::ServiceTopicInfo,
-    ) -> Result<Self, Self::Error> {
-        let Some(topic_proto) = value.topic.as_ref() else {
-            return Err(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "Service returned invalid ServiceTopicInfo: no topic",
-            ));
-        };
-        let Ok(topic) = UUri::try_from(topic_proto) else {
-            return Err(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "Service returned invalid ServiceTopicInfo: malformed topic URI",
-            ));
-        };
-        let Some(uservice_topic) = value.info.as_ref() else {
-            return Err(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "Service returned invalid ServiceTopicInfo: no info object",
-            ));
-        };
-        Ok(TopicInfo {
-            topic,
-            message_type: uservice_topic.message.clone(),
-            permission_level: uservice_topic.permission_level,
-            ttl: value.ttl,
-        })
     }
 }
 

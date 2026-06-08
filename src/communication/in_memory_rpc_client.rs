@@ -24,11 +24,10 @@ use tokio::time::timeout;
 use tracing::{debug, info};
 
 use crate::{
+    communication::{
+        build_message, CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload,
+    },
     LocalUriProvider, UCode, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri, UUID,
-};
-
-use super::{
-    build_message, CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload,
 };
 
 /// Handles an RPC Response message received from the transport layer.

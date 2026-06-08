@@ -12,8 +12,7 @@
  ********************************************************************************/
 
 /*!
-Provides a local UTransport which can be used for connecting uEntities running in the same
-process.
+Provides an implementation of uProtocol's [Transport & Session Layer API](crate::UTransport) which can be used for connecting uEntities that are running in the same process.
 */
 
 use std::{collections::HashSet, sync::Arc};
@@ -52,7 +51,7 @@ impl RegisteredListener {
 /// A [`UTransport`] that can be used to exchange messages within a single process.
 ///
 /// A message sent via [`UTransport::send`] will be dispatched to all registered listeners that
-/// match the message's source and sink filters.
+/// match the message's source and sink filters on the current thread.
 #[derive(Default)]
 pub struct LocalTransport {
     listeners: RwLock<HashSet<RegisteredListener>>,
