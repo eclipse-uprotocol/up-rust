@@ -36,16 +36,9 @@ fn unix_epoch_millis_as_protobuf_timestamp(
     millis: Option<u64>,
 ) -> Result<Option<Timestamp>, UStatus> {
     if let Some(milliseconds) = millis {
-        let seconds = milliseconds
-            .checked_div(1000)
-            .ok_or_else(|| {
-                UStatus::fail_with_code(UCode::InvalidArgument, "timestamp out of range")
-            })
-            .and_then(|s| {
-                i64::try_from(s).map_err(|_| {
-                    UStatus::fail_with_code(UCode::InvalidArgument, "timestamp out of range")
-                })
-            })?;
+        // this will always yield a valid Timestamp as the maximum value of u64 (2^64 - 1) divided by 1000
+        // is less than the maximum number of milliseconds that can be represented in an i64 (2^63 - 1)
+        let seconds = (milliseconds / 1000_u64) as i64;
         let nanos = (milliseconds % 1000)
             .checked_mul(1_000_000)
             .ok_or_else(|| {
@@ -76,6 +69,12 @@ fn protobuf_timestamp_as_unix_epoch_milliseconds(
                 "invalid timestamp: seconds value out of range",
             )
         };
+        if ts.nanos < 0 || ts.nanos >= 1_000_000_000 {
+            return Err(UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                "invalid timestamp: nanos value out of range",
+            ));
+        }
         u64::try_from(ts.seconds)
             .ok()
             .and_then(|s| s.checked_mul(1000))
@@ -451,6 +450,48 @@ mod tests {
         UCode, UUri,
     };
     use std::sync::Arc;
+
+    #[test]
+    fn test_unix_epoch_millis_as_protobuf_timestamp() {
+        assert!(
+            unix_epoch_millis_as_protobuf_timestamp(Some(1_000)).is_ok_and(|ts| {
+                ts == Some(Timestamp {
+                    seconds: 1,
+                    nanos: 0,
+                    ..Default::default()
+                })
+            })
+        );
+
+        assert!(
+            unix_epoch_millis_as_protobuf_timestamp(Some(1_234)).is_ok_and(|ts| {
+                ts == Some(Timestamp {
+                    seconds: 1,
+                    nanos: 234_000_000,
+                    ..Default::default()
+                })
+            })
+        );
+
+        assert!(unix_epoch_millis_as_protobuf_timestamp(Some(u64::MAX)).is_ok());
+        assert!(unix_epoch_millis_as_protobuf_timestamp(None).is_ok_and(|ts| ts.is_none()));
+    }
+
+    #[test_case::test_case(10, 234_000_000 => matches Ok(Some(10_234)); "succeeds for valid timestamp")]
+    #[test_case::test_case(-10, 234_000_000 => matches Err(UStatus {..}); "fails for negative seconds")]
+    #[test_case::test_case(10, -1 => matches Err(UStatus {..}); "fails for nanos exceeding lower bound")]
+    #[test_case::test_case(10, 1_000_000_000 => matches Err(UStatus {..}); "fails for nanos exeeding upper bound")]
+    fn test_protobuf_timestamp_as_unix_epoch_milliseconds(
+        seconds: i64,
+        nanos: i32,
+    ) -> Result<Option<u64>, UStatus> {
+        let timestamp = Timestamp {
+            seconds,
+            nanos,
+            ..Default::default()
+        };
+        protobuf_timestamp_as_unix_epoch_milliseconds(Some(&timestamp))
+    }
 
     #[tokio::test]
     async fn test_subscribe_invokes_rpc_client() {

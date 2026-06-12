@@ -55,6 +55,21 @@ pub struct SubscriptionInfo {
 }
 
 impl SubscriptionInfo {
+    /// Creates a new info object.
+    ///
+    /// # Arguments
+    /// * `topic` - The topic of the subscription.
+    /// * `subscriber` - The uEntity that has established the subscription.
+    /// * `status` - The status of the subscription.
+    /// * `expiration` - The point in time at which the subscription expires (milliseconds since Unix epoch).
+    ///   If not specified, the subscription is valid until explicitly unsubscribed.
+    /// * `min_sample_period` - The minimum duration (in seconds) between two events that should be maintained
+    ///   for remote only topics. Device dispatchers (i.e. streamers) use this attribute to reduce the publication
+    ///   rates of events sent between devices.
+    ///   This attribute is commonly used for mobile/cloud components subscribing to vehicle topics that are published
+    ///   at a high rate. If the desired sampling period set by the subscriber is lower than the original
+    ///   publisher's publication period, the attribute is ignored. If not specified, the sampling period is set
+    ///   by the publisher.
     #[must_use]
     pub fn new(
         topic: UUri,
@@ -113,6 +128,7 @@ impl SubscriptionInfo {
     ///     None,
     /// );
     /// assert!(subscription_info.has_status(SubscriptionStatus::Subscribed));
+    /// assert!(!subscription_info.has_status(SubscriptionStatus::Unsubscribed));
     /// ```
     #[must_use]
     pub fn has_status(&self, state: SubscriptionStatus) -> bool {
@@ -120,6 +136,7 @@ impl SubscriptionInfo {
     }
 }
 
+/// Potential reasons for resetting the uSubscription service.
 #[derive(Debug, PartialEq)]
 #[repr(C)]
 pub enum ResetReason {
@@ -263,7 +280,7 @@ pub trait USubscription: Send + Sync {
     ///
     /// * `reason` - The reason for the reset.
     /// * `message` - An optional human-readable message providing additional context about the reset.
-    /// * `before` - An optional timestamp (seconds since Unix epoch). All subscriptions created before
+    /// * `before` - An optional timestamp (milliseconds since Unix epoch). All subscriptions created before
     ///   this timestamp will be removed.
     ///
     /// # Errors

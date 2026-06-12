@@ -715,9 +715,18 @@ mod core_types_support {
 
         fn try_from(attribs_proto: &UAttributesProto) -> Result<Self, Self::Error> {
             Ok(UAttributes {
-                commstatus: attribs_proto
-                    .commstatus
-                    .map(|cs| UCode::from(cs.enum_value_or_default())),
+                commstatus: match attribs_proto.commstatus {
+                    None => None,
+                    Some(cs) => cs
+                        .enum_value()
+                        .map_err(|e| {
+                            UAttributesError::parsing_error(format!(
+                                "unknown commstatus value: {e}"
+                            ))
+                        })
+                        .map(UCode::from)
+                        .map(Some)?,
+                },
                 id: UUID::try_from(
                     attribs_proto
                         .id
@@ -728,9 +737,7 @@ mod core_types_support {
                     .type_
                     .enum_value()
                     .map_err(|e| {
-                        UAttributesError::validation_error(format!(
-                            "unknown message type value: {e}"
-                        ))
+                        UAttributesError::parsing_error(format!("unknown message type value: {e}"))
                     })
                     .and_then(UMessageType::try_from)?,
                 source: UUri::try_from(
@@ -747,7 +754,7 @@ mod core_types_support {
                     Ok(UPriorityProto::UPRIORITY_UNSPECIFIED) => None,
                     Ok(p) => Some(UPriority::try_from(p)?),
                     Err(e) => {
-                        return Err(UAttributesError::validation_error(format!(
+                        return Err(UAttributesError::parsing_error(format!(
                             "unknown priority value: {e}"
                         )))
                     }
@@ -763,7 +770,7 @@ mod core_types_support {
                 payload_format: match attribs_proto.payload_format.enum_value() {
                     Ok(pf) => Some(UPayloadFormat::from(pf)),
                     Err(e) => {
-                        return Err(UAttributesError::validation_error(format!(
+                        return Err(UAttributesError::parsing_error(format!(
                             "unknown payload format value: {e}"
                         )))
                     }
@@ -804,6 +811,68 @@ mod core_types_support {
                     crate::SerializationError::new(format!("Failed to pack UAttributes: {e}"))
                 })
                 .and_then(|any| any.write_to_protobuf_bytes())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use protobuf::EnumOrUnknown;
+
+        #[test_case::test_case(|attribs| attribs => matches Ok(()); "succeeds for valid values")]
+        #[test_case::test_case(|mut attribs| { attribs.type_ = EnumOrUnknown::from_i32(-1); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid message type")]
+        #[test_case::test_case(|mut attribs| { attribs.id = None.into(); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for missing message id")]
+        #[test_case::test_case(|mut attribs| { attribs.id.as_mut().unwrap().msb = 0x0000000000018000_u64; attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid message id")]
+        #[test_case::test_case(|mut attribs| { attribs.source = None.into(); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for missing source")]
+        #[test_case::test_case(|mut attribs| { attribs.source.as_mut().unwrap().authority_name = "INVALID".to_string(); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid source")]
+        #[test_case::test_case(|mut attribs| { attribs.sink.as_mut().unwrap().authority_name = "INVALID".to_string(); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid sink")]
+        #[test_case::test_case(|mut attribs| { attribs.priority = EnumOrUnknown::from_i32(-1); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid priority")]
+        #[test_case::test_case(|mut attribs| { attribs.commstatus = Some(EnumOrUnknown::from_i32(-1)); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid commstatus")]
+        #[test_case::test_case(|mut attribs| { attribs.reqid.as_mut().unwrap().msb = 0x0000000000018000_u64; attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid request id")]
+        #[test_case::test_case(|mut attribs| { attribs.payload_format = EnumOrUnknown::from_i32(-1); attribs } => matches Err(UAttributesError::ParsingError(_)); "fails for invalid payload format")]
+        fn test_try_from_attributes<F: FnOnce(UAttributesProto) -> UAttributesProto>(
+            mutator: F,
+        ) -> Result<(), UAttributesError> {
+            let valid_attribs_proto = UAttributesProto {
+                type_: EnumOrUnknown::from_i32(3), // corresponds to Response
+                id: Some(crate::up_core_api::uuid::UUID {
+                    msb: 0x0000000000017000_u64,
+                    lsb: 0x8010101010101a1a_u64,
+                    ..Default::default()
+                })
+                .into(),
+                source: Some(crate::up_core_api::uri::UUri {
+                    authority_name: "source".to_string(),
+                    ue_id: 0x0001,
+                    ue_version_major: 0x01,
+                    resource_id: 0x0001,
+                    ..Default::default()
+                })
+                .into(),
+                sink: Some(crate::up_core_api::uri::UUri {
+                    ue_id: 0x1000,
+                    ue_version_major: 0x01,
+                    resource_id: 0x0000,
+                    ..Default::default()
+                })
+                .into(),
+                priority: EnumOrUnknown::from_i32(4), // CS4
+                commstatus: Some(EnumOrUnknown::from_i32(5)), // NOT_FOUND
+                ttl: None,
+                permission_level: None,
+                token: None,
+                traceparent: None,
+                reqid: Some(crate::up_core_api::uuid::UUID {
+                    msb: 0x0000000000017000_u64,
+                    lsb: 0x8010101010101a1b_u64,
+                    ..Default::default()
+                })
+                .into(),
+                payload_format: EnumOrUnknown::from_i32(3), // JSON
+                ..Default::default()
+            };
+            let attribs_proto = mutator(valid_attribs_proto);
+            UAttributes::try_from(&attribs_proto).map(|_| ())
         }
     }
 }

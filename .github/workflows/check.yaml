@@ -161,7 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature-flags: ["--features up-core-types", "--all-features"]
+        feature-flags: ["", "--features protobuf-support,up-l2-api", "--all-features"]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -178,6 +178,7 @@ jobs:
         run: |
           RUSTC_BOOTSTRAP=1 cargo test --no-fail-fast --doc ${{ matrix.feature-flags }} -- -Z unstable-options --format junit --report-time > ${GITHUB_WORKSPACE}/target/doc-test-results.xml
       - name: Run TCK tests
+        if: matrix.feature-flags == '--all-features'
         run: |
           # the Cucumber based tests write a results file in JUnit format to "tck-[test_name]-results.xml"
           cargo test --no-fail-fast --test 'tck_*' ${{ matrix.feature-flags }} -- --junit-out-folder=${GITHUB_WORKSPACE}/target
