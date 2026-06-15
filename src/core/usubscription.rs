@@ -170,6 +170,13 @@ pub fn usubscription_uri(resource_id: u16) -> UUri {
 ///
 /// Please refer to the [uSubscription service specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l3/usubscription/v3/README.adoc)
 /// for details.
+///
+/// **Note** that in contrast to the uSubscription service specification, the functions defined in this trait only
+/// support commonly used input and output parameters of the operations defined in the specification. This is mainly
+/// due to the fact, that for many of the other parameters defined in the specification, it is not entirely clear if
+/// and how they should be used in practice. The next version of the uSubscription service specification will
+/// include a more detailed description of the operations and their parameters, which will then be reflected in the
+/// next version of this trait.
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait USubscription: Send + Sync {
@@ -178,11 +185,11 @@ pub trait USubscription: Send + Sync {
     /// # Parameters
     ///
     /// * `topic` - The topic to subscribe to.
-    /// * `expiration` - The point in time at which the subscription expires (seconds since Unix epoch).
+    /// * `expiration` - The point in time at which the subscription expires (milliseconds since Unix epoch).
     ///   If not specified, the subscription is valid until explicitly unsubscribed.
-    /// * `min_sample_period` - The minimum time between two events that should be maintained for remote
-    ///   only topics. Device dispatchers (i.e. streamers) use this attribute to reduce the publication rates of
-    ///   events sent between devices.
+    /// * `min_sample_period` - The minimum duration (in seconds) between two events that should be maintained
+    ///   for remote only topics. Device dispatchers (i.e. streamers) use this attribute to reduce the
+    ///   publication rates of events sent between devices.
     ///   This attribute is commonly used for mobile/cloud components subscribing to vehicle topics that are published
     ///   at a high rate. If the desired sampling period set by the subscriber is lower than the original publisher's
     ///   publication period, the attribute is ignored.
@@ -190,7 +197,7 @@ pub trait USubscription: Send + Sync {
     ///
     /// # Returns
     ///
-    /// * The outcome of the attempt to establish the subscription.
+    /// The outcome of the attempt to establish the subscription.
     async fn subscribe(
         &self,
         topic: &UUri,
@@ -198,7 +205,7 @@ pub trait USubscription: Send + Sync {
         min_sample_period: Option<u32>,
     ) -> Result<SubscriptionStatus, UStatus>;
 
-    /// Unsubscribes from a topic.
+    /// Unsubscribes this client from a topic.
     ///
     /// # Parameters
     ///
@@ -206,7 +213,7 @@ pub trait USubscription: Send + Sync {
     ///
     /// # Errors
     ///
-    /// returns an error if the attempt has failed.
+    /// Returns an error if the attempt to unsubscribe has failed.
     async fn unsubscribe(&self, topic: &UUri) -> Result<(), UStatus>;
 
     /// Gets all (currently) active subscriptions for a given topic.
@@ -217,7 +224,7 @@ pub trait USubscription: Send + Sync {
     ///
     /// # Errors
     ///
-    /// returns an error if the attempt to retrieve the subscriptions has failed.
+    /// Returns an error if the attempt to retrieve the subscriptions has failed.
     async fn fetch_subscriptions_by_topic(
         &self,
         topic: &UUri,
@@ -231,13 +238,13 @@ pub trait USubscription: Send + Sync {
     ///
     /// # Errors
     ///
-    /// returns an error if the attempt to retrieve the subscriptions has failed.
+    /// Returns an error if the attempt to retrieve the subscriptions has failed.
     async fn fetch_subscriptions_by_subscriber(
         &self,
         subscriber: &UUri,
     ) -> Result<Vec<SubscriptionInfo>, UStatus>;
 
-    /// Registers for notifications about changes subscription status for a given topic.
+    /// Registers this client for notifications about changes to the subscription status for a given topic.
     ///
     /// # Parameters
     ///
@@ -245,10 +252,10 @@ pub trait USubscription: Send + Sync {
     ///
     /// # Errors
     ///
-    /// returns an error if the attempt to register for notifications has failed.
+    /// Returns an error if the attempt to register for notifications has failed.
     async fn register_for_notifications(&self, topic: &UUri) -> Result<(), UStatus>;
 
-    /// Unregisters from notifications about changes subscription status for a given topic.
+    /// Unregisters this client from notifications about changes to the subscription status for a given topic.
     ///
     /// # Parameters
     ///
@@ -256,22 +263,22 @@ pub trait USubscription: Send + Sync {
     ///
     /// # Errors
     ///
-    /// returns an error if the attempt to unregister from notifications has failed.
+    /// Returns an error if the attempt to unregister from notifications has failed.
     async fn unregister_for_notifications(&self, topic: &UUri) -> Result<(), UStatus>;
 
     /// Fetches a list of subscribers that are currently subscribed to a given topic.
     ///
     /// # Parameters
     ///
-    /// * `topic` - The topic.
+    /// * `topic` - The topic to fetch subscriptions for.
     ///
     /// # Returns
     ///
-    /// a list of URIs representing the uEntities that are subscribed to the given topic.
+    /// A list of URIs representing the uEntities that are subscribed to the given topic.
     ///
     /// # Errors
     ///
-    /// returns an error if the attempt to fetch subscribers has failed.
+    /// Returns an error if the attempt to fetch subscribers has failed.
     async fn fetch_subscribers(&self, topic: &UUri) -> Result<Vec<UUri>, UStatus>;
 
     /// Flushes all stored subscription information, including any persistently stored subscriptions.
@@ -285,7 +292,7 @@ pub trait USubscription: Send + Sync {
     ///
     /// # Errors
     ///
-    /// returns an error if the attempt to reset has failed.
+    /// Returns an error if the attempt to reset has failed.
     async fn reset(
         &self,
         reason: ResetReason,
