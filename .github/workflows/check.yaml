@@ -12,13 +12,14 @@
 # *******************************************************************************/
 
 # Comprehensive combination of checks, linting, feature-checks, testing to be run on merge and on PR
-# Upload test results for potential re-use in publication workflow, returns the corresponding download URL as an output on workflow_call
+# Upload test results for potential re-use in publication workflow, returns the corresponding download
+# URL as an output on workflow_call
 
 name: Default checks
 
 on:
   push:
-    branches: 
+    branches:
       - main
   pull_request:
     paths:
@@ -39,6 +40,9 @@ concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
+permissions:
+  contents: read # needed for checking out the code
+
 env:
   RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
   RUSTFLAGS: -Dwarnings
@@ -48,31 +52,36 @@ jobs:
   deny:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-    - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
-      with: 
-        command: check
-        arguments: --all-features
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
+        with:
+          command: check
+          arguments: --all-features
 
   # [impl->req~up-language-ci-build~1]
   check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      with:
-        submodules: "recursive"
-    - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
-      with:
-        toolchain: ${{ env.RUST_TOOLCHAIN }}
-    - name: Run cargo check
-      run: |
-        cargo check --workspace --all-targets --all-features
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: "recursive"
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Run cargo check
+        run: |
+          cargo check --workspace --all-targets --all-features
 
   # [impl->req~up-language-ci-linter~1]
   fmt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -88,6 +97,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: "recursive"
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -106,6 +116,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: "recursive"
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -120,13 +131,14 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: "recursive"
+          persist-credentials: false
       - name: Restore lychee cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .lycheecache
           key: cache-lychee-${{ github.sha }}
           restore-keys: cache-lychee-
-      
+
       - name: Run lychee
         uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
         with:
@@ -139,6 +151,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: "recursive"
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -161,31 +174,53 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature-flags: ["", "--features protobuf-support,up-l2-api", "--all-features"]
+        feature-flags:
+          [
+            "",
+            "--features protobuf-support,up-l2-api",
+            "--all-features",
+          ]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: "recursive"
+          persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Run lib tests
+        env:
+          # needed to run tests on the stable toolchain, as some of the tests use unstable features
+          RUSTC_BOOTSTRAP: 1
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/target
-          RUSTC_BOOTSTRAP=1 cargo test --no-fail-fast --lib ${{ matrix.feature-flags }} -- -Z unstable-options --format junit --report-time > ${GITHUB_WORKSPACE}/target/lib-test-results.xml
+          cargo test --no-fail-fast --lib ${{ matrix.feature-flags }} -- \
+            -Z unstable-options \
+            --format junit \
+            --report-time \
+            > ${GITHUB_WORKSPACE}/target/lib-test-results.xml
       - name: Run doc tests
+        env:
+          RUSTC_BOOTSTRAP: 1
         run: |
-          RUSTC_BOOTSTRAP=1 cargo test --no-fail-fast --doc ${{ matrix.feature-flags }} -- -Z unstable-options --format junit --report-time > ${GITHUB_WORKSPACE}/target/doc-test-results.xml
+          mkdir -p ${GITHUB_WORKSPACE}/target
+          cargo test --no-fail-fast --doc ${{ matrix.feature-flags }} -- \
+            -Z unstable-options \
+            --format junit \
+            --report-time \
+              > ${GITHUB_WORKSPACE}/target/doc-test-results.xml
       - name: Run TCK tests
         if: matrix.feature-flags == '--all-features'
         run: |
           # the Cucumber based tests write a results file in JUnit format to "tck-[test_name]-results.xml"
-          cargo test --no-fail-fast --test 'tck_*' ${{ matrix.feature-flags }} -- --junit-out-folder=${GITHUB_WORKSPACE}/target
+          cargo test --no-fail-fast --test 'tck_*' ${{ matrix.feature-flags }} -- \
+          --junit-out-folder=${GITHUB_WORKSPACE}/target
 
       - name: Upload all-features test results artifact
         id: test_results
-        if: matrix.feature-flags == '--all-features'
+        # prevent execution when running the workflow locally with act
+        if: matrix.feature-flags == '--all-features' && !env.ACT
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
