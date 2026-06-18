@@ -47,6 +47,6 @@ jobs:
           | sed -E 's|([^ ]+) v([^ ]+).*|crate/cratesio/-/\1/\2|' \
           > DEPS.txt
     - name: Run Eclipse Dash Licenses tool
-      uses: eclipse-uprotocol/ci-cd/.github/actions/run-eclipse-dash@ad3f99eac0675c714f08c473412dae14d9fecaa8
+      uses: eclipse-uprotocol/ci-cd/.github/actions/run-eclipse-dash@ad3f99eac0675c714f08c473412dae14d9fecaa8 # main
       with:
         components-file: DEPS.txt
