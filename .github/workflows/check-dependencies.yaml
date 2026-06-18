@@ -26,12 +26,17 @@ concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
+permissions:
+  contents: read # needed for checking out the code
+
 jobs:
   deps:
     name: "Check 3rd party licenses"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      with:
+        persist-credentials: false
     - name: Determine 3rd party dependencies
       working-directory: ${{github.workspace}}
       run: |
@@ -42,6 +47,6 @@ jobs:
           | sed -E 's|([^ ]+) v([^ ]+).*|crate/cratesio/-/\1/\2|' \
           > DEPS.txt
     - name: Run Eclipse Dash Licenses tool
-      uses: eclipse-uprotocol/ci-cd/.github/actions/run-eclipse-dash@fcaf488b5d152c290a3a8dca2463a5c1dec65acd
+      uses: eclipse-uprotocol/ci-cd/.github/actions/run-eclipse-dash@ad3f99eac0675c714f08c473412dae14d9fecaa8
       with:
         components-file: DEPS.txt
