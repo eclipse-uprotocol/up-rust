@@ -24,21 +24,22 @@ use tokio::time::timeout;
 use tracing::{debug, info};
 
 use crate::{
+    communication::{
+        build_message, CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload,
+    },
     LocalUriProvider, UCode, UListener, UMessage, UMessageBuilder, UStatus, UTransport, UUri, UUID,
-};
-
-use super::{
-    build_message, CallOptions, RegistrationError, RpcClient, ServiceInvocationError, UPayload,
 };
 
 /// Handles an RPC Response message received from the transport layer.
 fn handle_response_message(response: UMessage) -> Result<Option<UPayload>, ServiceInvocationError> {
     match response.commstatus() {
-        Some(UCode::OK) | None => {
+        Some(UCode::Ok) | None => {
             // successful invocation
-            let payload_format = response.payload_format().unwrap_or_default();
+            let payload_format = response
+                .payload_format()
+                .unwrap_or(crate::UPayloadFormat::Unspecified);
             Ok(response
-                .payload
+                .payload()
                 .map(|payload| UPayload::new(payload, payload_format)))
         }
         Some(code) => {
@@ -136,7 +137,7 @@ impl UListener for ResponseListener {
             self.handle_response(msg);
         } else {
             debug!(
-                message_type = msg.type_unchecked().to_cloudevent_type(),
+                message_type = msg.type_().to_cloudevent_type(),
                 "ignoring non-response message received by RPC client"
             );
         }
@@ -208,7 +209,9 @@ impl<T: UTransport, P: LocalUriProvider> RpcClient for InMemoryRpcClient<T, P> {
         call_options: CallOptions,
         payload: Option<UPayload>,
     ) -> Result<Option<UPayload>, ServiceInvocationError> {
-        let message_id = call_options.message_id().unwrap_or_else(UUID::build);
+        let message_id = call_options
+            .message_id()
+            .map_or_else(UUID::build, |id| id.to_owned());
 
         let mut builder = UMessageBuilder::request(
             method.clone(),
@@ -280,16 +283,11 @@ mod tests {
     use crate::{utransport::MockTransport, StaticUriProvider, UMessageBuilder, UPriority, UUri};
 
     fn new_uri_provider() -> Arc<StaticUriProvider> {
-        Arc::new(StaticUriProvider::new("", 0x0005, 0x02))
+        Arc::new(StaticUriProvider::new("", 0x0005, 0x02).expect("failed to create URI provider"))
     }
 
     fn service_method_uri() -> UUri {
-        UUri {
-            ue_id: 0x0001,
-            ue_version_major: 0x01,
-            resource_id: 0x1000,
-            ..Default::default()
-        }
+        UUri::try_from_parts("", 0x0001, 0x01, 0x1000).expect("failed to create service method URI")
     }
 
     #[tokio::test]
@@ -302,7 +300,7 @@ mod tests {
             .once()
             .returning(|_source_filter, _sink_filter, _listener| {
                 Err(UStatus::fail_with_code(
-                    UCode::RESOURCE_EXHAUSTED,
+                    UCode::ResourceExhausted,
                     "max number of listeners exceeded",
                 ))
             });
@@ -330,7 +328,7 @@ mod tests {
             .expect_do_send()
             .returning(|_request_message| {
                 Err(UStatus::fail_with_code(
-                    UCode::UNAVAILABLE,
+                    UCode::Unavailable,
                     "transport not available",
                 ))
             });
@@ -358,7 +356,7 @@ mod tests {
             5_000,
             Some(message_id.clone()),
             Some("my_token".to_string()),
-            Some(crate::UPriority::UPRIORITY_CS6),
+            Some(crate::UPriority::CS6),
         );
 
         let (captured_listener_tx, captured_listener_rx) = tokio::sync::oneshot::channel();
@@ -371,17 +369,17 @@ mod tests {
             .expect_do_register_listener()
             .once()
             .return_once(move |_source_filter, _sink_filter, listener| {
-                captured_listener_tx
-                    .send(listener)
-                    .map_err(|_e| UStatus::fail("cannot capture listener"))
+                captured_listener_tx.send(listener).map_err(|_e| {
+                    UStatus::fail_with_code(UCode::Internal, "cannot capture listener")
+                })
             });
         let expected_message_id = message_id.clone();
         mock_transport
             .expect_do_send()
             .once()
             .withf(move |request_message| {
-                request_message.id_unchecked() == &expected_message_id
-                    && request_message.priority_unchecked() == UPriority::UPRIORITY_CS6
+                request_message.id() == &expected_message_id
+                    && request_message.priority_unchecked() == UPriority::CS6
                     && request_message.ttl_unchecked() == 5_000
                     && request_message.token() == Some(&String::from("my_token"))
             })
@@ -466,7 +464,7 @@ mod tests {
         mock_transport
             .expect_do_send()
             .once()
-            .withf(move |request_message| request_message.id_unchecked() == &expected_message_id)
+            .withf(move |request_message| request_message.id() == &expected_message_id)
             .returning(move |_request_message| {
                 first_request_sent_clone.notify_one();
                 Ok(())
@@ -534,22 +532,21 @@ mod tests {
         let mut mock_transport = MockTransport::default();
         mock_transport.expect_do_register_listener().returning(
             move |_source_filter, _sink_filter, listener| {
-                captured_listener_tx
-                    .send(listener)
-                    .map_err(|_e| UStatus::fail("cannot capture listener"))
+                captured_listener_tx.send(listener).map_err(|_e| {
+                    UStatus::fail_with_code(UCode::Internal, "cannot capture listener")
+                })
             },
         );
         // and a remote service operation that returns an error
         mock_transport
             .expect_do_send()
             .returning(move |request_message| {
-                let error = UStatus::fail_with_code(UCode::NOT_FOUND, "no such object");
-                let response_message = UMessageBuilder::response_for_request(
-                    request_message.attributes.as_ref().unwrap(),
-                )
-                .with_comm_status(UCode::NOT_FOUND)
-                .build_with_protobuf_payload(&error)
-                .unwrap();
+                let error = UStatus::fail_with_code(UCode::NotFound, "no such object");
+                let response_message =
+                    UMessageBuilder::response_for_request(request_message.attributes())
+                        .with_comm_status(UCode::NotFound)
+                        .build_with_protobuf_payload(&error)
+                        .unwrap();
                 let captured_listener = captured_listener_rx.recv().unwrap().to_owned();
                 tokio::spawn(async move { captured_listener.on_receive(response_message).await });
                 Ok(())

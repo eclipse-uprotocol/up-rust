@@ -34,7 +34,7 @@ impl UListener for ConsolePrinter {
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const ORIGIN_RESOURCE_ID: u16 = 0xb4c1;
-    let uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xa34b, 0x01));
+    let uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xa34b, 0x01)?);
     // using the LocalTransport here allows us to run the client and server in the same process
     // without any network communication, which is useful for testing purposes
     // in a real application, you would use a transport that employs the network to communicate

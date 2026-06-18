@@ -12,107 +12,15 @@
  ********************************************************************************/
 
 use async_trait::async_trait;
-use core::hash::{Hash, Hasher};
 #[cfg(test)]
 use mockall::automock;
 
-pub use crate::up_core_api::usubscription::{
-    fetch_subscriptions_request::Request, subscription_status::State, EventDeliveryConfig,
-    FetchSubscribersRequest, FetchSubscribersResponse, FetchSubscriptionsRequest,
-    FetchSubscriptionsResponse, NotificationsRequest, NotificationsResponse, ResetRequest,
-    ResetResponse, SubscribeAttributes, SubscriberInfo, Subscription, SubscriptionRequest,
-    SubscriptionResponse, SubscriptionStatus, UnsubscribeRequest, UnsubscribeResponse, Update,
-};
+use crate::{communication::SubscriptionStatus, UStatus, UUri};
 
-use crate::{UStatus, UUri};
-
-impl Hash for SubscriberInfo {
-    /// Creates a hash value based on the URI property.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use std::hash::{DefaultHasher, Hash, Hasher};
-    /// use up_rust::UUri;
-    /// use up_rust::core::usubscription::SubscriberInfo;
-    ///
-    /// let mut hasher = DefaultHasher::new();
-    /// let info = SubscriberInfo {
-    ///     uri: Some(UUri::try_from_parts("", 0x1000, 0x01, 0x9a00).unwrap()).into(),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// info.hash(&mut hasher);
-    /// let hash_one = hasher.finish();
-    ///
-    /// let mut hasher = DefaultHasher::new();
-    /// let info = SubscriberInfo {
-    ///     uri: Some(UUri::try_from_parts("", 0x1000, 0x02, 0xf100).unwrap()).into(),
-    ///     ..Default::default()
-    /// };
-    ///
-    /// info.hash(&mut hasher);
-    /// let hash_two = hasher.finish();
-    ///
-    /// assert_ne!(hash_one, hash_two);
-    /// ```
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.uri.hash(state);
-    }
-}
-
-impl Eq for SubscriberInfo {}
-
-/// Checks if a given [`SubscriberInfo`] contains any information.
-///
-/// # Returns
-///
-/// `true` if the given instance is equal to [`SubscriberInfo::default`], `false` otherwise.
-///
-/// # Examples
-///
-/// ```rust
-/// use up_rust::UUri;
-/// use up_rust::core::usubscription::SubscriberInfo;
-///
-/// let mut info = SubscriberInfo::default();
-/// assert!(info.is_empty());
-///
-/// info.uri = Some(UUri::try_from_parts("", 0x1000, 0x01, 0x9a00).unwrap()).into();
-/// assert!(!info.is_empty());
-/// ```
-impl SubscriberInfo {
-    pub fn is_empty(&self) -> bool {
-        self.eq(&SubscriberInfo::default())
-    }
-}
-
-impl SubscriptionResponse {
-    /// Checks if this `SubscriptionResponse` is in a specific state (`usubscription::State``).
-    ///
-    /// Returns `true` if SubscriptionResponse contains a valid SubscriptionStatus, which has a
-    /// state property that is equal to state passed as argument.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::core::usubscription::{SubscriptionResponse, SubscriptionStatus, State};
-    ///
-    /// let subscription_response = SubscriptionResponse {
-    ///     status: Some(SubscriptionStatus {
-    ///         state: State::SUBSCRIBED.into(),
-    ///         ..Default::default()
-    ///         }).into(),
-    ///     ..Default::default()
-    /// };
-    /// assert!(subscription_response.is_state(State::SUBSCRIBED));
-    /// ```
-    pub fn is_state(&self, state: State) -> bool {
-        self.status
-            .as_ref()
-            .is_some_and(|ss| ss.state.enum_value().is_ok_and(|s| s.eq(&state)))
-    }
-}
+#[cfg(all(feature = "up-l2-rpc-client", feature = "up-core-types"))]
+mod usubscription_client;
+#[cfg(all(feature = "up-l2-rpc-client", feature = "up-core-types"))]
+pub use usubscription_client::RpcClientUSubscription;
 
 /// The uEntity (type) identifier of the uSubscription service.
 pub const USUBSCRIPTION_TYPE_ID: u32 = 0x0000_0000;
@@ -136,6 +44,107 @@ pub const RESOURCE_ID_RESET: u16 = 0x0009;
 /// The resource identifier of uSubscription's _subscription change_ topic.
 pub const RESOURCE_ID_SUBSCRIPTION_CHANGE: u16 = 0x8000;
 
+#[derive(Clone, Debug, PartialEq)]
+#[repr(C)]
+pub struct SubscriptionInfo {
+    topic: UUri,
+    subscriber: UUri,
+    status: SubscriptionStatus,
+    expiration: Option<u64>,
+    min_sample_period: Option<u32>,
+}
+
+impl SubscriptionInfo {
+    /// Creates a new info object.
+    ///
+    /// # Arguments
+    /// * `topic` - The topic of the subscription.
+    /// * `subscriber` - The uEntity that has established the subscription.
+    /// * `status` - The status of the subscription.
+    /// * `expiration` - The point in time at which the subscription expires (milliseconds since Unix epoch).
+    ///   If not specified, the subscription is valid until explicitly unsubscribed.
+    /// * `min_sample_period` - The minimum duration (in seconds) between two events that should be maintained
+    ///   for remote only topics. Device dispatchers (i.e. streamers) use this attribute to reduce the publication
+    ///   rates of events sent between devices.
+    ///   This attribute is commonly used for mobile/cloud components subscribing to vehicle topics that are published
+    ///   at a high rate. If the desired sampling period set by the subscriber is lower than the original
+    ///   publisher's publication period, the attribute is ignored. If not specified, the sampling period is set
+    ///   by the publisher.
+    #[must_use]
+    pub fn new(
+        topic: UUri,
+        subscriber: UUri,
+        status: SubscriptionStatus,
+        expiration: Option<u64>,
+        min_sample_period: Option<u32>,
+    ) -> Self {
+        Self {
+            topic,
+            subscriber,
+            status,
+            expiration,
+            min_sample_period,
+        }
+    }
+
+    #[must_use]
+    pub fn topic(&self) -> &UUri {
+        &self.topic
+    }
+
+    #[must_use]
+    pub fn subscriber(&self) -> &UUri {
+        &self.subscriber
+    }
+
+    #[must_use]
+    pub fn status(&self) -> &SubscriptionStatus {
+        &self.status
+    }
+
+    #[must_use]
+    pub fn expiration(&self) -> &Option<u64> {
+        &self.expiration
+    }
+
+    #[must_use]
+    pub fn min_sample_period(&self) -> &Option<u32> {
+        &self.min_sample_period
+    }
+
+    /// Checks for a specific subscription status.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{communication::SubscriptionStatus, UUri};
+    /// use up_rust::core::usubscription::SubscriptionInfo;
+    ///
+    /// let subscription_info = SubscriptionInfo::new(
+    ///     UUri::try_from("/A100/1/9000").unwrap(),
+    ///     UUri::try_from("//subscriber/ABCD/1/0").unwrap(),
+    ///     SubscriptionStatus::Subscribed,
+    ///     None,
+    ///     None,
+    /// );
+    /// assert!(subscription_info.has_status(SubscriptionStatus::Subscribed));
+    /// assert!(!subscription_info.has_status(SubscriptionStatus::Unsubscribed));
+    /// ```
+    #[must_use]
+    pub fn has_status(&self, state: SubscriptionStatus) -> bool {
+        self.status == state
+    }
+}
+
+/// Potential reasons for resetting the uSubscription service.
+#[derive(Debug, PartialEq)]
+#[repr(C)]
+pub enum ResetReason {
+    Unspecified,
+    FactoryReset,
+    CorruptedData,
+}
+
 /// Gets a UUri referring to one of the local uSubscription service's resources.
 ///
 /// # Examples
@@ -144,8 +153,9 @@ pub const RESOURCE_ID_SUBSCRIPTION_CHANGE: u16 = 0x8000;
 /// use up_rust::core::usubscription;
 ///
 /// let uuri = usubscription::usubscription_uri(usubscription::RESOURCE_ID_SUBSCRIBE);
-/// assert_eq!(uuri.resource_id, 0x0001);
+/// assert_eq!(uuri.resource_id(), 0x0001);
 /// ```
+#[must_use]
 pub fn usubscription_uri(resource_id: u16) -> UUri {
     UUri::try_from_parts(
         "",
@@ -160,96 +170,133 @@ pub fn usubscription_uri(resource_id: u16) -> UUri {
 ///
 /// Please refer to the [uSubscription service specification](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l3/usubscription/v3/README.adoc)
 /// for details.
+///
+/// **Note** that in contrast to the uSubscription service specification, the functions defined in this trait only
+/// support commonly used input and output parameters of the operations defined in the specification. This is mainly
+/// due to the fact, that for many of the other parameters defined in the specification, it is not entirely clear if
+/// and how they should be used in practice. The next version of the uSubscription service specification will
+/// include a more detailed description of the operations and their parameters, which will then be reflected in the
+/// next version of this trait.
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait USubscription: Send + Sync {
-    /// Subscribes to a topic, using a [`SubscriptionRequest`]
+    /// Subscribes to a topic.
     ///
     /// # Parameters
     ///
-    /// * `subscription_request` - A request to subscribe
+    /// * `topic` - The topic to subscribe to.
+    /// * `expiration` - The point in time at which the subscription expires (milliseconds since Unix epoch).
+    ///   If not specified, the subscription is valid until explicitly unsubscribed.
+    /// * `min_sample_period` - The minimum duration (in seconds) between two events that should be maintained
+    ///   for remote only topics. Device dispatchers (i.e. streamers) use this attribute to reduce the
+    ///   publication rates of events sent between devices.
+    ///   This attribute is commonly used for mobile/cloud components subscribing to vehicle topics that are published
+    ///   at a high rate. If the desired sampling period set by the subscriber is lower than the original publisher's
+    ///   publication period, the attribute is ignored.
+    ///   If not specified, the sampling period is set by the publisher.
     ///
     /// # Returns
     ///
-    /// * [`SubscriptionResponse`] detailing if subscription was successful with other metadata
+    /// The outcome of the attempt to establish the subscription.
     async fn subscribe(
         &self,
-        subscription_request: SubscriptionRequest,
-    ) -> Result<SubscriptionResponse, UStatus>;
+        topic: &UUri,
+        expiration: Option<u64>,
+        min_sample_period: Option<u32>,
+    ) -> Result<SubscriptionStatus, UStatus>;
 
-    /// Unsubscribes from a topic, using an [`UnsubscribeRequest`]
+    /// Unsubscribes this client from a topic.
     ///
     /// # Parameters
     ///
-    /// * `unsubscribe_request` - A request to unsubscribe
+    /// * `topic` - The topic to unsubscribe from.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// * [`UStatus`] detailing if unsubscription was successful and if not why not
-    async fn unsubscribe(&self, unsubscribe_request: UnsubscribeRequest) -> Result<(), UStatus>;
+    /// Returns an error if the attempt to unsubscribe has failed.
+    async fn unsubscribe(&self, topic: &UUri) -> Result<(), UStatus>;
 
-    /// Fetches all subscriptions for a given topic or subscriber contained inside a [`FetchSubscriptionsRequest`]
+    /// Gets all (currently) active subscriptions for a given topic.
     ///
     /// # Parameters
     ///
-    /// * `fetch_subscriptions_request` - A request to fetch subscriptions given a topic or subscriber
+    /// * `topic` - The topic to fetch subscriptions for.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// * [`FetchSubscriptionsResponse`] detailing the zero or more subscriptions' info
-    async fn fetch_subscriptions(
+    /// Returns an error if the attempt to retrieve the subscriptions has failed.
+    async fn fetch_subscriptions_by_topic(
         &self,
-        fetch_subscriptions_request: FetchSubscriptionsRequest,
-    ) -> Result<FetchSubscriptionsResponse, UStatus>;
+        topic: &UUri,
+    ) -> Result<Vec<SubscriptionInfo>, UStatus>;
 
-    /// Registers for notifications relevant to a given topic inside a [`NotificationsRequest`]
-    /// changing in subscription status.
+    /// Gets a uEntity's (currently) active subscriptions.
     ///
     /// # Parameters
     ///
-    /// * `notifications_register_request` - A request to receive changes to subscription status
+    /// * `subscriber` - The uEntity to get the subscriptions for.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attempt to retrieve the subscriptions has failed.
+    async fn fetch_subscriptions_by_subscriber(
+        &self,
+        subscriber: &UUri,
+    ) -> Result<Vec<SubscriptionInfo>, UStatus>;
+
+    /// Registers this client for notifications about changes to the subscription status for a given topic.
+    ///
+    /// # Parameters
+    ///
+    /// * `topic` - The topic to receive changes to subscription status for.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attempt to register for notifications has failed.
+    async fn register_for_notifications(&self, topic: &UUri) -> Result<(), UStatus>;
+
+    /// Unregisters this client from notifications about changes to the subscription status for a given topic.
+    ///
+    /// # Parameters
+    ///
+    /// * `topic` - The topic to no longer receive changes to subscription status for.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attempt to unregister from notifications has failed.
+    async fn unregister_for_notifications(&self, topic: &UUri) -> Result<(), UStatus>;
+
+    /// Fetches a list of subscribers that are currently subscribed to a given topic.
+    ///
+    /// # Parameters
+    ///
+    /// * `topic` - The topic to fetch subscriptions for.
     ///
     /// # Returns
     ///
-    /// * [`UStatus`] detailing if notification registration was successful and if not why not
-    async fn register_for_notifications(
+    /// A list of URIs representing the uEntities that are subscribed to the given topic.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attempt to fetch subscribers has failed.
+    async fn fetch_subscribers(&self, topic: &UUri) -> Result<Vec<UUri>, UStatus>;
+
+    /// Flushes all stored subscription information, including any persistently stored subscriptions.
+    ///
+    /// # Parameters
+    ///
+    /// * `reason` - The reason for the reset.
+    /// * `message` - An optional human-readable message providing additional context about the reset.
+    /// * `before` - An optional timestamp (milliseconds since Unix epoch). All subscriptions created before
+    ///   this timestamp will be removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attempt to reset has failed.
+    async fn reset(
         &self,
-        notifications_register_request: NotificationsRequest,
+        reason: ResetReason,
+        message: Option<String>,
+        before: Option<u64>,
     ) -> Result<(), UStatus>;
-
-    /// Unregisters from notifications relevant to a given topic inside a [`NotificationsRequest`]
-    /// changing in subscription status.
-    ///
-    /// # Parameters
-    ///
-    /// * `notifications_unregister_request` - A request to no longer receive changes to subscription status
-    ///
-    /// # Returns
-    ///
-    /// * [`UStatus`] detailing if notification unregistration was successful and if not why not
-    async fn unregister_for_notifications(
-        &self,
-        notifications_unregister_request: NotificationsRequest,
-    ) -> Result<(), UStatus>;
-
-    /// Fetches a list of subscribers that are currently subscribed to a given topic in a [`FetchSubscribersRequest`]
-    ///
-    /// # Parameters
-    ///
-    /// * `fetch_subscribers_request` - Request containing topic for which we'd like all subscribers' info
-    ///
-    /// # Returns
-    ///
-    /// * [`FetchSubscriptionsResponse`] detailing subscriber info for the provided topic
-    async fn fetch_subscribers(
-        &self,
-        fetch_subscribers_request: FetchSubscribersRequest,
-    ) -> Result<FetchSubscribersResponse, UStatus>;
-
-    /// Flushes all stored subscription information, including any persistently stored subscriptions
-    ///
-    /// # Returns
-    ///
-    /// * [`ResetResponse`] with result of the operation
-    async fn reset(&self, reset_request: ResetRequest) -> Result<ResetResponse, UStatus>;
 }

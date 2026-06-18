@@ -11,6 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+/*!
+Implementation of the [uProtocol URI (UUri) data model](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/basics/uri.adoc).
+A UUri represents a uProtocol resource identifier and is used in various places across the uProtocol specification, e.g., to identify the source and destination of messages or to identify resources that are being accessed via RPC calls.
+*/
+
 // [impl->dsn~uri-data-model-naming~1]
 // [impl->req~uri-data-model-proto~1]
 
@@ -20,23 +25,29 @@ use std::sync::LazyLock;
 
 use uriparse::{Authority, URIReference};
 
-pub use crate::up_core_api::uri::UUri;
-
 pub(crate) const WILDCARD_AUTHORITY: &str = "*";
 pub(crate) const WILDCARD_ENTITY_INSTANCE: u32 = 0xFFFF_0000;
 pub(crate) const WILDCARD_ENTITY_TYPE: u32 = 0x0000_FFFF;
-pub(crate) const WILDCARD_ENTITY_VERSION: u32 = 0x0000_00FF;
-pub(crate) const WILDCARD_RESOURCE_ID: u32 = 0x0000_FFFF;
+pub(crate) const WILDCARD_ENTITY_VERSION: u8 = 0xFF;
+pub(crate) const WILDCARD_RESOURCE_ID: u16 = 0xFFFF;
 
-pub(crate) const RESOURCE_ID_RESPONSE: u32 = 0;
-pub(crate) const RESOURCE_ID_MIN_EVENT: u32 = 0x8000;
+pub(crate) const RESOURCE_ID_RESPONSE: u16 = 0x0000;
+pub(crate) const RESOURCE_ID_MIN_EVENT: u16 = 0x8000;
 
-static AUTHORITY_NAME_PATTERN: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"^[a-z0-9\-._~]{0,128}$").unwrap());
+const AUTHORITY_NAME_MAX_LENGTH: usize = 128;
+static AUTHORITY_NAME_PATTERN: LazyLock<regex::Regex> = LazyLock::new(|| {
+    let regex = format!(r"^[a-z0-9\-._~]{{0,{}}}$", AUTHORITY_NAME_MAX_LENGTH);
+    regex::Regex::new(&regex).unwrap()
+});
 
+type AuthorityNameString = String;
+
+/// An error indicating a problem with creating or parsing a UUri.
 #[derive(Debug)]
 pub enum UUriError {
+    /// Indicates that a given URI string cannot be parsed into a UUri due to invalid formatting or content.
     SerializationError(String),
+    /// Indicates that a given URI does not comply with the UUri specification.
     ValidationError(String),
 }
 
@@ -67,6 +78,22 @@ impl std::fmt::Display for UUriError {
 
 impl std::error::Error for UUriError {}
 
+/// A URI that represents a uProtocol resource identifier.
+#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+pub struct UUri {
+    authority_name: AuthorityNameString,
+    ue_id: u32,
+    ue_version_major: u8,
+    resource_id: u16,
+}
+
+impl std::fmt::Display for UUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", UUri::to_uri(self, true))
+    }
+}
+
 // [impl->req~uri-serialization~1]
 impl From<&UUri> for String {
     /// Serializes a uProtocol URI to a URI string.
@@ -85,14 +112,7 @@ impl From<&UUri> for String {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uuri = UUri {
-    ///     authority_name: String::from("vin.vehicles"),
-    ///     ue_id: 0x0000_800A,
-    ///     ue_version_major: 0x02,
-    ///     resource_id: 0x0000_1a50,
-    ///     ..Default::default()
-    /// };
-    ///
+    /// let uuri = UUri::try_from_parts("vin.vehicles", 0x0000_800A, 0x02, 0x0000_1a50).unwrap();
     /// let uri_string = String::from(&uuri);
     /// assert_eq!(uri_string, "//vin.vehicles/800A/2/1A50");
     /// ````
@@ -124,14 +144,7 @@ impl FromStr for UUri {
     /// use std::str::FromStr;
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     authority_name: "vin.vehicles".to_string(),
-    ///     ue_id: 0x000A_8000,
-    ///     ue_version_major: 0x02,
-    ///     resource_id: 0x0000_1a50,
-    ///     ..Default::default()
-    /// };
-    ///
+    /// let uri = UUri::try_from_parts("vin.vehicles", 0x000A_8000, 0x02, 0x0000_1a50).unwrap();
     /// let uri_from = UUri::from_str("//vin.vehicles/A8000/2/1A50").unwrap();
     /// assert_eq!(uri, uri_from);
     /// ````
@@ -165,9 +178,10 @@ impl FromStr for UUri {
                 "uProtocol URI must not contain fragment",
             ));
         }
-        let authority_name = parsed_uri
-            .authority()
-            .map_or(Ok(String::default()), Self::verify_parsed_authority)?;
+        let authority_name = parsed_uri.authority().map_or(
+            Ok(AuthorityNameString::default()),
+            Self::verify_parsed_authority,
+        )?;
 
         let path_segments = parsed_uri.path().segments();
         match path_segments {
@@ -200,9 +214,8 @@ impl FromStr for UUri {
                 Ok(UUri {
                     authority_name,
                     ue_id,
-                    ue_version_major: ue_version_major as u32,
-                    resource_id: resource_id as u32,
-                    ..Default::default()
+                    ue_version_major,
+                    resource_id,
                 })
             }
             _ => Err(UUriError::serialization_error(
@@ -231,14 +244,7 @@ impl TryFrom<String> for UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     authority_name: "".to_string(),
-    ///     ue_id: 0x001A_8000,
-    ///     ue_version_major: 0x02,
-    ///     resource_id: 0x0000_1a50,
-    ///     ..Default::default()
-    /// };
-    ///
+    /// let uri = UUri::try_from_parts("", 0x001A_8000, 0x02, 0x1a50).unwrap();
     /// let uri_from = UUri::try_from("/1A8000/2/1A50".to_string()).unwrap();
     /// assert_eq!(uri, uri_from);
     /// ````
@@ -266,14 +272,7 @@ impl TryFrom<&str> for UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     authority_name: "".to_string(),
-    ///     ue_id: 0x001A_8000,
-    ///     ue_version_major: 0x02,
-    ///     resource_id: 0x0000_1a50,
-    ///     ..Default::default()
-    /// };
-    ///
+    /// let uri = UUri::try_from_parts("", 0x001A_8000, 0x02, 0x1a50).unwrap();
     /// let uri_from = UUri::try_from("/1A8000/2/1A50").unwrap();
     /// assert_eq!(uri, uri_from);
     /// ````
@@ -330,20 +329,14 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uuri = UUri {
-    ///     authority_name: String::from("vin.vehicles"),
-    ///     ue_id: 0x0000_800A,
-    ///     ue_version_major: 0x02,
-    ///     resource_id: 0x0000_1a50,
-    ///     ..Default::default()
-    /// };
-    ///
+    /// let uuri = UUri::try_from_parts("vin.vehicles", 0x0000_800A, 0x02, 0x1a50).unwrap();
     /// let uri_string = uuri.to_uri(true);
     /// assert_eq!(uri_string, "up://vin.vehicles/800A/2/1A50");
     /// ````
     // [impl->dsn~uri-authority-mapping~1]
     // [impl->dsn~uri-path-mapping~2]
     // [impl->req~uri-serialization~1]
+    #[must_use]
     pub fn to_uri(&self, include_scheme: bool) -> String {
         let mut output = String::default();
         if include_scheme {
@@ -351,7 +344,7 @@ impl UUri {
         }
         if !self.authority_name.is_empty() {
             output.push_str("//");
-            output.push_str(&self.authority_name);
+            output.push_str(self.authority_name.as_str());
         }
         let uri = format!(
             "/{:X}/{:X}/{:X}",
@@ -382,29 +375,29 @@ impl UUri {
         entity_version: u8,
         resource_id: u16,
     ) -> Result<Self, UUriError> {
-        let authority_name = Self::verify_authority(authority)?;
+        let authority_name = Self::verify_authority_name(authority)?;
         Ok(UUri {
             authority_name,
             ue_id: entity_id,
-            ue_version_major: entity_version as u32,
-            resource_id: resource_id as u32,
-            ..Default::default()
+            ue_version_major: entity_version,
+            resource_id,
         })
     }
 
-    /// Gets a URI that consists of wildcards only and therefore matches any URI.
+    /// Gets a pattern URI that [matches](UUri::matches) any given candidate URI.
+    #[must_use]
     pub fn any() -> Self {
         Self::any_with_resource_id(WILDCARD_RESOURCE_ID)
     }
 
-    /// Gets a URI that consists of wildcards and the specific resource ID.
-    pub fn any_with_resource_id(resource_id: u32) -> Self {
+    /// Gets a pattern URI that [matches](UUri::matches) any given candidate URI with a specific resource ID.
+    #[must_use]
+    pub fn any_with_resource_id(resource_id: u16) -> Self {
         UUri {
-            authority_name: WILDCARD_AUTHORITY.to_string(),
+            authority_name: AuthorityNameString::from(WILDCARD_AUTHORITY),
             ue_id: WILDCARD_ENTITY_INSTANCE | WILDCARD_ENTITY_TYPE,
             ue_version_major: WILDCARD_ENTITY_VERSION,
             resource_id,
-            ..Default::default()
         }
     }
 
@@ -416,10 +409,11 @@ impl UUri {
     /// use up_rust::UUri;
     ///
     /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
-    /// assert_eq!(uri.authority_name(), *"my-vehicle");
+    /// assert_eq!(uri.authority_name(), "my-vehicle");
     /// ```
-    pub fn authority_name(&self) -> String {
-        self.authority_name.to_owned()
+    #[must_use]
+    pub fn authority_name(&self) -> &str {
+        self.authority_name.as_str()
     }
 
     // Gets the uEntity type identifier part from this uProtocol URI.
@@ -432,6 +426,7 @@ impl UUri {
     /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
     /// assert_eq!(uri.uentity_type_id(), 0x1234);
     /// ```
+    #[must_use]
     pub fn uentity_type_id(&self) -> u16 {
         (self.ue_id & WILDCARD_ENTITY_TYPE) as u16
     }
@@ -446,6 +441,7 @@ impl UUri {
     /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
     /// assert_eq!(uri.uentity_instance_id(), 0x1010);
     /// ```
+    #[must_use]
     pub fn uentity_instance_id(&self) -> u16 {
         ((self.ue_id & WILDCARD_ENTITY_INSTANCE) >> 16) as u16
     }
@@ -460,8 +456,9 @@ impl UUri {
     /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
     /// assert_eq!(uri.uentity_major_version(), 0x01);
     /// ```
+    #[must_use]
     pub fn uentity_major_version(&self) -> u8 {
-        (self.ue_version_major & WILDCARD_ENTITY_VERSION) as u8
+        self.ue_version_major
     }
 
     // Gets the resource identifier part from this uProtocol URI.
@@ -474,8 +471,19 @@ impl UUri {
     /// let uri = UUri::try_from_parts("my-vehicle", 0x10101234, 0x01, 0x9a10).unwrap();
     /// assert_eq!(uri.resource_id(), 0x9a10);
     /// ```
+    #[must_use]
     pub fn resource_id(&self) -> u16 {
-        (self.resource_id & WILDCARD_RESOURCE_ID) as u16
+        self.resource_id
+    }
+
+    #[must_use]
+    pub fn clone_with_resource_id(&self, resource_id: u16) -> Self {
+        UUri {
+            authority_name: self.authority_name.clone(),
+            ue_id: self.ue_id,
+            ue_version_major: self.ue_version_major,
+            resource_id,
+        }
     }
 
     /// Verifies that the given authority name complies with the UUri specification.
@@ -497,7 +505,13 @@ impl UUri {
     /// ```
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
-    pub fn verify_authority(authority: &str) -> Result<String, UUriError> {
+    pub fn verify_authority(authority: &str) -> Result<(), UUriError> {
+        Self::verify_authority_name(authority).map(|_| ())
+    }
+
+    // [impl->dsn~uri-authority-name-length~1]
+    // [impl->dsn~uri-host-only~2]
+    pub(crate) fn verify_authority_name(authority: &str) -> Result<AuthorityNameString, UUriError> {
         Authority::try_from(authority)
             .map_err(|e| UUriError::validation_error(format!("invalid authority: {e}")))
             .and_then(|auth| Self::verify_parsed_authority(&auth))
@@ -505,7 +519,9 @@ impl UUri {
 
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
-    pub(crate) fn verify_parsed_authority(auth: &Authority) -> Result<String, UUriError> {
+    pub(crate) fn verify_parsed_authority(
+        auth: &Authority,
+    ) -> Result<AuthorityNameString, UUriError> {
         if auth.has_port() {
             Err(UUriError::validation_error(
                 "uProtocol URI's authority must not contain port",
@@ -515,9 +531,9 @@ impl UUri {
                 "uProtocol URI's authority must not contain userinfo",
             ))
         } else {
-            match auth.host() {
+            let verified_name = match auth.host() {
                 uriparse::Host::IPv4Address(_) | uriparse::Host::IPv6Address(_) => {
-                    Ok(auth.host().to_string())
+                    auth.host().to_string()
                 }
                 uriparse::Host::RegisteredName(name) => {
                     if !WILDCARD_AUTHORITY.eq(name.as_str())
@@ -527,78 +543,11 @@ impl UUri {
                             "uProtocol URI's authority contains invalid characters",
                         ));
                     }
-                    Ok(name.to_string())
+                    name.to_string()
                 }
-            }
+            };
+            Ok(verified_name)
         }
-    }
-
-    fn verify_major_version(major_version: u32) -> Result<u8, UUriError> {
-        u8::try_from(major_version).map_err(|_e| {
-            UUriError::ValidationError(
-                "uProtocol URI's major version must be an 8 bit unsigned integer".to_string(),
-            )
-        })
-    }
-
-    fn verify_resource_id(resource_id: u32) -> Result<u16, UUriError> {
-        u16::try_from(resource_id).map_err(|_e| {
-            UUriError::ValidationError(
-                "uProtocol URI's resource ID must be a 16 bit unsigned integer".to_string(),
-            )
-        })
-    }
-
-    /// Verifies that this UUri is indeed a valid uProtocol URI.
-    ///
-    /// This check is not necessary, if any of UUri's constructors functions has been used
-    /// to create the URI. However, if the origin of a UUri is unknown, e.g. when it has
-    /// been deserialized from a protobuf, then this function can be used to check if all
-    /// properties are compliant with the uProtocol specification.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if this UUri is not a valid uProtocol URI. The returned error may
-    /// contain details regarding the cause of the validation to have failed.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UUri;
-    ///
-    /// let uuri = UUri {
-    ///   authority_name: "valid_name".into(),
-    ///   ue_id: 0x1000,
-    ///   ue_version_major: 0x01,
-    ///   resource_id: 0x8100,
-    ///   ..Default::default()
-    /// };
-    /// assert!(uuri.check_validity().is_ok());
-    /// ```
-    pub fn check_validity(&self) -> Result<(), UUriError> {
-        Self::verify_authority(self.authority_name.as_str())?;
-        Self::verify_major_version(self.ue_version_major)?;
-        Self::verify_resource_id(self.resource_id)?;
-        Ok(())
-    }
-
-    /// Checks if this URI is empty.
-    ///
-    /// # Returns
-    ///
-    /// 'true' if this URI is equal to `UUri::default()`, `false` otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UUri;
-    ///
-    /// let uuri = UUri::try_from_parts("myvin", 0xa13b, 0x01, 0x7f4e).unwrap();
-    /// assert!(!uuri.is_empty());
-    /// assert!(UUri::default().is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.eq(&UUri::default())
     }
 
     /// Check if an `UUri` is remote, by comparing authority fields.
@@ -626,8 +575,9 @@ impl UUri {
     /// assert!(!authority_a.is_remote(&authority_wildcard));
     /// assert!(!authority_wildcard.is_remote(&authority_wildcard));
     /// ````
+    #[must_use]
     pub fn is_remote(&self, other_uri: &UUri) -> bool {
-        self.is_remote_authority(&other_uri.authority_name)
+        self.is_remote_authority(other_uri.authority_name.as_str())
     }
 
     /// Check if an authority is remote compared to the authority field of the UUri.
@@ -644,21 +594,22 @@ impl UUri {
     /// use up_rust::UUri;
     ///
     /// let authority_a = UUri::from_str("up://authority.a/100A/1/0").unwrap();
-    /// let authority_b = "authority.b".to_string();
+    /// let authority_b = "authority.b";
     /// assert!(authority_a.is_remote_authority(&authority_b));
     ///
-    /// let authority_local = "".to_string();
+    /// let authority_local = "";
     /// assert!(!authority_a.is_remote_authority(&authority_local));
     ///
-    /// let authority_wildcard = "*".to_string();
+    /// let authority_wildcard = "*";
     /// assert!(!authority_a.is_remote_authority(&authority_wildcard));
     /// ```
-    pub fn is_remote_authority(&self, authority: &String) -> bool {
+    #[must_use]
+    pub fn is_remote_authority(&self, authority: &str) -> bool {
         !authority.is_empty()
             && !self.authority_name.is_empty()
             && !self.has_wildcard_authority()
             && authority != WILDCARD_AUTHORITY
-            && self.authority_name != *authority
+            && self.authority_name.as_str() != authority
     }
 
     /// Checks if this UUri has an empty authority name.
@@ -671,6 +622,7 @@ impl UUri {
     /// let uuri = UUri::try_from_parts("", 0x9b3a, 0x01, 0x145b).unwrap();
     /// assert!(uuri.has_empty_authority());
     /// ```
+    #[must_use]
     pub fn has_empty_authority(&self) -> bool {
         self.authority_name.is_empty()
     }
@@ -685,6 +637,7 @@ impl UUri {
     /// let uuri = UUri::try_from_parts("*", 0x9b3a, 0x01, 0x145b).unwrap();
     /// assert!(uuri.has_wildcard_authority());
     /// ```
+    #[must_use]
     pub fn has_wildcard_authority(&self) -> bool {
         self.authority_name == WILDCARD_AUTHORITY
     }
@@ -699,6 +652,7 @@ impl UUri {
     /// let uuri = UUri::try_from_parts("vin", 0xFFFF_0123, 0x01, 0x145b).unwrap();
     /// assert!(uuri.has_wildcard_entity_instance());
     /// ```
+    #[must_use]
     pub fn has_wildcard_entity_instance(&self) -> bool {
         self.ue_id & WILDCARD_ENTITY_INSTANCE == WILDCARD_ENTITY_INSTANCE
     }
@@ -713,6 +667,7 @@ impl UUri {
     /// let uuri = UUri::try_from_parts("vin", 0x00C0_FFFF, 0x01, 0x145b).unwrap();
     /// assert!(uuri.has_wildcard_entity_type());
     /// ```
+    #[must_use]
     pub fn has_wildcard_entity_type(&self) -> bool {
         self.ue_id & WILDCARD_ENTITY_TYPE == WILDCARD_ENTITY_TYPE
     }
@@ -727,6 +682,7 @@ impl UUri {
     /// let uuri = UUri::try_from_parts("vin", 0x9b3a, 0xFF, 0x145b).unwrap();
     /// assert!(uuri.has_wildcard_version());
     /// ```
+    #[must_use]
     pub fn has_wildcard_version(&self) -> bool {
         self.ue_version_major == WILDCARD_ENTITY_VERSION
     }
@@ -741,6 +697,7 @@ impl UUri {
     /// let uuri = UUri::try_from_parts("vin", 0x9b3a, 0x01, 0xFFFF).unwrap();
     /// assert!(uuri.has_wildcard_resource_id());
     /// ```
+    #[must_use]
     pub fn has_wildcard_resource_id(&self) -> bool {
         self.resource_id == WILDCARD_RESOURCE_ID
     }
@@ -756,13 +713,7 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     authority_name: String::from("VIN.vehicles"),
-    ///     ue_id: 0x0000_2310,
-    ///     ue_version_major: 0x03,
-    ///     resource_id: 0xa000,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("vin.vehicles", 0x0000_2310, 0x03, 0xa000).unwrap();
     /// assert!(uri.verify_no_wildcards().is_ok());
     /// ```
     pub fn verify_no_wildcards(&self) -> Result<(), UUriError> {
@@ -799,12 +750,10 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0x7FFF,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x7FFF).unwrap();
     /// assert!(uri.is_rpc_method());
     /// ```
+    #[must_use]
     pub fn is_rpc_method(&self) -> bool {
         self.resource_id > RESOURCE_ID_RESPONSE && self.resource_id < RESOURCE_ID_MIN_EVENT
     }
@@ -821,16 +770,10 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0x8000,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x8000).unwrap();
     /// assert!(uri.verify_rpc_method().is_err());
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0x0,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x0000).unwrap();
     /// assert!(uri.verify_rpc_method().is_err());
     /// ```
     pub fn verify_rpc_method(&self) -> Result<(), UUriError> {
@@ -851,12 +794,10 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x0000).unwrap();
     /// assert!(uri.is_notification_destination());
     /// ```
+    #[must_use]
     pub fn is_notification_destination(&self) -> bool {
         self.resource_id == RESOURCE_ID_RESPONSE
     }
@@ -870,12 +811,10 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x0000).unwrap();
     /// assert!(uri.is_rpc_response());
     /// ```
+    #[must_use]
     pub fn is_rpc_response(&self) -> bool {
         self.resource_id == RESOURCE_ID_RESPONSE
     }
@@ -892,10 +831,7 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0x4001,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x4001).unwrap();
     /// assert!(uri.verify_rpc_response().is_err());
     /// ```
     pub fn verify_rpc_response(&self) -> Result<(), UUriError> {
@@ -917,12 +853,10 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0x8000,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x8000).unwrap();
     /// assert!(uri.is_event());
     /// ```
+    #[must_use]
     pub fn is_event(&self) -> bool {
         self.resource_id >= RESOURCE_ID_MIN_EVENT
     }
@@ -939,10 +873,7 @@ impl UUri {
     /// ```rust
     /// use up_rust::UUri;
     ///
-    /// let uri = UUri {
-    ///     resource_id: 0x7FFF,
-    ///     ..Default::default()
-    /// };
+    /// let uri = UUri::try_from_parts("", 0xabcd, 0x01, 0x7FFF).unwrap();
     /// assert!(uri.verify_event().is_err());
     /// ```
     pub fn verify_event(&self) -> Result<(), UUriError> {
@@ -999,10 +930,90 @@ impl UUri {
     /// assert!(pattern.matches(&candidate));
     /// ```
     // [impl->dsn~uri-pattern-matching~2]
+    #[must_use]
     pub fn matches(&self, candidate: &UUri) -> bool {
         self.matches_authority(candidate)
             && self.matches_entity(candidate)
             && self.matches_resource(candidate)
+    }
+}
+
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use super::*;
+    use crate::up_core_api::uri::UUri as UUriProto;
+    use crate::ProtobufMappable;
+    use protobuf::{well_known_types::any::Any, Message};
+
+    impl TryFrom<&UUriProto> for UUri {
+        type Error = crate::UUriError;
+
+        fn try_from(uuri_proto: &UUriProto) -> Result<Self, Self::Error> {
+            let version = u8::try_from(uuri_proto.ue_version_major).map_err(|_e| {
+                UUriError::validation_error(
+                    "uProtocol URI's major version must be an 8 bit unsigned integer".to_string(),
+                )
+            })?;
+            let resource_id = u16::try_from(uuri_proto.resource_id).map_err(|_e| {
+                UUriError::validation_error(
+                    "uProtocol URI's resource ID must be a 16 bit unsigned integer".to_string(),
+                )
+            })?;
+            UUri::try_from_parts(
+                &uuri_proto.authority_name,
+                uuri_proto.ue_id,
+                version,
+                resource_id,
+            )
+        }
+    }
+
+    impl From<&UUri> for UUriProto {
+        fn from(uuri: &UUri) -> Self {
+            UUriProto {
+                authority_name: uuri.authority_name.as_str().to_string(),
+                ue_id: uuri.ue_id,
+                ue_version_major: uuri.ue_version_major as u32,
+                resource_id: uuri.resource_id as u32,
+                ..Default::default()
+            }
+        }
+    }
+
+    impl ProtobufMappable for UUri {
+        fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+            let uuri_proto = UUriProto::parse_from_bytes(proto).map_err(|e| {
+                crate::SerializationError::new(format!("Protobuf decode error: {e}"))
+            })?;
+            UUri::try_from(&uuri_proto)
+                .map_err(|e| crate::SerializationError::new(format!("UUri conversion error: {e}")))
+        }
+        fn parse_from_packed_protobuf_bytes(
+            proto: &[u8],
+        ) -> Result<Self, crate::SerializationError> {
+            Any::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+                .and_then(|any| match any.unpack::<UUriProto>() {
+                    Ok(Some(uuri_proto)) => UUri::try_from(&uuri_proto)
+                        .map_err(|e| crate::SerializationError::new(e.to_string())),
+                    Ok(None) => Err(crate::SerializationError::new(
+                        "Protobuf Any does not contain UUriProto".to_string(),
+                    )),
+                    Err(e) => Err(crate::SerializationError::new(format!(
+                        "Protobuf Any unpack error: {e}"
+                    ))),
+                })
+        }
+        fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            UUriProto::from(self)
+                .write_to_bytes()
+                .map_err(|e| crate::SerializationError::new(format!("Protobuf encode error: {e}")))
+        }
+        fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            Any::pack(&UUriProto::from(self))
+                .map_err(|e| crate::SerializationError::new(format!("Failed to pack UUri: {e}")))
+                .and_then(|any| any.write_to_protobuf_bytes())
+        }
     }
 }
 
@@ -1016,7 +1027,6 @@ mod tests {
             ue_id: 0x0000_8000,
             ue_version_major: 0x01,
             resource_id: 0x0002,
-            ..Default::default()
         },
         "//vin/8000/1/2" => true;
         "succeeds for full URI with authority")]
@@ -1025,7 +1035,6 @@ mod tests {
             ue_id: 0x0000_8000,
             ue_version_major: 0x01,
             resource_id: 0x0002,
-            ..Default::default()
         },
         "up:/8000/1/2" => true;
         "succeeds for URI without authority")]
@@ -1034,7 +1043,6 @@ mod tests {
             ue_id: 0x0000_8000,
             ue_version_major: 0x01,
             resource_id: 0x0002,
-            ..Default::default()
         },
         "//other-vin/8000/1/2" => false;
         "fails for different authority")]
@@ -1043,7 +1051,6 @@ mod tests {
             ue_id: 0x0000_8000,
             ue_version_major: 0x01,
             resource_id: 0x0002,
-            ..Default::default()
         },
         "up://vin/18000/1/2" => false;
         "fails for different entity ID")]
@@ -1052,7 +1059,6 @@ mod tests {
             ue_id: 0x0000_8000,
             ue_version_major: 0x01,
             resource_id: 0x0002,
-            ..Default::default()
         },
         "//vin/8000/2/2" => false;
         "fails for different version")]
@@ -1061,53 +1067,12 @@ mod tests {
             ue_id: 0x0000_8000,
             ue_version_major: 0x01,
             resource_id: 0x0002,
-            ..Default::default()
         },
         "up://vin/8000/1/5" => false;
         "fails for different resource ID")]
     #[allow(clippy::cmp_owned)]
     fn test_eq_with_str(uuri: UUri, uri_str: &str) -> bool {
         uuri == uri_str && uuri == *uri_str && uuri == String::from(uri_str)
-    }
-
-    // [utest->dsn~uri-authority-name-length~1]
-    // [utest->dsn~uri-host-only~2]
-    #[test_case(UUri {
-            authority_name: "invalid:5671".into(),
-            ue_id: 0x0000_8000,
-            ue_version_major: 0x01,
-            resource_id: 0x0002,
-            ..Default::default()
-        };
-        "for authority including port")]
-    #[test_case(UUri {
-            authority_name: ['a'; 129].iter().collect::<String>(),
-            ue_id: 0x0000_8000,
-            ue_version_major: 0x01,
-            resource_id: 0x0002,
-            ..Default::default()
-        };
-        "for authority exceeding max length")]
-    // additional test cases covering all sorts of invalid authority are
-    // included in [`test_from_string_fails`]
-    #[test_case(UUri {
-            authority_name: "valid".into(),
-            ue_id: 0x0000_8000,
-            ue_version_major: 0x0101,
-            resource_id: 0x0002,
-            ..Default::default()
-        };
-        "for invalid major version")]
-    #[test_case(UUri {
-            authority_name: "valid".into(),
-            ue_id: 0x0000_8000,
-            ue_version_major: 0x01,
-            resource_id: 0x10002,
-            ..Default::default()
-        };
-        "for invalid resource ID")]
-    fn test_check_validity_fails(uuri: UUri) {
-        assert!(uuri.check_validity().is_err());
     }
 
     #[test_case("//*/A100/1/1"; "for any authority")]

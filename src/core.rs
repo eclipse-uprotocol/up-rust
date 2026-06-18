@@ -10,12 +10,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
+/*!
+Default client implementations for interacting with [uProtocol's Core entities](https://github.com/eclipse-uprotocol/up-spec/tree/v1.6.0-alpha.7/up-l3#2-core-uprotocol-uentities).
+*/
 
-#[cfg(feature = "usubscription")]
-pub mod usubscription;
-
-// Types not used by up_rust, but re-exported to up_rust users, keeping them in their respective submodules
 #[cfg(feature = "udiscovery")]
 pub mod udiscovery;
-#[cfg(feature = "utwin")]
-pub mod utwin;
+#[cfg(feature = "usubscription")]
+pub mod usubscription;

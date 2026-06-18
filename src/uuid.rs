@@ -11,13 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use bytes::{Buf, Bytes};
-use rand::RngCore;
 use std::time::{Duration, SystemTime};
 use std::{hash::Hash, str::FromStr};
 
-pub use crate::up_core_api::uuid::UUID;
-
+use bytes::{Buf, Bytes};
+use rand::RngCore;
 use uuid_simd::{AsciiCase, Out};
 
 const BITMASK_VERSION: u64 = 0b1111 << 12;
@@ -48,11 +46,24 @@ impl UuidConversionError {
 
 impl std::fmt::Display for UuidConversionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error converting Uuid: {}", self.message)
+        write!(f, "Error converting UUID: {}", self.message)
     }
 }
 
 impl std::error::Error for UuidConversionError {}
+
+#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+pub struct UUID {
+    msb: u64,
+    lsb: u64,
+}
+
+impl std::fmt::Display for UUID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hyphenated_string())
+    }
+}
 
 impl UUID {
     /// Creates a new UUID from a byte array.
@@ -68,7 +79,7 @@ impl UUID {
     /// # Errors
     ///
     /// Returns an error if the given bytes contain an invalid version and/or variant identifier.
-    pub(crate) fn from_bytes(bytes: &[u8; 16]) -> Result<Self, UuidConversionError> {
+    pub fn from_bytes(bytes: &[u8; 16]) -> Result<Self, UuidConversionError> {
         let mut msb = [0_u8; 8];
         let mut lsb = [0_u8; 8];
         msb.copy_from_slice(&bytes[..8]);
@@ -78,7 +89,8 @@ impl UUID {
 
     /// Creates a new UUID from a high/low value pair.
     ///
-    /// NOTE: This function does *not* check if the given bytes represent a [valid uProtocol UUID](Self::is_uprotocol_uuid).
+    /// NOTE: This function does *not* check if the given bytes represent a
+    ///       [valid uProtocol UUID](Self::is_uprotocol_uuid).
     ///       It should therefore only be used in cases where the bytes passed in are known to be valid.
     ///
     /// # Arguments
@@ -93,7 +105,6 @@ impl UUID {
         UUID {
             msb: u64::from_be_bytes(msb),
             lsb: u64::from_be_bytes(lsb),
-            ..Default::default()
         }
     }
 
@@ -112,18 +123,14 @@ impl UUID {
     ///
     /// Returns an error if the given bytes contain an invalid version and/or variant identifier.
     // [impl->dsn~uuid-spec~1]
-    pub(crate) fn from_u64_pair(msb: u64, lsb: u64) -> Result<Self, UuidConversionError> {
+    pub fn from_u64_pair(msb: u64, lsb: u64) -> Result<Self, UuidConversionError> {
         if !is_correct_version(msb) {
             return Err(UuidConversionError::new("not a v7 UUID"));
         }
         if !is_correct_variant(lsb) {
             return Err(UuidConversionError::new("not an RFC4122 UUID"));
         }
-        Ok(UUID {
-            msb,
-            lsb,
-            ..Default::default()
-        })
+        Ok(UUID { msb, lsb })
     }
 
     // [impl->dsn~uuid-spec~1]
@@ -159,13 +166,18 @@ impl UUID {
     /// # Examples
     ///
     /// ```
+    /// use std::time::SystemTime;
     /// use up_rust::UUID;
     ///
     /// let uuid = UUID::build();
-    /// assert!(uuid.is_uprotocol_uuid());
+    /// assert!(uuid.get_time() <= SystemTime::now()
+    ///     .duration_since(SystemTime::UNIX_EPOCH)
+    ///     .expect("current system time is set to a point in time before UNIX Epoch")
+    ///     .as_millis() as u64);
     /// ```
     // [impl->dsn~uuid-spec~1]
     // [utest->dsn~uuid-spec~1]
+    #[must_use]
     pub fn build() -> UUID {
         let duration_since_unix_epoch = SystemTime::UNIX_EPOCH
             .elapsed()
@@ -186,10 +198,11 @@ impl UUID {
     /// let msb = 0x0000000000017000_u64;
     /// // variant = 0b10, random = 0x0010101010101a1a
     /// let lsb = 0x8010101010101a1a_u64;
-    /// let uuid = UUID { msb, lsb, ..Default::default() };
+    /// let uuid = UUID::from_u64_pair(msb, lsb).unwrap();
     /// assert_eq!(uuid.to_hyphenated_string(), "00000000-0001-7000-8010-101010101a1a");
     /// ```
     // [impl->req~uuid-hex-and-dash~1]
+    #[must_use]
     pub fn to_hyphenated_string(&self) -> String {
         let mut bytes = [0_u8; 16];
         bytes[..8].clone_from_slice(self.msb.to_be_bytes().as_slice());
@@ -204,8 +217,7 @@ impl UUID {
     ///
     /// # Returns
     ///
-    /// The number of milliseconds since UNIX EPOCH if this UUID is a uProtocol UUID,
-    /// or [`Option::None`] otherwise.
+    /// The number of milliseconds since UNIX EPOCH.
     ///
     /// # Examples
     ///
@@ -217,61 +229,87 @@ impl UUID {
     /// let msb = 0x018D548EA8E07000u64;
     /// // variant = 0b10
     /// let lsb = 0x8000000000000000u64;
-    /// let creation_time = UUID { msb, lsb, ..Default::default() }.get_time();
-    /// assert_eq!(creation_time.unwrap(), 0x018D548EA8E0_u64);
-    ///
-    /// // timestamp = 1, (invalid) ver = 0b1100
-    /// let msb = 0x000000000001C000u64;
-    /// // variant = 0b10
-    /// let lsb = 0x8000000000000000u64;
-    /// let creation_time = UUID { msb, lsb, ..Default::default() }.get_time();
-    /// assert!(creation_time.is_none());
+    /// let creation_time = UUID::from_u64_pair(msb, lsb).unwrap().get_time();
+    /// assert_eq!(creation_time, 0x018D548EA8E0_u64);
     /// ```
     // [impl->dsn~uuid-spec~1]
     // [utest->dsn~uuid-spec~1]
-    pub fn get_time(&self) -> Option<u64> {
-        if self.is_uprotocol_uuid() {
-            // the timestamp is contained in the 48 most significant bits
-            Some(self.msb >> 16)
-        } else {
-            None
+    #[must_use]
+    pub fn get_time(&self) -> u64 {
+        // the timestamp is contained in the 48 most significant bits
+        self.msb >> 16
+    }
+}
+
+#[cfg(feature = "up-core-types")]
+mod core_types_support {
+    use super::*;
+    use crate::up_core_api::uuid::UUID as UUIDProto;
+    use crate::ProtobufMappable;
+    use protobuf::{well_known_types::any::Any, Message};
+
+    impl TryFrom<&UUIDProto> for UUID {
+        type Error = UuidConversionError;
+
+        fn try_from(value: &UUIDProto) -> Result<Self, Self::Error> {
+            UUID::from_u64_pair(value.msb, value.lsb)
         }
     }
 
-    /// Checks if this is a valid uProtocol UUID.
-    ///
-    /// # Returns
-    ///
-    /// `true` if this UUID meets the formal requirements defined by the
-    /// [uProtocol spec](https://github.com/eclipse-uprotocol/up-spec).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use up_rust::UUID;
-    ///
-    /// // timestamp = 1, ver = 0b0111
-    /// let msb = 0x0000000000017000u64;
-    /// // variant = 0b10
-    /// let lsb = 0x8000000000000000u64;
-    /// assert!(UUID { msb, lsb, ..Default::default() }.is_uprotocol_uuid());
-    ///
-    /// // timestamp = 1, (invalid) ver = 0b1100
-    /// let msb = 0x000000000001C000u64;
-    /// // variant = 0b10
-    /// let lsb = 0x8000000000000000u64;
-    /// assert!(!UUID { msb, lsb, ..Default::default() }.is_uprotocol_uuid());
-    ///
-    /// // timestamp = 1, ver = 0b0111
-    /// let msb = 0x0000000000017000u64;
-    /// // (invalid) variant = 0b01
-    /// let lsb = 0x4000000000000000u64;
-    /// assert!(!UUID { msb, lsb, ..Default::default() }.is_uprotocol_uuid());
-    /// ```
-    // [impl->dsn~uuid-spec~1]
-    // [utest->dsn~uuid-spec~1]
-    pub fn is_uprotocol_uuid(&self) -> bool {
-        is_correct_version(self.msb) && is_correct_variant(self.lsb)
+    impl TryFrom<UUIDProto> for UUID {
+        type Error = UuidConversionError;
+
+        fn try_from(value: UUIDProto) -> Result<Self, Self::Error> {
+            Self::try_from(&value)
+        }
+    }
+
+    impl From<&UUID> for UUIDProto {
+        fn from(value: &UUID) -> Self {
+            UUIDProto {
+                msb: value.msb,
+                lsb: value.lsb,
+                ..Default::default()
+            }
+        }
+    }
+
+    impl ProtobufMappable for UUID {
+        fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+            let uuid_proto = UUIDProto::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))?;
+            UUID::try_from(uuid_proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+        }
+
+        fn parse_from_packed_protobuf_bytes(
+            proto: &[u8],
+        ) -> Result<Self, crate::SerializationError> {
+            Any::parse_from_bytes(proto)
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+                .and_then(|any| match any.unpack::<UUIDProto>() {
+                    Ok(Some(v)) => UUID::try_from(v)
+                        .map_err(|err| crate::SerializationError::new(err.to_string())),
+                    Ok(None) => Err(crate::SerializationError::new(
+                        "cannot unpack UUID, type mismatch",
+                    )),
+                    Err(e) => Err(crate::SerializationError::from(e)),
+                })
+        }
+
+        fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            UUIDProto::from(self)
+                .write_to_bytes()
+                .map_err(|err| crate::SerializationError::new(err.to_string()))
+        }
+
+        fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+            Any::pack(&UUIDProto::from(self))
+                .map_err(|err| {
+                    crate::SerializationError::new(format!("Failed to pack UUID: {err}"))
+                })
+                .and_then(|any| any.write_to_protobuf_bytes())
+        }
     }
 }
 
@@ -316,8 +354,7 @@ impl TryFrom<Vec<u8>> for UUID {
     /// let conversion_attempt = UUID::try_from(bytes);
     /// assert!(conversion_attempt.is_ok());
     /// let uuid = conversion_attempt.unwrap();
-    /// assert!(uuid.is_uprotocol_uuid());
-    /// assert_eq!(uuid.get_time(), Some(0x1_u64));
+    /// assert_eq!(uuid.get_time(), 0x1_u64);
     /// ```
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         let mut buf: Bytes = value.into();
@@ -352,7 +389,7 @@ impl From<&UUID> for Vec<u8> {
     /// let msb = 0x0000000000017000_u64;
     /// // variant = 0b10, random = 0x0010101010101a1a
     /// let lsb = 0x8010101010101a1a_u64;
-    /// let uuid = UUID { msb, lsb, ..Default::default() };
+    /// let uuid = UUID::from_u64_pair(msb, lsb).unwrap();
     /// let bytes: Vec<u8> = uuid.into();
     /// assert_eq!(bytes, vec![
     ///     0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x70, 0x00,
@@ -403,10 +440,6 @@ impl FromStr for UUID {
     /// // parsing a valid uProtocol UUID succeeds
     /// let parsing_attempt = "00000000-0001-7000-8010-101010101a1A".parse::<UUID>();
     /// assert!(parsing_attempt.is_ok());
-    /// let uuid = parsing_attempt.unwrap();
-    /// assert!(uuid.is_uprotocol_uuid());
-    /// assert_eq!(uuid.msb, 0x0000000000017000_u64);
-    /// assert_eq!(uuid.lsb, 0x8010101010101a1a_u64);
     ///
     /// // parsing an invalid UUID fails
     /// assert!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
@@ -442,10 +475,7 @@ mod tests {
         let lsb = 0x8000000000000000_u64;
         let conversion_attempt = UUID::from_u64_pair(msb, lsb);
         assert!(conversion_attempt.is_ok_and(|uuid| {
-            uuid.is_uprotocol_uuid()
-                && uuid.get_time() == Some(0x1_u64)
-                && uuid.msb == msb
-                && uuid.lsb == lsb
+            uuid.get_time() == 0x1_u64 && uuid.msb == msb && uuid.lsb == lsb
         }));
 
         // timestamp = 1, (invalid) ver = 0b0000
@@ -472,8 +502,7 @@ mod tests {
         let conversion_attempt = UUID::from_bytes(&bytes);
         assert!(conversion_attempt.is_ok());
         let uuid = conversion_attempt.unwrap();
-        assert!(uuid.is_uprotocol_uuid());
-        assert_eq!(uuid.get_time(), Some(0x1_u64));
+        assert_eq!(uuid.get_time(), 0x1_u64);
     }
 
     #[test]
@@ -490,11 +519,7 @@ mod tests {
         let msb = 0x0000000000017000_u64;
         // variant = 0b10, random = 0x0010101010101a1a
         let lsb = 0x8010101010101a1a_u64;
-        let uuid = UUID {
-            msb,
-            lsb,
-            ..Default::default()
-        };
+        let uuid = UUID { msb, lsb };
 
         assert_eq!(String::from(&uuid), "00000000-0001-7000-8010-101010101a1a");
         assert_eq!(String::from(uuid), "00000000-0001-7000-8010-101010101a1a");

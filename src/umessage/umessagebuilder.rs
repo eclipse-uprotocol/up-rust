@@ -12,9 +12,10 @@
  ********************************************************************************/
 
 use bytes::Bytes;
-use protobuf::{well_known_types::any::Any, Enum, EnumOrUnknown, Message, MessageFull};
 
 use crate::uattributes::NotificationValidator;
+#[cfg(feature = "protobuf-support")]
+use crate::ProtobufMappable;
 use crate::{
     PublishValidator, RequestValidator, ResponseValidator, UAttributes, UAttributesValidator,
     UCode, UMessage, UMessageError, UMessageType, UPayloadFormat, UPriority, UUri, UUID,
@@ -25,41 +26,20 @@ use crate::{
 /// Messages are being used by a uEntity to inform other entities about the occurrence of events
 /// and/or to invoke service operations provided by other entities.
 pub struct UMessageBuilder {
-    comm_status: Option<EnumOrUnknown<UCode>>,
+    comm_status: Option<UCode>,
     message_id: Option<UUID>,
     message_type: UMessageType,
     payload: Option<Bytes>,
     payload_format: UPayloadFormat,
     permission_level: Option<u32>,
-    priority: UPriority,
+    priority: Option<UPriority>,
     request_id: Option<UUID>,
     sink: Option<UUri>,
-    source: Option<UUri>,
+    source: UUri,
     token: Option<String>,
     traceparent: Option<String>,
     ttl: Option<u32>,
     validator: Box<dyn UAttributesValidator>,
-}
-
-impl Default for UMessageBuilder {
-    fn default() -> Self {
-        UMessageBuilder {
-            comm_status: None,
-            message_id: None,
-            message_type: UMessageType::UMESSAGE_TYPE_UNSPECIFIED,
-            payload: None,
-            payload_format: UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED,
-            permission_level: None,
-            priority: UPriority::UPRIORITY_UNSPECIFIED,
-            request_id: None,
-            sink: None,
-            source: None,
-            token: None,
-            traceparent: None,
-            ttl: None,
-            validator: Box::new(PublishValidator),
-        }
-    }
 }
 
 impl UMessageBuilder {
@@ -80,20 +60,31 @@ impl UMessageBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic.clone())
-    ///                    .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.type_unchecked(), UMessageType::UMESSAGE_TYPE_PUBLISH);
-    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS1);
-    /// assert_eq!(message.source_unchecked(), &topic);
+    ///                    .build_with_payload("closed", UPayloadFormat::Text)?;
+    /// assert_eq!(message.type_(), UMessageType::Publish);
+    /// assert!(message.priority().is_none());
+    /// assert_eq!(message.source(), &topic);
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn publish(topic: UUri) -> UMessageBuilder {
         UMessageBuilder {
-            validator: Box::new(PublishValidator),
+            comm_status: None,
+            message_id: None,
             // [impl->dsn~up-attributes-publish-type~1]
-            message_type: UMessageType::UMESSAGE_TYPE_PUBLISH,
-            source: Some(topic),
-            ..Default::default()
+            message_type: UMessageType::Publish,
+            payload: None,
+            payload_format: UPayloadFormat::Unspecified,
+            permission_level: None,
+            priority: None,
+            request_id: None,
+            sink: None,
+            source: topic,
+            token: None,
+            traceparent: None,
+            ttl: None,
+            validator: Box::new(PublishValidator),
         }
     }
 
@@ -115,22 +106,32 @@ impl UMessageBuilder {
     /// let origin = UUri::try_from("//my-vehicle/4210/5/F20B")?;
     /// let destination = UUri::try_from("//my-cloud/CCDD/2/0")?;
     /// let message = UMessageBuilder::notification(origin.clone(), destination.clone())
-    ///                    .build_with_payload("unexpected movement", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.type_unchecked(), UMessageType::UMESSAGE_TYPE_NOTIFICATION);
-    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS1);
-    /// assert_eq!(message.source_unchecked(), &origin);
+    ///                    .build_with_payload("unexpected movement", UPayloadFormat::Text)?;
+    /// assert_eq!(message.type_(), UMessageType::Notification);
+    /// assert!(message.priority().is_none());
+    /// assert_eq!(message.source(), &origin);
     /// assert_eq!(message.sink_unchecked(), &destination);
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn notification(origin: UUri, destination: UUri) -> UMessageBuilder {
         UMessageBuilder {
-            validator: Box::new(NotificationValidator),
+            comm_status: None,
+            message_id: None,
             // [impl->dsn~up-attributes-notification-type~1]
-            message_type: UMessageType::UMESSAGE_TYPE_NOTIFICATION,
-            source: Some(origin),
+            message_type: UMessageType::Notification,
+            payload: None,
+            payload_format: UPayloadFormat::Unspecified,
+            permission_level: None,
+            priority: None,
+            request_id: None,
             sink: Some(destination),
-            ..Default::default()
+            source: origin,
+            token: None,
+            traceparent: None,
+            ttl: None,
+            validator: Box::new(NotificationValidator),
         }
     }
 
@@ -139,7 +140,7 @@ impl UMessageBuilder {
     /// A request message is used to invoke a service's method with some input data, expecting
     /// the service to reply with a response message which is correlated by means of the `request_id`.
     ///
-    /// The builder will be initialized with [`UPriority::UPRIORITY_CS4`].
+    /// The builder will be initialized with [`UPriority::CS4`].
     ///
     /// # Arguments
     ///
@@ -157,25 +158,33 @@ impl UMessageBuilder {
     /// let method_to_invoke = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
     /// let message = UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
-    ///                    .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.type_unchecked(), UMessageType::UMESSAGE_TYPE_REQUEST);
-    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS4);
-    /// assert_eq!(message.source_unchecked(), &reply_to_address);
+    ///                    .build_with_payload("lock", UPayloadFormat::Text)?;
+    /// assert_eq!(message.type_(), UMessageType::Request);
+    /// assert_eq!(message.priority_unchecked(), UPriority::CS4);
+    /// assert_eq!(message.source(), &reply_to_address);
     /// assert_eq!(message.sink_unchecked(), &method_to_invoke);
     /// assert_eq!(message.ttl_unchecked(), 5000);
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn request(method_to_invoke: UUri, reply_to_address: UUri, ttl: u32) -> UMessageBuilder {
         UMessageBuilder {
-            validator: Box::new(RequestValidator),
+            comm_status: None,
+            message_id: None,
             // [impl->dsn~up-attributes-request-type~1]
-            message_type: UMessageType::UMESSAGE_TYPE_REQUEST,
-            source: Some(reply_to_address),
+            message_type: UMessageType::Request,
+            payload: None,
+            payload_format: UPayloadFormat::Unspecified,
+            permission_level: None,
+            priority: Some(UPriority::CS4),
+            request_id: None,
             sink: Some(method_to_invoke),
+            source: reply_to_address,
+            token: None,
+            traceparent: None,
             ttl: Some(ttl),
-            priority: UPriority::UPRIORITY_CS4,
-            ..Default::default()
+            validator: Box::new(RequestValidator),
         }
     }
 
@@ -184,7 +193,7 @@ impl UMessageBuilder {
     /// A response message is used to send the outcome of processing a request message
     /// to the original sender of the request message.
     ///
-    /// The builder will be initialized with [`UPriority::UPRIORITY_CS4`].
+    /// The builder will be initialized with [`UPriority::CS4`].
     ///
     /// # Arguments
     ///
@@ -206,28 +215,36 @@ impl UMessageBuilder {
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address.clone(), request_id.clone(), invoked_method.clone())
     ///                    .build()?;
-    /// assert_eq!(message.type_unchecked(), UMessageType::UMESSAGE_TYPE_RESPONSE);
-    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS4);
-    /// assert_eq!(message.source_unchecked(), &invoked_method);
+    /// assert_eq!(message.type_(), UMessageType::Response);
+    /// assert_eq!(message.priority_unchecked(), UPriority::CS4);
+    /// assert_eq!(message.source(), &invoked_method);
     /// assert_eq!(message.sink_unchecked(), &reply_to_address);
     /// assert_eq!(message.request_id_unchecked(), &request_id);
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn response(
         reply_to_address: UUri,
         request_id: UUID,
         invoked_method: UUri,
     ) -> UMessageBuilder {
         UMessageBuilder {
-            validator: Box::new(ResponseValidator),
+            comm_status: None,
+            message_id: None,
             // [impl->dsn~up-attributes-response-type~1]
-            message_type: UMessageType::UMESSAGE_TYPE_RESPONSE,
-            source: Some(invoked_method),
-            sink: Some(reply_to_address),
+            message_type: UMessageType::Response,
+            payload: None,
+            payload_format: UPayloadFormat::Unspecified,
+            permission_level: None,
+            priority: Some(UPriority::CS4),
             request_id: Some(request_id),
-            priority: UPriority::UPRIORITY_CS4,
-            ..Default::default()
+            sink: Some(reply_to_address),
+            source: invoked_method,
+            token: None,
+            traceparent: None,
+            ttl: None,
+            validator: Box::new(ResponseValidator),
         }
     }
 
@@ -243,6 +260,10 @@ impl UMessageBuilder {
     /// * `request_attributes` - The attributes from the request message. The response message
     ///   builder will be initialized with the corresponding attribute values.
     ///
+    /// # Panics
+    ///
+    /// if the given attributes do not represent a request message.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -254,33 +275,45 @@ impl UMessageBuilder {
     /// let request_message_id = UUID::build();
     /// let request_message = UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
     ///                           .with_message_id(request_message_id.clone()) // normally not needed, used only for asserts below
-    ///                           .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                           .build_with_payload("lock", UPayloadFormat::Text)?;
     ///
-    /// let response_message = UMessageBuilder::response_for_request(&request_message.attributes)
-    ///                           .with_priority(UPriority::UPRIORITY_CS5)
+    /// let response_message = UMessageBuilder::response_for_request(request_message.attributes())
+    ///                           .with_priority(UPriority::CS5)
     ///                           .build()?;
-    /// assert_eq!(response_message.type_unchecked(), UMessageType::UMESSAGE_TYPE_RESPONSE);
-    /// assert_eq!(response_message.priority_unchecked(), UPriority::UPRIORITY_CS5);
-    /// assert_eq!(response_message.source_unchecked(), &method_to_invoke);
+    /// assert_eq!(response_message.type_(), UMessageType::Response);
+    /// assert_eq!(response_message.priority_unchecked(), UPriority::CS5);
+    /// assert_eq!(response_message.source(), &method_to_invoke);
     /// assert_eq!(response_message.sink_unchecked(), &reply_to_address);
     /// assert_eq!(response_message.request_id_unchecked(), &request_message_id);
     /// assert_eq!(response_message.ttl_unchecked(), 5000);
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn response_for_request(request_attributes: &UAttributes) -> UMessageBuilder {
+        assert!(
+            request_attributes.is_request(),
+            "Given attributes do not represent a request message"
+        );
         UMessageBuilder {
-            validator: Box::new(ResponseValidator),
+            comm_status: None,
+            message_id: None,
             // [impl->dsn~up-attributes-response-type~1]
-            message_type: UMessageType::UMESSAGE_TYPE_RESPONSE,
-            source: request_attributes.sink.as_ref().cloned(),
-            sink: request_attributes.source.as_ref().cloned(),
-            request_id: request_attributes.id.as_ref().cloned(),
-            priority: request_attributes
-                .priority
-                .enum_value_or(UPriority::UPRIORITY_CS4),
+            message_type: UMessageType::Response,
+            payload: None,
+            payload_format: UPayloadFormat::Unspecified,
+            permission_level: None,
+            priority: request_attributes.priority,
+            request_id: Some(request_attributes.id.clone()),
+            sink: Some(request_attributes.source.clone()),
+            source: request_attributes
+                .sink()
+                .expect("Request attributes must have a sink")
+                .clone(),
+            token: None,
+            traceparent: None,
             ttl: request_attributes.ttl,
-            ..Default::default()
+            validator: Box::new(ResponseValidator),
         }
     }
 
@@ -300,10 +333,6 @@ impl UMessageBuilder {
     ///
     /// The builder.
     ///
-    /// # Panics
-    ///
-    /// Panics if the given UUID is not a [valid uProtocol UUID](`UUID::is_uprotocol_uuid`).
-    ///
     /// # Examples
     ///
     /// ```rust
@@ -312,26 +341,22 @@ impl UMessageBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/4210/1/B24D")?;
     /// let mut builder = UMessageBuilder::publish(topic);
-    /// builder.with_priority(UPriority::UPRIORITY_CS2);
+    /// builder.with_priority(UPriority::CS2);
     /// let message_one = builder
     ///                     .with_message_id(UUID::build())
-    ///                     .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                     .build_with_payload("closed", UPayloadFormat::Text)?;
     /// let message_two = builder
     ///                     // use new message ID but retain all other attributes
     ///                     .with_message_id(UUID::build())
-    ///                     .build_with_payload("open", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_ne!(message_one.id_unchecked(), message_two.id_unchecked());
-    /// assert_eq!(message_one.source_unchecked(), message_two.source_unchecked());
-    /// assert_eq!(message_one.priority_unchecked(), UPriority::UPRIORITY_CS2);
-    /// assert_eq!(message_two.priority_unchecked(), UPriority::UPRIORITY_CS2);
+    ///                     .build_with_payload("open", UPayloadFormat::Text)?;
+    /// assert_ne!(message_one.id(), message_two.id());
+    /// assert_eq!(message_one.source(), message_two.source());
+    /// assert_eq!(message_one.priority_unchecked(), UPriority::CS2);
+    /// assert_eq!(message_two.priority_unchecked(), UPriority::CS2);
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_message_id(&mut self, message_id: UUID) -> &mut UMessageBuilder {
-        assert!(
-            message_id.is_uprotocol_uuid(),
-            "Message ID must be a valid uProtocol UUID"
-        );
         self.message_id = Some(message_id);
         self
     }
@@ -362,26 +387,25 @@ impl UMessageBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic)
-    ///                   .with_priority(UPriority::UPRIORITY_CS5)
-    ///                   .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS5);
+    ///                   .with_priority(UPriority::CS5)
+    ///                   .build_with_payload("closed", UPayloadFormat::Text)?;
+    /// assert_eq!(message.priority_unchecked(), UPriority::CS5);
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_priority(&mut self, priority: UPriority) -> &mut UMessageBuilder {
         // [impl->dsn~up-attributes-request-priority~1]
-        if self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST
-            || self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE
+        if self.message_type == UMessageType::Request || self.message_type == UMessageType::Response
         {
-            assert!(priority.value() >= UPriority::UPRIORITY_CS4.value())
+            assert!(priority >= UPriority::CS4)
         }
         if !UAttributes::is_default_priority(priority) {
             // only set priority explicitly if it differs from the default priority
-            self.priority = priority;
+            self.priority = Some(priority);
         } else {
             // in all other cases set to UNSPECIFIED which will result in the
             // priority not being included in the serialized protobuf
-            self.priority = UPriority::UPRIORITY_UNSPECIFIED;
+            self.priority = None;
         }
         self
     }
@@ -441,17 +465,17 @@ impl UMessageBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let method_to_invoke = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
-    /// let token = String::from("this-is-my-token");
+    /// let token = "this-is-my-token";
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
-    ///                     .with_token(token.clone())
-    ///                     .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.token(), Some(&token));
+    ///                     .with_token(token)
+    ///                     .build_with_payload("lock", UPayloadFormat::Text)?;
+    /// assert_eq!(message.token(), Some(token));
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_token<T: Into<String>>(&mut self, token: T) -> &mut UMessageBuilder {
         // [impl->dsn~up-attributes-request-token~1]
-        assert!(self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST);
+        assert!(self.message_type == UMessageType::Request);
         self.token = Some(token.into());
         self
     }
@@ -481,14 +505,14 @@ impl UMessageBuilder {
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
     /// let message = UMessageBuilder::request(method_to_invoke, reply_to_address, 5000)
     ///                     .with_permission_level(12)
-    ///                     .build_with_payload("lock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
+    ///                     .build_with_payload("lock", UPayloadFormat::Text)?;
     /// assert_eq!(message.permission_level(), Some(12));
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_permission_level(&mut self, level: u32) -> &mut UMessageBuilder {
         // [impl->dsn~up-attributes-permission-level~1]
-        assert!(self.message_type == UMessageType::UMESSAGE_TYPE_REQUEST);
+        assert!(self.message_type == UMessageType::Request);
         self.permission_level = Some(level);
         self
     }
@@ -519,15 +543,15 @@ impl UMessageBuilder {
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_msg_id, invoked_method)
-    ///                     .with_comm_status(UCode::OK)
+    ///                     .with_comm_status(UCode::Ok)
     ///                     .build()?;
-    /// assert_eq!(message.commstatus_unchecked(), UCode::OK);
+    /// assert_eq!(message.commstatus_unchecked(), UCode::Ok);
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_comm_status(&mut self, comm_status: UCode) -> &mut UMessageBuilder {
-        assert!(self.message_type == UMessageType::UMESSAGE_TYPE_RESPONSE);
-        self.comm_status = Some(comm_status.into());
+        assert!(self.message_type == UMessageType::Response);
+        self.comm_status = Some(comm_status);
         self
     }
 
@@ -548,11 +572,11 @@ impl UMessageBuilder {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/4210/1/B24D")?;
-    /// let traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01".to_string();
+    /// let traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
     /// let message = UMessageBuilder::publish(topic.clone())
-    ///                    .with_traceparent(&traceparent)
-    ///                    .build_with_payload("closed", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert_eq!(message.traceparent(), Some(&traceparent));
+    ///                    .with_traceparent(traceparent)
+    ///                    .build_with_payload("closed", UPayloadFormat::Text)?;
+    /// assert_eq!(message.traceparent(), Some(traceparent));
     /// # Ok(())
     /// # }
     pub fn with_traceparent<T: Into<String>>(&mut self, traceparent: T) -> &mut UMessageBuilder {
@@ -610,7 +634,7 @@ impl UMessageBuilder {
     /// let message = UMessageBuilder::response(reply_to_address, UUID::build(), invoked_method)
     ///                     .with_message_id(message_id.clone())
     ///                     .build()?;
-    /// assert_eq!(message.id_unchecked(), &message_id);
+    /// assert_eq!(message.id(), &message_id);
     /// # Ok(())
     /// # }
     /// ```
@@ -618,31 +642,26 @@ impl UMessageBuilder {
         // [impl->dsn~up-attributes-id~1]
         let message_id = self
             .message_id
-            .clone()
-            .map_or_else(|| Some(UUID::build()), Some);
+            .as_ref()
+            .map_or_else(UUID::build, |id| id.clone());
         let attributes = UAttributes {
             commstatus: self.comm_status,
-            id: message_id.into(),
+            id: message_id,
             payload_format: self.payload_format.into(),
             permission_level: self.permission_level,
-            priority: self.priority.into(),
-            reqid: self.request_id.clone().into(),
-            sink: self.sink.clone().into(),
-            source: self.source.clone().into(),
+            priority: self.priority,
+            reqid: self.request_id.clone(),
+            sink: self.sink.clone(),
+            source: self.source.clone(),
             token: self.token.clone(),
             traceparent: self.traceparent.clone(),
             ttl: self.ttl,
-            type_: self.message_type.into(),
-            ..Default::default()
+            type_: self.message_type,
         };
         self.validator
             .validate(&attributes)
             .map_err(UMessageError::from)
-            .map(|_| UMessage {
-                attributes: Some(attributes).into(),
-                payload: self.payload.to_owned(),
-                ..Default::default()
-            })
+            .and_then(|_| UMessage::new(attributes, self.payload.clone()))
     }
 
     /// Creates the message based on the builder's state and some payload.
@@ -669,8 +688,8 @@ impl UMessageBuilder {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/4210/1/B24D")?;
     /// let message = UMessageBuilder::publish(topic)
-    ///                    .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)?;
-    /// assert!(message.payload.is_some());
+    ///                    .build_with_payload("locked", UPayloadFormat::Text)?;
+    /// assert!(message.payload().is_some());
     /// # Ok(())
     /// # }
     /// ```
@@ -695,7 +714,7 @@ impl UMessageBuilder {
     /// # Returns
     ///
     /// A message ready to be sent using [`crate::UTransport::send`]. The message will have
-    /// [`UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF`] set as its payload format.
+    /// [`UPayloadFormat::Protobuf`] set as its payload format.
     ///
     /// # Errors
     ///
@@ -706,34 +725,34 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
+    /// use protobuf::well_known_types::wrappers::StringValue;
     /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
+    /// let payload = StringValue::new();
     /// let request_id = UUID::build();
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
-    ///                    .with_comm_status(UCode::INVALID_ARGUMENT)
-    ///                    .build_with_protobuf_payload(&UStatus::fail("failed to parse request"))?;
-    /// assert!(message.payload.is_some());
-    /// assert_eq!(message.payload_format_unchecked(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF);
+    ///                    .with_comm_status(UCode::InvalidArgument)
+    ///                    .build_with_protobuf_payload(&payload)?;
+    /// assert!(message.payload().is_some());
+    /// assert_eq!(message.payload_format_unchecked(), UPayloadFormat::Protobuf);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn build_with_protobuf_payload<T: Message>(
+    #[cfg(feature = "protobuf-support")]
+    pub fn build_with_protobuf_payload<T: ProtobufMappable>(
         &mut self,
         payload: &T,
     ) -> Result<UMessage, UMessageError> {
         payload
-            .write_to_bytes()
+            .write_to_protobuf_bytes()
             .map_err(UMessageError::from)
             .and_then(|serialized_payload| {
-                self.build_with_payload(
-                    serialized_payload,
-                    UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF,
-                )
+                self.build_with_payload(serialized_payload, UPayloadFormat::Protobuf)
             })
     }
 
@@ -746,7 +765,7 @@ impl UMessageBuilder {
     /// # Returns
     ///
     /// A message ready to be sent using [`crate::UTransport::send`]. The message will have
-    /// [`UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`] set as its payload format.
+    /// [`UPayloadFormat::ProtobufWrappedInAny`] set as its payload format.
     ///
     /// # Errors
     ///
@@ -757,66 +776,53 @@ impl UMessageBuilder {
     /// # Examples
     ///
     /// ```rust
+    /// use protobuf::well_known_types::wrappers::StringValue;
     /// use up_rust::{UCode, UMessageBuilder, UMessageType, UPayloadFormat, UPriority, UStatus, UUID, UUri};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let invoked_method = UUri::try_from("//my-vehicle/4210/5/64AB")?;
     /// let reply_to_address = UUri::try_from("//my-cloud/BA4C/1/0")?;
+    /// let payload = StringValue::new();
     /// let request_id = UUID::build();
     /// // a service implementation would normally use
     /// // `UMessageBuilder::response_for_request(&request_message.attributes)` instead
     /// let message = UMessageBuilder::response(reply_to_address, request_id, invoked_method)
-    ///                    .with_comm_status(UCode::INVALID_ARGUMENT)
-    ///                    .build_with_wrapped_protobuf_payload(&UStatus::fail("failed to parse request"))?;
-    /// assert!(message.payload.is_some());
-    /// assert_eq!(message.payload_format_unchecked(), UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY);
+    ///                    .with_comm_status(UCode::InvalidArgument)
+    ///                    .build_with_wrapped_protobuf_payload(&payload)?;
+    /// assert!(message.payload().is_some());
+    /// assert_eq!(message.payload_format_unchecked(), UPayloadFormat::ProtobufWrappedInAny);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn build_with_wrapped_protobuf_payload<T: MessageFull>(
+    #[cfg(feature = "protobuf-support")]
+    pub fn build_with_wrapped_protobuf_payload<T: ProtobufMappable>(
         &mut self,
         payload: &T,
     ) -> Result<UMessage, UMessageError> {
-        Any::pack(payload)
-            .map_err(UMessageError::DataSerializationError)
-            .and_then(|any| any.write_to_bytes().map_err(UMessageError::from))
+        payload
+            .write_to_packed_protobuf_bytes()
+            .map_err(UMessageError::from)
             .and_then(|serialized_payload| {
-                self.build_with_payload(
-                    serialized_payload,
-                    UPayloadFormat::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY,
-                )
+                self.build_with_payload(serialized_payload, UPayloadFormat::ProtobufWrappedInAny)
             })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::UCode;
-
     use super::*;
+    #[cfg(feature = "up-core-types")]
+    use crate::ProtobufMappable;
 
-    use protobuf::Message;
     use test_case::test_case;
 
     const METHOD_TO_INVOKE: &str = "//my-vehicle/4D123/2/6FA3";
     const REPLY_TO_ADDRESS: &str = "//my-cloud/9CB3/1/0";
     const TOPIC: &str = "//my-vehicle/4210/1/B24D";
 
-    #[test]
-    #[should_panic]
-    fn test_with_message_id_panics_for_invalid_uuid() {
-        let invalid_message_id = UUID {
-            msb: 0x00000000000000ab_u64,
-            lsb: 0x0000000000018000_u64,
-            ..Default::default()
-        };
-        let topic = UUri::try_from(TOPIC).expect("should have been able to create UUri");
-        UMessageBuilder::publish(topic).with_message_id(invalid_message_id);
-    }
-
     // [utest->dsn~up-attributes-permission-level~1]
     #[test_case(Some(5), None, None; "with permission level")]
-    #[test_case(None, Some(UCode::NOT_FOUND), None; "with commstatus")]
+    #[test_case(None, Some(UCode::NotFound), None; "with commstatus")]
     // [utest->dsn~up-attributes-request-token~1]
     #[test_case(None, None, Some(String::from("my-token")); "with token")]
     #[should_panic]
@@ -838,7 +844,7 @@ mod tests {
 
     // [utest->dsn~up-attributes-permission-level~1]
     #[test_case(Some(5), None, None; "with permission level")]
-    #[test_case(None, Some(UCode::NOT_FOUND), None; "with commstatus")]
+    #[test_case(None, Some(UCode::NotFound), None; "with commstatus")]
     // [utest->dsn~up-attributes-request-token~1]
     #[test_case(None, None, Some(String::from("my-token")); "with token")]
     #[should_panic]
@@ -865,15 +871,13 @@ mod tests {
     // [utest->dsn~up-attributes-request-token~1]
     #[test_case(None, Some(String::from("my-token")), None; "with token")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, None, Some(UPriority::UPRIORITY_UNSPECIFIED); "with priority UNSPECIFIED")]
+    #[test_case(None, None, Some(UPriority::CS0); "with priority CS0")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, None, Some(UPriority::UPRIORITY_CS0); "with priority CS0")]
+    #[test_case(None, None, Some(UPriority::CS1); "with priority CS1")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, None, Some(UPriority::UPRIORITY_CS1); "with priority CS1")]
+    #[test_case(None, None, Some(UPriority::CS2); "with priority CS2")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, None, Some(UPriority::UPRIORITY_CS2); "with priority CS2")]
-    // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, None, Some(UPriority::UPRIORITY_CS3); "with priority CS3")]
+    #[test_case(None, None, Some(UPriority::CS3); "with priority CS3")]
     #[should_panic]
     fn test_response_message_builder_panics(
         perm_level: Option<u32>,
@@ -896,17 +900,15 @@ mod tests {
         }
     }
 
-    #[test_case(Some(UCode::NOT_FOUND), None; "for comm status")]
+    #[test_case(Some(UCode::NotFound), None; "for comm status")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, Some(UPriority::UPRIORITY_UNSPECIFIED); "for priority class unspecified")]
+    #[test_case(None, Some(UPriority::CS0); "for priority class CS0")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, Some(UPriority::UPRIORITY_CS0); "for priority class CS0")]
+    #[test_case(None, Some(UPriority::CS1); "for priority class CS1")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, Some(UPriority::UPRIORITY_CS1); "for priority class CS1")]
+    #[test_case(None, Some(UPriority::CS2); "for priority class CS2")]
     // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, Some(UPriority::UPRIORITY_CS2); "for priority class CS2")]
-    // [utest->dsn~up-attributes-request-priority~1]
-    #[test_case(None, Some(UPriority::UPRIORITY_CS3); "for priority class CS3")]
+    #[test_case(None, Some(UPriority::CS3); "for priority class CS3")]
     #[should_panic]
     fn test_request_message_builder_panics(
         comm_status: Option<UCode>,
@@ -931,11 +933,11 @@ mod tests {
         let mut builder = UMessageBuilder::publish(topic);
         let message_one = builder
             .with_message_id(UUID::build())
-            .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .build_with_payload("locked", UPayloadFormat::Text)
             .expect("should have been able to create message");
         let message_two = builder
             .with_message_id(UUID::build())
-            .build_with_payload("unlocked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .build_with_payload("unlocked", UPayloadFormat::Text)
             .expect("should have been able to create message");
         assert_eq!(message_one.attributes.type_, message_two.attributes.type_);
         assert_ne!(message_one.attributes.id, message_two.attributes.id);
@@ -948,45 +950,40 @@ mod tests {
     // [utest->req~umessage-data-model-impl~1]
     fn test_build_retains_all_publish_attributes() {
         let message_id = UUID::build();
-        let traceparent = String::from("traceparent");
+        let traceparent = "traceparent";
         let topic = UUri::try_from(TOPIC).expect("should have been able to create UUri");
         let message = UMessageBuilder::publish(topic.clone())
             .with_message_id(message_id.clone())
             .with_ttl(5000)
-            .with_traceparent(&traceparent)
-            .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .with_traceparent(traceparent)
+            .build_with_payload("locked", UPayloadFormat::Text)
             .expect("should have been able to create message");
 
         // [utest->dsn~up-attributes-id~1]
-        assert_eq!(message.id_unchecked(), &message_id);
-        assert!(UAttributes::is_default_priority(
-            message.priority_unchecked()
-        ));
-        assert_eq!(message.source_unchecked(), &topic);
+        assert_eq!(message.id(), &message_id);
+        assert!(message.priority().is_none());
+        assert_eq!(message.source(), &topic);
         // [utest->dsn~up-attributes-publish-sink~1]
         assert!(message.sink().is_none());
         assert_eq!(message.ttl_unchecked(), 5000);
         // [utest->dsn~up-attributes-traceparent~1]
-        assert_eq!(message.traceparent(), Some(&traceparent));
+        assert_eq!(message.traceparent(), Some(traceparent));
         // [utest->dsn~up-attributes-publish-type~1]
-        assert_eq!(
-            message.type_unchecked(),
-            UMessageType::UMESSAGE_TYPE_PUBLISH
-        );
+        assert_eq!(message.type_(), UMessageType::Publish);
         // [utest->dsn~up-attributes-payload-format~1]
-        assert_eq!(
-            message.payload_format_unchecked(),
-            UPayloadFormat::UPAYLOAD_FORMAT_TEXT
-        );
+        assert_eq!(message.payload_format_unchecked(), UPayloadFormat::Text);
 
-        // [utest->req~uattributes-data-model-proto~1]
-        // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message =
-            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            // [utest->req~uattributes-data-model-proto~1]
+            // [utest->req~umessage-data-model-proto~1]
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 
     #[test]
@@ -994,45 +991,42 @@ mod tests {
     // [utest->req~umessage-data-model-impl~1]
     fn test_build_retains_all_notification_attributes() {
         let message_id = UUID::build();
-        let traceparent = String::from("traceparent");
+        let traceparent = "traceparent";
         let origin = UUri::try_from(TOPIC).expect("should have been able to create UUri");
         let destination =
             UUri::try_from(REPLY_TO_ADDRESS).expect("should have been able to create UUri");
         let message = UMessageBuilder::notification(origin.clone(), destination.clone())
             .with_message_id(message_id.clone())
-            .with_priority(UPriority::UPRIORITY_CS2)
+            .with_priority(UPriority::CS2)
             .with_ttl(5000)
-            .with_traceparent(&traceparent)
-            .build_with_payload("locked", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+            .with_traceparent(traceparent)
+            .build_with_payload("locked", UPayloadFormat::Text)
             .expect("should have been able to create message");
 
         // [utest->dsn~up-attributes-id~1]
-        assert_eq!(message.id_unchecked(), &message_id);
-        assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS2);
-        assert_eq!(message.source_unchecked(), &origin);
+        assert_eq!(message.id(), &message_id);
+        assert_eq!(message.priority_unchecked(), UPriority::CS2);
+        assert_eq!(message.source(), &origin);
         assert_eq!(message.sink_unchecked(), &destination);
         assert_eq!(message.ttl_unchecked(), 5000);
         // [utest->dsn~up-attributes-traceparent~1]
-        assert_eq!(message.traceparent(), Some(&traceparent));
+        assert_eq!(message.traceparent(), Some(traceparent));
         // [utest->dsn~up-attributes-notification-type~1]
-        assert_eq!(
-            message.type_unchecked(),
-            UMessageType::UMESSAGE_TYPE_NOTIFICATION
-        );
+        assert!(message.is_notification());
         // [utest->dsn~up-attributes-payload-format~1]
-        assert_eq!(
-            message.payload_format_unchecked(),
-            UPayloadFormat::UPAYLOAD_FORMAT_TEXT
-        );
+        assert_eq!(message.payload_format_unchecked(), UPayloadFormat::Text);
 
-        // [utest->req~uattributes-data-model-proto~1]
-        // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message =
-            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            // [utest->req~uattributes-data-model-proto~1]
+            // [utest->req~umessage-data-model-proto~1]
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 
     #[test]
@@ -1040,8 +1034,8 @@ mod tests {
     // [utest->req~umessage-data-model-impl~1]
     fn test_build_retains_all_request_attributes() {
         let message_id = UUID::build();
-        let token = String::from("token");
-        let traceparent = String::from("traceparent");
+        let token = "token";
+        let traceparent = "traceparent";
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
             .expect("should have been able to create destination UUri");
         let reply_to_address = UUri::try_from(REPLY_TO_ADDRESS)
@@ -1050,43 +1044,40 @@ mod tests {
             UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
                 .with_message_id(message_id.clone())
                 .with_permission_level(5)
-                .with_priority(UPriority::UPRIORITY_CS4)
-                .with_token(&token)
-                .with_traceparent(&traceparent)
-                .build_with_payload("unlock", UPayloadFormat::UPAYLOAD_FORMAT_TEXT)
+                .with_priority(UPriority::CS4)
+                .with_token(token)
+                .with_traceparent(traceparent)
+                .build_with_payload("unlock", UPayloadFormat::Text)
                 .expect("should have been able to create message");
 
         // [utest->dsn~up-attributes-id~1]
-        assert_eq!(message.id_unchecked(), &message_id);
+        assert_eq!(message.id(), &message_id);
         // [utest->dsn~up-attributes-permission-level~1]
         assert_eq!(message.permission_level(), Some(5));
-        assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS4);
+        assert_eq!(message.priority_unchecked(), UPriority::CS4);
         assert_eq!(message.sink_unchecked(), &method_to_invoke);
-        assert_eq!(message.source_unchecked(), &reply_to_address);
+        assert_eq!(message.source(), &reply_to_address);
         // [utest->dsn~up-attributes-request-token~1]
-        assert_eq!(message.token(), Some(&token));
+        assert_eq!(message.token(), Some(token));
         assert_eq!(message.ttl_unchecked(), 5000);
         // [utest->dsn~up-attributes-traceparent~1]
-        assert_eq!(message.traceparent(), Some(&traceparent));
+        assert_eq!(message.traceparent(), Some(traceparent));
         // [utest->dsn~up-attributes-request-type~1]
-        assert_eq!(
-            message.type_unchecked(),
-            UMessageType::UMESSAGE_TYPE_REQUEST
-        );
+        assert!(message.is_request());
         // [utest->dsn~up-attributes-payload-format~1]
-        assert_eq!(
-            message.payload_format_unchecked(),
-            UPayloadFormat::UPAYLOAD_FORMAT_TEXT
-        );
+        assert_eq!(message.payload_format_unchecked(), UPayloadFormat::Text);
 
         // [utest->req~uattributes-data-model-proto~1]
         // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message =
-            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 
     #[test]
@@ -1100,30 +1091,27 @@ mod tests {
         let request_message =
             UMessageBuilder::request(method_to_invoke.clone(), reply_to_address.clone(), 5000)
                 .with_message_id(request_message_id.clone())
-                .with_priority(UPriority::UPRIORITY_CS5)
+                .with_priority(UPriority::CS5)
                 .build()
                 .expect("should have been able to create message");
         let message = UMessageBuilder::response_for_request(&request_message.attributes)
             .with_message_id(response_message_id.clone())
-            .with_comm_status(UCode::DEADLINE_EXCEEDED)
+            .with_comm_status(UCode::DeadlineExceeded)
             .build()
             .expect("should have been able to create message");
         // [utest->dsn~up-attributes-id~1]
-        assert_eq!(message.id_unchecked(), &response_message_id);
-        assert_eq!(message.commstatus_unchecked(), UCode::DEADLINE_EXCEEDED);
-        assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS5);
+        assert_eq!(message.id(), &response_message_id);
+        assert_eq!(message.commstatus_unchecked(), UCode::DeadlineExceeded);
+        assert_eq!(message.priority_unchecked(), UPriority::CS5);
         assert_eq!(message.request_id_unchecked(), &request_message_id);
         assert_eq!(message.sink_unchecked(), &reply_to_address);
-        assert_eq!(message.source_unchecked(), &method_to_invoke);
+        assert_eq!(message.source(), &method_to_invoke);
         assert_eq!(message.ttl_unchecked(), 5000);
         // [utest->dsn~up-attributes-response-type~1]
-        assert_eq!(
-            message.type_unchecked(),
-            UMessageType::UMESSAGE_TYPE_RESPONSE
-        );
+        assert!(message.is_response());
         assert_eq!(
             message.payload_format_unchecked(),
-            UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED
+            UPayloadFormat::Unspecified
         );
         assert!(message.payload.is_none());
     }
@@ -1134,7 +1122,7 @@ mod tests {
     fn test_build_retains_all_response_attributes() {
         let message_id = UUID::build();
         let request_id = UUID::build();
-        let traceparent = String::from("traceparent");
+        let traceparent = "traceparent";
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
             .expect("should have been able to create destination UUri");
         let reply_to_address = UUri::try_from(REPLY_TO_ADDRESS)
@@ -1145,41 +1133,41 @@ mod tests {
             method_to_invoke.clone(),
         )
         .with_message_id(message_id.clone())
-        .with_comm_status(UCode::DEADLINE_EXCEEDED)
-        .with_priority(UPriority::UPRIORITY_CS5)
+        .with_comm_status(UCode::DeadlineExceeded)
+        .with_priority(UPriority::CS5)
         .with_ttl(4000)
-        .with_traceparent(&traceparent)
+        .with_traceparent(traceparent)
         .build()
         .expect("should have been able to create message");
 
         // [utest->dsn~up-attributes-id~1]
-        assert_eq!(message.id_unchecked(), &message_id);
-        assert_eq!(message.commstatus_unchecked(), UCode::DEADLINE_EXCEEDED);
-        assert_eq!(message.priority_unchecked(), UPriority::UPRIORITY_CS5);
+        assert_eq!(message.id(), &message_id);
+        assert_eq!(message.commstatus_unchecked(), UCode::DeadlineExceeded);
+        assert_eq!(message.priority_unchecked(), UPriority::CS5);
         assert_eq!(message.request_id_unchecked(), &request_id);
         assert_eq!(message.sink_unchecked(), &reply_to_address);
-        assert_eq!(message.source_unchecked(), &method_to_invoke);
+        assert_eq!(message.source(), &method_to_invoke);
         assert_eq!(message.ttl_unchecked(), 4000);
         // [utest->dsn~up-attributes-traceparent~1]
-        assert_eq!(message.traceparent(), Some(&traceparent));
+        assert_eq!(message.traceparent(), Some(traceparent));
         // [utest->dsn~up-attributes-response-type~1]
-        assert_eq!(
-            message.type_unchecked(),
-            UMessageType::UMESSAGE_TYPE_RESPONSE
-        );
+        assert!(message.is_response());
         assert_eq!(
             message.payload_format_unchecked(),
-            UPayloadFormat::UPAYLOAD_FORMAT_UNSPECIFIED
+            UPayloadFormat::Unspecified
         );
         assert!(message.payload.is_none());
 
         // [utest->req~uattributes-data-model-proto~1]
         // [utest->req~umessage-data-model-proto~1]
-        let proto = message
-            .write_to_bytes()
-            .expect("failed to serialize to protobuf");
-        let deserialized_message =
-            UMessage::parse_from_bytes(proto.as_slice()).expect("failed to deserialize protobuf");
-        assert_eq!(message, deserialized_message);
+        #[cfg(feature = "up-core-types")]
+        {
+            let proto = message
+                .write_to_protobuf_bytes()
+                .expect("failed to serialize to protobuf");
+            let deserialized_message = UMessage::parse_from_protobuf_bytes(proto.as_slice())
+                .expect("failed to deserialize protobuf");
+            assert_eq!(message, deserialized_message);
+        }
     }
 }

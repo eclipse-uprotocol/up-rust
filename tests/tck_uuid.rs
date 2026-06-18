@@ -14,8 +14,7 @@
 use std::str::FromStr;
 
 use cucumber::{given, then, when};
-use protobuf::Message;
-use up_rust::UUID;
+use up_rust::{ProtobufMappable, UUID};
 
 mod common;
 
@@ -23,7 +22,7 @@ const FEATURES_GLOB_PATTERN: &str = "up-spec/basics/**/uuid_*.feature";
 
 #[derive(cucumber::World, Default, Debug)]
 struct UUIDWorld {
-    uuid: UUID,
+    uuid: Option<UUID>,
     hyphenated_string: String,
     protobuf: Vec<u8>,
     error: Option<Box<dyn std::error::Error>>,
@@ -36,20 +35,31 @@ async fn with_hyphenated_string(w: &mut UUIDWorld, hyphenated_string: String) {
 
 #[given(expr = "a UUID having MSB {word} and LSB {word}")]
 async fn with_msb_lsb(w: &mut UUIDWorld, msb_hex_string: String, lsb_hex_string: String) {
-    w.uuid.msb = common::value_as_u64(msb_hex_string);
-    w.uuid.lsb = common::value_as_u64(lsb_hex_string);
+    w.uuid = Some(
+        UUID::from_u64_pair(
+            common::value_as_u64(msb_hex_string),
+            common::value_as_u64(lsb_hex_string),
+        )
+        .expect("failed to create UUID from MSB and LSB"),
+    );
 }
 
 #[when(expr = "serializing the UUID to a hyphenated string")]
 async fn serialize_to_hyphenated_string(w: &mut UUIDWorld) {
-    w.hyphenated_string = w.uuid.to_hyphenated_string();
+    w.hyphenated_string = w
+        .uuid
+        .as_ref()
+        .expect("UUID is not set")
+        .to_hyphenated_string();
 }
 
 #[when(expr = "serializing the UUID to its protobuf wire format")]
 async fn serialize_to_protobuf(w: &mut UUIDWorld) {
     w.protobuf = w
         .uuid
-        .write_to_bytes()
+        .as_ref()
+        .expect("UUID is not set")
+        .write_to_protobuf_bytes()
         .expect("failed to serialize UUID to protobuf");
 }
 
@@ -57,7 +67,7 @@ async fn serialize_to_protobuf(w: &mut UUIDWorld) {
 async fn deserialize_from_hyphenated_string(w: &mut UUIDWorld) {
     match UUID::from_str(&w.hyphenated_string) {
         Ok(uuid) => {
-            w.uuid = uuid;
+            w.uuid = Some(uuid);
         }
         Err(e) => {
             w.error = Some(Box::from(e));
@@ -80,18 +90,20 @@ async fn assert_original_uuid_can_be_recreated_from_hyphenated_string(w: &mut UU
     assert!(w
         .hyphenated_string
         .parse::<UUID>()
-        .is_ok_and(|uuid| w.uuid.eq(&uuid)));
+        .is_ok_and(|uuid| w.uuid.eq(&Some(uuid))));
 }
 
 #[then(expr = "the original UUID can be recreated from the protobuf wire format")]
 async fn assert_original_uuid_can_be_recreated_from_protobuf(w: &mut UUIDWorld) {
-    assert!(UUID::parse_from_bytes(&w.protobuf).is_ok_and(|uuid| w.uuid.eq(&uuid)));
+    assert!(UUID::parse_from_protobuf_bytes(&w.protobuf).is_ok_and(|uuid| w.uuid.eq(&Some(uuid))));
 }
 
 #[then(expr = "the same UUID can be deserialized from {word}")]
 async fn assert_deserialize_uuid_from_protobuf(w: &mut UUIDWorld, hex_string: String) {
     let buf = hex::decode(common::trimhex(&hex_string)).expect("not a valid hex string");
-    assert!(UUID::parse_from_bytes(buf.as_slice()).is_ok_and(|uuid| w.uuid.eq(&uuid)));
+    assert!(
+        UUID::parse_from_protobuf_bytes(buf.as_slice()).is_ok_and(|uuid| w.uuid.eq(&Some(uuid)))
+    );
 }
 
 // [utest->req~uuid-hex-and-dash~1]

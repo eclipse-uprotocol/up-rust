@@ -12,15 +12,13 @@
  ********************************************************************************/
 
 use std::sync::Arc;
-use thiserror::Error;
 
 use async_trait::async_trait;
-use protobuf::MessageFull;
+use thiserror::Error;
 
-use crate::communication::RegistrationError;
 use crate::{UAttributes, UCode, UStatus, UUri};
 
-use super::{CallOptions, UPayload};
+use super::{CallOptions, RegistrationError, UPayload};
 
 /// An error indicating a problem with invoking a (remote) service operation.
 // [impl->dsn~communication-layer-api-declaration~1]
@@ -55,7 +53,7 @@ pub enum ServiceInvocationError {
     ResourceExhausted(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to publish a message.
     #[error("unknown error: {0}")]
-    RpcError(UStatus),
+    RpcError(Box<UStatus>),
     /// Indicates that the calling uE could not be authenticated properly.
     #[error("unauthenticated")]
     Unauthenticated,
@@ -69,27 +67,42 @@ pub enum ServiceInvocationError {
 
 impl From<UStatus> for ServiceInvocationError {
     fn from(value: UStatus) -> Self {
-        match value.code.enum_value() {
-            Ok(UCode::ALREADY_EXISTS) => ServiceInvocationError::AlreadyExists(value.get_message()),
-            Ok(UCode::DEADLINE_EXCEEDED) => ServiceInvocationError::DeadlineExceeded,
-            Ok(UCode::FAILED_PRECONDITION) => {
-                ServiceInvocationError::FailedPrecondition(value.get_message())
+        match value.get_code() {
+            UCode::AlreadyExists => ServiceInvocationError::AlreadyExists(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::DeadlineExceeded => ServiceInvocationError::DeadlineExceeded,
+            UCode::FailedPrecondition => ServiceInvocationError::FailedPrecondition(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::Internal => {
+                ServiceInvocationError::Internal(value.get_message_or_default("N/A").to_string())
             }
-            Ok(UCode::INTERNAL) => ServiceInvocationError::Internal(value.get_message()),
-            Ok(UCode::INVALID_ARGUMENT) => {
-                ServiceInvocationError::InvalidArgument(value.get_message())
+            UCode::InvalidArgument => ServiceInvocationError::InvalidArgument(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::NotFound => {
+                ServiceInvocationError::NotFound(value.get_message_or_default("N/A").to_string())
             }
-            Ok(UCode::NOT_FOUND) => ServiceInvocationError::NotFound(value.get_message()),
-            Ok(UCode::PERMISSION_DENIED) => {
-                ServiceInvocationError::PermissionDenied(value.get_message())
+            UCode::PermissionDenied => ServiceInvocationError::PermissionDenied(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::ResourceExhausted => ServiceInvocationError::ResourceExhausted(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::Unauthenticated => ServiceInvocationError::Unauthenticated,
+            UCode::Unavailable => {
+                ServiceInvocationError::Unavailable(value.get_message_or_default("N/A").to_string())
             }
-            Ok(UCode::RESOURCE_EXHAUSTED) => {
-                ServiceInvocationError::ResourceExhausted(value.get_message())
-            }
-            Ok(UCode::UNAUTHENTICATED) => ServiceInvocationError::Unauthenticated,
-            Ok(UCode::UNAVAILABLE) => ServiceInvocationError::Unavailable(value.get_message()),
-            Ok(UCode::UNIMPLEMENTED) => ServiceInvocationError::Unimplemented(value.get_message()),
-            _ => ServiceInvocationError::RpcError(value),
+            UCode::Unimplemented => ServiceInvocationError::Unimplemented(
+                value.get_message_or_default("N/A").to_string(),
+            ),
+            UCode::Ok
+            | UCode::Cancelled
+            | UCode::Unknown
+            | UCode::Aborted
+            | UCode::OutOfRange
+            | UCode::DataLoss => ServiceInvocationError::RpcError(Box::from(value)),
         }
     }
 }
@@ -98,35 +111,35 @@ impl From<ServiceInvocationError> for UStatus {
     fn from(value: ServiceInvocationError) -> Self {
         match value {
             ServiceInvocationError::AlreadyExists(msg) => {
-                UStatus::fail_with_code(UCode::ALREADY_EXISTS, msg)
+                UStatus::fail_with_code(UCode::AlreadyExists, msg)
             }
             ServiceInvocationError::DeadlineExceeded => {
-                UStatus::fail_with_code(UCode::DEADLINE_EXCEEDED, "request timed out")
+                UStatus::fail_with_code(UCode::DeadlineExceeded, "request timed out")
             }
             ServiceInvocationError::FailedPrecondition(msg) => {
-                UStatus::fail_with_code(UCode::FAILED_PRECONDITION, msg)
+                UStatus::fail_with_code(UCode::FailedPrecondition, msg)
             }
-            ServiceInvocationError::Internal(msg) => UStatus::fail_with_code(UCode::INTERNAL, msg),
+            ServiceInvocationError::Internal(msg) => UStatus::fail_with_code(UCode::Internal, msg),
             ServiceInvocationError::InvalidArgument(msg) => {
-                UStatus::fail_with_code(UCode::INVALID_ARGUMENT, msg)
+                UStatus::fail_with_code(UCode::InvalidArgument, msg)
             }
-            ServiceInvocationError::NotFound(msg) => UStatus::fail_with_code(UCode::NOT_FOUND, msg),
+            ServiceInvocationError::NotFound(msg) => UStatus::fail_with_code(UCode::NotFound, msg),
             ServiceInvocationError::PermissionDenied(msg) => {
-                UStatus::fail_with_code(UCode::PERMISSION_DENIED, msg)
+                UStatus::fail_with_code(UCode::PermissionDenied, msg)
             }
             ServiceInvocationError::ResourceExhausted(msg) => {
-                UStatus::fail_with_code(UCode::RESOURCE_EXHAUSTED, msg)
+                UStatus::fail_with_code(UCode::ResourceExhausted, msg)
             }
             ServiceInvocationError::Unauthenticated => {
-                UStatus::fail_with_code(UCode::UNAUTHENTICATED, "client must authenticate")
+                UStatus::fail_with_code(UCode::Unauthenticated, "client must authenticate")
             }
             ServiceInvocationError::Unavailable(msg) => {
-                UStatus::fail_with_code(UCode::UNAVAILABLE, msg)
+                UStatus::fail_with_code(UCode::Unavailable, msg)
             }
             ServiceInvocationError::Unimplemented(msg) => {
-                UStatus::fail_with_code(UCode::UNIMPLEMENTED, msg)
+                UStatus::fail_with_code(UCode::Unimplemented, msg)
             }
-            _ => UStatus::fail_with_code(UCode::UNKNOWN, "unknown"),
+            _ => UStatus::fail_with_code(UCode::Unknown, "unknown"),
         }
     }
 }
@@ -163,6 +176,7 @@ pub trait RpcClient: Send + Sync {
     ) -> Result<Option<UPayload>, ServiceInvocationError>;
 }
 
+#[cfg(feature = "protobuf-support")]
 impl dyn RpcClient {
     /// Invokes a method on a service using and returning proto-generated `Message` objects.
     ///
@@ -187,8 +201,8 @@ impl dyn RpcClient {
         request_message: T,
     ) -> Result<R, ServiceInvocationError>
     where
-        T: MessageFull,
-        R: MessageFull,
+        T: crate::ProtobufMappable,
+        R: crate::ProtobufMappable + Default,
     {
         let payload = UPayload::try_from_protobuf(request_message)
             .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
@@ -328,13 +342,10 @@ impl RpcServer for MockRpcServerImpl {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "protobuf-support"))]
 mod tests {
-    use std::sync::Arc;
-
-    use protobuf::well_known_types::wrappers::StringValue;
-
     use crate::{communication::CallOptions, UUri};
+    use protobuf::well_known_types::wrappers::{DoubleValue, StringValue};
 
     use super::*;
 
@@ -345,8 +356,7 @@ mod tests {
             .expect_invoke_method()
             .once()
             .returning(|_method, _options, _payload| {
-                let error = UStatus::fail_with_code(UCode::INTERNAL, "internal error");
-                let response_payload = UPayload::try_from_protobuf(error).unwrap();
+                let response_payload = UPayload::try_from_protobuf(DoubleValue::new()).unwrap();
                 Ok(Some(response_payload))
             });
         let client: Arc<dyn RpcClient> = Arc::new(rpc_client);

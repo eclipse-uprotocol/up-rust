@@ -12,8 +12,7 @@
  ********************************************************************************/
 
 /*!
-Provides a local UTransport which can be used for connecting uEntities running in the same
-process.
+Provides an implementation of uProtocol's [Transport & Session Layer API](crate::UTransport) which can be used for connecting uEntities that are running in the same process.
 */
 
 use std::{collections::HashSet, sync::Arc};
@@ -42,20 +41,7 @@ impl RegisteredListener {
         }
     }
     fn matches_msg(&self, msg: &UMessage) -> bool {
-        if let Some(source) = msg
-            .attributes
-            .as_ref()
-            .and_then(|attribs| attribs.source.as_ref())
-        {
-            self.matches(
-                source,
-                msg.attributes
-                    .as_ref()
-                    .and_then(|attribs| attribs.sink.as_ref()),
-            )
-        } else {
-            false
-        }
+        self.matches(msg.source(), msg.sink())
     }
     async fn on_receive(&self, msg: UMessage) {
         self.listener.on_receive(msg).await
@@ -65,7 +51,7 @@ impl RegisteredListener {
 /// A [`UTransport`] that can be used to exchange messages within a single process.
 ///
 /// A message sent via [`UTransport::send`] will be dispatched to all registered listeners that
-/// match the message's source and sink filters.
+/// match the message's source and sink filters on the current thread.
 #[derive(Default)]
 pub struct LocalTransport {
     listeners: RwLock<HashSet<RegisteredListener>>,
@@ -103,7 +89,7 @@ impl UTransport for LocalTransport {
         let mut listeners = self.listeners.write().await;
         if listeners.contains(&registered_listener) {
             Err(UStatus::fail_with_code(
-                crate::UCode::ALREADY_EXISTS,
+                crate::UCode::AlreadyExists,
                 "listener already registered for filters",
             ))
         } else {
@@ -128,7 +114,7 @@ impl UTransport for LocalTransport {
             Ok(())
         } else {
             Err(UStatus::fail_with_code(
-                crate::UCode::NOT_FOUND,
+                crate::UCode::NotFound,
                 "no such listener registered for filters",
             ))
         }
@@ -146,7 +132,8 @@ mod tests {
         let mut listener = MockUListener::new();
         listener.expect_on_receive().once().return_const(());
         let listener_ref = Arc::new(listener);
-        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02);
+        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02)
+            .expect("failed to create URI provider");
         let transport = LocalTransport::default();
 
         transport
@@ -188,7 +175,8 @@ mod tests {
         let mut listener = MockUListener::new();
         listener.expect_on_receive().never().return_const(());
         let listener_ref = Arc::new(listener);
-        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02);
+        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02)
+            .expect("failed to create URI provider");
         let transport = LocalTransport::default();
 
         transport
