@@ -27,4 +27,5 @@ wildcards = "deny"
 skip-tree = [
     { crate = "protobuf-codegen", reason = "this is only needed/used during the build process" },
     { crate = "windows-sys", reason = "a foundational crate for many that bumps far too frequently to ever have a shared version" },
+    { crate = "wasip3", reason = "skipping this tree because it pulls in a conflicting version of wit-bindgen but we cannot disable support for it" },
 ]
