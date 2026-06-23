@@ -60,8 +60,8 @@ protobuf = { version = "3.7.2", features = ["with-bytes"], optional = true}
 rand = { version = "0.9.3" }
 regex = { version = "1.11" }
 serde = { version = "1.0.228", optional = true }
-serde_json = { version = "1.0.145", optional = true }
-symphony = { version = "0.1", optional = true }
+serde_json = { version = "1.0.150", optional = true }
+symphony = { version = "0.1.5", optional = true }
 thiserror = { version = "1.0.69", optional = true }
 tokio = { version = "1.45.1", default-features = false, optional = true }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
