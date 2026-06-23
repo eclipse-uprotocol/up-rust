@@ -11,11 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use bytes::{Buf, Bytes};
+use rand::Rng;
 use std::time::{Duration, SystemTime};
 use std::{hash::Hash, str::FromStr};
 
-use bytes::{Buf, Bytes};
-use rand::RngCore;
 use uuid_simd::{AsciiCase, Out};
 
 const BITMASK_VERSION: u64 = 0b1111 << 12;
