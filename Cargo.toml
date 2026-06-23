@@ -152,7 +152,7 @@ required-features = ["up-l2-rpc-client", "up-l2-rpc-server", "util"]
 
 [[example]]
 name = "symphony_target"
-required-features = ["symphony", "util"]
+required-features = ["symphony", "up-l2-rpc-client", "up-l2-rpc-server", "util"]
 
 [[test]]
 name = "tck_uuri"
