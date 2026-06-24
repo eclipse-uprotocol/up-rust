@@ -1747,7 +1747,7 @@ dependencies = [
  "serde_json",
  "symphony",
  "test-case",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "time",
  "tokio",
  "tracing",

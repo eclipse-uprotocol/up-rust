@@ -67,7 +67,7 @@ regex = { version = "1.11" }
 serde = { version = "1.0.228", optional = true }
 serde_json = { version = "1.0.150", optional = true }
 symphony = { version = "0.1.5", optional = true }
-thiserror = { version = "1.0.69", optional = true }
+thiserror = { version = "2.0.18", optional = true }
 tokio = { version = "1.45.1", default-features = false, optional = true }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 uriparse = { version = "0.6" }
