@@ -377,7 +377,7 @@ impl UMessageBuilder<InitialBuilderState> {
             message_type: UMessageType::Response,
             source: request_attributes
                 .sink()
-                .expect("Request attributes must have a sink")
+                .expect("Request attributes must contain a sink")
                 .to_owned(),
             message_id: None,
             sink: Some(request_attributes.source().to_owned()),
@@ -781,10 +781,6 @@ impl UMessageBuilder<RequestBuilderState> {
     ///
     /// The builder.
     ///
-    /// # Panics
-    ///
-    /// * if the message is not an RPC request message
-    ///
     /// # Examples
     ///
     /// ```rust
@@ -816,11 +812,6 @@ impl UMessageBuilder<RequestBuilderState> {
     /// # Returns
     ///
     /// The builder.
-    ///
-    /// # Panics
-    ///
-    /// * if the given level is greater than [`i32::MAX`]
-    /// * if the message is not an RPC request message
     ///
     /// # Examples
     ///
@@ -854,10 +845,6 @@ impl UMessageBuilder<ResponseBuilderState> {
     /// # Returns
     ///
     /// The builder.
-    ///
-    /// # Panics
-    ///
-    /// * if the message is not an RPC response message
     ///
     /// # Examples
     ///

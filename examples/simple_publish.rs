@@ -25,16 +25,17 @@ struct ConsolePrinter {}
 #[async_trait::async_trait]
 impl UListener for ConsolePrinter {
     async fn on_receive(&self, msg: UMessage) {
+        let priority = msg.priority().map_or("None", |p| p.to_priority_code());
         match msg.payload_format() {
             Some(up_rust::UPayloadFormat::Text) => {
                 if let Some(payload) = msg.payload() {
                     let msg = String::from_utf8(payload.to_vec()).unwrap();
-                    println!("received event: {}", msg);
+                    println!("received event [priority: {}]: {}", priority, msg);
                 }
             }
             Some(up_rust::UPayloadFormat::ProtobufWrappedInAny) => {
                 if let Ok(payload) = msg.extract_protobuf::<StringValue>() {
-                    println!("received event: {}", payload.value);
+                    println!("received event [priority: {}]: {}", priority, payload.value);
                 }
             }
             _ => {
@@ -63,6 +64,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // sending message via L1 Transport API, which is used by the Publisher internally
     let msg = UMessageBuilder::publish(topic.clone())
+        .with_priority(up_rust::UPriority::CS2)
         .build_with_payload("Hello plain text", up_rust::UPayloadFormat::Text)?;
     transport.send(msg).await?;
 
@@ -77,7 +79,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     publisher
         .publish(
             ORIGIN_RESOURCE_ID,
-            CallOptions::for_publish(None, None, None),
+            CallOptions::for_publish(None, None, Some(up_rust::UPriority::CS3)),
             Some(payload),
         )
         .await?;
