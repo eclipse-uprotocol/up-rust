@@ -67,9 +67,9 @@ pub use in_memory_rpc_server::InMemoryRpcServer;
 /// * message ID
 /// * priority
 #[cfg(any(feature = "up-l2-notifier", feature = "up-l2-publisher"))]
-pub(crate) fn apply_common_options(
+pub(crate) fn apply_common_options<S: crate::umessage::BuilderState>(
     call_options: CallOptions,
-    message_builder: &mut crate::UMessageBuilder,
+    message_builder: &mut crate::UMessageBuilder<S>,
 ) {
     message_builder.with_ttl(call_options.ttl);
     if let Some(v) = call_options.message_id {
@@ -87,8 +87,8 @@ pub(crate) fn apply_common_options(
     feature = "up-l2-rpc-client",
     feature = "up-l2-rpc-server"
 ))]
-pub(crate) fn build_message(
-    message_builder: &mut crate::UMessageBuilder,
+pub(crate) fn build_message<S: crate::umessage::BuilderState>(
+    message_builder: &mut crate::UMessageBuilder<S>,
     payload: Option<UPayload>,
 ) -> Result<crate::UMessage, crate::UMessageError> {
     if let Some(pl) = payload {
