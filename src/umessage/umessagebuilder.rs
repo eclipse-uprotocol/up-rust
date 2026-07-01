@@ -887,7 +887,6 @@ mod tests {
     #[test_case(UPriority::CS2; "with priority CS2")]
     #[test_case(UPriority::CS3; "with priority CS3")]
     // [utest->dsn~up-attributes-request-priority~1]
-    // [utest->dsn~up-attributes-response-priority~1]
     fn test_rpc_message_builders_fail(priority: UPriority) {
         let request_id = UUID::build();
         let method_to_invoke = UUri::try_from(METHOD_TO_INVOKE)
@@ -1107,7 +1106,10 @@ mod tests {
         // [utest->dsn~up-attributes-id~1]
         assert_eq!(message.id(), &response_message_id);
         assert_eq!(message.commstatus_unchecked(), UCode::DeadlineExceeded);
-        assert_eq!(message.priority_unchecked(), UPriority::CS5);
+        assert_eq!(
+            message.priority_unchecked(),
+            request_message.priority_unchecked()
+        );
         assert_eq!(message.request_id_unchecked(), &request_message_id);
         assert_eq!(message.sink_unchecked(), &reply_to_address);
         assert_eq!(message.source(), &method_to_invoke);
