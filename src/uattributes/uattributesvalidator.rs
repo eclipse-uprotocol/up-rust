@@ -370,6 +370,7 @@ impl UAttributesValidator for RequestValidator {
             self.validate_ttl(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
+            // [impl->dsn~up-attributes-request-priority~1]
             validate_rpc_priority(attributes),
         ]
         .into_iter()
