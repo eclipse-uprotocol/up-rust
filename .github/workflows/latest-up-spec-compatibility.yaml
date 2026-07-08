@@ -70,7 +70,7 @@ jobs:
 
       # now try to build and run the tests which may fail if incompatible changes
       # have been introduced into the uProtocol Core API
-      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with: 
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Run tests
