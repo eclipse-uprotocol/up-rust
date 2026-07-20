@@ -1,0 +1,29 @@
+################################################################################
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# SPDX-License-Identifier: Apache-2.0
+################################################################################
+
+[package]
+description = "Procedural macros for up-rust"
+edition = "2021"
+license = "Apache-2.0"
+name = "up-rust-macros"
+repository = "https://github.com/eclipse-uprotocol/up-rust"
+rust-version = "1.88"
+version = "0.10.0-SNAPSHOT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }
+
+[lints.rust]
+# every public item is documented; every public type is inspectable.
+# missing_copy_implementations is deliberately not enforced: implementing
+# Copy is a semver commitment we make per-type, not a hygiene default.
+missing_docs = "deny"
+missing_debug_implementations = "deny"

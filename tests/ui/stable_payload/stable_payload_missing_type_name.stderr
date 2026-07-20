@@ -1,0 +1,5 @@
+error: StablePayload derive requires #[stable_payload(type_name = "...")]
+ --> tests/ui/stable_payload/stable_payload_missing_type_name.rs:9:8
+  |
+9 | struct MissingTypeName {
+  |        ^^^^^^^^^^^^^^^

@@ -204,6 +204,13 @@ pub struct RpcClientUSubscription {
     rpc_client: Arc<dyn RpcClient>,
 }
 
+impl core::fmt::Debug for RpcClientUSubscription {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("RpcClientUSubscription")
+            .finish_non_exhaustive()
+    }
+}
+
 impl RpcClientUSubscription {
     /// Creates a new Notifier for a given transport.
     ///
@@ -406,13 +413,7 @@ impl USubscription for RpcClientUSubscription {
         Ok(result)
     }
 
-    async fn reset(
-        &self,
-        reason: ResetReason,
-        message: Option<String>,
-        before: Option<u64>, // millis since Unix Epoch
-    ) -> Result<(), UStatus> {
-        let before_ts = unix_epoch_millis_as_protobuf_timestamp(before)?;
+    async fn reset(&self, reason: ResetReason, message: Option<String>) -> Result<(), UStatus> {
         let reset_request = crate::up_core_api::usubscription::ResetRequest {
             reason: Some(crate::up_core_api::usubscription::reset_request::Reason {
                 code: crate::up_core_api::usubscription::reset_request::reason::Code::from(reason)
@@ -421,7 +422,6 @@ impl USubscription for RpcClientUSubscription {
                 ..Default::default()
             })
             .into(),
-            before: before_ts.into(),
             ..Default::default()
         };
         self.rpc_client
@@ -541,7 +541,7 @@ mod tests {
         assert!(usubscription_client
             .subscribe(&topic, None, None)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Internal));
+            .is_err_and(|e| e.code() == UCode::Internal));
         assert!(usubscription_client
             .subscribe(&topic, None, None)
             .await
@@ -591,7 +591,7 @@ mod tests {
         assert!(usubscription_client
             .unsubscribe(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Internal));
+            .is_err_and(|e| e.code() == UCode::Internal));
         assert!(usubscription_client.unsubscribe(&topic).await.is_ok());
     }
 
@@ -640,7 +640,7 @@ mod tests {
         assert!(usubscription_client
             .fetch_subscriptions_by_topic(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Internal));
+            .is_err_and(|e| e.code() == UCode::Internal));
         assert!(usubscription_client
             .fetch_subscriptions_by_topic(&topic)
             .await
@@ -692,7 +692,7 @@ mod tests {
         assert!(usubscription_client
             .fetch_subscribers(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Internal));
+            .is_err_and(|e| e.code() == UCode::Internal));
         assert!(usubscription_client.fetch_subscribers(&topic).await.is_ok());
     }
 
@@ -742,7 +742,7 @@ mod tests {
         assert!(usubscription_client
             .register_for_notifications(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Internal));
+            .is_err_and(|e| e.code() == UCode::Internal));
         assert!(usubscription_client
             .register_for_notifications(&topic)
             .await
@@ -795,7 +795,7 @@ mod tests {
         assert!(usubscription_client
             .unregister_for_notifications(&topic)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Internal));
+            .is_err_and(|e| e.code() == UCode::Internal));
         assert!(usubscription_client
             .unregister_for_notifications(&topic)
             .await
@@ -848,11 +848,11 @@ mod tests {
         let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
 
         assert!(usubscription_client
-            .reset(ResetReason::Unspecified, None, None)
+            .reset(ResetReason::Unspecified, None)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Internal));
+            .is_err_and(|e| e.code() == UCode::Internal));
         assert!(usubscription_client
-            .reset(ResetReason::Unspecified, None, None)
+            .reset(ResetReason::Unspecified, None)
             .await
             .is_ok());
     }

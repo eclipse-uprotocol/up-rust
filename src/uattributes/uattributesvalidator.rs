@@ -11,10 +11,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use crate::{UAttributes, UMessageType, UPriority, UUri};
+use crate::{PayloadEncoding, UAttributes, UMessageType, UPayloadFormat, UPriority, UUri};
 
 use crate::UAttributesError;
 
+/// *Role: standalone utility validating message attributes per message kind; used by transports at boundaries — see the [trait map](crate::guide::trait_map).*
+///
 /// `UAttributes` is the struct that defines the Payload. It serves as the configuration for various aspects
 /// like time to live, priority, security tokens, and more. Each variant of `UAttributes` defines a different
 /// type of message payload. The payload could represent a simple published payload with some state change,
@@ -85,11 +87,47 @@ pub fn validate_rpc_priority(attributes: &UAttributes) -> Result<(), UAttributes
         })
 }
 
+fn validate_payload_encoding(attributes: &UAttributes) -> Result<(), UAttributesError> {
+    let legacy_present = matches!(
+        attributes.payload_format(),
+        Some(format) if format != UPayloadFormat::Unspecified
+    );
+    let open_present = attributes.open_payload_encoding_parts() != (None, None, None);
+
+    if legacy_present && open_present {
+        return Err(UAttributesError::validation_error(
+            "payload encoding must use exactly one mechanism: payload_format or open payload-encoding fields",
+        ));
+    }
+
+    if open_present {
+        let (registry_id, literal_id, content_type) = attributes.open_payload_encoding_parts();
+        let encoding = PayloadEncoding::from_parts(
+            registry_id,
+            literal_id.map(ToOwned::to_owned),
+            content_type.map(ToOwned::to_owned),
+        )
+        .map_err(|error| UAttributesError::validation_error(error.to_string()))?;
+        if encoding.to_legacy_format().is_some() {
+            return Err(UAttributesError::validation_error(
+                "registered-range payload encodings must use payload_format, not open payload-encoding fields",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 /// Enum that hold the implementations of uattributesValidator according to type.
+#[derive(Debug)]
 pub enum UAttributesValidators {
+    /// Validates publish-message attributes.
     Publish,
+    /// Validates notification-message attributes.
     Notification,
+    /// Validates request-message attributes.
     Request,
+    /// Validates response-message attributes.
     Response,
 }
 
@@ -129,14 +167,14 @@ impl UAttributesValidators {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let msg = UMessageBuilder::publish(topic).build()?;
-    /// let validator = UAttributesValidators::get_validator_for_attributes(msg.attributes());
+    /// let validator = UAttributesValidators::validator_for_attributes(msg.attributes());
     /// assert!(validator.validate(msg.attributes()).is_ok());
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn get_validator_for_attributes(attributes: &UAttributes) -> Box<dyn UAttributesValidator> {
-        Self::get_validator(attributes.type_())
+    pub fn validator_for_attributes(attributes: &UAttributes) -> Box<dyn UAttributesValidator> {
+        Self::validator_for(attributes.type_())
     }
 
     /// Gets a validator that can be used to check attributes of a given type of message.
@@ -149,13 +187,13 @@ impl UAttributesValidators {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let topic = UUri::try_from("//my-vehicle/D45/23/A001")?;
     /// let msg = UMessageBuilder::publish(topic).build()?;
-    /// let validator = UAttributesValidators::get_validator(UMessageType::Publish);
+    /// let validator = UAttributesValidators::validator_for(UMessageType::Publish);
     /// assert!(validator.validate(msg.attributes()).is_ok());
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn get_validator(message_type: UMessageType) -> Box<dyn UAttributesValidator> {
+    pub fn validator_for(message_type: UMessageType) -> Box<dyn UAttributesValidator> {
         match message_type {
             UMessageType::Publish => Box::new(PublishValidator),
             UMessageType::Notification => Box::new(NotificationValidator),
@@ -163,9 +201,21 @@ impl UAttributesValidators {
             UMessageType::Response => Box::new(ResponseValidator),
         }
     }
+    /// Deprecated alias for [`Self::validator_for`].
+    #[deprecated(since = "0.11.0", note = "renamed to `validator_for`")]
+    pub fn get_validator(message_type: crate::UMessageType) -> Box<dyn UAttributesValidator> {
+        Self::validator_for(message_type)
+    }
+
+    /// Deprecated alias for [`Self::validator_for_attributes`].
+    #[deprecated(since = "0.11.0", note = "renamed to `validator_for_attributes`")]
+    pub fn get_validator_for_attributes(attributes: &UAttributes) -> Box<dyn UAttributesValidator> {
+        Self::validator_for_attributes(attributes)
+    }
 }
 
 /// Validates attributes describing a Publish message.
+#[derive(Debug)]
 pub struct PublishValidator;
 
 impl UAttributesValidator for PublishValidator {
@@ -188,6 +238,7 @@ impl UAttributesValidator for PublishValidator {
             self.validate_type(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
+            validate_payload_encoding(attributes),
         ]
         .into_iter()
         .filter_map(Result::err)
@@ -236,6 +287,7 @@ impl UAttributesValidator for PublishValidator {
 }
 
 /// Validates attributes describing a Notification message.
+#[derive(Debug)]
 pub struct NotificationValidator;
 
 impl UAttributesValidator for NotificationValidator {
@@ -258,6 +310,7 @@ impl UAttributesValidator for NotificationValidator {
             self.validate_type(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
+            validate_payload_encoding(attributes),
         ]
         .into_iter()
         .filter_map(Result::err)
@@ -325,6 +378,7 @@ impl UAttributesValidator for NotificationValidator {
 }
 
 /// Validate `UAttributes` with type `UMessageType::Request`
+#[derive(Debug)]
 pub struct RequestValidator;
 
 impl RequestValidator {
@@ -370,8 +424,8 @@ impl UAttributesValidator for RequestValidator {
             self.validate_ttl(attributes),
             self.validate_source(attributes),
             self.validate_sink(attributes),
-            // [impl->dsn~up-attributes-request-priority~1]
             validate_rpc_priority(attributes),
+            validate_payload_encoding(attributes),
         ]
         .into_iter()
         .filter_map(Result::err)
@@ -418,6 +472,7 @@ impl UAttributesValidator for RequestValidator {
 }
 
 /// Validate `UAttributes` with type `UMessageType::Response`
+#[derive(Debug)]
 pub struct ResponseValidator;
 
 impl ResponseValidator {
@@ -459,6 +514,7 @@ impl UAttributesValidator for ResponseValidator {
             self.validate_sink(attributes),
             self.validate_reqid(attributes),
             validate_rpc_priority(attributes),
+            validate_payload_encoding(attributes),
         ]
         .into_iter()
         .filter_map(Result::err)
@@ -522,7 +578,7 @@ mod tests {
         expected_validator_type: UMessageType,
     ) {
         let validator: Box<dyn UAttributesValidator> =
-            UAttributesValidators::get_validator(message_type);
+            UAttributesValidators::validator_for(message_type);
         assert_eq!(validator.message_type(), expected_validator_type);
     }
 
@@ -542,6 +598,9 @@ mod tests {
             commstatus: None,
             id: UUID::build(),
             payload_format: None,
+            payload_encoding_registry_id: None,
+            payload_encoding: None,
+            payload_content_type: None,
             permission_level: None,
             priority: UPriority::CS1.into(),
             reqid: None,
@@ -589,6 +648,9 @@ mod tests {
             commstatus: None,
             id: UUID::build(),
             payload_format: None,
+            payload_encoding_registry_id: None,
+            payload_encoding: None,
+            payload_content_type: None,
             permission_level: None,
             priority: UPriority::CS1.into(),
             reqid: None,
@@ -647,6 +709,9 @@ mod tests {
             commstatus: None,
             id: UUID::build(),
             payload_format: None,
+            payload_encoding_registry_id: None,
+            payload_encoding: None,
+            payload_content_type: None,
             permission_level: perm_level,
             priority,
             reqid: None,
@@ -705,6 +770,9 @@ mod tests {
             commstatus,
             id: UUID::build(),
             payload_format: None,
+            payload_encoding_registry_id: None,
+            payload_encoding: None,
+            payload_content_type: None,
             permission_level: None,
             priority,
             reqid,

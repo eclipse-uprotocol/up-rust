@@ -42,13 +42,32 @@ communication = [
     "up-l2-rpc-client",
     "up-l2-rpc-server",
 ]
+payload-contract-fixtures = ["protobuf-wire", "zero-copy-transport", "dep:serde", "dep:serde_json", "dep:sha2"]
 protobuf-support = ["dep:protobuf"]
 symphony = ["up-l2-rpc-server", "dep:serde", "dep:serde_json", "dep:symphony"]
 test-util = ["dep:mockall"]
-up-core-types = ["protobuf-support"]
-up-l2-api = ["dep:thiserror"]
-up-l2-notifier = ["up-l2-api"]
-up-l2-publisher = ["up-l2-api"]
+up-core-api = ["protobuf-support"]
+# Renamed from up-core-types: the feature gates the generated up_core_api
+# module, not the unconditional core types. The old name forwards.
+up-core-types = ["up-core-api"]
+transport-implementer-api = ["selected-wire-transport-core"]
+selected-wire-transport-core = ["selected-wire-codec-core"]
+selected-wire-transport-adapter = ["selected-wire-transport-core"]
+selected-wire-codec-core = []
+wire-implementer-api = ["selected-wire-codec-core"]
+selected-wire-user-api = ["selected-wire-transport-adapter", "up-core-api"]
+payload-contract-large-fixtures = ["payload-contract-fixtures"]
+payload-contract-simulator-fixtures = ["payload-contract-large-fixtures"]
+perf-diagnostics = ["zero-copy-transport"]
+protobuf-wire = ["up-core-api"]
+zero-copy-transport = []
+owned-frame-transport = ["selected-wire-transport-core", "up-core-api"]
+communication-api = ["dep:thiserror"]
+# Renamed from up-l2-api to match the communication layer's name in the
+# guide. The old name forwards.
+up-l2-api = ["communication-api"]
+up-l2-notifier = ["communication-api"]
+up-l2-publisher = ["communication-api"]
 up-l2-subscriber = ["up-l2-api", "usubscription"]
 up-l2-rpc-client = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time"]
 up-l2-rpc-server = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time"]
@@ -64,7 +83,7 @@ mockall = { version = "0.13", optional = true }
 protobuf = { version = "3.7.2", features = ["with-bytes"], optional = true }
 rand = { version = "0.10.1" }
 regex = { version = "1.11" }
-serde = { version = "1.0.228", optional = true }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.150", optional = true }
 symphony = { version = "0.1.5", optional = true }
 thiserror = { version = "1.0.69", optional = true }
@@ -73,16 +92,24 @@ tracing = { version = "0.1", default-features = false, features = ["log", "std"]
 uriparse = { version = "0.6" }
 uuid-simd = { version = "0.8", default-features = false, features = ["std", "detect"] }
 
+document-features = { version = "0.2", optional = true }
+sha2 = { version = "0.11", optional = true }
+up-rust-macros = { path = "macros", version = "0.10.0-SNAPSHOT" }
+
 [build-dependencies]
 protobuf-codegen = { version = "3.7.2" }
 protoc-bin-vendored = { version = "3.2" }
 
 [dev-dependencies]
+trybuild = { version = "1.0.114" }
+criterion = { version = "0.5.1", features = ["csv_output"] }
 clap = { version = "4.6.1" }
 cucumber = { version = "0.23.0", features = ["output-junit"] }
 hex = { version = "0.4.3" }
 mockall = { version = "0.13.1" }
 test-case = { version = "3.3.1" }
+pretty_assertions = { version = "1.4" }
+proptest = { version = "1.5" }
 time = { version = "0.3.47" }
 tokio = { version = "1.45.1", default-features = false, features = [
     "macros",
@@ -108,34 +135,34 @@ skip_feature_sets = [
     ["up-core-types", "protobuf-support"],
     ["cloudevents", "protobuf-support"],
     ["symphony", "up-l2-rpc-server"],
-    ["symphony", "up-l2-api"],
+    ["symphony", "communication-api"],
     ["communication", "up-l2-notifier"],
     ["communication", "up-l2-publisher"],
     ["communication", "up-l2-subscriber"],
     ["communication", "up-l2-rpc-client"],
     ["communication", "up-l2-rpc-server"],
-    ["communication", "up-l2-api"],
+    ["communication", "communication-api"],
     ["communication", "up-core-types"],
     ["communication", "protobuf-support"],
     ["communication", "usubscription"],
-    ["up-l2-notifier", "up-l2-api"],
-    ["up-l2-publisher", "up-l2-api"],
-    ["up-l2-subscriber", "up-l2-api"],
+    ["up-l2-notifier", "communication-api"],
+    ["up-l2-publisher", "communication-api"],
+    ["up-l2-subscriber", "communication-api"],
     ["up-l2-subscriber", "usubscription"],
     ["up-l2-subscriber", "up-l2-rpc-client"],
     ["up-l2-subscriber", "up-core-types"],
-    ["up-l2-rpc-client", "up-l2-api"],
+    ["up-l2-rpc-client", "communication-api"],
     ["up-l2-rpc-client", "up-core-types"],
     ["up-l2-rpc-client", "protobuf-support"],
-    ["up-l2-rpc-server", "up-l2-api"],
+    ["up-l2-rpc-server", "communication-api"],
     ["up-l2-rpc-server", "up-core-types"],
     ["up-l2-rpc-server", "protobuf-support"],
     ["usubscription", "up-l2-rpc-client"],
-    ["usubscription", "up-l2-api"],
+    ["usubscription", "communication-api"],
     ["usubscription", "up-core-types"],
     ["usubscription", "protobuf-support"],
     ["udiscovery", "up-l2-rpc-client"],
-    ["udiscovery", "up-l2-api"],
+    ["udiscovery", "communication-api"],
     ["udiscovery", "up-core-types"],
     ["udiscovery", "protobuf-support"],
 ]
@@ -170,6 +197,11 @@ harness = false                       # allows Cucumber to print output instead 
 required-features = ["up-core-types"]
 
 [lints.rust]
+# every public item is documented; every public type is inspectable.
+# missing_copy_implementations is deliberately not enforced: implementing
+# Copy is a semver commitment we make per-type, not a hygiene default.
+missing_docs = "deny"
+missing_debug_implementations = "deny"
 # this prevents cargo from complaining about code blocks
 # excluded from tarpaulin coverage checks
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
@@ -182,3 +214,70 @@ wildcard_enum_match_arm = "deny"
 unneeded_field_pattern = "deny"
 fn_params_excessive_bools = "deny"
 must_use_candidate = "allow"
+
+
+
+[[test]]
+name = "payload_contract"
+required-features = ["payload-contract-fixtures", "wire-implementer-api"]
+
+[[test]]
+name = "wire_metadata_conformance"
+required-features = ["wire-implementer-api", "up-core-api"]
+
+[[test]]
+name = "wire_metadata_golden"
+required-features = ["wire-implementer-api", "up-core-api"]
+
+[[test]]
+name = "wire_transport_adapter"
+required-features = ["selected-wire-user-api", "wire-implementer-api", "transport-implementer-api", "protobuf-wire", "zero-copy-transport"]
+
+[[test]]
+name = "wire_transport_trybuild"
+required-features = ["selected-wire-user-api", "wire-implementer-api", "transport-implementer-api", "protobuf-wire", "zero-copy-transport"]
+
+[[test]]
+name = "stable_container_miri"
+required-features = ["test-util", "zero-copy-transport"]
+
+[[test]]
+name = "role_firewall_trybuild"
+required-features = ["selected-wire-user-api"]
+
+[[test]]
+name = "role_module_compatibility"
+required-features = ["selected-wire-user-api", "wire-implementer-api", "transport-implementer-api", "owned-frame-transport", "zero-copy-transport"]
+
+[[test]]
+name = "zero_copy_uninit_surface_trybuild"
+required-features = ["selected-wire-user-api", "transport-implementer-api", "communication-api", "zero-copy-transport"]
+
+[[test]]
+name = "validation_typestate_trybuild"
+required-features = ["owned-frame-transport", "zero-copy-transport"]
+
+[[bench]]
+name = "selected_wire_metadata"
+harness = false
+required-features = ["selected-wire-user-api", "wire-implementer-api", "transport-implementer-api", "protobuf-wire", "zero-copy-transport"]
+
+[[bench]]
+name = "selected_wire_rx"
+harness = false
+required-features = ["selected-wire-user-api", "wire-implementer-api", "transport-implementer-api", "protobuf-wire", "zero-copy-transport"]
+
+[[bench]]
+name = "selected_wire_filter"
+harness = false
+required-features = ["selected-wire-user-api", "wire-implementer-api", "transport-implementer-api", "protobuf-wire", "zero-copy-transport"]
+
+[[bench]]
+name = "selected_wire_adapter_receive"
+harness = false
+required-features = ["selected-wire-user-api", "wire-implementer-api", "transport-implementer-api", "protobuf-wire", "zero-copy-transport"]
+
+[[bench]]
+name = "stable_payload_init"
+harness = false
+required-features = ["zero-copy-transport"]

@@ -1,0 +1,5 @@
+error: StablePayload derive does not support unions
+  --> tests/ui/stable_payload/stable_payload_union.rs:10:1
+   |
+10 | union UnionPayload {
+   | ^^^^^

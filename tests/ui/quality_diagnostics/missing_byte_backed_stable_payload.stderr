@@ -1,0 +1,17 @@
+error[E0277]: `StableOnly` does not implement the byte-backed stable-payload contract
+  --> tests/ui/quality_diagnostics/missing_byte_backed_stable_payload.rs:13:25
+   |
+13 |     needs_byte_backed::<StableOnly>();
+   |                         ^^^^^^^^^^ this type cannot use byte-backed stable-container paths
+   |
+help: the trait `ByteBackedStablePayload` is not implemented for `StableOnly`
+  --> tests/ui/quality_diagnostics/missing_byte_backed_stable_payload.rs:4:1
+   |
+ 4 | struct StableOnly(u8);
+   | ^^^^^^^^^^^^^^^^^
+   = note: derive `ByteBackedStablePayload` only for an eligible `#[repr(C)]` type with no implicit padding and recursively byte-backed fields
+note: required by a bound in `needs_byte_backed`
+  --> tests/ui/quality_diagnostics/missing_byte_backed_stable_payload.rs:10:25
+   |
+10 | fn needs_byte_backed<T: ByteBackedStablePayload>() {}
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `needs_byte_backed`

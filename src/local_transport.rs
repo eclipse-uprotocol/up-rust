@@ -57,6 +57,12 @@ pub struct LocalTransport {
     listeners: RwLock<HashSet<RegisteredListener>>,
 }
 
+impl core::fmt::Debug for LocalTransport {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("LocalTransport").finish_non_exhaustive()
+    }
+}
+
 impl LocalTransport {
     async fn dispatch(&self, message: UMessage) {
         let listeners = self.listeners.read().await;

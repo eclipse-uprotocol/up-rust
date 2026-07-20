@@ -1,0 +1,5 @@
+error: StablePayload derive does not support generic types yet
+  --> tests/ui/stable_payload/stable_payload_generic.rs:10:22
+   |
+10 | struct GenericPayload<T> {
+   |                      ^^^

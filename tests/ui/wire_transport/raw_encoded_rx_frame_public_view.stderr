@@ -1,0 +1,65 @@
+error[E0277]: the trait bound `RawEncodedRxFrame: UFrameView` is not satisfied
+  --> tests/ui/wire_transport/raw_encoded_rx_frame_public_view.rs:54:22
+   |
+54 |     needs_frame_view(&raw);
+   |     ---------------- ^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `UFrameView` is not implemented for `RawEncodedRxFrame`
+  --> tests/ui/wire_transport/raw_encoded_rx_frame_public_view.rs:18:1
+   |
+18 | struct RawEncodedRxFrame;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `UFrameView`
+  --> src/wire_transport.rs
+   |
+   | / impl<Rx, W, C> UFrameView for UWireRx<Rx, W, C>
+   | | where
+   | |     Rx: UEncodedRxFrame,
+   | |     W: UWire,
+   | |     C: UWireMetadataCodecFor<W>,
+   | |________________________________^ `UWireRx<Rx, W, C>`
+   |
+  ::: src/zero_copy/tests.rs
+   |
+   |   impl UFrameView for UVecRxLease {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `UVecRxLease`
+note: required by a bound in `needs_frame_view`
+  --> tests/ui/wire_transport/raw_encoded_rx_frame_public_view.rs:47:24
+   |
+47 | fn needs_frame_view<T: UFrameView>(_frame: &T) {}
+   |                        ^^^^^^^^^^ required by this bound in `needs_frame_view`
+
+error[E0277]: the trait bound `RawEncodedRxFrame: UZeroCopyRxLease` is not satisfied
+  --> tests/ui/wire_transport/raw_encoded_rx_frame_public_view.rs:55:30
+   |
+55 |     needs_zero_copy_rx_lease(&raw);
+   |     ------------------------ ^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `UZeroCopyRxLease` is not implemented for `RawEncodedRxFrame`
+  --> tests/ui/wire_transport/raw_encoded_rx_frame_public_view.rs:18:1
+   |
+18 | struct RawEncodedRxFrame;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `UZeroCopyRxLease`
+  --> src/wire_transport.rs
+   |
+   | / impl<Rx, W, C> UZeroCopyRxLease for UWireRx<Rx, W, C>
+   | | where
+   | |     Rx: UEncodedRxFrame,
+   | |     W: UWire,
+   | |     C: UWireMetadataCodecFor<W>,
+   | |________________________________^ `UWireRx<Rx, W, C>`
+   |
+  ::: src/zero_copy/tests.rs
+   |
+   |   impl UZeroCopyRxLease for UVecRxLease {}
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `UVecRxLease`
+note: required by a bound in `needs_zero_copy_rx_lease`
+  --> tests/ui/wire_transport/raw_encoded_rx_frame_public_view.rs:49:32
+   |
+49 | fn needs_zero_copy_rx_lease<T: UZeroCopyRxLease>(_lease: &T) {}
+   |                                ^^^^^^^^^^^^^^^^ required by this bound in `needs_zero_copy_rx_lease`

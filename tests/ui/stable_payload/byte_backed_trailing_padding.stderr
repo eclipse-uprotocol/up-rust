@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: ByteBackedStablePayload types must not have implicit trailing padding; use explicit initialized padding fields
+ --> tests/ui/stable_payload/byte_backed_trailing_padding.rs:8:34
+  |
+8 | #[derive(up_rust::StablePayload, up_rust::ByteBackedStablePayload)]
+  |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here

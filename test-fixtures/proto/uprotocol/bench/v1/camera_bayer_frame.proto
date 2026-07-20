@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package uprotocol.bench.v1;
+
+import "uprotocol/bench/v1/common.proto";
+
+message CameraBayerFrame {
+  BenchHeader header = 1;
+  uint32 camera_id = 2;
+  uint64 frame_counter = 3;
+  uint64 sensor_timestamp_ns = 4;
+  uint32 width = 5;
+  uint32 height = 6;
+  uint32 stride_bytes = 7;
+  uint32 bayer_pattern = 8;
+  uint32 bits_per_sample = 9;
+  uint32 packed_layout = 10;
+  uint64 exposure_start_ns = 11;
+  uint32 exposure_time_us = 12;
+  float analog_gain = 13;
+  float digital_gain = 14;
+  CameraIntrinsics intrinsics = 15;
+  Pose3d extrinsics = 16;
+  Roi roi = 17;
+  bytes pixels = 18;
+  uint32 checksum = 19;
+}

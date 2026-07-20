@@ -1,0 +1,5 @@
+error: StablePayload derive does not support enums
+  --> tests/ui/stable_payload/stable_payload_enum.rs:10:1
+   |
+10 | enum EnumPayload {
+   | ^^^^

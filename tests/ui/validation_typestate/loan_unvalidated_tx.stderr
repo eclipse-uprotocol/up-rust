@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+ --> tests/ui/validation_typestate/loan_unvalidated_tx.rs:7:23
+  |
+7 |     transport.loan_tx(spec).await.unwrap();
+  |               ------- ^^^^ expected `UTxLoanSpec`, found `UTxLoanSpec<Unvalidated>`
+  |               |
+  |               arguments to this method are incorrect
+  |
+  = note: expected struct `UTxLoanSpec<Validated>`
+             found struct `UTxLoanSpec<Unvalidated>`
+note: method defined here
+ --> src/zero_copy/transport.rs
+  |
+  |     async fn loan_tx(&self, spec: UTxLoanSpec) -> Result<Self::Tx, UStatus>;
+  |              ^^^^^^^

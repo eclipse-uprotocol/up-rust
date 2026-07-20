@@ -1,0 +1,5 @@
+error[E0432]: unresolved import `up_rust::XcdrV2Wire`
+ --> tests/ui/wire_transport/xcdrv2_wire_not_in_up_rust.rs:7:5
+  |
+7 | use up_rust::XcdrV2Wire;
+  |     ^^^^^^^^^^^^^^^^^^^ no `XcdrV2Wire` in the root

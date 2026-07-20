@@ -11,9 +11,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+//! Example: send a targeted notification through the communication layer.
+
 use std::sync::Arc;
 
-use bytes::Bytes;
+use protobuf::well_known_types::wrappers::StringValue;
 use up_rust::{
     communication::{CallOptions, Notifier, SimpleNotifier, UPayload},
     local_transport::LocalTransport,
@@ -25,13 +27,13 @@ struct ConsolePrinter {}
 #[async_trait::async_trait]
 impl UListener for ConsolePrinter {
     async fn on_receive(&self, msg: UMessage) {
-        if let Some(payload) = msg.payload() {
-            let msg = String::from_utf8_lossy(payload.as_ref());
-            println!("received notification: {}", msg);
+        if let Ok(payload) = msg.extract_protobuf::<StringValue>() {
+            println!("received notification: {}", payload.value);
         }
     }
 }
 
+/// Runs the targeted-notification example.
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const ORIGIN_RESOURCE_ID: u16 = 0xd100;
@@ -48,7 +50,11 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     notifier.start_listening(&topic, listener.clone()).await?;
 
-    let payload = UPayload::new(Bytes::from("Hello"), up_rust::UPayloadFormat::Text);
+    let value = StringValue {
+        value: "Hello".to_string(),
+        ..Default::default()
+    };
+    let payload = UPayload::try_from_protobuf(value)?;
     notifier
         .notify(
             ORIGIN_RESOURCE_ID,
@@ -58,12 +64,6 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    // At this point we can be sure that all notifications have been processed already.
-    // This is because the LocalTransport dispatches all messages to listeners on the same
-    // thread that has been used to send the messages.
-    // When using an asynchronous transport, such as MQTT5 or Eclipse Zenoh, we would need to
-    // notify the sender from within the listener, e.g. by means of a Channel, before stopping
-    // the listener.
     notifier.stop_listening(&topic, listener).await?;
     Ok(())
 }

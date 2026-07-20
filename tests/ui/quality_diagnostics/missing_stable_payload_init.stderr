@@ -1,0 +1,17 @@
+error[E0277]: `NotInitialized` has no stable-payload initializer
+ --> tests/ui/quality_diagnostics/missing_stable_payload_init.rs:8:25
+  |
+8 |     needs_stable_init::<NotInitialized>();
+  |                         ^^^^^^^^^^^^^^ missing `StablePayloadInit` implementation
+  |
+help: the trait `StablePayloadInit` is not implemented for `NotInitialized`
+ --> tests/ui/quality_diagnostics/missing_stable_payload_init.rs:3:1
+  |
+3 | struct NotInitialized;
+  | ^^^^^^^^^^^^^^^^^^^^^
+  = note: derive `StablePayloadInit` to get the typestate builder used by `send_uninit_stable_payload`
+note: required by a bound in `needs_stable_init`
+ --> tests/ui/quality_diagnostics/missing_stable_payload_init.rs:5:25
+  |
+5 | fn needs_stable_init<T: StablePayloadInit>() {}
+  |                         ^^^^^^^^^^^^^^^^^ required by this bound in `needs_stable_init`

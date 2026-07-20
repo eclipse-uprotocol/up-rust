@@ -1,0 +1,33 @@
+error[E0038]: the trait `UWire` is not dyn compatible
+  --> tests/ui/wire_transport/erased_wire_static_claim.rs:12:29
+   |
+12 |     needs_static_wire::<dyn UWire>();
+   |                             ^^^^^ `UWire` is not dyn compatible
+   |
+note: for a trait to be dyn compatible it needs to allow building a vtable
+      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+  --> src/wire.rs
+   |
+   |     const WIRE_ID: WireIdentity;
+   |           ^^^^^^^ the trait is not dyn compatible because it contains associated const `WIRE_ID`
+   |     /// Payload operation family supported by this selected wire.
+   |     const PAYLOAD_FAMILY_ID: WireIdentity;
+   |           ^^^^^^^^^^^^^^^^^ the trait is not dyn compatible because it contains associated const `PAYLOAD_FAMILY_ID`
+   |     /// Metadata byte layout used by this selected wire.
+   |     const METADATA_LAYOUT_ID: WireIdentity;
+   |           ^^^^^^^^^^^^^^^^^^ the trait is not dyn compatible because it contains associated const `METADATA_LAYOUT_ID`
+   |     /// Metadata byte-format version supported by this selected wire.
+   |     const FORMAT_VERSION: u16;
+   |           ^^^^^^^^^^^^^^ the trait is not dyn compatible because it contains associated const `FORMAT_VERSION`
+...
+   |     fn wire_compatibility(actual: &WireIdentityRef) -> WireCompatibility {
+   |        ^^^^^^^^^^^^^^^^^^ the trait is not dyn compatible because associated function `wire_compatibility` has no `self` parameter
+...
+   |     fn payload_family_compatibility(actual: &WireIdentityRef) -> WireCompatibility {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait is not dyn compatible because associated function `payload_family_compatibility` has no `self` parameter
+   = help: the following types implement `UWire`:
+             up_rust::UProtocolNativeWire
+             up_rust::ProtobufWire
+             up_rust::StableContainerWireFormat
+           consider defining an enum where each variant holds one of these types,
+           implementing `UWire` for this new enum and using it instead

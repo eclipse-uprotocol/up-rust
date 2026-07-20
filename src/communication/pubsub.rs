@@ -24,8 +24,10 @@ use crate::{
 /// An error indicating a problem with publishing a message to a topic.
 // [impl->dsn~communication-layer-api-declaration~1]
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum PubSubError {
-    /// Indicates that the given message cannot be sent because it is not a [valid Publish message](crate::PublishValidator).
+    /// Indicates that the given message cannot be sent because it is not a
+    /// [valid Publish message](crate::UAttributesValidators::Publish).
     #[error("invalid argument: {0}")]
     InvalidArgument(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to publish a message.
@@ -61,6 +63,7 @@ pub trait Publisher: Send + Sync {
 
 // [impl->dsn~communication-layer-api-declaration~1]
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
+/// Callback invoked when a subscription's status changes.
 pub trait SubscriptionChangeHandler: Send + Sync {
     /// Invoked for each update to the subscription status for a given topic.
     ///

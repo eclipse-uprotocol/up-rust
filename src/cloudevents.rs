@@ -32,6 +32,7 @@ include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
 
 // The _official_ content type to use for CloudEvents serialized using the
 // protobuf format.
+/// MIME content type for protobuf-encoded CloudEvents.
 pub const CONTENT_TYPE_CLOUDEVENTS_PROTOBUF: &str = "application/cloudevents+protobuf";
 
 const CLOUDEVENTS_SPEC_VERSION: &str = "1.0";
@@ -317,6 +318,22 @@ impl TryFrom<UMessage> for CloudEvent {
     //
     // Returns an error if the given message does not contain the necessary information for creating a CloudEvent.
     fn try_from(message: UMessage) -> Result<Self, Self::Error> {
+        // [impl->dsn~up-cloudevents-open-identity-unrepresentable~1]
+        // This mapping revision defines carriage for `payload_format`
+        // (registry ids 1..=8) only. A message carrying the open
+        // payload-encoding identity fields has no CloudEvents
+        // representation here and MUST fail the mapping explicitly: the
+        // identity is never dropped, substituted into `pformat`, or
+        // emitted as an unlabeled payload.
+        {
+            let attribs = message.attributes();
+            if attribs.open_payload_encoding_parts() != (None, None, None) {
+                return Err(UMessageError::PayloadError(
+                    "open payload-encoding identity fields are not representable in the CloudEvents mapping"
+                        .to_string(),
+                ));
+            }
+        }
         let mut event = CloudEvent::new();
         event.spec_version = CLOUDEVENTS_SPEC_VERSION.into();
         event.set_id(message.id());
@@ -416,8 +433,11 @@ impl TryFrom<CloudEvent> for UMessage {
             token: event.get_token()?,
             traceparent: event.get_traceparent()?,
             payload_format: Some(event.get_payload_format()?),
+            payload_encoding_registry_id: None,
+            payload_encoding: None,
+            payload_content_type: None,
         };
-        UAttributesValidators::get_validator_for_attributes(&attributes).validate(&attributes)?;
+        UAttributesValidators::validator_for_attributes(&attributes).validate(&attributes)?;
 
         let payload = if event.has_binary_data() {
             Some(Bytes::copy_from_slice(event.binary_data()))
@@ -830,5 +850,24 @@ mod tests {
         assert_eq!(attribs.reqid, Some(request_id));
         assert_eq!(attribs.payload_format_unchecked(), UPayloadFormat::Protobuf);
         assert_eq!(umessage.payload(), Some(DATA.as_slice().into()));
+    }
+
+    /// [utest->dsn~up-cloudevents-open-identity-unrepresentable~1]
+    #[test]
+    fn umessage_with_open_payload_encoding_identity_fails_mapping() {
+        let encoding =
+            crate::PayloadEncoding::custom("up.xcdr-v2", "application/vnd.uprotocol.xcdr-v2")
+                .expect("encoding");
+        let message =
+            UMessageBuilder::publish(UUri::try_from_parts("vin", 0x10AB, 1, 0x8000).expect("uri"))
+                .build_with_payload(vec![0xC0, 0xFF], UPayloadFormat::Unspecified)
+                .expect("message")
+                .with_assumed_payload_encoding(&encoding);
+
+        let result = CloudEvent::try_from(message);
+        assert!(
+            matches!(result, Err(UMessageError::PayloadError(_))),
+            "open identity must fail the CE mapping explicitly"
+        );
     }
 }

@@ -1,0 +1,10 @@
+error[E0308]: mismatched types
+  --> tests/ui/stable_payload/stable_payload_init_missing_field.rs:31:61
+   |
+31 |     let _: InitializedStablePayload<'_, InitMissingField> = init.tag(1);
+   |            ----------------------------------------------   ^^^^^^^^^^^ expected `InitializedStablePayload<'_, ...>`, found `__UpRustStablePayloadInitForInitMissingField<'_, ..., ...>`
+   |            |
+   |            expected due to this
+   |
+   = note: expected struct `InitializedStablePayload<'_, InitMissingField>`
+              found struct `__UpRustStablePayloadInitForInitMissingField<'_, up_rust::payload::stable::StablePayloadInitSet, up_rust::payload::stable::StablePayloadInitUnset>`

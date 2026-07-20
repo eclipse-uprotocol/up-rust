@@ -35,6 +35,22 @@ Similarly, the project requests that markdown is formatted and linted properly -
 
 During development, before submitting a PR, you can use `./tools/fmt_clippy_doc.sh` to run these checks on the workspace.
 
+## Performance evidence
+
+Performance reports preserve raw observations exactly. Integer bencher output
+may round a sub-nanosecond observation to `0 ns/iter`; that is a statement about
+timer and output resolution, never evidence that an operation is free, absent,
+zero-copy, or end-to-end no-copy. Generated prose that contains a zero value must
+carry this caveat.
+
+The first measured corpus for a new operation or profile is a baseline, not a
+regression or improvement result. Before measuring a candidate, record the
+baseline identity, comparison policy, controls, sample/iteration rules,
+thresholds, variance treatment, and failure handling. A later comparison may use
+only a policy that predates the candidate evidence. Do not retrofit thresholds
+after observing the result or compare unrelated machines/toolchains without an
+explicitly labeled diagnostic purpose.
+
 There also exists a helper script in ./tools to generate test results and test code coverage reports. These reports are placed in the `./target/tarpaulin` directory. If you use VSCode with the [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters) extension, you can enable display of code coverage information with these settings:
 
 ``` json

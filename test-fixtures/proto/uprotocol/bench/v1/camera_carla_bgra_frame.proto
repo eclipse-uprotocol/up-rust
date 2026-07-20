@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package uprotocol.bench.v1;
+
+import "uprotocol/bench/v1/common.proto";
+
+message CameraCarlaBgraFrame {
+  BenchHeader header = 1;
+  uint32 camera_id = 2;
+  uint64 frame_counter = 3;
+  uint64 sensor_timestamp_ns = 4;
+  uint32 width = 5;
+  uint32 height = 6;
+  uint32 stride_bytes = 7;
+  uint32 pixel_format = 8;
+  uint64 exposure_start_ns = 9;
+  bytes bgra = 10;
+  uint32 checksum = 11;
+}

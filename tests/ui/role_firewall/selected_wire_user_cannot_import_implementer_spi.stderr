@@ -1,0 +1,90 @@
+error[E0432]: unresolved imports `up_rust::transport_implementer_api`, `up_rust::wire_implementer_api`, `up_rust::UEncodedRxFrame`, `up_rust::UWire`, `up_rust::UWirePayload`, `up_rust::UWireTransport`
+ --> tests/ui/role_firewall/selected_wire_user_cannot_import_implementer_spi.rs:8:5
+  |
+8 |     transport_implementer_api, wire, wire_implementer_api, wire_transport, UEncodedRxFrame, UWire,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^        ^^^^^^^^^^^^^^^^^^^^                  ^^^^^^^^^^^^^^^  ^^^^^ no `UWire` in the root
+  |     |                                |                                     |
+  |     |                                |                                     no `UEncodedRxFrame` in the root
+  |     |                                no `wire_implementer_api` in the root
+  |     no `transport_implementer_api` in the root
+9 |     UWirePayload, UWireTransport,
+  |     ^^^^^^^^^^^^  ^^^^^^^^^^^^^^ no `UWireTransport` in the root
+  |     |
+  |     no `UWirePayload` in the root
+  |
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  | #[cfg(feature = "transport-implementer-api")]
+  |       ------------------------------------- the item is gated behind the `transport-implementer-api` feature
+  | pub mod transport_implementer_api {
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  | #[cfg(feature = "wire-implementer-api")]
+  |       -------------------------------- the item is gated behind the `wire-implementer-api` feature
+  | pub mod wire_implementer_api {
+  |         ^^^^^^^^^^^^^^^^^^^^
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  | #[cfg(feature = "transport-implementer-api")]
+  |       ------------------------------------- the item is gated behind the `transport-implementer-api` feature
+  | pub use wire_transport::UEncodedRxFrame;
+  |                         ^^^^^^^^^^^^^^^
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  | #[cfg(feature = "wire-implementer-api")]
+  |       -------------------------------- the item is gated behind the `wire-implementer-api` feature
+  | pub use wire::{UWire, UWireDecode, UWireEncode, UWirePayload, UWireReadDecode};
+  |                ^^^^^
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  | #[cfg(feature = "wire-implementer-api")]
+  |       -------------------------------- the item is gated behind the `wire-implementer-api` feature
+  | pub use wire::{UWire, UWireDecode, UWireEncode, UWirePayload, UWireReadDecode};
+  |                                                 ^^^^^^^^^^^^
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  |       any(
+  |  ________-
+  | |         feature = "transport-implementer-api",
+  | |         feature = "wire-implementer-api"
+  | |     )
+  | |_____- the item is gated here
+  |   ))]
+  |   pub use wire_transport::UWireTransport;
+  |                           ^^^^^^^^^^^^^^
+help: a similar name exists in the module
+  |
+9 -     UWirePayload, UWireTransport,
+9 +     UWirePayload, wire_transport,
+  |
+
+error[E0603]: module `wire` is private
+ --> tests/ui/role_firewall/selected_wire_user_cannot_import_implementer_spi.rs:8:32
+  |
+8 |     transport_implementer_api, wire, wire_implementer_api, wire_transport, UEncodedRxFrame, UWire,
+  |                                ^^^^ private module
+  |
+note: the module `wire` is defined here
+ --> src/lib.rs
+  |
+  | mod wire;
+  | ^^^^^^^^
+
+error[E0603]: module `wire_transport` is private
+ --> tests/ui/role_firewall/selected_wire_user_cannot_import_implementer_spi.rs:8:60
+  |
+8 |     transport_implementer_api, wire, wire_implementer_api, wire_transport, UEncodedRxFrame, UWire,
+  |                                                            ^^^^^^^^^^^^^^ private module
+  |
+note: the module `wire_transport` is defined here
+ --> src/lib.rs
+  |
+  | mod wire_transport;
+  | ^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,19 @@
+error[E0277]: the payload codec `RawBytes` cannot encode `u32`
+ --> tests/ui/quality_diagnostics/missing_encode_payload.rs:6:21
+  |
+6 |     needs_encoder::<RawBytes>();
+  |                     ^^^^^^^^ no `EncodePayload<u32>` implementation
+  |
+  = note: wire implementers provide `payload_layout` and `encode_payload`; see the wire-implementer walkthrough
+help: the trait `EncodePayload<u32>` is not implemented for `RawBytes`
+      but trait `EncodePayload<[u8]>` is implemented for it
+ --> src/payload/codec.rs
+  |
+  | impl EncodePayload<[u8]> for RawBytes {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: for that trait implementation, expected `[u8]`, found `u32`
+note: required by a bound in `needs_encoder`
+ --> tests/ui/quality_diagnostics/missing_encode_payload.rs:3:21
+  |
+3 | fn needs_encoder<C: EncodePayload<u32>>() {}
+  |                     ^^^^^^^^^^^^^^^^^^ required by this bound in `needs_encoder`

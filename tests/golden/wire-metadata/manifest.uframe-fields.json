@@ -1,0 +1,8 @@
+[
+  {"fixture": "publish-no-payload", "profile": "uframe-fields", "file": "publish-no-payload.uframe-fields.hex", "len": 60},
+  {"fixture": "publish-raw-payload", "profile": "uframe-fields", "file": "publish-raw-payload.uframe-fields.hex", "len": 99},
+  {"fixture": "publish-custom-payload", "profile": "uframe-fields", "file": "publish-custom-payload.uframe-fields.hex", "len": 113},
+  {"fixture": "notification", "profile": "uframe-fields", "file": "notification.uframe-fields.hex", "len": 73},
+  {"fixture": "request", "profile": "uframe-fields", "file": "request.uframe-fields.hex", "len": 81},
+  {"fixture": "response", "profile": "uframe-fields", "file": "response.uframe-fields.hex", "len": 89}
+]

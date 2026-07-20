@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: ByteBackedStablePayload field `count` has implicit padding before it; add explicit initialized padding fields
+  --> tests/ui/stable_payload/stable_payload_init_nested_padded_by_value.rs:20:5
+   |
+20 |     count: u32,
+   |     ^^^^^ evaluation of `_` failed here

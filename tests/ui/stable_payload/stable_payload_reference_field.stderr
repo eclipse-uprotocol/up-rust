@@ -1,0 +1,5 @@
+error: StablePayload fields must not be references
+  --> tests/ui/stable_payload/stable_payload_reference_field.rs:11:12
+   |
+11 |     value: &'static u32,
+   |            ^^^^^^^^^^^^

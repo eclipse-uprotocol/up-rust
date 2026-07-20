@@ -1,0 +1,44 @@
+error: lifetime may not live long enough
+  --> tests/ui/stable_payload/stable_payload_init_detached_nested_array.rs:48:46
+   |
+40 |     let detached = Leaf::init_from_uninit_bytes(uninit_bytes(&mut detached))
+   |         -------- lifetime `'2` appears in the type of `detached`
+...
+48 |     let _ = parent.leaves(|_index, _context| Ok(detached));
+   |                                    --------  ^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
+   |                                    |
+   |                                    has type `StablePayloadInitContext<'1, Leaf>`
+   |
+   = note: requirement occurs because of the type `InitializedStablePayload<'_, Leaf>`, which makes the generic argument `'_` invariant
+   = note: the struct `InitializedStablePayload<'a, T>` is invariant over the parameter `'a`
+   = help: see <https://doc.rust-lang.org/nomicon/subtyping.html> for more information about variance
+
+error[E0507]: cannot move out of `detached`, a captured variable in an `FnMut` closure
+  --> tests/ui/stable_payload/stable_payload_init_detached_nested_array.rs:48:49
+   |
+40 |     let detached = Leaf::init_from_uninit_bytes(uninit_bytes(&mut detached))
+   |         -------- captured outer variable
+...
+48 |     let _ = parent.leaves(|_index, _context| Ok(detached));
+   |                           ------------------    ^^^^^^^^ move occurs because `detached` has type `InitializedStablePayload<'_, Leaf>`, which does not implement the `Copy` trait
+   |                           |
+   |                           captured by this `FnMut` closure
+   |
+help: `Fn` and `FnMut` closures require captured values to be able to be consumed multiple times, but `FnOnce` closures may consume them only once
+  --> tests/ui/stable_payload/stable_payload_init_detached_nested_array.rs:26:5
+   |
+26 |     leaves: [Leaf; 2],
+   |     ^^^^^^
+
+error[E0597]: `detached` does not live long enough
+  --> tests/ui/stable_payload/stable_payload_init_detached_nested_array.rs:40:62
+   |
+39 |     let mut detached = MaybeUninit::<Leaf>::uninit();
+   |         ------------ binding `detached` declared here
+40 |     let detached = Leaf::init_from_uninit_bytes(uninit_bytes(&mut detached))
+   |                                                              ^^^^^^^^^^^^^ borrowed value does not live long enough
+...
+48 |     let _ = parent.leaves(|_index, _context| Ok(detached));
+   |                                              ------------ returning this value requires that `detached` is borrowed for `'static`
+49 | }
+   | - `detached` dropped here while still borrowed

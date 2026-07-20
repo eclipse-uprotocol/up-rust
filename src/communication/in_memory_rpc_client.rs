@@ -163,6 +163,12 @@ pub struct InMemoryRpcClient<T, P> {
     response_listener: Arc<ResponseListener>,
 }
 
+impl<T, P> core::fmt::Debug for InMemoryRpcClient<T, P> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("InMemoryRpcClient").finish_non_exhaustive()
+    }
+}
+
 impl<T: UTransport, P: LocalUriProvider> InMemoryRpcClient<T, P> {
     /// Creates a new RPC client for a given transport.
     ///

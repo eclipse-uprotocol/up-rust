@@ -32,6 +32,12 @@ pub struct SimpleNotifier<T, P> {
     uri_provider: Arc<P>,
 }
 
+impl<T, P> core::fmt::Debug for SimpleNotifier<T, P> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SimpleNotifier").finish_non_exhaustive()
+    }
+}
+
 impl<T: UTransport, P: LocalUriProvider> SimpleNotifier<T, P> {
     /// Creates a new Notifier for a given transport.
     ///
@@ -236,7 +242,7 @@ mod tests {
         let options = CallOptions::for_notification(None, None, None);
         let result = notifier.notify(0xB10F, &destination, options, None).await;
         assert!(result.is_err_and(|e| match e {
-            NotificationError::NotifyError(status) => status.get_code() == UCode::Unavailable,
+            NotificationError::NotifyError(status) => status.code() == UCode::Unavailable,
             _ => false,
         }));
     }

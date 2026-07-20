@@ -23,6 +23,7 @@ use super::{CallOptions, RegistrationError, UPayload};
 /// An error indicating a problem with invoking a (remote) service operation.
 // [impl->dsn~communication-layer-api-declaration~1]
 #[derive(Clone, Error, Debug)]
+#[non_exhaustive]
 pub enum ServiceInvocationError {
     /// Indicates that the calling uE requested to add/create something that already exists.
     #[error("entity already exists: {0}")]
@@ -67,36 +68,36 @@ pub enum ServiceInvocationError {
 
 impl From<UStatus> for ServiceInvocationError {
     fn from(value: UStatus) -> Self {
-        match value.get_code() {
-            UCode::AlreadyExists => ServiceInvocationError::AlreadyExists(
-                value.get_message_or_default("N/A").to_string(),
-            ),
+        match value.code() {
+            UCode::AlreadyExists => {
+                ServiceInvocationError::AlreadyExists(value.message_or_default("N/A").to_string())
+            }
             UCode::DeadlineExceeded => ServiceInvocationError::DeadlineExceeded,
             UCode::FailedPrecondition => ServiceInvocationError::FailedPrecondition(
-                value.get_message_or_default("N/A").to_string(),
+                value.message_or_default("N/A").to_string(),
             ),
             UCode::Internal => {
-                ServiceInvocationError::Internal(value.get_message_or_default("N/A").to_string())
+                ServiceInvocationError::Internal(value.message_or_default("N/A").to_string())
             }
-            UCode::InvalidArgument => ServiceInvocationError::InvalidArgument(
-                value.get_message_or_default("N/A").to_string(),
-            ),
+            UCode::InvalidArgument => {
+                ServiceInvocationError::InvalidArgument(value.message_or_default("N/A").to_string())
+            }
             UCode::NotFound => {
-                ServiceInvocationError::NotFound(value.get_message_or_default("N/A").to_string())
+                ServiceInvocationError::NotFound(value.message_or_default("N/A").to_string())
             }
             UCode::PermissionDenied => ServiceInvocationError::PermissionDenied(
-                value.get_message_or_default("N/A").to_string(),
+                value.message_or_default("N/A").to_string(),
             ),
             UCode::ResourceExhausted => ServiceInvocationError::ResourceExhausted(
-                value.get_message_or_default("N/A").to_string(),
+                value.message_or_default("N/A").to_string(),
             ),
             UCode::Unauthenticated => ServiceInvocationError::Unauthenticated,
             UCode::Unavailable => {
-                ServiceInvocationError::Unavailable(value.get_message_or_default("N/A").to_string())
+                ServiceInvocationError::Unavailable(value.message_or_default("N/A").to_string())
             }
-            UCode::Unimplemented => ServiceInvocationError::Unimplemented(
-                value.get_message_or_default("N/A").to_string(),
-            ),
+            UCode::Unimplemented => {
+                ServiceInvocationError::Unimplemented(value.message_or_default("N/A").to_string())
+            }
             UCode::Ok
             | UCode::Cancelled
             | UCode::Unknown
@@ -139,7 +140,7 @@ impl From<ServiceInvocationError> for UStatus {
             ServiceInvocationError::Unimplemented(msg) => {
                 UStatus::fail_with_code(UCode::Unimplemented, msg)
             }
-            _ => UStatus::fail_with_code(UCode::Unknown, "unknown"),
+            ServiceInvocationError::RpcError(status) => *status,
         }
     }
 }
@@ -311,7 +312,17 @@ mockall::mock! {
     /// This extra struct is necessary in order to comply with mockall's requirements regarding the parameter lifetimes
     /// see <https://github.com/asomers/mockall/issues/571>
     pub RpcServerImpl {
+        /// Mock hook; configure with mockall expectations.
+    ///
+    /// # Errors
+    ///
+    /// Returns whatever the test's expectations are configured to return.
         pub async fn do_register_endpoint<'a>(&'a self, origin_filter: Option<&'a UUri>, resource_id: u16, request_handler: Arc<dyn RequestHandler>) -> Result<(), RegistrationError>;
+        /// Mock hook; configure with mockall expectations.
+    ///
+    /// # Errors
+    ///
+    /// Returns whatever the test's expectations are configured to return.
         pub async fn do_unregister_endpoint<'a>(&'a self, origin_filter: Option<&'a UUri>, resource_id: u16, request_handler: Arc<dyn RequestHandler>) -> Result<(), RegistrationError>;
     }
 }

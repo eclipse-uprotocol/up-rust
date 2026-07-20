@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+ --> tests/ui/validation_typestate/send_unvalidated_owned.rs:7:26
+  |
+7 |     transport.send_owned(frame).await.unwrap();
+  |               ---------- ^^^^^ expected `UOwnedFrame`, found `UOwnedFrame<Unvalidated>`
+  |               |
+  |               arguments to this method are incorrect
+  |
+  = note: expected struct `UOwnedFrame<Validated>`
+             found struct `UOwnedFrame<Unvalidated>`
+note: method defined here
+ --> src/utransport.rs
+  |
+  |     async fn send_owned(&self, frame: UOwnedFrame) -> Result<(), UStatus>;
+  |              ^^^^^^^^^^

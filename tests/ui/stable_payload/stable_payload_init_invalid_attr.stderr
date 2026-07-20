@@ -1,0 +1,5 @@
+error: unsupported stable_payload_init attribute; no stable_payload_init field or type attributes are currently defined
+  --> tests/ui/stable_payload/stable_payload_init_invalid_attr.rs:10:1
+   |
+10 | #[stable_payload_init(foo)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^

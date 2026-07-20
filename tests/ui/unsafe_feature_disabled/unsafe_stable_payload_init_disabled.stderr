@@ -1,0 +1,5 @@
+error[E0599]: no method named `as_mut_ptr` found for struct `LoanedUninitPayload<'a, T>` in the current scope
+  --> tests/ui/unsafe_feature_disabled/unsafe_stable_payload_init_disabled.rs:14:30
+   |
+14 |     let _raw = unsafe { slot.as_mut_ptr() };
+   |                              ^^^^^^^^^^ method not found in `LoanedUninitPayload<'_, ManualPayload>`

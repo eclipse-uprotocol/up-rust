@@ -1,0 +1,10 @@
+error[E0624]: method `uninit_ptr` is private
+  --> tests/ui/unsafe_feature_disabled/unsafe_uninit_payload_bytes_disabled.rs:14:21
+   |
+14 |     let _raw = slot.uninit_ptr();
+   |                     ^^^^^^^^^^ private method
+   |
+  ::: src/payload/loan.rs
+   |
+   |     pub(crate) fn uninit_ptr(&self) -> NonNull<mem::MaybeUninit<T>> {
+   |     --------------------------------------------------------------- private method defined here

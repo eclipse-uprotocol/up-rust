@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: StablePayload types must not implement Drop or contain fields that need drop
+  --> tests/ui/stable_payload/stable_payload_drop_field.rs:18:10
+   |
+18 | #[derive(up_rust::StablePayload)]
+   |          ^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here

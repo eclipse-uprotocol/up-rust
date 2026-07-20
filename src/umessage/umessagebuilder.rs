@@ -40,21 +40,29 @@ mod sealed {
 /// which might produce invalid [UMessage] instances by means of the [Self::merge_into_attributes]
 /// function.
 pub trait BuilderState: sealed::Sealed {
+    /// The merge into attributes.
     fn merge_into_attributes(&self, _attributes: &mut UAttributes) {}
 }
 
+#[derive(Debug)]
 pub struct InitialBuilderState;
 impl sealed::Sealed for InitialBuilderState {}
 impl BuilderState for InitialBuilderState {}
 
+/// The item.
+#[derive(Debug)]
 pub struct PublishBuilderState;
 impl sealed::Sealed for PublishBuilderState {}
 impl BuilderState for PublishBuilderState {}
 
+/// The item.
+#[derive(Debug)]
 pub struct NotificationBuilderState;
 impl sealed::Sealed for NotificationBuilderState {}
 impl BuilderState for NotificationBuilderState {}
 
+/// The item.
+#[derive(Debug)]
 pub struct RequestBuilderState {
     permission_level: Option<u32>,
     token: Option<String>,
@@ -67,6 +75,8 @@ impl BuilderState for RequestBuilderState {
     }
 }
 
+/// The item.
+#[derive(Debug)]
 pub struct ResponseBuilderState {
     comm_status: Option<UCode>,
     request_id: UUID,
@@ -89,6 +99,7 @@ struct CommonAttributes {
     traceparent: Option<String>,
     payload_format: Option<UPayloadFormat>,
     payload: Option<Bytes>,
+    open_payload_encoding: Option<crate::PayloadEncoding>,
     validator: Box<dyn UAttributesValidator>,
 }
 
@@ -102,6 +113,12 @@ struct CommonAttributes {
 pub struct UMessageBuilder<S: BuilderState> {
     common: CommonAttributes,
     extra: S,
+}
+
+impl<S: BuilderState> core::fmt::Debug for UMessageBuilder<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("UMessageBuilder").finish_non_exhaustive()
+    }
 }
 
 impl UMessageBuilder<InitialBuilderState> {
@@ -142,6 +159,7 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
+            open_payload_encoding: None,
             validator: Box::new(PublishValidator),
         };
         UMessageBuilder {
@@ -192,6 +210,7 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
+            open_payload_encoding: None,
             validator: Box::new(NotificationValidator),
         };
         UMessageBuilder {
@@ -249,6 +268,7 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
+            open_payload_encoding: None,
             validator: Box::new(RequestValidator),
         };
         UMessageBuilder {
@@ -312,6 +332,7 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
+            open_payload_encoding: None,
             validator: Box::new(ResponseValidator),
         };
         UMessageBuilder {
@@ -386,6 +407,7 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
+            open_payload_encoding: None,
             validator: Box::new(ResponseValidator),
         };
         UMessageBuilder {
@@ -612,6 +634,21 @@ impl<S: BuilderState> UMessageBuilder<S> {
             traceparent: self.common.traceparent.to_owned(),
             payload_format: self.common.payload_format,
             token: None, // token is only relevant for request messages and is set via the RequestBuilderState
+            payload_encoding: self
+                .common
+                .open_payload_encoding
+                .as_ref()
+                .and_then(|e| e.literal_id().map(str::to_owned)),
+            payload_encoding_registry_id: self
+                .common
+                .open_payload_encoding
+                .as_ref()
+                .and_then(crate::PayloadEncoding::registry_id),
+            payload_content_type: self
+                .common
+                .open_payload_encoding
+                .as_ref()
+                .and_then(|e| e.content_type().map(str::to_owned)),
             permission_level: None, // permission_level is only relevant for request messages and is set via the RequestBuilderState
             commstatus: None, // commstatus is only relevant for response messages and is set via the ResponseBuilderState
             reqid: None, // reqid is only relevant for response messages and is set via the ResponseBuilderState
@@ -624,6 +661,33 @@ impl<S: BuilderState> UMessageBuilder<S> {
             .validate(&attributes)
             .map_err(UMessageError::from)
             .and_then(|_| UMessage::new(attributes, self.common.payload.clone()))
+    }
+
+    /// Creates the message based on the builder's state and a payload labeled
+    /// with an open payload-encoding identity.
+    ///
+    /// Reserved-range encodings produce the same attributes as
+    /// [`Self::build_with_payload`]. Other encodings populate the open
+    /// payload-encoding identity fields and leave `payload_format` unspecified.
+    ///
+    /// # Errors
+    ///
+    /// If the properties set on the builder do not represent a consistent set
+    /// of [`UAttributes`], a [`UMessageError::AttributesValidationError`] is
+    /// returned.
+    pub fn build_with_payload_encoding<T: Into<Bytes>>(
+        &mut self,
+        payload: T,
+        encoding: crate::PayloadEncoding,
+    ) -> Result<UMessage, UMessageError> {
+        if let Some(format) = encoding.to_legacy_format() {
+            return self.build_with_payload(payload, format);
+        }
+
+        self.common.payload = Some(payload.into());
+        self.common.payload_format = Some(UPayloadFormat::Unspecified);
+        self.common.open_payload_encoding = Some(encoding);
+        self.build()
     }
 
     /// Creates the message based on the builder's state and some payload.
@@ -663,6 +727,7 @@ impl<S: BuilderState> UMessageBuilder<S> {
         self.common.payload = Some(payload.into());
         // [impl->dsn~up-attributes-payload-format~1]
         self.common.payload_format = Some(format);
+        self.common.open_payload_encoding = None;
 
         self.build()
     }
@@ -923,6 +988,29 @@ mod tests {
         assert_ne!(message_one.attributes.id, message_two.attributes.id);
         assert_eq!(message_one.attributes.source, message_two.attributes.source);
         assert_ne!(message_one.payload, message_two.payload);
+    }
+
+    #[test]
+    fn test_build_with_payload_resets_open_payload_encoding() {
+        let topic = UUri::try_from(TOPIC).expect("should have been able to create UUri");
+        let encoding =
+            crate::PayloadEncoding::custom("up.xcdr-v2", "application/vnd.uprotocol.xcdr-v2")
+                .expect("valid payload encoding");
+        let mut builder = UMessageBuilder::publish(topic);
+
+        builder
+            .build_with_payload_encoding("open", encoding)
+            .expect("should have built open-encoding message");
+
+        let message = builder
+            .build_with_payload("legacy", UPayloadFormat::Text)
+            .expect("legacy payload should replace the open encoding");
+
+        assert_eq!(message.payload_format(), Some(UPayloadFormat::Text));
+        assert_eq!(
+            message.attributes().open_payload_encoding_parts(),
+            (None, None, None)
+        );
     }
 
     #[test]

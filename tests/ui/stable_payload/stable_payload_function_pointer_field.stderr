@@ -1,0 +1,5 @@
+error: StablePayload fields must not be function pointers
+  --> tests/ui/stable_payload/stable_payload_function_pointer_field.rs:11:15
+   |
+11 |     callback: fn(),
+   |               ^^^^

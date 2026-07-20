@@ -1,0 +1,57 @@
+error[E0277]: the trait bound `IncompatibleMetadataCodec: UWireMetadataCodecFor<UProtocolNativeWire>` is not satisfied
+  --> tests/ui/wire_transport/incompatible_metadata_codec.rs:46:9
+   |
+43 |     let _transport = UWireTransport::new(
+   |                      ------------------- required by a bound introduced by this call
+...
+46 |         IncompatibleMetadataCodec,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `UWireMetadataCodecFor<UProtocolNativeWire>` is not implemented for `IncompatibleMetadataCodec`
+  --> tests/ui/wire_transport/incompatible_metadata_codec.rs:22:1
+   |
+22 | struct IncompatibleMetadataCodec;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `UWireMetadataCodecFor<W>` is implemented for `NativePrefixFrameMetadataCodec`
+  --> src/wire.rs
+   |
+   | impl<W> UWireMetadataCodecFor<W> for NativePrefixFrameMetadataCodec where W: UWire {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `UWireTransport::<TCore, W, C>::new`
+  --> src/wire_transport.rs
+   |
+   |     C: UWireMetadataCodecFor<W>,
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `UWireTransport::<TCore, W, C>::new`
+...
+   |     pub fn new(core: TCore, wire: W, metadata_codec: C) -> Self {
+   |            --- required by a bound in this associated function
+
+error[E0277]: the trait bound `IncompatibleMetadataCodec: UWireMetadataCodecFor<UProtocolNativeWire>` is not satisfied
+  --> tests/ui/wire_transport/incompatible_metadata_codec.rs:43:22
+   |
+43 |       let _transport = UWireTransport::new(
+   |  ______________________^
+44 | |         Core,
+45 | |         UProtocolNativeWire,
+46 | |         IncompatibleMetadataCodec,
+47 | |     );
+   | |_____^ unsatisfied trait bound
+   |
+help: the trait `UWireMetadataCodecFor<UProtocolNativeWire>` is not implemented for `IncompatibleMetadataCodec`
+  --> tests/ui/wire_transport/incompatible_metadata_codec.rs:22:1
+   |
+22 | struct IncompatibleMetadataCodec;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `UWireMetadataCodecFor<W>` is implemented for `NativePrefixFrameMetadataCodec`
+  --> src/wire.rs
+   |
+   | impl<W> UWireMetadataCodecFor<W> for NativePrefixFrameMetadataCodec where W: UWire {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `UWireTransport`
+  --> src/wire_transport.rs
+   |
+   | pub struct UWireTransport<TCore, W, C>
+   |            -------------- required by a bound in this struct
+...
+   |     C: UWireMetadataCodecFor<W>,
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `UWireTransport`

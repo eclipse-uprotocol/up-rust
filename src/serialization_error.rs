@@ -12,6 +12,7 @@
  ********************************************************************************/
 
 #[derive(Debug, Clone)]
+/// Error produced when a value cannot be serialized or deserialized.
 pub struct SerializationError(String);
 
 impl std::fmt::Display for SerializationError {
@@ -23,6 +24,7 @@ impl std::fmt::Display for SerializationError {
 impl std::error::Error for SerializationError {}
 
 impl SerializationError {
+    /// Creates a serialization error with the given message.
     pub fn new(msg: impl Into<String>) -> Self {
         Self(msg.into())
     }

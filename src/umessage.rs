@@ -13,7 +13,7 @@
 
 use bytes::Bytes;
 
-#[cfg(all(feature = "up-l2-api", feature = "protobuf-support"))]
+#[cfg(all(feature = "communication-api", feature = "protobuf-support"))]
 pub(crate) use protobuf_support::deserialize_protobuf_bytes;
 pub use umessagebuilder::*;
 
@@ -27,9 +27,13 @@ mod umessagebuilder;
 pub(crate) type Payload = Bytes;
 
 #[derive(Debug)]
+/// Errors produced when building or converting a [`UMessage`].
 pub enum UMessageError {
+    /// The message attributes failed validation.
     AttributesValidationError(UAttributesError),
+    /// The payload could not be (de)serialized.
     DataSerializationError(SerializationError),
+    /// The payload is inconsistent with the message (wrong format or presence).
     PayloadError(String),
 }
 
@@ -82,12 +86,46 @@ impl From<&str> for UMessageError {
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(C)]
+/// One uProtocol message: attributes plus optional payload bytes.
 pub struct UMessage {
     attributes: UAttributes,
     payload: Option<Payload>,
 }
 
 impl UMessage {
+    /// Returns this message with an assumed payload encoding stamped on its
+    /// attributes when the message has payload bytes and no encoding
+    /// declaration yet.
+    ///
+    /// This is for transports whose wire profile fixes payload encoding by
+    /// topic convention rather than carrying it per message. Existing encoding
+    /// declarations are preserved unchanged.
+    #[must_use]
+    pub fn with_assumed_payload_encoding(mut self, encoding: &crate::PayloadEncoding) -> Self {
+        if self.payload.is_none() {
+            return self;
+        }
+
+        let attributes = &mut self.attributes;
+        let has_legacy = !matches!(
+            attributes.payload_format,
+            None | Some(crate::UPayloadFormat::Unspecified)
+        );
+        let has_open = attributes.open_payload_encoding_parts() != (None, None, None);
+        if has_legacy || has_open {
+            return self;
+        }
+
+        if let Some(format) = encoding.to_legacy_format() {
+            attributes.payload_format = Some(format);
+        } else {
+            attributes.payload_encoding_registry_id = encoding.registry_id();
+            attributes.payload_encoding = encoding.literal_id().map(str::to_owned);
+            attributes.payload_content_type = encoding.content_type().map(str::to_owned);
+        }
+        self
+    }
+
     // This convenience constructor is used internally only, e.g. by the UMessageBuilder for creating
     // the final message after validation.
     // Client code can create UMessages using the UMessageBuilder only.
@@ -550,6 +588,7 @@ impl UMessage {
     }
 
     #[must_use]
+    /// Returns the payload bytes, if the message carries any.
     pub fn payload(&self) -> Option<Bytes> {
         self.payload.clone()
     }
@@ -865,7 +904,7 @@ mod protobuf_support {
     }
 }
 
-#[cfg(feature = "up-core-types")]
+#[cfg(feature = "up-core-api")]
 mod core_types_support {
     use protobuf::{well_known_types::any::Any, Message};
 

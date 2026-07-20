@@ -20,6 +20,7 @@ A UUri represents a uProtocol resource identifier and is used in various places 
 // [impl->req~uri-data-model-proto~1]
 
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::LazyLock;
 
@@ -44,6 +45,7 @@ type AuthorityNameString = String;
 
 /// An error indicating a problem with creating or parsing a UUri.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum UUriError {
     /// Indicates that a given URI string cannot be parsed into a UUri due to invalid formatting or content.
     SerializationError(String),
@@ -52,6 +54,7 @@ pub enum UUriError {
 }
 
 impl UUriError {
+    /// Creates a serialization error with the given message.
     pub fn serialization_error<T>(message: T) -> UUriError
     where
         T: Into<String>,
@@ -59,6 +62,7 @@ impl UUriError {
         Self::SerializationError(message.into())
     }
 
+    /// Creates a validation error with the given message.
     pub fn validation_error<T>(message: T) -> UUriError
     where
         T: Into<String>,
@@ -292,6 +296,76 @@ impl Hash for UUri {
 
 impl Eq for UUri {}
 
+/// A [`UUri`] that has been checked to contain no wildcard components.
+///
+/// This proof type is for APIs where exact-vs-wildcard URI behavior is
+/// materially different. It only carries the result of
+/// [`UUri::verify_no_wildcards`]; it does not imply physical transport
+/// prefiltering or no-copy behavior.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct ExactUUri(UUri);
+
+impl ExactUUri {
+    /// Creates an exact URI proof from a URI with no wildcard components.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same validation error as [`UUri::verify_no_wildcards`] when
+    /// any URI component contains a wildcard.
+    pub fn try_new(uri: UUri) -> Result<Self, UUriError> {
+        uri.verify_no_wildcards()?;
+        Ok(Self(uri))
+    }
+
+    /// Borrows the checked URI.
+    #[must_use]
+    pub fn as_uuri(&self) -> &UUri {
+        &self.0
+    }
+
+    /// Consumes this proof and returns the underlying URI.
+    #[must_use]
+    pub fn into_inner(self) -> UUri {
+        self.0
+    }
+}
+
+impl AsRef<UUri> for ExactUUri {
+    fn as_ref(&self) -> &UUri {
+        self.as_uuri()
+    }
+}
+
+impl Deref for ExactUUri {
+    type Target = UUri;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_uuri()
+    }
+}
+
+impl From<ExactUUri> for UUri {
+    fn from(value: ExactUUri) -> Self {
+        value.into_inner()
+    }
+}
+
+impl TryFrom<UUri> for ExactUUri {
+    type Error = UUriError;
+
+    fn try_from(value: UUri) -> Result<Self, Self::Error> {
+        Self::try_new(value)
+    }
+}
+
+impl TryFrom<&UUri> for ExactUUri {
+    type Error = UUriError;
+
+    fn try_from(value: &UUri) -> Result<Self, Self::Error> {
+        Self::try_new(value.clone())
+    }
+}
+
 impl PartialEq<str> for UUri {
     fn eq(&self, other: &str) -> bool {
         match UUri::from_str(other) {
@@ -477,6 +551,7 @@ impl UUri {
     }
 
     #[must_use]
+    /// Returns a copy of this URI with the resource id replaced.
     pub fn clone_with_resource_id(&self, resource_id: u16) -> Self {
         UUri {
             authority_name: self.authority_name.clone(),
@@ -938,7 +1013,7 @@ impl UUri {
     }
 }
 
-#[cfg(feature = "up-core-types")]
+#[cfg(feature = "up-core-api")]
 mod core_types_support {
     use super::*;
     use crate::up_core_api::uri::UUri as UUriProto;
@@ -1103,5 +1178,35 @@ mod tests {
                 && uuri.ue_version_major == 0xA1
                 && uuri.resource_id == 0xBCD1
         }));
+    }
+}
+
+#[cfg(test)]
+mod round_trip_properties {
+    use std::str::FromStr;
+
+    use proptest::prelude::*;
+
+    use super::UUri;
+
+    proptest! {
+        /// Serialization round-trip: any valid URI built from parts survives
+        /// `to_string` -> `from_str` unchanged. Hand-enumerated cases pin the
+        /// known edges; this pins the space between them.
+        #[test]
+        fn uri_survives_string_round_trip(
+            authority in "[a-z][a-z0-9]{0,11}",
+            ue_id in 1u32..0xFFFF,
+            version in 1u8..=0xFE,
+            resource in 0u16..0xFFFE,
+        ) {
+            let uri = UUri::try_from_parts(&authority, ue_id, version, resource)
+                .expect("parts chosen from the valid, wildcard-free range");
+
+            let round_tripped = UUri::from_str(&uri.to_uri(false))
+                .expect("serialized form of a valid URI must parse");
+
+            prop_assert_eq!(uri, round_tripped);
+        }
     }
 }

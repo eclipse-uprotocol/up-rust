@@ -1,0 +1,5 @@
+error: StablePayload fields must not own heap allocations
+  --> tests/ui/stable_payload/stable_payload_init_heap_field.rs:11:12
+   |
+11 |     value: String,
+   |            ^^^^^^

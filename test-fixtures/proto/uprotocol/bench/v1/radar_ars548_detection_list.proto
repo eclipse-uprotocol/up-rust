@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package uprotocol.bench.v1;
+
+import "uprotocol/bench/v1/common.proto";
+
+message Ars548Detection {
+  float azimuth_angle = 1;
+  float azimuth_angle_std = 2;
+  uint32 invalid_flags = 3;
+  float elevation_angle = 4;
+  float elevation_angle_std = 5;
+  float range = 6;
+  float range_std = 7;
+  float range_rate = 8;
+  float range_rate_std = 9;
+  sint32 rcs = 10;
+  uint32 measurement_id = 11;
+  uint32 positive_predictive_value = 12;
+  uint32 classification = 13;
+  uint32 multi_target_probability = 14;
+  uint32 object_id = 15;
+  uint32 ambiguity_flag = 16;
+  uint32 sort_index = 17;
+}
+
+message Ars548DetectionList {
+  BenchHeader header = 1;
+  uint32 sensor_id = 2;
+  uint32 measurement_counter = 3;
+  uint32 cycle_counter = 4;
+  uint64 measurement_timestamp_ns = 5;
+  uint32 list_numofdetections = 6;
+  repeated Ars548Detection detections = 7;
+  uint32 checksum = 8;
+}

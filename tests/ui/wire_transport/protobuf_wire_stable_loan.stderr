@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `ProtobufPayload: LoanPayload<protobuf::well_known_types::wrappers::StringValue>` is not satisfied
+  --> tests/ui/wire_transport/protobuf_wire_stable_loan.rs:18:24
+   |
+18 |     needs_typed_loan::<ProtobufWire, StringValue>();
+   |                        ^^^^^^^^^^^^ the trait `LoanPayload<protobuf::well_known_types::wrappers::StringValue>` is not implemented for `ProtobufPayload`
+   |
+help: the trait `LoanPayload<T>` is implemented for `StableContainerPayload<T>`
+  --> src/payload/stable.rs
+   |
+   | / unsafe impl<T> LoanPayload<T> for StableContainerPayload<T>
+   | | where
+   | |     T: ByteBackedStablePayload + Default,
+   | |_________________________________________^
+note: required by a bound in `needs_typed_loan`
+  --> tests/ui/wire_transport/protobuf_wire_stable_loan.rs:13:36
+   |
+10 | fn needs_typed_loan<W, T>()
+   |    ---------------- required by a bound in this function
+...
+13 |     <W as UWirePayload<T>>::Codec: LoanPayload<T>,
+   |                                    ^^^^^^^^^^^^^^ required by this bound in `needs_typed_loan`

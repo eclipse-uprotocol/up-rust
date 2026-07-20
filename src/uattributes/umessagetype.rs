@@ -20,10 +20,15 @@ const CE_TYPE_RESPONSE: &str = "up-res.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
+/// The four uProtocol message kinds.
 pub enum UMessageType {
+    /// A publication to a topic; delivered to all subscribers.
     Publish,
+    /// An RPC request targeting a method.
     Request,
+    /// An RPC response correlated to a request.
     Response,
+    /// A notification targeting one uEntity.
     Notification,
 }
 
@@ -64,7 +69,7 @@ impl UMessageType {
     }
 }
 
-#[cfg(feature = "up-core-types")]
+#[cfg(feature = "up-core-api")]
 mod core_types_support {
     use super::*;
     use crate::up_core_api::uattributes::UMessageType as UMessageTypeProto;

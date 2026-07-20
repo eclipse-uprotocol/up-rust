@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package uprotocol.bench.v1;
+
+import "uprotocol/bench/v1/common.proto";
+
+message LidarPointCloudFrame {
+  BenchHeader header = 1;
+  uint32 lidar_id = 2;
+  uint64 frame_counter = 3;
+  uint64 sensor_timestamp_ns = 4;
+  uint32 width = 5;
+  uint32 height = 6;
+  uint32 point_count = 7;
+  uint32 point_step = 8;
+  uint32 row_step = 9;
+  uint32 points_per_second = 10;
+  uint32 scan_duration_ns = 11;
+  uint32 horizontal_fov_mdeg = 12;
+  uint32 vertical_fov_mdeg = 13;
+  uint32 horizontal_resolution_mdeg = 14;
+  uint32 vertical_resolution_mdeg = 15;
+  uint32 range_10pct_reflectivity_m = 16;
+  uint32 point_format = 17;
+  bool is_bigendian = 18;
+  bool is_dense = 19;
+  Pose3d extrinsics = 20;
+  bytes points_xyzircaedt_le = 21;
+  uint32 checksum = 22;
+}

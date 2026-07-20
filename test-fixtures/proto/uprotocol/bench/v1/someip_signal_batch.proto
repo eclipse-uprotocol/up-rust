@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package uprotocol.bench.v1;
+
+import "uprotocol/bench/v1/common.proto";
+
+message SignalSample {
+  uint32 signal_id = 1;
+  uint32 status = 2;
+  uint64 timestamp_ns = 3;
+  double value = 4;
+}
+
+message SomeIpSignalBatch {
+  BenchHeader header = 1;
+  uint32 service_id = 2;
+  uint32 method_or_event_id = 3;
+  uint32 length = 4;
+  uint32 client_id = 5;
+  uint32 session_id = 6;
+  uint32 protocol_version = 7;
+  uint32 interface_version = 8;
+  uint32 message_type = 9;
+  uint32 return_code = 10;
+  uint64 source_timestamp_ns = 11;
+  repeated SignalSample samples = 12;
+  uint32 checksum = 13;
+}
