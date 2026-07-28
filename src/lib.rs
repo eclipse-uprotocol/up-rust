@@ -76,7 +76,10 @@ pub use uattributes::{
 };
 
 mod umessage;
-pub use umessage::{UMessage, UMessageBuilder, UMessageError};
+pub use umessage::{
+    BuilderState, NotificationBuilderState, PublishBuilderState, RequestBuilderState,
+    ResponseBuilderState, UMessage, UMessageBuilder, UMessageError,
+};
 
 mod uri;
 pub use uri::{UUri, UUriError};

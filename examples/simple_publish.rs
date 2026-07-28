@@ -17,7 +17,7 @@ use protobuf::well_known_types::wrappers::StringValue;
 use up_rust::{
     communication::{CallOptions, Publisher, SimplePublisher, UPayload},
     local_transport::LocalTransport,
-    LocalUriProvider, StaticUriProvider, UListener, UMessage, UTransport,
+    LocalUriProvider, StaticUriProvider, UListener, UMessage, UMessageBuilder, UTransport,
 };
 
 struct ConsolePrinter {}
@@ -25,8 +25,22 @@ struct ConsolePrinter {}
 #[async_trait::async_trait]
 impl UListener for ConsolePrinter {
     async fn on_receive(&self, msg: UMessage) {
-        if let Ok(payload) = msg.extract_protobuf::<StringValue>() {
-            println!("received event: {}", payload.value);
+        let priority = msg.priority().map_or("None", |p| p.to_priority_code());
+        match msg.payload_format() {
+            Some(up_rust::UPayloadFormat::Text) => {
+                if let Some(payload) = msg.payload() {
+                    let msg = String::from_utf8(payload.to_vec()).unwrap();
+                    println!("received event [priority: {}]: {}", priority, msg);
+                }
+            }
+            Some(up_rust::UPayloadFormat::ProtobufWrappedInAny) => {
+                if let Ok(payload) = msg.extract_protobuf::<StringValue>() {
+                    println!("received event [priority: {}]: {}", priority, payload.value);
+                }
+            }
+            _ => {
+                println!("received event with unsupported payload format");
+            }
         }
     }
 }
@@ -42,34 +56,42 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transport = Arc::new(LocalTransport::default());
     let publisher = SimplePublisher::new(transport.clone(), uri_provider.clone());
     let listener = Arc::new(ConsolePrinter {});
+    let topic = uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID);
 
     transport
-        .register_listener(
-            &uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID),
-            None,
-            listener.clone(),
-        )
+        .register_listener(&topic, None, listener.clone())
         .await?;
 
+    // sending message via L1 Transport API, which is used by the Publisher internally
+    let msg = UMessageBuilder::publish(topic.clone())
+        .with_priority(up_rust::UPriority::CS2)
+        .build_with_payload("Hello plain text", up_rust::UPayloadFormat::Text)?;
+    transport.send(msg).await?;
+
+    // now sending a message via the Publisher API, which is the recommended way to send messages
+    // as it handles all the necessary details for you, such as setting the correct URIs and CallOptions
     let value = StringValue {
-        value: "Hello".to_string(),
+        value: "Hello protobuf".to_string(),
         ..Default::default()
     };
+
     let payload = UPayload::try_from_protobuf(value)?;
     publisher
         .publish(
             ORIGIN_RESOURCE_ID,
-            CallOptions::for_publish(None, None, None),
+            CallOptions::for_publish(None, None, Some(up_rust::UPriority::CS3)),
             Some(payload),
         )
         .await?;
 
+    // At this point we can be sure that all events have been processed already.
+    // This is because the LocalTransport dispatches all messages to listeners on the same
+    // thread that has been used to send the messages.
+    // When using an asynchronous transport, such as MQTT5 or Eclipse Zenoh, we would need to
+    // notify the sender from within the listener, e.g. by means of a Channel, before stopping
+    // the listener.
     transport
-        .unregister_listener(
-            &uri_provider.get_resource_uri(ORIGIN_RESOURCE_ID),
-            None,
-            listener,
-        )
+        .unregister_listener(&topic, None, listener)
         .await?;
 
     Ok(())
