@@ -1,0 +1,10 @@
+[package]
+name = "up-frame-codec"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+up-rust = "0.9.0"
+protobuf = "3.7.2"
+anyhow = "1.0"
