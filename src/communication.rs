@@ -422,3 +422,15 @@ pub enum SubscriptionStatus {
     Subscribed,
     UnsubscribePending,
 }
+
+impl std::fmt::Display for SubscriptionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let status = match self {
+            SubscriptionStatus::Unsubscribed => "Unsubscribed",
+            SubscriptionStatus::SubscribePending => "SubscribePending",
+            SubscriptionStatus::Subscribed => "Subscribed",
+            SubscriptionStatus::UnsubscribePending => "UnsubscribePending",
+        };
+        write!(f, "{status}")
+    }
+}
