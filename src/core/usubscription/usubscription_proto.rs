@@ -161,6 +161,42 @@ impl TryFrom<&SubscriptionInfoProto> for SubscriptionInfo {
     }
 }
 
+impl ProtobufMappable for SubscriptionInfo {
+    fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        SubscriptionInfo::try_from(&SubscriptionInfoProto::parse_from_bytes(proto)?)
+            .map_err(|e| SerializationError::new(e.to_string()))
+    }
+
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        Any::parse_from_bytes(proto)
+            .map_err(|err| crate::SerializationError::new(err.to_string()))
+            .and_then(|any| match any.unpack::<SubscriptionInfoProto>() {
+                Ok(Some(message_proto)) => SubscriptionInfo::try_from(&message_proto)
+                    .map_err(|e| crate::SerializationError::new(e.to_string())),
+                Ok(None) => Err(crate::SerializationError::new(
+                    "protobuf Any does not contain expected type".to_string(),
+                )),
+                Err(e) => Err(crate::SerializationError::new(format!(
+                    "protobuf Any unpack error: {e}"
+                ))),
+            })
+    }
+
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Ok(SubscriptionInfoProto::try_from(self)
+            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
+            .write_to_bytes()?)
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Any::pack(&SubscriptionInfoProto::try_from(self).map_err(|e| {
+            SerializationError::new(format!("failed to serialize to protobuf: {e}"))
+        })?)
+        .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
+        .and_then(|any| any.write_to_protobuf_bytes())
+    }
+}
+
 // SubscribeRequest conversions
 
 impl TryFrom<&SubscribeRequest> for SubscribeRequestProto {
@@ -209,10 +245,10 @@ impl ProtobufMappable for SubscribeRequest {
                 Ok(Some(message_proto)) => SubscribeRequest::try_from(&message_proto)
                     .map_err(|e| crate::SerializationError::new(e.to_string())),
                 Ok(None) => Err(crate::SerializationError::new(
-                    "Protobuf Any does not contain SubscribeRequest".to_string(),
+                    "protobuf Any does not contain expected type".to_string(),
                 )),
                 Err(e) => Err(crate::SerializationError::new(format!(
-                    "Protobuf Any unpack error: {e}"
+                    "protobuf Any unpack error: {e}"
                 ))),
             })
     }
@@ -227,9 +263,7 @@ impl ProtobufMappable for SubscribeRequest {
         Any::pack(&SubscribeRequestProto::try_from(self).map_err(|e| {
             SerializationError::new(format!("failed to serialize to protobuf: {e}"))
         })?)
-        .map_err(|e| {
-            crate::SerializationError::new(format!("Failed to pack SubscribeRequest: {e}"))
-        })
+        .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
         .and_then(|any| any.write_to_protobuf_bytes())
     }
 }
@@ -271,10 +305,10 @@ impl ProtobufMappable for SubscribeResponse {
                 Ok(Some(message_proto)) => SubscribeResponse::try_from(&message_proto)
                     .map_err(|e| crate::SerializationError::new(e.to_string())),
                 Ok(None) => Err(crate::SerializationError::new(
-                    "Protobuf Any does not contain SubscribeRequest".to_string(),
+                    "protobuf Any does not contain expected type".to_string(),
                 )),
                 Err(e) => Err(crate::SerializationError::new(format!(
-                    "Protobuf Any unpack error: {e}"
+                    "protobuf Any unpack error: {e}"
                 ))),
             })
     }
@@ -285,9 +319,7 @@ impl ProtobufMappable for SubscribeResponse {
 
     fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(&SubscribeResponseProto::from(self))
-            .map_err(|e| {
-                crate::SerializationError::new(format!("Failed to pack SubscribeRequest: {e}"))
-            })
+            .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
             .and_then(|any| any.write_to_protobuf_bytes())
     }
 }
@@ -330,10 +362,10 @@ impl ProtobufMappable for UnsubscribeRequest {
                 Ok(Some(message_proto)) => UnsubscribeRequest::try_from(&message_proto)
                     .map_err(|e| crate::SerializationError::new(e.to_string())),
                 Ok(None) => Err(crate::SerializationError::new(
-                    "Protobuf Any does not contain SubscribeRequest".to_string(),
+                    "protobuf Any does not contain expected type".to_string(),
                 )),
                 Err(e) => Err(crate::SerializationError::new(format!(
-                    "Protobuf Any unpack error: {e}"
+                    "protobuf Any unpack error: {e}"
                 ))),
             })
     }
@@ -348,9 +380,7 @@ impl ProtobufMappable for UnsubscribeRequest {
         Any::pack(&UnsubscribeRequestProto::try_from(self).map_err(|e| {
             SerializationError::new(format!("failed to serialize to protobuf: {e}"))
         })?)
-        .map_err(|e| {
-            crate::SerializationError::new(format!("Failed to pack SubscribeRequest: {e}"))
-        })
+        .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
         .and_then(|any| any.write_to_protobuf_bytes())
     }
 }
@@ -412,10 +442,10 @@ impl ProtobufMappable for FetchSubscriptionsRequest {
                 Ok(Some(message_proto)) => FetchSubscriptionsRequest::try_from(&message_proto)
                     .map_err(|e| crate::SerializationError::new(e.to_string())),
                 Ok(None) => Err(crate::SerializationError::new(
-                    "Protobuf Any does not contain SubscribeRequest".to_string(),
+                    "protobuf Any does not contain expected type".to_string(),
                 )),
                 Err(e) => Err(crate::SerializationError::new(format!(
-                    "Protobuf Any unpack error: {e}"
+                    "protobuf Any unpack error: {e}"
                 ))),
             })
     }
@@ -426,9 +456,7 @@ impl ProtobufMappable for FetchSubscriptionsRequest {
 
     fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(&FetchSubscriptionsRequestProto::from(self))
-            .map_err(|e| {
-                crate::SerializationError::new(format!("Failed to pack SubscribeRequest: {e}"))
-            })
+            .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
             .and_then(|any| any.write_to_protobuf_bytes())
     }
 }
@@ -481,10 +509,10 @@ impl ProtobufMappable for FetchSubscriptionsResponse {
                     Ok(Some(message_proto)) => FetchSubscriptionsResponse::try_from(&message_proto)
                         .map_err(|e| crate::SerializationError::new(e.to_string())),
                     Ok(None) => Err(crate::SerializationError::new(
-                        "Protobuf Any does not contain SubscribeRequest".to_string(),
+                        "protobuf Any does not contain expected type".to_string(),
                     )),
                     Err(e) => Err(crate::SerializationError::new(format!(
-                        "Protobuf Any unpack error: {e}"
+                        "protobuf Any unpack error: {e}"
                     ))),
                 },
             )
@@ -502,9 +530,7 @@ impl ProtobufMappable for FetchSubscriptionsResponse {
                 SerializationError::new(format!("failed to serialize to protobuf: {e}"))
             })?,
         )
-        .map_err(|e| {
-            crate::SerializationError::new(format!("Failed to pack SubscribeRequest: {e}"))
-        })
+        .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
         .and_then(|any| any.write_to_protobuf_bytes())
     }
 }
