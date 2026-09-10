@@ -176,6 +176,11 @@ async fn main() -> Result<(), RegistrationError> {
         .register_endpoint(None, 0x00A1, Arc::new(EchoHandler))
         .await?;
 
+#   // tarpaulin does not respect the "no_run" property on the doc test
+#   // so we explicitly exclude the following statement from being compiled
+#   // because otherwise tarpaulin would run into a timeout waiting for the
+#   // doc test to finish
+#   #[cfg(not(tarpaulin))]
     std::future::pending::<()>().await;
     Ok(())
 }
