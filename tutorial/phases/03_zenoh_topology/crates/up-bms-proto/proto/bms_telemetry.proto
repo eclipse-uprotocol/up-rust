@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Nirmalya Sengupta (https://github.com/nsengupta)
+
+syntax = "proto3";
+
+package tutorial.bms.v1;
+
+// Battery management telemetry published by the demo publisher.
+// SoC and cell temperature only — thermal logging is a separate consumer (Stage 3 §3.4).
+message BatteryTelemetry {
+  float soc_percent = 1;
+  int32 temp_celsius = 2;
+}
