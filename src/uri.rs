@@ -21,7 +21,6 @@ A UUri represents a uProtocol resource identifier and is used in various places 
 
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
-use std::sync::LazyLock;
 
 use uriparse::{Authority, URIReference};
 
@@ -35,12 +34,16 @@ pub(crate) const RESOURCE_ID_RESPONSE: u16 = 0x0000;
 pub(crate) const RESOURCE_ID_MIN_EVENT: u16 = 0x8000;
 
 const AUTHORITY_NAME_MAX_LENGTH: usize = 128;
-static AUTHORITY_NAME_PATTERN: LazyLock<regex::Regex> = LazyLock::new(|| {
-    let regex = format!(r"^[a-z0-9\-._~]{{0,{}}}$", AUTHORITY_NAME_MAX_LENGTH);
-    regex::Regex::new(&regex).unwrap()
-});
 
 type AuthorityNameString = String;
+
+// Equivalent to matching against `^[a-z0-9\-._~]{0,128}$`.
+fn is_valid_authority_name(name: &str) -> bool {
+    name.len() <= AUTHORITY_NAME_MAX_LENGTH
+        && name.bytes().all(|b| {
+            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'.' | b'_' | b'~')
+        })
+}
 
 /// An error indicating a problem with creating or parsing a UUri.
 #[derive(Debug)]
@@ -537,7 +540,7 @@ impl UUri {
                 }
                 uriparse::Host::RegisteredName(name) => {
                     if !WILDCARD_AUTHORITY.eq(name.as_str())
-                        && !AUTHORITY_NAME_PATTERN.is_match(name.as_str())
+                        && !is_valid_authority_name(name.as_str())
                     {
                         return Err(UUriError::validation_error(
                             "uProtocol URI's authority contains invalid characters",
