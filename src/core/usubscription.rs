@@ -11,8 +11,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+use std::time::{Duration, SystemTime};
+
 use async_trait::async_trait;
-use chrono::{DateTime, TimeDelta, Utc};
 #[cfg(test)]
 use mockall::automock;
 
@@ -58,8 +59,8 @@ pub struct SubscriptionInfo {
     topic: UUri,
     subscriber: UUri,
     status: SubscriptionStatus,
-    expiration: Option<DateTime<Utc>>,
-    min_sample_period: Option<TimeDelta>,
+    expiration: Option<SystemTime>,
+    min_sample_period: Option<Duration>,
 }
 
 impl SubscriptionInfo {
@@ -83,8 +84,8 @@ impl SubscriptionInfo {
         topic: UUri,
         subscriber: UUri,
         status: SubscriptionStatus,
-        expiration: Option<DateTime<Utc>>,
-        min_sample_period: Option<TimeDelta>,
+        expiration: Option<SystemTime>,
+        min_sample_period: Option<Duration>,
     ) -> Self {
         Self {
             topic,
@@ -111,12 +112,12 @@ impl SubscriptionInfo {
     }
 
     #[must_use]
-    pub fn expiration(&self) -> &Option<DateTime<Utc>> {
+    pub fn expiration(&self) -> &Option<SystemTime> {
         &self.expiration
     }
 
     #[must_use]
-    pub fn min_sample_period(&self) -> &Option<TimeDelta> {
+    pub fn min_sample_period(&self) -> &Option<Duration> {
         &self.min_sample_period
     }
 
@@ -150,9 +151,9 @@ pub struct SubscribeRequest {
     /// The topic to subscribe to.
     pub topic: UUri,
     /// The point in time at which the subscription expires.
-    pub expiration: Option<DateTime<Utc>>,
+    pub expiration: Option<SystemTime>,
     /// The minimum duration between two events (before they should be forwarded by a UStreamer).
-    pub sample_period: Option<TimeDelta>,
+    pub sample_period: Option<Duration>,
 }
 
 /// The response to a [`SubscribeRequest`].
@@ -236,7 +237,7 @@ pub trait USubscription: Send + Sync {
     ///   at a high rate. If the desired sampling period set by the subscriber is lower than the original publisher's
     ///   publication period, the attribute is ignored.
     ///   If not specified, the sampling period is set by the publisher.
-    ///   TimeDeltas used in `min_sample_period` will be clamped to [0; u32::MAX] milliseconds.
+    ///   Durations used in `min_sample_period` will be clamped to [0; u32::MAX] milliseconds.
     ///
     /// # Returns
     ///
@@ -244,8 +245,8 @@ pub trait USubscription: Send + Sync {
     async fn subscribe(
         &self,
         topic: &UUri,
-        expiration: Option<DateTime<Utc>>,
-        min_sample_period: Option<TimeDelta>,
+        expiration: Option<SystemTime>,
+        min_sample_period: Option<Duration>,
     ) -> Result<SubscriptionStatus, UStatus>;
 
     /// Unsubscribes this client from a topic.

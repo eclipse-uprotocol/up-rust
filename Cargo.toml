@@ -60,7 +60,6 @@ util = ["tokio/sync"]
 [dependencies]
 async-trait = { version = "0.1.92" }
 bytes = { version = "1.12.1" }
-chrono = { version = "0.4.45" }
 mediatype = "0.23.0"
 mockall = { version = "0.15.0", optional = true }
 protobuf = { version = "3.7.2", features = ["with-bytes"], optional = true }

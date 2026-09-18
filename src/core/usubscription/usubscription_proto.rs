@@ -15,7 +15,8 @@
 Conversion logic for up-rust USubscription message types into and from their corresponding protobuf types.
 */
 
-use chrono::{DateTime, TimeDelta, Timelike, Utc};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use protobuf::{
     well_known_types::{any::Any, timestamp::Timestamp},
     EnumFull, EnumOrUnknown, Message, MessageField,
@@ -43,14 +44,28 @@ use crate::{
     ProtobufMappable, SerializationError, UCode, UStatus, UUri,
 };
 
-pub(crate) fn chrono_datetime_as_protobuf_timestamp(
-    datetime: Option<DateTime<Utc>>,
+pub(crate) fn system_time_as_protobuf_timestamp(
+    time: Option<SystemTime>,
 ) -> Result<Option<Timestamp>, UStatus> {
-    if let Some(dt) = datetime {
+    if let Some(t) = time {
+        let (seconds, nanos) = match t.duration_since(UNIX_EPOCH) {
+            Ok(duration) => (duration.as_secs() as i64, duration.subsec_nanos() as i32),
+            Err(before_epoch) => {
+                let duration = before_epoch.duration();
+                let whole_seconds = duration.as_secs() as i64;
+                let subsec_nanos = duration.subsec_nanos();
+                // protobuf's Timestamp always uses a non-negative `nanos` offset added to
+                // `seconds`, so a non-zero fraction shifts one whole second into it
+                if subsec_nanos == 0 {
+                    (-whole_seconds, 0)
+                } else {
+                    (-whole_seconds - 1, 1_000_000_000 - subsec_nanos as i32)
+                }
+            }
+        };
         Ok(Some(Timestamp {
-            seconds: dt.timestamp(),
-            // strip chrono's leap-second flag; result is always in [0, 999_999_999]
-            nanos: (dt.nanosecond() % 1_000_000_000) as i32,
+            seconds,
+            nanos,
             ..Default::default()
         }))
     } else {
@@ -58,9 +73,9 @@ pub(crate) fn chrono_datetime_as_protobuf_timestamp(
     }
 }
 
-pub(crate) fn protobuf_timestamp_as_chrono_datetime(
+pub(crate) fn protobuf_timestamp_as_system_time(
     ts: Option<&Timestamp>,
-) -> Result<Option<DateTime<Utc>>, UStatus> {
+) -> Result<Option<SystemTime>, UStatus> {
     if let Some(ts) = ts {
         let err = || {
             UStatus::fail_with_code(
@@ -75,9 +90,19 @@ pub(crate) fn protobuf_timestamp_as_chrono_datetime(
             ));
         }
         // nanos already validated to be in [0, 1_000_000_000), so this cast is safe
-        DateTime::from_timestamp(ts.seconds, ts.nanos as u32)
-            .ok_or_else(err)
-            .map(Some)
+        let nanos = ts.nanos as u32;
+        let time = if ts.seconds >= 0 {
+            UNIX_EPOCH.checked_add(Duration::new(ts.seconds as u64, nanos))
+        } else {
+            // reverse of the +1s/complementary-nanos shift applied when encoding a
+            // pre-epoch instant; `-(ts.seconds + 1)` cannot overflow since ts.seconds < 0
+            let whole_seconds_before_epoch = (-(ts.seconds + 1)) as u64;
+            UNIX_EPOCH.checked_sub(Duration::new(
+                whole_seconds_before_epoch,
+                1_000_000_000 - nanos,
+            ))
+        };
+        time.ok_or_else(err).map(Some)
     } else {
         Ok(None)
     }
@@ -123,10 +148,10 @@ impl TryFrom<&SubscriptionInfo> for SubscriptionInfoProto {
             subscriber: MessageField::some(UUriProto::from(&value.subscriber)),
             topic: MessageField::some(UUriProto::from(&value.topic)),
             status: SubscriptionStatusProto::from(&value.status).into(),
-            expiration: chrono_datetime_as_protobuf_timestamp(*value.expiration())?.into(),
+            expiration: system_time_as_protobuf_timestamp(*value.expiration())?.into(),
             sample_period: value
                 .min_sample_period
-                .map(|p| p.num_milliseconds().clamp(0, u32::MAX as i64) as u32),
+                .map(|p| p.as_millis().clamp(0, u32::MAX as u128) as u32),
             ..Default::default()
         })
     }
@@ -153,21 +178,14 @@ impl TryFrom<&SubscriptionInfoProto> for SubscriptionInfo {
             require_topic(proto.topic.clone())?,
             subscriber,
             require_status(proto.status)?,
-            protobuf_timestamp_as_chrono_datetime(proto.expiration.as_ref())?,
-            proto
-                .sample_period
-                .map(|p| TimeDelta::milliseconds(p as i64)),
+            protobuf_timestamp_as_system_time(proto.expiration.as_ref())?,
+            proto.sample_period.map(|p| Duration::from_millis(p as u64)),
         ))
     }
 }
 
 impl ProtobufMappable for SubscriptionInfo {
     fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        SubscriptionInfo::try_from(&SubscriptionInfoProto::parse_from_bytes(proto)?)
-            .map_err(|e| SerializationError::new(e.to_string()))
-    }
-
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
         Any::parse_from_bytes(proto)
             .map_err(|err| crate::SerializationError::new(err.to_string()))
             .and_then(|any| match any.unpack::<SubscriptionInfoProto>() {
@@ -182,18 +200,23 @@ impl ProtobufMappable for SubscriptionInfo {
             })
     }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(SubscriptionInfoProto::try_from(self)
-            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
-            .write_to_bytes()?)
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        SubscriptionInfo::try_from(&SubscriptionInfoProto::parse_from_bytes(proto)?)
+            .map_err(|e| SerializationError::new(e.to_string()))
     }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(&SubscriptionInfoProto::try_from(self).map_err(|e| {
             SerializationError::new(format!("failed to serialize to protobuf: {e}"))
         })?)
         .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
         .and_then(|any| any.write_to_protobuf_bytes())
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Ok(SubscriptionInfoProto::try_from(self)
+            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
+            .write_to_bytes()?)
     }
 }
 
@@ -205,10 +228,10 @@ impl TryFrom<&SubscribeRequest> for SubscribeRequestProto {
     fn try_from(value: &SubscribeRequest) -> Result<Self, Self::Error> {
         Ok(SubscribeRequestProto {
             topic: MessageField::some(UUriProto::from(&value.topic)),
-            expiration: chrono_datetime_as_protobuf_timestamp(value.expiration)?.into(),
+            expiration: system_time_as_protobuf_timestamp(value.expiration)?.into(),
             sample_period: value
                 .sample_period
-                .map(|p| p.num_milliseconds().clamp(0, u32::MAX as i64) as u32),
+                .map(|p| p.as_millis().clamp(0, u32::MAX as u128) as u32),
             ..Default::default()
         })
     }
@@ -223,22 +246,17 @@ impl TryFrom<&SubscribeRequestProto> for SubscribeRequest {
             // [impl->dsn~usubscription-subscribe-valid-topic-uuris~1]
             topic: require_topic(proto.topic.clone())?,
             // [impl->dsn~usubscription-subscription-expiration-datatype~1]
-            expiration: protobuf_timestamp_as_chrono_datetime(proto.expiration.as_ref())?,
+            expiration: protobuf_timestamp_as_system_time(proto.expiration.as_ref())?,
             // [impl->dsn~usubscription-sample-period-datatype~1]
             sample_period: proto
                 .sample_period
-                .map(|sp| TimeDelta::milliseconds(sp as i64)),
+                .map(|sp| Duration::from_millis(sp as u64)),
         })
     }
 }
 
 impl ProtobufMappable for SubscribeRequest {
     fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        SubscribeRequest::try_from(&SubscribeRequestProto::parse_from_bytes(proto)?)
-            .map_err(|e| SerializationError::new(e.to_string()))
-    }
-
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
         Any::parse_from_bytes(proto)
             .map_err(|err| crate::SerializationError::new(err.to_string()))
             .and_then(|any| match any.unpack::<SubscribeRequestProto>() {
@@ -253,18 +271,23 @@ impl ProtobufMappable for SubscribeRequest {
             })
     }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(SubscribeRequestProto::try_from(self)
-            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
-            .write_to_bytes()?)
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        SubscribeRequest::try_from(&SubscribeRequestProto::parse_from_bytes(proto)?)
+            .map_err(|e| SerializationError::new(e.to_string()))
     }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(&SubscribeRequestProto::try_from(self).map_err(|e| {
             SerializationError::new(format!("failed to serialize to protobuf: {e}"))
         })?)
         .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
         .and_then(|any| any.write_to_protobuf_bytes())
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Ok(SubscribeRequestProto::try_from(self)
+            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
+            .write_to_bytes()?)
     }
 }
 
@@ -294,11 +317,6 @@ impl TryFrom<&SubscribeResponseProto> for SubscribeResponse {
 
 impl ProtobufMappable for SubscribeResponse {
     fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        SubscribeResponse::try_from(&SubscribeResponseProto::parse_from_bytes(proto)?)
-            .map_err(|e| SerializationError::new(e.to_string()))
-    }
-
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
         Any::parse_from_bytes(proto)
             .map_err(|err| crate::SerializationError::new(err.to_string()))
             .and_then(|any| match any.unpack::<SubscribeResponseProto>() {
@@ -313,14 +331,19 @@ impl ProtobufMappable for SubscribeResponse {
             })
     }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(SubscribeResponseProto::from(self).write_to_bytes()?)
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        SubscribeResponse::try_from(&SubscribeResponseProto::parse_from_bytes(proto)?)
+            .map_err(|e| SerializationError::new(e.to_string()))
     }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(&SubscribeResponseProto::from(self))
             .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
             .and_then(|any| any.write_to_protobuf_bytes())
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Ok(SubscribeResponseProto::from(self).write_to_bytes()?)
     }
 }
 
@@ -351,11 +374,6 @@ impl TryFrom<&UnsubscribeRequestProto> for UnsubscribeRequest {
 
 impl ProtobufMappable for UnsubscribeRequest {
     fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        UnsubscribeRequest::try_from(&UnsubscribeRequestProto::parse_from_bytes(proto)?)
-            .map_err(|e| SerializationError::new(e.to_string()))
-    }
-
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
         Any::parse_from_bytes(proto)
             .map_err(|err| crate::SerializationError::new(err.to_string()))
             .and_then(|any| match any.unpack::<UnsubscribeRequestProto>() {
@@ -370,18 +388,23 @@ impl ProtobufMappable for UnsubscribeRequest {
             })
     }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(UnsubscribeRequestProto::try_from(self)
-            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
-            .write_to_bytes()?)
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        UnsubscribeRequest::try_from(&UnsubscribeRequestProto::parse_from_bytes(proto)?)
+            .map_err(|e| SerializationError::new(e.to_string()))
     }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(&UnsubscribeRequestProto::try_from(self).map_err(|e| {
             SerializationError::new(format!("failed to serialize to protobuf: {e}"))
         })?)
         .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
         .and_then(|any| any.write_to_protobuf_bytes())
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Ok(UnsubscribeRequestProto::try_from(self)
+            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
+            .write_to_bytes()?)
     }
 }
 
@@ -429,13 +452,6 @@ impl TryFrom<&FetchSubscriptionsRequestProto> for FetchSubscriptionsRequest {
 
 impl ProtobufMappable for FetchSubscriptionsRequest {
     fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        FetchSubscriptionsRequest::try_from(&FetchSubscriptionsRequestProto::parse_from_bytes(
-            proto,
-        )?)
-        .map_err(|e| SerializationError::new(e.to_string()))
-    }
-
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
         Any::parse_from_bytes(proto)
             .map_err(|err| crate::SerializationError::new(err.to_string()))
             .and_then(|any| match any.unpack::<FetchSubscriptionsRequestProto>() {
@@ -450,14 +466,21 @@ impl ProtobufMappable for FetchSubscriptionsRequest {
             })
     }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(FetchSubscriptionsRequestProto::from(self).write_to_bytes()?)
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        FetchSubscriptionsRequest::try_from(&FetchSubscriptionsRequestProto::parse_from_bytes(
+            proto,
+        )?)
+        .map_err(|e| SerializationError::new(e.to_string()))
     }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(&FetchSubscriptionsRequestProto::from(self))
             .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
             .and_then(|any| any.write_to_protobuf_bytes())
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Ok(FetchSubscriptionsRequestProto::from(self).write_to_bytes()?)
     }
 }
 
@@ -495,13 +518,6 @@ impl TryFrom<&FetchSubscriptionsResponseProto> for FetchSubscriptionsResponse {
 
 impl ProtobufMappable for FetchSubscriptionsResponse {
     fn parse_from_packed_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        FetchSubscriptionsResponse::try_from(&FetchSubscriptionsResponseProto::parse_from_bytes(
-            proto,
-        )?)
-        .map_err(|e| SerializationError::new(e.to_string()))
-    }
-
-    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
         Any::parse_from_bytes(proto)
             .map_err(|err| crate::SerializationError::new(err.to_string()))
             .and_then(
@@ -518,13 +534,14 @@ impl ProtobufMappable for FetchSubscriptionsResponse {
             )
     }
 
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(FetchSubscriptionsResponseProto::try_from(self)
-            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
-            .write_to_bytes()?)
+    fn parse_from_protobuf_bytes(proto: &[u8]) -> Result<Self, crate::SerializationError> {
+        FetchSubscriptionsResponse::try_from(&FetchSubscriptionsResponseProto::parse_from_bytes(
+            proto,
+        )?)
+        .map_err(|e| SerializationError::new(e.to_string()))
     }
 
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
         Any::pack(
             &FetchSubscriptionsResponseProto::try_from(self).map_err(|e| {
                 SerializationError::new(format!("failed to serialize to protobuf: {e}"))
@@ -532,6 +549,12 @@ impl ProtobufMappable for FetchSubscriptionsResponse {
         )
         .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
         .and_then(|any| any.write_to_protobuf_bytes())
+    }
+
+    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
+        Ok(FetchSubscriptionsResponseProto::try_from(self)
+            .map_err(|e| SerializationError::new(format!("failed to serialize to protobuf: {e}")))?
+            .write_to_bytes()?)
     }
 }
 
@@ -563,12 +586,12 @@ mod tests {
     use protobuf::well_known_types::timestamp::Timestamp;
 
     #[test]
-    fn test_chrono_datetime_as_protobuf_timestamp() {
-        assert!(chrono_datetime_as_protobuf_timestamp(None).is_ok_and(|ts| ts.is_none()));
+    fn test_system_time_as_protobuf_timestamp() {
+        assert!(system_time_as_protobuf_timestamp(None).is_ok_and(|ts| ts.is_none()));
 
-        let datetime = DateTime::from_timestamp(1, 234_000_000).unwrap();
+        let time = UNIX_EPOCH + Duration::new(1, 234_000_000);
         assert!(
-            chrono_datetime_as_protobuf_timestamp(Some(datetime)).is_ok_and(|ts| {
+            system_time_as_protobuf_timestamp(Some(time)).is_ok_and(|ts| {
                 ts == Some(Timestamp {
                     seconds: 1,
                     nanos: 234_000_000,
@@ -579,35 +602,35 @@ mod tests {
     }
 
     #[test]
-    fn test_protobuf_timestamp_as_chrono_datetime_maps_none() {
-        assert!(protobuf_timestamp_as_chrono_datetime(None).is_ok_and(|dt| dt.is_none()));
+    fn test_protobuf_timestamp_as_system_time_maps_none() {
+        assert!(protobuf_timestamp_as_system_time(None).is_ok_and(|dt| dt.is_none()));
     }
 
     #[test_case::test_case(10, 234_000_000 => matches Ok(Some(_)); "succeeds for valid timestamp")]
     #[test_case::test_case(-10, 234_000_000 => matches Ok(Some(_)); "succeeds for timestamp before Unix epoch")]
     #[test_case::test_case(10, -1 => matches Err(UStatus {..}); "fails for nanos exceeding lower bound")]
     #[test_case::test_case(10, 1_000_000_000 => matches Err(UStatus {..}); "fails for nanos exceeding upper bound")]
-    fn test_protobuf_timestamp_as_chrono_datetime(
+    fn test_protobuf_timestamp_as_system_time(
         seconds: i64,
         nanos: i32,
-    ) -> Result<Option<DateTime<Utc>>, UStatus> {
+    ) -> Result<Option<SystemTime>, UStatus> {
         let timestamp = Timestamp {
             seconds,
             nanos,
             ..Default::default()
         };
-        protobuf_timestamp_as_chrono_datetime(Some(&timestamp))
+        protobuf_timestamp_as_system_time(Some(&timestamp))
     }
 
     // [utest->dsn~usubscription-subscription-expiration-datatype~1]
     #[test]
     fn test_timestamp_conversion_round_trip() {
-        let datetime = DateTime::from_timestamp(1_700_000_000, 123_456_789).unwrap();
-        let timestamp = chrono_datetime_as_protobuf_timestamp(Some(datetime))
+        let time = UNIX_EPOCH + Duration::new(1_700_000_000, 123_456_789);
+        let timestamp = system_time_as_protobuf_timestamp(Some(time))
             .expect("conversion to protobuf timestamp should succeed");
-        let round_tripped = protobuf_timestamp_as_chrono_datetime(timestamp.as_ref())
-            .expect("conversion back to chrono datetime should succeed");
-        assert_eq!(round_tripped, Some(datetime));
+        let round_tripped = protobuf_timestamp_as_system_time(timestamp.as_ref())
+            .expect("conversion back to system time should succeed");
+        assert_eq!(round_tripped, Some(time));
     }
 
     // [utest->dsn~usubscription-fetch-subscriptions-invalid-subscriber-filter~1]
@@ -671,6 +694,6 @@ mod tests {
             ..Default::default()
         };
         let request = SubscribeRequest::try_from(&proto).unwrap();
-        assert_eq!(request.sample_period, Some(TimeDelta::milliseconds(500)));
+        assert_eq!(request.sample_period, Some(Duration::from_millis(500)));
     }
 }

@@ -12,9 +12,9 @@
  ********************************************************************************/
 
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use chrono::{DateTime, TimeDelta, Utc};
 
 use crate::{
     communication::{CallOptions, RpcClient},
@@ -58,8 +58,8 @@ impl USubscription for RpcClientUSubscription {
     async fn subscribe(
         &self,
         topic: &UUri,
-        expiration: Option<DateTime<Utc>>,
-        sample_period: Option<TimeDelta>,
+        expiration: Option<SystemTime>,
+        sample_period: Option<Duration>,
     ) -> Result<SubscriptionStatus, UStatus> {
         let subscription_request = SubscribeRequest {
             topic: topic.clone(),
