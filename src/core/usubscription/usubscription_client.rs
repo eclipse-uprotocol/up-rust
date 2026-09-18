@@ -28,7 +28,7 @@ use crate::{
         NotificationsResponse as NotificationResponseProto, ResetResponse as ResetResponseProto,
         UnsubscribeResponse as UnsubscribeResponseProto,
     },
-    UCode, UStatus, UUri,
+    UStatus, UUri,
 };
 
 /// A [`USubscription`] client implementation for invoking operations of a local USubscription service.
