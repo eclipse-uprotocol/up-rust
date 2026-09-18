@@ -1,0 +1,25 @@
+# ********************************************************************************
+#  Copyright (c) 2023 Contributors to the Eclipse Foundation
+#
+#  See the NOTICE file(s) distributed with this work for additional
+#  information regarding copyright ownership.
+#
+#  This program and the accompanying materials are made available under the
+#  terms of the Apache License Version 2.0 which is available at
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************/
+
+# Exclude URLs and mail addresses from checking. The values are treated as regular expressions
+exclude = [
+    '^https://gitlab\.eclipse\.org/security/vulnerability-reports/-/work_items/new', # requires authentication
+    '^up://',                                                                        # ignore UProtocol URLs
+]
+
+# Exclude paths from getting checked. The values are treated as regular expressions
+exclude_path = [
+    "^up-spec/", # no need to validate links in uProtocol Specification
+]
+
+extensions = ["rs", "md", "yaml", "yml"]

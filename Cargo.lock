@@ -1644,7 +1644,6 @@ dependencies = [
  "protobuf-codegen",
  "protoc-bin-vendored",
  "rand",
- "regex",
  "serde",
  "serde_json",
  "symphony",

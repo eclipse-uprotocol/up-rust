@@ -19,7 +19,9 @@ use std::{collections::HashSet, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use crate::{ComparableListener, UListener, UMessage, UStatus, UTransport, UUri};
+use crate::{
+    verify_filter_criteria, ComparableListener, UListener, UMessage, UStatus, UTransport, UUri,
+};
 
 #[derive(Eq, PartialEq, Hash)]
 struct RegisteredListener {
@@ -81,21 +83,15 @@ impl UTransport for LocalTransport {
         sink_filter: Option<&UUri>,
         listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus> {
+        verify_filter_criteria(source_filter, sink_filter).map_err(|status| *status)?;
         let registered_listener = RegisteredListener {
             source_filter: source_filter.to_owned(),
             sink_filter: sink_filter.map(|u| u.to_owned()),
             listener: ComparableListener::new(listener),
         };
         let mut listeners = self.listeners.write().await;
-        if listeners.contains(&registered_listener) {
-            Err(UStatus::fail_with_code(
-                crate::UCode::AlreadyExists,
-                "listener already registered for filters",
-            ))
-        } else {
-            listeners.insert(registered_listener);
-            Ok(())
-        }
+        listeners.insert(registered_listener);
+        Ok(())
     }
 
     async fn unregister_listener(
@@ -104,6 +100,7 @@ impl UTransport for LocalTransport {
         sink_filter: Option<&UUri>,
         listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus> {
+        verify_filter_criteria(source_filter, sink_filter).map_err(|status| *status)?;
         let registered_listener = RegisteredListener {
             source_filter: source_filter.to_owned(),
             sink_filter: sink_filter.map(|u| u.to_owned()),
@@ -124,7 +121,9 @@ impl UTransport for LocalTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{utransport::MockUListener, LocalUriProvider, StaticUriProvider, UMessageBuilder};
+    use crate::{
+        utransport::MockUListener, LocalUriProvider, StaticUriProvider, UCode, UMessageBuilder,
+    };
 
     #[tokio::test]
     async fn test_send_dispatches_to_matching_listener() {
@@ -210,5 +209,67 @@ mod tests {
                     .unwrap(),
             )
             .await;
+    }
+
+    #[tokio::test]
+    async fn test_register_listener_is_idempotent() {
+        const RESOURCE_ID: u16 = 0xa1b3;
+        let mut listener = MockUListener::new();
+        listener.expect_on_receive().once().return_const(());
+        let listener_ref = Arc::new(listener);
+        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02)
+            .expect("failed to create URI provider");
+        let topic = uri_provider.get_resource_uri(RESOURCE_ID);
+        let transport = LocalTransport::default();
+
+        transport
+            .register_listener(&topic, None, listener_ref.clone())
+            .await
+            .unwrap();
+        transport
+            .register_listener(&topic, None, listener_ref.clone())
+            .await
+            .unwrap();
+
+        transport
+            .send(UMessageBuilder::publish(topic.clone()).build().unwrap())
+            .await
+            .unwrap();
+        transport
+            .unregister_listener(&topic, None, listener_ref)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_register_listener_rejects_invalid_filters() {
+        let listener = Arc::new(MockUListener::new());
+        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02)
+            .expect("failed to create URI provider");
+        let invalid_source_filter = uri_provider.get_resource_uri(0x0001);
+        let transport = LocalTransport::default();
+
+        let error = transport
+            .register_listener(&invalid_source_filter, None, listener)
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.get_code(), UCode::InvalidArgument);
+    }
+
+    #[tokio::test]
+    async fn test_unregister_listener_rejects_invalid_filters() {
+        let listener = Arc::new(MockUListener::new());
+        let uri_provider = StaticUriProvider::new("my-vehicle", 0x100d, 0x02)
+            .expect("failed to create URI provider");
+        let invalid_source_filter = uri_provider.get_resource_uri(0x0001);
+        let transport = LocalTransport::default();
+
+        let error = transport
+            .unregister_listener(&invalid_source_filter, None, listener)
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.get_code(), UCode::InvalidArgument);
     }
 }

@@ -46,4 +46,4 @@ All communication regarding committer nominations and retirement, *SHALL* be sen
 In addition to the duties mentioned in [Eclipse Contributor Handbook](https://www.eclipse.org/projects/handbook/#roles-pl), project leads *MUST* also fulfill the Committer [Duties defined above](#duties).
 
 
-NOTE: Violation to this code of conduct should be reported to the [Eclipse Foundation Management Office (EMO)](https://gitlab.eclipse.org/eclipsefdn/emo-team/emo/-/issues)
+NOTE: Violation to this code of conduct should be reported to the [Eclipse Foundation Management Office (EMO)](https://gitlab.eclipse.org/eclipsefdn/emo-team/emo/-/work_items)

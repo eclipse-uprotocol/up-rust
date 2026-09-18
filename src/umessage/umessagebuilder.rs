@@ -13,12 +13,11 @@
 
 use bytes::Bytes;
 
-use crate::uattributes::NotificationValidator;
 #[cfg(feature = "protobuf-support")]
 use crate::ProtobufMappable;
 use crate::{
-    PublishValidator, RequestValidator, ResponseValidator, UAttributes, UAttributesValidator,
-    UCode, UMessage, UMessageError, UMessageType, UPayloadFormat, UPriority, UUri, UUID,
+    UAttributes, UCode, UMessage, UMessageError, UMessageType, UPayloadFormat, UPriority, UUri,
+    UUID,
 };
 
 mod sealed {
@@ -89,7 +88,6 @@ struct CommonAttributes {
     traceparent: Option<String>,
     payload_format: Option<UPayloadFormat>,
     payload: Option<Bytes>,
-    validator: Box<dyn UAttributesValidator>,
 }
 
 /// A builder for creating [`UMessage`]s.
@@ -142,7 +140,6 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
-            validator: Box::new(PublishValidator),
         };
         UMessageBuilder {
             common,
@@ -192,7 +189,6 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
-            validator: Box::new(NotificationValidator),
         };
         UMessageBuilder {
             common,
@@ -249,7 +245,6 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
-            validator: Box::new(RequestValidator),
         };
         UMessageBuilder {
             common,
@@ -312,7 +307,6 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
-            validator: Box::new(ResponseValidator),
         };
         UMessageBuilder {
             common,
@@ -386,7 +380,6 @@ impl UMessageBuilder<InitialBuilderState> {
             traceparent: None,
             payload_format: None,
             payload: None,
-            validator: Box::new(ResponseValidator),
         };
         UMessageBuilder {
             common,
@@ -618,12 +611,8 @@ impl<S: BuilderState> UMessageBuilder<S> {
         };
         // add state-specific attributes
         self.extra.merge_into_attributes(&mut attributes);
-        // make sure that we have created a valid set of attributes before creating the final message
-        self.common
-            .validator
-            .validate(&attributes)
-            .map_err(UMessageError::from)
-            .and_then(|_| UMessage::new(attributes, self.common.payload.clone()))
+        // finally, create the message, this also includes message validation
+        UMessage::new(attributes, self.common.payload.clone())
     }
 
     /// Creates the message based on the builder's state and some payload.

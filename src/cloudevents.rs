@@ -20,8 +20,8 @@
 // [impl->dsn~cloudevents-umessage-mapping~2]
 
 use crate::{
-    UAttributes, UAttributesError, UAttributesValidators, UCode, UMessage, UMessageError,
-    UMessageType, UPayloadFormat, UPriority, UUri, UUID,
+    UAttributes, UAttributesError, UCode, UMessage, UMessageError, UMessageType, UPayloadFormat,
+    UPriority, UUri, UUID,
 };
 use bytes::Bytes;
 use protobuf::well_known_types::any::Any;
@@ -417,7 +417,6 @@ impl TryFrom<CloudEvent> for UMessage {
             traceparent: event.get_traceparent()?,
             payload_format: Some(event.get_payload_format()?),
         };
-        UAttributesValidators::get_validator_for_attributes(&attributes).validate(&attributes)?;
 
         let payload = if event.has_binary_data() {
             Some(Bytes::copy_from_slice(event.binary_data()))
@@ -429,6 +428,7 @@ impl TryFrom<CloudEvent> for UMessage {
             None
         };
 
+        // this will also validate the attributes and return an error if they are not valid
         UMessage::new(attributes, payload)
     }
 }

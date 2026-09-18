@@ -19,8 +19,8 @@ pub(crate) use protobuf_support::deserialize_protobuf_bytes;
 pub use umessagebuilder::*;
 
 use crate::{
-    SerializationError, UAttributes, UAttributesError, UCode, UMessageType, UPayloadFormat,
-    UPriority, UUri, UUID,
+    SerializationError, UAttributes, UAttributesError, UAttributesValidators, UCode, UMessageType,
+    UPayloadFormat, UPriority, UUri, UUID,
 };
 
 mod umessagebuilder;
@@ -76,17 +76,62 @@ pub struct UMessage {
 }
 
 impl UMessage {
-    // This convenience constructor is used internally only, e.g. by the UMessageBuilder for creating
-    // the final message after validation.
-    // Client code can create UMessages using the UMessageBuilder only.
+    /// This convenience constructor is used internally only, e.g. by the [crate::UMessageBuilder] for creating
+    /// the final message after validation.
+    ///
+    /// Client code can only create UMessages using the [crate::UMessageBuilder] or by deserializing and mapping a
+    /// protobuf. Both of these approaches use this constructor and will therefore validate the message before
+    /// returning it to client code.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the given attributes and payload fail [validation](Self::validate).
     pub(crate) fn new(
         attributes: UAttributes,
         payload: Option<Bytes>,
     ) -> Result<Self, UMessageError> {
-        Ok(UMessage {
+        let msg = UMessage {
             attributes,
             payload,
-        })
+        };
+        msg.validate()?;
+        Ok(msg)
+    }
+
+    /// Validates this message's attributes and payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message's attributes are [invalid](crate::UAttributesValidator::validate)
+    /// or are not consistent with the message's payload, e.g. the message has a payload format but no
+    /// payload or vice versa.
+    ///
+    /// # Example
+    /// ```
+    /// use up_rust::{UMessageBuilder, UUri, UPayloadFormat};
+    ///
+    /// let topic = UUri::try_from("//my-vehicle/D45/23/A001").unwrap();
+    /// let msg = UMessageBuilder::publish(topic.clone()).build().unwrap();
+    /// assert!(msg.validate().is_ok());
+    ///
+    /// let msg = UMessageBuilder::publish(topic).build_with_payload("Hello", UPayloadFormat::Text).unwrap();
+    /// assert!(msg.validate().is_ok());
+    /// ```
+    pub fn validate(&self) -> Result<(), UMessageError> {
+        UAttributesValidators::get_validator_for_attributes(&self.attributes)
+            .validate(&self.attributes)?;
+        // [impl->dsn~up-attributes-payload-format~1]
+        if self.attributes.payload_format().is_some() && self.payload.is_none() {
+            return Err(UMessageError::PayloadError(
+                "Message has payload format but no payload".to_string(),
+            ));
+        }
+        if self.attributes.payload_format().is_none() && self.payload.is_some() {
+            return Err(UMessageError::PayloadError(
+                "Message has payload but no payload format".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Get this message's attributes.
