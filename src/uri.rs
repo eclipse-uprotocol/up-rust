@@ -22,7 +22,11 @@ A UUri represents a uProtocol resource identifier and is used in various places 
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
-use uriparse::{Authority, URIReference};
+use fluent_uri::{
+    component::{Authority, Host, Scheme},
+    UriRef,
+};
+use thiserror::Error;
 
 pub(crate) const WILDCARD_AUTHORITY: &str = "*";
 pub(crate) const WILDCARD_ENTITY_INSTANCE: u32 = 0xFFFF_0000;
@@ -32,6 +36,8 @@ pub(crate) const WILDCARD_RESOURCE_ID: u16 = 0xFFFF;
 
 pub(crate) const RESOURCE_ID_RESPONSE: u16 = 0x0000;
 pub(crate) const RESOURCE_ID_MIN_EVENT: u16 = 0x8000;
+
+const SCHEME_UP: &Scheme = Scheme::new_or_panic("up");
 
 const AUTHORITY_NAME_MAX_LENGTH: usize = 128;
 
@@ -46,11 +52,13 @@ fn is_valid_authority_name(name: &str) -> bool {
 }
 
 /// An error indicating a problem with creating or parsing a UUri.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum UUriError {
     /// Indicates that a given URI string cannot be parsed into a UUri due to invalid formatting or content.
+    #[error("Serialization error: {0}")]
     SerializationError(String),
     /// Indicates that a given URI does not comply with the UUri specification.
+    #[error("Validation error: {0}")]
     ValidationError(String),
 }
 
@@ -69,17 +77,6 @@ impl UUriError {
         Self::ValidationError(message.into())
     }
 }
-
-impl std::fmt::Display for UUriError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SerializationError(e) => f.write_fmt(format_args!("Serialization error: {e}")),
-            Self::ValidationError(e) => f.write_fmt(format_args!("Validation error: {e}")),
-        }
-    }
-}
-
-impl std::error::Error for UUriError {}
 
 /// A URI that represents a uProtocol resource identifier.
 #[derive(Debug, Clone, PartialEq)]
@@ -161,15 +158,13 @@ impl FromStr for UUri {
         if uri.is_empty() {
             return Err(UUriError::serialization_error("URI is empty"));
         }
-        let parsed_uri = URIReference::try_from(uri)
-            .map_err(|e| UUriError::serialization_error(e.to_string()))?;
+        let parsed_uri =
+            UriRef::parse(uri).map_err(|e| UUriError::serialization_error(e.to_string()))?;
 
-        if let Some(scheme) = parsed_uri.scheme() {
-            if scheme.ne("up") {
-                return Err(UUriError::serialization_error(
-                    "uProtocol URI must use 'up' scheme",
-                ));
-            }
+        if parsed_uri.scheme().is_some_and(|s| s.ne(SCHEME_UP)) {
+            return Err(UUriError::serialization_error(
+                "uProtocol URI must use 'up' scheme",
+            ));
         }
         if parsed_uri.has_query() {
             return Err(UUriError::serialization_error(
@@ -181,49 +176,69 @@ impl FromStr for UUri {
                 "uProtocol URI must not contain fragment",
             ));
         }
-        let authority_name = parsed_uri.authority().map_or(
-            Ok(AuthorityNameString::default()),
-            Self::verify_parsed_authority,
-        )?;
+        let authority_name = parsed_uri
+            .authority()
+            .map_or(Ok(AuthorityNameString::default()), |auth| {
+                Self::verify_parsed_authority(&auth)
+            })?;
 
-        let path_segments = parsed_uri.path().segments();
-        match path_segments {
-            [entity, version, resource] => {
-                if entity.is_empty() {
-                    return Err(UUriError::serialization_error(
-                        "URI must contain non-empty entity ID",
-                    ));
-                }
-                let ue_id = u32::from_str_radix(entity, 16).map_err(|e| {
-                    UUriError::serialization_error(format!("Cannot parse entity ID: {e}"))
-                })?;
-                if version.is_empty() {
-                    return Err(UUriError::serialization_error(
-                        "URI must contain non-empty entity version",
-                    ));
-                }
-                let ue_version_major = u8::from_str_radix(version, 16).map_err(|e| {
-                    UUriError::serialization_error(format!("Cannot parse entity version: {e}"))
-                })?;
-                if resource.is_empty() {
-                    return Err(UUriError::serialization_error(
-                        "URI must contain non-empty resource ID",
-                    ));
-                }
-                let resource_id = u16::from_str_radix(resource, 16).map_err(|e| {
-                    UUriError::serialization_error(format!("Cannot parse resource ID: {e}"))
-                })?;
-
-                Ok(UUri {
-                    authority_name,
-                    ue_id,
-                    ue_version_major,
-                    resource_id,
-                })
+        if let Some(mut path_segments) = parsed_uri.path().segments_if_absolute() {
+            let Some(entity) = path_segments.next() else {
+                return Err(UUriError::serialization_error(
+                    "uProtocol URI must contain entity ID",
+                ));
+            };
+            let Some(version) = path_segments.next() else {
+                return Err(UUriError::serialization_error(
+                    "uProtocol URI must contain entity version",
+                ));
+            };
+            let Some(resource) = path_segments.next() else {
+                return Err(UUriError::serialization_error(
+                    "uProtocol URI must contain resource ID",
+                ));
+            };
+            if path_segments.next().is_some() {
+                return Err(UUriError::serialization_error(
+                    "uProtocol URI path must contain exactly three segments",
+                ));
             }
-            _ => Err(UUriError::serialization_error(
+
+            if entity.is_empty() {
+                return Err(UUriError::serialization_error(
+                    "URI must contain non-empty entity ID",
+                ));
+            }
+            let ue_id = u32::from_str_radix(entity.as_str(), 16).map_err(|e| {
+                UUriError::serialization_error(format!("Cannot parse entity ID: {e}"))
+            })?;
+            if version.is_empty() {
+                return Err(UUriError::serialization_error(
+                    "URI must contain non-empty entity version",
+                ));
+            }
+            let ue_version_major = u8::from_str_radix(version.as_str(), 16).map_err(|e| {
+                UUriError::serialization_error(format!("Cannot parse entity version: {e}"))
+            })?;
+            if resource.is_empty() {
+                return Err(UUriError::serialization_error(
+                    "URI must contain non-empty resource ID",
+                ));
+            }
+            let resource_id = u16::from_str_radix(resource.as_str(), 16).map_err(|e| {
+                UUriError::serialization_error(format!("Cannot parse resource ID: {e}"))
+            })?;
+
+            Ok(UUri {
+                authority_name,
+                ue_id,
+                ue_version_major,
+                resource_id,
+            })
+        } else {
+            Err(UUriError::serialization_error(
                 "uProtocol URI must contain entity ID, entity version and resource ID",
-            )),
+            ))
         }
     }
 }
@@ -515,9 +530,14 @@ impl UUri {
     // [impl->dsn~uri-authority-name-length~1]
     // [impl->dsn~uri-host-only~2]
     pub(crate) fn verify_authority_name(authority: &str) -> Result<AuthorityNameString, UUriError> {
-        Authority::try_from(authority)
-            .map_err(|e| UUriError::validation_error(format!("invalid authority: {e}")))
-            .and_then(|auth| Self::verify_parsed_authority(&auth))
+        // sadly, there is no way to parse a string into an Authority directly in fluent-uri
+        let uri_ref = UriRef::parse(format!("//{authority}"))
+            .map_err(|e| UUriError::validation_error(format!("invalid authority: {e:?}")))?;
+        if let Some(auth) = uri_ref.authority() {
+            Self::verify_parsed_authority(&auth)
+        } else {
+            Err(UUriError::validation_error("missing authority"))
+        }
     }
 
     // [impl->dsn~uri-authority-name-length~1]
@@ -529,16 +549,14 @@ impl UUri {
             Err(UUriError::validation_error(
                 "uProtocol URI's authority must not contain port",
             ))
-        } else if auth.has_username() || auth.has_password() {
+        } else if auth.has_userinfo() {
             Err(UUriError::validation_error(
                 "uProtocol URI's authority must not contain userinfo",
             ))
         } else {
-            let verified_name = match auth.host() {
-                uriparse::Host::IPv4Address(_) | uriparse::Host::IPv6Address(_) => {
-                    auth.host().to_string()
-                }
-                uriparse::Host::RegisteredName(name) => {
+            let verified_name = match auth.host_parsed() {
+                Host::Ipv4(_) | Host::Ipv6(_) => auth.host().to_string(),
+                Host::RegName(name) => {
                     if !WILDCARD_AUTHORITY.eq(name.as_str())
                         && !is_valid_authority_name(name.as_str())
                     {
@@ -548,6 +566,7 @@ impl UUri {
                     }
                     name.to_string()
                 }
+                _ => todo!(),
             };
             Ok(verified_name)
         }
