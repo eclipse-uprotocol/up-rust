@@ -28,7 +28,7 @@ use crate::{
         NotificationsResponse as NotificationResponseProto, ResetResponse as ResetResponseProto,
         UnsubscribeResponse as UnsubscribeResponseProto,
     },
-    UStatus, UUri,
+    UCode, UStatus, UUri,
 };
 
 /// A [`USubscription`] client implementation for invoking operations of a local USubscription service.
@@ -61,6 +61,13 @@ impl USubscription for RpcClientUSubscription {
         expiration: Option<SystemTime>,
         sample_period: Option<Duration>,
     ) -> Result<SubscriptionStatus, UStatus> {
+        // [impl->dsn~usubscription-unsubscribe-valid-topic-uuris~1]
+        topic.verify_event().map_err(|e| {
+            UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                format!("topic URI is not a valid event source: {e}"),
+            )
+        })?;
         let subscription_request = SubscribeRequest {
             topic: topic.clone(),
             expiration,
