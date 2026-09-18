@@ -61,20 +61,15 @@ impl USubscription for RpcClientUSubscription {
         expiration: Option<SystemTime>,
         sample_period: Option<Duration>,
     ) -> Result<SubscriptionStatus, UStatus> {
-        let subscription_request = SubscribeRequest {
-            topic: topic.clone(),
-            expiration,
-            sample_period,
-        };
         // [impl->dsn~usubscription-unsubscribe-valid-topic-uuris~1]
-        validate_subscription_options(&subscription_request)?;
+        let subscribe_request = SubscribeRequest::new(topic, expiration, sample_period)?;
 
         Ok(self
             .rpc_client
             .invoke_proto_method::<_, SubscribeResponse>(
                 usubscription_uri(RESOURCE_ID_SUBSCRIBE),
                 Self::default_call_options(),
-                subscription_request,
+                subscribe_request,
             )
             .await?
             .status)
@@ -149,42 +144,6 @@ impl USubscription for RpcClientUSubscription {
             .map(|_response| ())
             .map_err(UStatus::from)
     }
-}
-
-/// Verifies that the given subscribe request's options comply with the USubscription specification.
-///
-/// # Arguments
-///
-/// * `subscribe_request` - The subscribe request to verify.
-///
-/// # Errors
-///
-/// Returns an error if the request's topic is not a valid event source, if `expiration` is set
-/// to a timestamp that is not in the future, or if `sample_period` is set to a duration of zero.
-pub fn validate_subscription_options(subscribe_request: &SubscribeRequest) -> Result<(), UStatus> {
-    subscribe_request.topic.verify_event().map_err(|e| {
-        UStatus::fail_with_code(
-            UCode::InvalidArgument,
-            format!("topic URI is not a valid event source: {e}"),
-        )
-    })?;
-    if let Some(expiration) = subscribe_request.expiration {
-        if expiration <= SystemTime::now() {
-            return Err(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "expiration must be a timestamp in the future",
-            ));
-        }
-    }
-    if let Some(sample_period) = subscribe_request.sample_period {
-        if sample_period.is_zero() {
-            return Err(UStatus::fail_with_code(
-                UCode::InvalidArgument,
-                "sample_period must be greater than zero",
-            ));
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

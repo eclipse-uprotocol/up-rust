@@ -17,7 +17,7 @@ use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 
-use crate::{communication::SubscriptionStatus, UStatus, UUri};
+use crate::{communication::SubscriptionStatus, UCode, UStatus, UUri};
 
 mod usubscription_client;
 pub use usubscription_client::RpcClientUSubscription;
@@ -154,6 +154,75 @@ pub struct SubscribeRequest {
     pub expiration: Option<SystemTime>,
     /// The minimum duration between two events (before they should be forwarded by a UStreamer).
     pub sample_period: Option<Duration>,
+}
+
+impl SubscribeRequest {
+    pub fn new(
+        topic: &UUri,
+        expiration: Option<SystemTime>,
+        sample_period: Option<Duration>,
+    ) -> Result<Self, UStatus> {
+        Self::validate_topic(topic)?;
+        Self::validate_expiration(&expiration)?;
+        Self::validate_sample_period(&sample_period)?;
+
+        Ok(SubscribeRequest {
+            topic: topic.to_owned(),
+            expiration,
+            sample_period,
+        })
+    }
+
+    fn validate_topic(topic: &UUri) -> Result<(), UStatus> {
+        topic.verify_event().map_err(|e| {
+            UStatus::fail_with_code(
+                UCode::InvalidArgument,
+                format!("topic URI is not a valid event source: {e}"),
+            )
+        })?;
+
+        Ok(())
+    }
+
+    fn validate_expiration(expiration: &Option<SystemTime>) -> Result<(), UStatus> {
+        if let Some(expiration) = expiration {
+            if expiration <= &SystemTime::now() {
+                return Err(UStatus::fail_with_code(
+                    UCode::InvalidArgument,
+                    "expiration must be a timestamp in the future",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_sample_period(sample_period: &Option<Duration>) -> Result<(), UStatus> {
+        if let Some(sample_period) = sample_period {
+            if sample_period.is_zero() {
+                return Err(UStatus::fail_with_code(
+                    UCode::InvalidArgument,
+                    "sample_period must be greater than zero",
+                ));
+            }
+        }
+        Ok(())
+    }
+    /// Verifies that the given subscribe request's options comply with the USubscription specification.
+    ///
+    /// # Arguments
+    ///
+    /// * `subscribe_request` - The subscribe request to verify.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request's topic is not a valid event source, if `expiration` is set
+    /// to a timestamp that is not in the future, or if `sample_period` is set to a duration of zero.
+    pub fn validate(&self) -> Result<(), UStatus> {
+        Self::validate_topic(&self.topic)?;
+        Self::validate_expiration(&self.expiration)?;
+        Self::validate_sample_period(&self.sample_period)?;
+        Ok(())
+    }
 }
 
 /// The response to a [`SubscribeRequest`].
