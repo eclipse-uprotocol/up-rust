@@ -161,7 +161,7 @@ impl UListener for SubscriptionChangeListener {
             return;
         }
         let Ok(subscription_update) =
-            msg.extract_protobuf::<crate::up_core_api::usubscription::Update>()
+            msg.extract_protobuf::<crate::up_core_api::usubscription::Subscription>()
         else {
             debug!("ignoring notification that does not contain subscription update");
             return;
@@ -416,7 +416,6 @@ mod tests {
 
     use crate::{
         communication::{notification::MockNotifier, pubsub::MockSubscriptionChangeHandler},
-        up_core_api::usubscription::Update,
         utransport::{MockTransport, MockUListener},
         UCode, UMessageBuilder, UMessageType, UStatus, UUri, UUID,
     };
@@ -901,14 +900,11 @@ mod tests {
     }
 
     fn status_update_without_topic() -> UMessage {
-        let status = crate::up_core_api::usubscription::SubscriptionStatus {
-            state: crate::up_core_api::usubscription::subscription_status::State::SUBSCRIBED.into(),
+        let update = crate::up_core_api::usubscription::Subscription {
+            status: crate::up_core_api::usubscription::SubscriptionStatus::STATUS_SUBSCRIBED.into(),
             ..Default::default()
         };
-        let update = Update {
-            status: Some(status).into(),
-            ..Default::default()
-        };
+
         UMessageBuilder::notification(
             UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
                 .expect("should have been able to create origin URI"),
@@ -923,7 +919,8 @@ mod tests {
         let topic = UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100)
             .expect("should have been able to create topic URI");
         let proto_topic = crate::up_core_api::uri::UUri::from(&topic);
-        let update = Update {
+
+        let update = crate::up_core_api::usubscription::Subscription {
             topic: Some(proto_topic).into(),
             ..Default::default()
         };
@@ -962,20 +959,15 @@ mod tests {
         let subscriber = UUri::try_from_parts("local", 0x2000, 0x01, 0x0000)
             .expect("should have been able to create subscriber URI");
         let topic = UUri::try_from_parts("other", 0x1a9a, 0x01, 0x8100).unwrap();
-        let status_proto = crate::up_core_api::usubscription::SubscriptionStatus {
-            state: crate::up_core_api::usubscription::subscription_status::State::SUBSCRIBED.into(),
-            ..Default::default()
-        };
-        let update_proto = Update {
+        let status_proto = crate::up_core_api::usubscription::SubscriptionStatus::STATUS_SUBSCRIBED;
+
+        let update_proto = crate::up_core_api::usubscription::Subscription {
             topic: Some((&topic).into()).into(),
-            subscriber: Some(crate::up_core_api::usubscription::SubscriberInfo {
-                uri: Some((&subscriber).into()).into(),
-                ..Default::default()
-            })
-            .into(),
-            status: Some(status_proto.clone()).into(),
+            subscriber: Some((&subscriber).into()).into(),
+            status: status_proto.into(),
             ..Default::default()
         };
+
         let subscription_change_notification = UMessageBuilder::notification(
             UUri::try_from_parts("local", 0x0000, 0x01, 0x8000)
                 .expect("should have been able to create uSubscription service URI"),
@@ -993,7 +985,7 @@ mod tests {
                 topic == &expected_topic
                     && *updated_status
                         == SubscriptionStatus::try_from(&status_proto)
-                            .expect("should have been able to convert status proto")
+                            .expect("should have received a valid subscription status")
             })
             .return_const(());
 
