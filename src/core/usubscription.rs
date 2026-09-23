@@ -11,11 +11,10 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
-use std::time::{Duration, SystemTime};
-
 use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
+use std::time::{Duration, SystemTime};
 
 use crate::{communication::SubscriptionStatus, UCode, UStatus, UUri};
 
@@ -240,6 +239,9 @@ pub struct UnsubscribeRequest {
     /// The topic to unsubscribe from.
     pub topic: UUri,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnsubscribeResponse {}
 
 /// A request to fetch subscription information.
 #[derive(Clone, Debug, PartialEq)]
