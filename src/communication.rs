@@ -99,44 +99,6 @@ pub(crate) fn build_message<S: crate::umessage::BuilderState>(
     }
 }
 
-/// The current status of a client's subscription to a topic.
-///
-/// The status goes through different stages during its lifecycle as defined in
-/// [uProtocol Specification, section 3.3.5](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l3/usubscription/v3/README.adoc#usubscription-states).
-#[derive(Clone, Debug, PartialEq)]
-#[repr(C)]
-pub enum SubscriptionStatus {
-    Unsubscribed,
-    SubscribePending,
-    Subscribed,
-    UnsubscribePending,
-}
-
-#[cfg(all(feature = "up-core-types", feature = "usubscription"))]
-mod core_types_support {
-    use super::{SubscriptionStatus, UCode, UStatus};
-    use crate::up_core_api::usubscription::subscription_status::State;
-    use crate::up_core_api::usubscription::SubscriptionStatus as SubscriptionStatusProto;
-
-    impl TryFrom<&SubscriptionStatusProto> for SubscriptionStatus {
-        type Error = UStatus;
-
-        fn try_from(status_proto: &SubscriptionStatusProto) -> Result<Self, Self::Error> {
-            let state = status_proto.state.enum_value();
-            match state {
-                Ok(State::UNSUBSCRIBED) => Ok(SubscriptionStatus::Unsubscribed),
-                Ok(State::SUBSCRIBE_PENDING) => Ok(SubscriptionStatus::SubscribePending),
-                Ok(State::SUBSCRIBED) => Ok(SubscriptionStatus::Subscribed),
-                Ok(State::UNSUBSCRIBE_PENDING) => Ok(SubscriptionStatus::UnsubscribePending),
-                Err(v) => Err(UStatus::fail_with_code(
-                    UCode::InvalidArgument,
-                    format!("unknown subscription status {:?}", v),
-                )),
-            }
-        }
-    }
-}
-
 /// An error indicating a problem with registering or unregistering a message listener.
 #[derive(Clone, Debug, Error)]
 pub enum RegistrationError {
@@ -440,5 +402,35 @@ impl UPayload {
         T: crate::ProtobufMappable,
     {
         crate::umessage::deserialize_protobuf_bytes(&self.payload, &self.payload_format)
+    }
+}
+
+/// The current status of a client's subscription to a topic.
+///
+/// The status goes through different stages during its lifecycle as defined in
+/// [uProtocol Specification, section 3.3.5](https://github.com/eclipse-uprotocol/up-spec/blob/main/up-l3/usubscription/v4/README.adoc#usubscription-states).
+///
+/// SubscriptionStatus is defined here because it is used by the pubsub module SubscriptionChangeHandler trait,
+/// which is enabled via communication.rs by the more generic 'up-l2-api' feature.
+/// So to avoid having to enable/pull in all the core (protobuf) types and code for this single trait we put
+/// SubscriptionStatus here, on the same level of module/feature genericity.
+#[derive(Clone, Debug, PartialEq)]
+#[repr(C)]
+pub enum SubscriptionStatus {
+    Unsubscribed,
+    SubscribePending,
+    Subscribed,
+    UnsubscribePending,
+}
+
+impl std::fmt::Display for SubscriptionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let status = match self {
+            SubscriptionStatus::Unsubscribed => "Unsubscribed",
+            SubscriptionStatus::SubscribePending => "SubscribePending",
+            SubscriptionStatus::Subscribed => "Subscribed",
+            SubscriptionStatus::UnsubscribePending => "UnsubscribePending",
+        };
+        write!(f, "{status}")
     }
 }
