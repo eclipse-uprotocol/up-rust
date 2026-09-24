@@ -62,6 +62,7 @@ async-trait = { version = "0.1.92" }
 bytes = { version = "1.12.1" }
 # prevent usage of yanked 0.10.1 version of chacha20
 chacha20 = { version = "0.10.2" }
+fluent-uri = { version = "0.4.1", features = ["net"] }
 mediatype = "0.23.0"
 mockall = { version = "0.15.0", optional = true }
 protobuf = { version = "3.7.2", features = ["with-bytes"], optional = true }
@@ -72,7 +73,6 @@ symphony = { version = "0.1.5", optional = true }
 thiserror = { version = "2.0.20" }
 tokio = { version = "1.53.1", default-features = false, optional = true }
 tracing = { version = "0.1.44", default-features = false, features = ["log", "std"] }
-uriparse = { version = "0.6.4" }
 uuid-simd = { version = "0.8.0", default-features = false, features = ["std", "detect"] }
 
 [build-dependencies]
