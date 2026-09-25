@@ -16,6 +16,7 @@ categories = ["api-bindings"]
 description = "The Eclipse uProtocol Rust Language Library"
 edition = "2021"
 include = [
+    "/abi/*",
     "/build.rs",
     "/Cargo.toml",
     "/examples/*",
