@@ -40,6 +40,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 
+use super::native::{NativePayloadIdentity, NativeProfileAgreement, NativeTypeToken};
 use crate::uattributes::PayloadEncoding;
 use crate::{UAttributes, UCode, UMessage, UMessageError, UMessageType, UPriority, UUri, UUID};
 
@@ -290,6 +291,7 @@ pub struct UFrameMetadata {
     token: Option<String>,
     traceparent: Option<String>,
     payload_encoding: Option<PayloadEncoding>,
+    native_type_token: Option<NativeTypeToken>,
 }
 
 impl UFrameMetadata {
@@ -354,6 +356,7 @@ impl UFrameMetadata {
         token: Option<String>,
         traceparent: Option<String>,
         payload_encoding: Option<PayloadEncoding>,
+        native_type_token: Option<NativeTypeToken>,
     ) -> Self {
         Self {
             kind,
@@ -368,6 +371,7 @@ impl UFrameMetadata {
             token,
             traceparent,
             payload_encoding,
+            native_type_token,
         }
     }
 
@@ -443,6 +447,41 @@ impl UFrameMetadata {
         self.payload_encoding.as_ref()
     }
 
+    /// Returns the independent native type token, if carried. It is an opaque
+    /// claim until checked against an agreed profile and complete representation.
+    pub fn native_type_token(&self) -> Option<NativeTypeToken> {
+        self.native_type_token
+    }
+
+    /// Sets an opaque native token without interpreting the payload.
+    ///
+    /// # Errors
+    ///
+    /// Rejects a token without payload encoding or invalid frame metadata.
+    pub fn with_native_type_token(
+        mut self,
+        token: NativeTypeToken,
+    ) -> Result<Self, UFrameMetadataError> {
+        self.native_type_token = Some(token);
+        self.validate()?;
+        Ok(self)
+    }
+
+    /// Sets both parts of an identity resolved under an explicit native agreement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resulting metadata violates message-kind rules.
+    pub fn with_native_payload_identity(
+        mut self,
+        identity: NativePayloadIdentity,
+    ) -> Result<Self, UFrameMetadataError> {
+        self.payload_encoding = Some(identity.encoding());
+        self.native_type_token = Some(identity.token());
+        self.validate()?;
+        Ok(self)
+    }
+
     /// Consumes this metadata and returns its native payload encoding.
     #[must_use]
     pub fn into_payload_encoding(self) -> Option<PayloadEncoding> {
@@ -458,15 +497,21 @@ impl UFrameMetadata {
         mut self,
         payload_encoding: PayloadEncoding,
     ) -> Result<Self, UFrameMetadataError> {
+        if self.native_type_token.is_some() && self.payload_encoding != Some(payload_encoding) {
+            return Err(UFrameMetadataError::InvalidMetadata(
+                "cannot change encoding independently of a carried native token".to_string(),
+            ));
+        }
         self.payload_encoding = Some(payload_encoding);
         self.validate()?;
         Ok(self)
     }
 
-    /// Returns metadata equal to `self` but without a payload encoding.
+    /// Removes payload identity, including any native token, for a payload-free frame.
     #[must_use]
     pub fn without_payload_encoding(mut self) -> Self {
         self.payload_encoding = None;
+        self.native_type_token = None;
         self
     }
 
@@ -479,6 +524,9 @@ impl UFrameMetadata {
     /// or an RPC frame with a priority below [`FramePriority::CS4`].
     pub fn validate(&self) -> Result<(), UFrameMetadataError> {
         let mut errors: Vec<String> = Vec::new();
+        if self.native_type_token.is_some() && self.payload_encoding.is_none() {
+            errors.push("native type token requires payload encoding".to_string());
+        }
         match self.kind {
             FrameMessageKind::Publish => {
                 if let Err(e) = self.source.verify_event() {
@@ -569,6 +617,13 @@ impl UFrameMetadata {
     /// Returns an error if the metadata is invalid or not representable.
     pub fn try_project_to_attributes(&self) -> Result<UAttributes, UFrameMetadataError> {
         self.validate()?;
+        if self.native_type_token.is_some() {
+            return Err(UFrameMetadataError::FieldNotRepresentable {
+                field: "native_type_token",
+                reason: "classic attributes require an agreed native profile before token removal"
+                    .to_string(),
+            });
+        }
         Ok(UAttributes {
             type_: self.kind.to_legacy_type(),
             id: self.id.clone(),
@@ -587,6 +642,40 @@ impl UFrameMetadata {
             reqid: self.reqid.clone(),
             payload_encoding_id: self.payload_encoding,
         })
+    }
+
+    /// Projects attributes through a confirmed native table/operation agreement.
+    /// This checks the carried pair before removing the native-only token.
+    ///
+    /// # Errors
+    ///
+    /// Rejects wrong or missing tokens for agreed native IDs, unknown token-bearing
+    /// IDs and ordinary attribute projection failures. No payload codec is run.
+    pub fn try_project_to_attributes_with_native_profile(
+        &self,
+        agreement: &NativeProfileAgreement,
+    ) -> Result<UAttributes, UFrameMetadataError> {
+        self.validate()?;
+        if let Some(encoding) = self.payload_encoding {
+            match self.native_type_token {
+                Some(token) => agreement.verify_carried(encoding, token).map_err(|error| {
+                    UFrameMetadataError::FieldNotRepresentable {
+                        field: "native_type_token",
+                        reason: error.to_string(),
+                    }
+                })?,
+                None if agreement.identity_for_encoding(encoding).is_some() => {
+                    return Err(UFrameMetadataError::FieldNotRepresentable {
+                        field: "native_type_token",
+                        reason: "agreed native representation has no carried token".to_string(),
+                    });
+                }
+                None => {}
+            }
+        }
+        let mut projected = self.clone();
+        projected.native_type_token = None;
+        projected.try_project_to_attributes()
     }
 }
 
@@ -629,6 +718,7 @@ pub struct UFrameMetadataBuilder {
     token: Option<String>,
     traceparent: Option<String>,
     payload_encoding: Option<PayloadEncoding>,
+    native_type_token: Option<NativeTypeToken>,
 }
 
 impl UFrameMetadataBuilder {
@@ -646,6 +736,7 @@ impl UFrameMetadataBuilder {
             token: None,
             traceparent: None,
             payload_encoding: None,
+            native_type_token: None,
         }
     }
 
@@ -705,6 +796,19 @@ impl UFrameMetadataBuilder {
         self
     }
 
+    /// Sets an opaque native token; building still requires a payload encoding.
+    pub fn with_native_type_token(mut self, token: NativeTypeToken) -> Self {
+        self.native_type_token = Some(token);
+        self
+    }
+
+    /// Sets the pair resolved by an explicit deployment agreement.
+    pub fn with_native_payload_identity(mut self, identity: NativePayloadIdentity) -> Self {
+        self.payload_encoding = Some(identity.encoding());
+        self.native_type_token = Some(identity.token());
+        self
+    }
+
     /// Builds and validates the frame metadata.
     ///
     /// A fresh UUIDv7 frame id is generated unless one was supplied via
@@ -728,6 +832,7 @@ impl UFrameMetadataBuilder {
             token: self.token,
             traceparent: self.traceparent,
             payload_encoding: self.payload_encoding,
+            native_type_token: self.native_type_token,
         };
         metadata.validate()?;
         Ok(metadata)
@@ -851,6 +956,7 @@ pub fn try_project_attributes_to_frame_metadata(
         token: attributes.token.clone(),
         traceparent: attributes.traceparent.clone(),
         payload_encoding,
+        native_type_token: None,
     };
     metadata.validate()?;
     Ok(metadata)
@@ -899,11 +1005,167 @@ pub fn try_project_frame_to_umessage(
     UMessage::new(attributes, payload).map_err(UFrameMetadataError::from)
 }
 
+/// Reconstructs native identity from the carried classic encoding and an agreed
+/// deployment mapping. Unknown IDs remain opaque, with no invented token.
+///
+/// # Errors
+///
+/// Returns an error for inconsistent payload presence or invalid metadata.
+pub fn try_project_umessage_to_frame_metadata_with_native_profile(
+    message: &UMessage,
+    agreement: &NativeProfileAgreement,
+) -> Result<UFrameMetadata, UFrameMetadataError> {
+    let mut metadata = try_project_umessage_to_frame_metadata(message)?;
+    if let Some(identity) = metadata
+        .payload_encoding()
+        .and_then(|encoding| agreement.identity_for_encoding(*encoding))
+    {
+        metadata = metadata.with_native_payload_identity(identity)?;
+    }
+    Ok(metadata)
+}
+
+/// Projects a complete native frame through a confirmed deployment agreement,
+/// checking identity before dropping the native-only token. Bytes are unchanged.
+///
+/// # Errors
+///
+/// Rejects inconsistent presence, missing/wrong native identity or unrepresentable
+/// metadata. In particular positive sub-millisecond TTLs are never truncated.
+pub fn try_project_frame_to_umessage_with_native_profile(
+    metadata: UFrameMetadata,
+    payload: Option<Bytes>,
+    agreement: &NativeProfileAgreement,
+) -> Result<UMessage, UFrameMetadataError> {
+    match (payload.is_some(), metadata.payload_encoding().is_some()) {
+        (true, true) | (false, false) => {}
+        (true, false) => return Err(UFrameMetadataError::PayloadWithoutEncoding),
+        (false, true) => return Err(UFrameMetadataError::EncodingWithoutPayload),
+    }
+    let attributes = metadata.try_project_to_attributes_with_native_profile(agreement)?;
+    UMessage::new(attributes, payload).map_err(UFrameMetadataError::from)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frame::native::{
+        NativeByteOrder, NativeContract, NativeProfile, NativeProfileMode, NativeProfileTable,
+        NativeRepresentation,
+    };
     use crate::{UCode, UMessageBuilder, UUri};
+    use std::sync::Arc;
     use test_case::test_case;
+
+    fn native_agreement(id: u32) -> (NativeProfileAgreement, NativePayloadIdentity) {
+        let representation =
+            NativeRepresentation::new("test.u32", 1, 4, 4, NativeByteOrder::LittleEndian, vec![])
+                .unwrap();
+        let mode = if id == 0 {
+            NativeProfileMode::ContractDefined(
+                NativeContract::new("test.event", representation.clone()).unwrap(),
+            )
+        } else {
+            NativeProfileMode::Table(
+                NativeProfileTable::new([(
+                    PayloadEncoding::from_id(id).unwrap(),
+                    representation.clone(),
+                )])
+                .unwrap(),
+            )
+        };
+        let profile = NativeProfile::new("test-domain", 1, mode).unwrap();
+        let agreement = NativeProfileAgreement::new(Arc::new(profile.clone()), &profile).unwrap();
+        let identity = agreement.identity_for(&representation).unwrap();
+        (agreement, identity)
+    }
+
+    #[test_case(0, b""; "contract defined empty payload")]
+    #[test_case(0, b"\xff\0\xfe"; "contract defined opaque bytes")]
+    #[test_case(0xF001, b""; "private empty payload")]
+    #[test_case(0xF001, b"\xff\0\xfe"; "private opaque bytes")]
+    fn native_classic_projection_requires_agreement_and_preserves_bytes(
+        id: u32,
+        payload: &'static [u8],
+    ) {
+        let (agreement, identity) = native_agreement(id);
+        let metadata = UFrameMetadata::publish(topic())
+            .with_native_payload_identity(identity)
+            .build()
+            .unwrap();
+        let bytes = Bytes::from_static(payload);
+        assert!(try_project_frame_to_umessage(metadata.clone(), Some(bytes.clone())).is_err());
+        let message = try_project_frame_to_umessage_with_native_profile(
+            metadata.clone(),
+            Some(bytes.clone()),
+            &agreement,
+        )
+        .unwrap();
+        assert_eq!(message.payload(), Some(bytes));
+        assert_eq!(
+            message.attributes().payload_encoding(),
+            Some(identity.encoding())
+        );
+        let restored =
+            try_project_umessage_to_frame_metadata_with_native_profile(&message, &agreement)
+                .unwrap();
+        assert_eq!(restored, metadata);
+    }
+
+    #[test_case(0xF001, None; "missing native token")]
+    #[test_case(0xF001, Some(0); "wrong native token")]
+    #[test_case(0xF002, Some(0); "unknown ID with token")]
+    fn native_projection_rejects_missing_or_wrong_identity(id: u32, token: Option<u32>) {
+        let (agreement, _) = native_agreement(0xF001);
+        let mut builder = UFrameMetadata::publish(topic())
+            .with_payload_encoding(PayloadEncoding::from_id(id).unwrap());
+        if let Some(token) = token {
+            builder = builder.with_native_type_token(NativeTypeToken::from_u32(token));
+        }
+        let metadata = builder.build().unwrap();
+        assert!(try_project_frame_to_umessage_with_native_profile(
+            metadata,
+            Some(Bytes::new()),
+            &agreement
+        )
+        .is_err());
+    }
+
+    #[test_case(8; "unassigned classic ID")]
+    #[test_case(0xE000; "reserved classic ID")]
+    #[test_case(0xF123; "private ID outside agreed table")]
+    fn unknown_classic_encoding_does_not_invent_native_identity(id: u32) {
+        let (agreement, _) = native_agreement(0xF001);
+        let encoding = PayloadEncoding::from_id(id).unwrap();
+        let message = UMessageBuilder::publish(topic())
+            .build_with_payload(Bytes::new(), encoding)
+            .unwrap();
+        let metadata =
+            try_project_umessage_to_frame_metadata_with_native_profile(&message, &agreement)
+                .unwrap();
+        assert_eq!(metadata.payload_encoding(), Some(&encoding));
+        assert_eq!(metadata.native_type_token(), None);
+    }
+
+    #[test]
+    fn native_identity_presence_and_pair_are_not_silently_changed() {
+        let (_, identity) = native_agreement(0xF001);
+        assert!(UFrameMetadata::publish(topic())
+            .with_native_type_token(identity.token())
+            .build()
+            .is_err());
+        let metadata = UFrameMetadata::publish(topic())
+            .with_native_payload_identity(identity)
+            .build()
+            .unwrap();
+        assert!(metadata
+            .clone()
+            .with_payload_encoding(PayloadEncoding::RAW)
+            .is_err());
+        let absent = metadata.without_payload_encoding();
+        assert_eq!(absent.native_type_token(), None);
+        assert!(absent.validate().is_ok());
+    }
 
     #[test]
     fn native_zero_ttl_projects_to_canonical_no_expiry() {

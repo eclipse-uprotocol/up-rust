@@ -60,6 +60,24 @@ fn metadata_without_payload() -> UFrameMetadata {
     message.to_frame_metadata_unencoded().expect("metadata")
 }
 
+#[cfg(feature = "owned-frame-transport")]
+#[test_case(b""; "present empty native payload")]
+#[test_case(b"\xff\0\xfe"; "opaque native payload")]
+fn native_identity_survives_the_complete_frame_envelope(payload: &'static [u8]) {
+    use up_rust::frame::{envelope::NativeUFrameEnvelope, native::NativeTypeToken};
+    use up_rust::{UFrameWireFormat, UOwnedFrame};
+    let metadata = UFrameMetadata::publish(topic())
+        .with_payload_encoding(PayloadEncoding::from_id(0xF001).unwrap())
+        .with_native_type_token(NativeTypeToken::from_u32(0xFEDC_BA98))
+        .build()
+        .unwrap();
+    let frame = UOwnedFrame::new(metadata.clone(), Some(Bytes::from_static(payload))).unwrap();
+    let bytes = NativeUFrameEnvelope::serialize_frame(&frame).unwrap();
+    let decoded = NativeUFrameEnvelope::deserialize_frame(&bytes).unwrap();
+    assert_eq!(decoded.metadata(), &metadata);
+    assert_eq!(decoded.payload(), Some(&Bytes::from_static(payload)));
+}
+
 fn metadata_with_standard_payload() -> UFrameMetadata {
     let message = UMessageBuilder::publish(topic())
         .build_with_payload(Bytes::from_static(b"payload"), PayloadEncoding::RAW)

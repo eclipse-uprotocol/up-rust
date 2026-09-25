@@ -42,6 +42,7 @@
 //! [FIELD_TOKEN]             u16 len, token bytes (UTF-8)
 //! [FIELD_TRACEPARENT]       u8 len, traceparent bytes (UTF-8)
 //! [FIELD_PAYLOAD_ENCODING]  u32 LE payload-encoding registry identifier
+//! [FIELD_NATIVE_TYPE_TOKEN] u32 LE structural native type token
 //! ```
 //!
 //! Values that do not fit a length field are rejected at encode time —
@@ -60,10 +61,11 @@
 //!    `wire_metadata_golden`.
 //!
 //! This is a metadata profile, not a whole-frame envelope and not an
-//! application payload codec. `up-spec/basics/uframe.adoc` defines the profile
-//! registry; `up-spec/up-l1/transport_families.adoc` defines selected-wire
-//! identity and rejection behavior.
+//! application payload codec. The experimental candidate contract is documented
+//! in `abi/uframe/WIRE-FORMAT.md`. Native tokens extend this unreleased profile;
+//! older readers reject their presence bit rather than silently dropping it.
 
+use super::native::NativeTypeToken;
 use std::time::Duration;
 
 use crate::{
@@ -90,8 +92,10 @@ pub const FIELD_TOKEN: u32 = 1 << 5;
 pub const FIELD_TRACEPARENT: u32 = 1 << 6;
 /// Presence bit: the frame has a payload encoding.
 pub const FIELD_PAYLOAD_ENCODING: u32 = 1 << 7;
+/// Presence bit: an independent structural native type token is carried.
+pub const FIELD_NATIVE_TYPE_TOKEN: u32 = 1 << 8;
 /// All presence bits defined by field block version 1.
-pub const FIELD_MASK_V1: u32 = (1 << 8) - 1;
+pub const FIELD_MASK_V1: u32 = (1 << 9) - 1;
 
 /// Errors returned by the frame metadata field block codec.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -166,6 +170,9 @@ pub fn encode_frame_metadata_fields(
     if metadata.payload_encoding().is_some() {
         presence |= FIELD_PAYLOAD_ENCODING;
     }
+    if metadata.native_type_token().is_some() {
+        presence |= FIELD_NATIVE_TYPE_TOKEN;
+    }
 
     let mut out = Vec::with_capacity(64);
     out.push(FRAME_FIELDS_VERSION);
@@ -207,6 +214,9 @@ pub fn encode_frame_metadata_fields(
     }
     if let Some(encoding) = metadata.payload_encoding() {
         write_payload_encoding(&mut out, encoding)?;
+    }
+    if let Some(token) = metadata.native_type_token() {
+        out.extend_from_slice(&token.as_u32().to_le_bytes());
     }
     Ok(out)
 }
@@ -298,6 +308,11 @@ pub fn decode_frame_metadata_fields(src: &[u8]) -> Result<UFrameMetadata, UFrame
     } else {
         None
     };
+    let native_type_token = if presence & FIELD_NATIVE_TYPE_TOKEN != 0 {
+        Some(NativeTypeToken::from_u32(reader.u32()?))
+    } else {
+        None
+    };
     reader.finish()?;
 
     let metadata = UFrameMetadata::from_decoded_parts(
@@ -313,6 +328,7 @@ pub fn decode_frame_metadata_fields(src: &[u8]) -> Result<UFrameMetadata, UFrame
         token,
         traceparent,
         payload_encoding,
+        native_type_token,
     );
     metadata.validate()?;
     Ok(metadata)
@@ -471,6 +487,55 @@ mod tests {
         let bytes = encode_frame_metadata_fields(&metadata).expect("encode");
         let decoded = decode_frame_metadata_fields(&bytes).expect("decode");
         assert_eq!(decoded, metadata);
+    }
+
+    #[test_case::test_case(0; "present zero token")]
+    #[test_case::test_case(u32::MAX; "all 32 token bits")]
+    fn native_token_has_its_own_variable_field_and_presence(token: u32) {
+        let base = UFrameMetadata::publish(topic())
+            .with_payload_encoding(PayloadEncoding::IMPLICIT)
+            .build()
+            .unwrap();
+        let baseline = encode_frame_metadata_fields(&base).unwrap();
+        let metadata = base
+            .with_native_type_token(NativeTypeToken::from_u32(token))
+            .unwrap();
+        let bytes = encode_frame_metadata_fields(&metadata).unwrap();
+        assert_eq!(bytes.len(), baseline.len() + 4);
+        assert_eq!(bytes.get(baseline.len()..).unwrap(), token.to_le_bytes());
+        let presence = u32::from_le_bytes(bytes.get(4..8).unwrap().try_into().unwrap());
+        assert_eq!(presence, FIELD_PAYLOAD_ENCODING | FIELD_NATIVE_TYPE_TOKEN);
+        assert_ne!(
+            presence & !0xFF,
+            0,
+            "historical readers must reject the new bit"
+        );
+        assert_eq!(decode_frame_metadata_fields(&bytes).unwrap(), metadata);
+    }
+
+    #[test_case::test_case(1; "one token byte missing")]
+    #[test_case::test_case(4; "complete token missing")]
+    fn native_token_field_is_required_when_present(missing: usize) {
+        let metadata = UFrameMetadata::publish(topic())
+            .with_payload_encoding(PayloadEncoding::IMPLICIT)
+            .with_native_type_token(NativeTypeToken::from_u32(7))
+            .build()
+            .unwrap();
+        let mut bytes = encode_frame_metadata_fields(&metadata).unwrap();
+        bytes.truncate(bytes.len() - missing);
+        assert!(decode_frame_metadata_fields(&bytes).is_err());
+    }
+
+    #[test]
+    fn decoded_native_token_without_encoding_is_rejected() {
+        let metadata = UFrameMetadata::publish(topic()).build().unwrap();
+        let mut bytes = encode_frame_metadata_fields(&metadata).unwrap();
+        bytes
+            .get_mut(4..8)
+            .unwrap()
+            .copy_from_slice(&FIELD_NATIVE_TYPE_TOKEN.to_le_bytes());
+        bytes.extend_from_slice(&0_u32.to_le_bytes());
+        assert!(decode_frame_metadata_fields(&bytes).is_err());
     }
 
     #[test]

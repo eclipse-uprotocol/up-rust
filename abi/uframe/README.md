@@ -18,6 +18,19 @@ The crate, standalone Rust, C and C++ definitions assert the same sizes,
 alignments, and field offsets at compile time; a drift in any view fails its
 build.
 
+## Native-profile candidate extension
+
+The unreleased v1 candidate now carries an independent 32-bit native type token:
+presence bit 8, appended after the encoding ID in the variable field block, or
+stored at offset 28 in the fixed ABI (formerly reserved storage). All four
+definitions agree. Size 928 and alignment 8 are retained; token-free bytes are
+unchanged. Historical readers reject native-token frames through the unknown-bit
+check. Native candidate routes explicitly require matching profile support and
+table/contract agreement; production support cutover is a separate decision.
+
+The token is not a payload-encoding allocation or a logical schema reference.
+See `WIRE-FORMAT.md` §1.3 for presence, projection and profile requirements.
+
 ## What changed from revision 1
 
 Revision 1 proposed one fixed 1024-byte `UFrameMetadata` as the semantic

@@ -5,5 +5,7 @@
   {"fixture": "notification", "profile": "uframe-fields", "file": "notification.uframe-fields.hex", "len": 73},
   {"fixture": "request", "profile": "uframe-fields", "file": "request.uframe-fields.hex", "len": 81},
   {"fixture": "response", "profile": "uframe-fields", "file": "response.uframe-fields.hex", "len": 89},
+  {"fixture": "publish-native-private-token", "profile": "uframe-fields", "file": "publish-native-private-token.uframe-fields.hex", "len": 68},
+  {"fixture": "publish-native-contract-token-zero", "profile": "uframe-fields", "file": "publish-native-contract-token-zero.uframe-fields.hex", "len": 68},
   {"fixture": "publish-explicit-zero-ttl", "profile": "uframe-fields", "file": "publish-explicit-zero-ttl.uframe-fields.hex", "len": 68}
 ]

@@ -52,7 +52,8 @@ inline constexpr std::uint32_t UFRAME_FIELD_PERMISSION_LEVEL = 1u << 4;
 inline constexpr std::uint32_t UFRAME_FIELD_TOKEN = 1u << 5;
 inline constexpr std::uint32_t UFRAME_FIELD_TRACEPARENT = 1u << 6;
 inline constexpr std::uint32_t UFRAME_FIELD_PAYLOAD_ENCODING = 1u << 7;
-inline constexpr std::uint32_t UFRAME_FIELD_MASK_V1 = 0xFF;
+inline constexpr std::uint32_t UFRAME_FIELD_NATIVE_TYPE_TOKEN = 1u << 8;
+inline constexpr std::uint32_t UFRAME_FIELD_MASK_V1 = 0x1FF;
 
 // frame message kind wire codes (normative UFrame registry)
 enum class UFrameKind : std::uint8_t {
@@ -127,7 +128,7 @@ struct UFrameMetadataAbiV1 {
     // scalars: 16..32
     std::uint64_t ttl_ns;
     std::uint32_t permission_level;
-    std::uint32_t reserved1;
+    std::uint32_t native_type_token; // iff FIELD_NATIVE_TYPE_TOKEN; zero when absent
 
     // identifiers: 32..64
     UUuidAbi id;
@@ -174,7 +175,7 @@ static_assert(offsetof(UFrameMetadataAbiV1, comm_status) == 14);
 static_assert(offsetof(UFrameMetadataAbiV1, reserved0) == 15);
 static_assert(offsetof(UFrameMetadataAbiV1, ttl_ns) == 16);
 static_assert(offsetof(UFrameMetadataAbiV1, permission_level) == 24);
-static_assert(offsetof(UFrameMetadataAbiV1, reserved1) == 28);
+static_assert(offsetof(UFrameMetadataAbiV1, native_type_token) == 28);
 static_assert(offsetof(UFrameMetadataAbiV1, id) == 32);
 static_assert(offsetof(UFrameMetadataAbiV1, reqid) == 48);
 static_assert(offsetof(UFrameMetadataAbiV1, payload_size) == 64);

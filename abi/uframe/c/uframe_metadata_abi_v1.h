@@ -67,7 +67,8 @@ extern "C" {
 #define UFRAME_FIELD_TOKEN            (1u << 5)
 #define UFRAME_FIELD_TRACEPARENT      (1u << 6)
 #define UFRAME_FIELD_PAYLOAD_ENCODING (1u << 7)
-#define UFRAME_FIELD_MASK_V1          0xFFu
+#define UFRAME_FIELD_NATIVE_TYPE_TOKEN (1u << 8)
+#define UFRAME_FIELD_MASK_V1          0x1FFu
 
 /* frame message kind wire codes (normative UFrame registry; the numbering
  * deliberately coincides with the legacy protobuf UMessageType projection) */
@@ -149,7 +150,7 @@ typedef struct uframe_metadata_abi_v1 {
     /* scalars: 16..32 */
     uint64_t ttl_ns;           /* iff FIELD_TTL */
     uint32_t permission_level; /* iff FIELD_PERMISSION_LEVEL */
-    uint32_t reserved1;        /* MUST be 0 */
+    uint32_t native_type_token; /* iff FIELD_NATIVE_TYPE_TOKEN; MUST be 0 when absent */
 
     /* identifiers: 32..64 */
     uframe_uuid_abi id;
@@ -196,7 +197,7 @@ static_assert(offsetof(uframe_metadata_abi_v1, comm_status) == 14, "comm_status 
 static_assert(offsetof(uframe_metadata_abi_v1, reserved0) == 15, "reserved0 offset");
 static_assert(offsetof(uframe_metadata_abi_v1, ttl_ns) == 16, "ttl_ns offset");
 static_assert(offsetof(uframe_metadata_abi_v1, permission_level) == 24, "permission_level offset");
-static_assert(offsetof(uframe_metadata_abi_v1, reserved1) == 28, "reserved1 offset");
+static_assert(offsetof(uframe_metadata_abi_v1, native_type_token) == 28, "native_type_token offset");
 static_assert(offsetof(uframe_metadata_abi_v1, id) == 32, "id offset");
 static_assert(offsetof(uframe_metadata_abi_v1, reqid) == 48, "reqid offset");
 static_assert(offsetof(uframe_metadata_abi_v1, payload_size) == 64, "payload_size offset");

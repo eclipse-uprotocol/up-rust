@@ -1,8 +1,8 @@
 # UFrame Metadata Byte Contracts (v1)
 
-This document is the language-neutral, normative definition of the two byte
-contracts every UFrame implementation must be able to parse, plus the
-payload-encoding registry. Multi-byte integers are **little-endian**
+This document defines two experimental candidate byte contracts for native
+frame carriage, with a reference to the authoritative payload-encoding registry.
+Peers explicitly select these profiles. Multi-byte integers are **little-endian**
 throughout. Values that do not fit a length field are **encode-time errors**
 — implementations never truncate.
 
@@ -49,6 +49,7 @@ source UUri block         (always present; §1.1)
 [FIELD_TOKEN]             u16 len, `len` UTF-8 bytes
 [FIELD_TRACEPARENT]       u8 len, `len` UTF-8 bytes
 [FIELD_PAYLOAD_ENCODING]  payload encoding block (§1.2)
+[FIELD_NATIVE_TYPE_TOKEN] u32 native structural type token (§1.3)
 ```
 
 Decoders MUST consume the entire input; trailing bytes are an error.
@@ -77,6 +78,31 @@ Present zero is contract-defined encoding; absent encoding means no payload.
 ```text
 u32  payload_encoding_id  little-endian; value must be at most 65535
 ```
+
+### 1.3 Native structural type token (candidate extension)
+
+`native_type_token` is a separate 32-bit field. All values, including zero,
+are carried unchanged when bit 8 is present. A token requires an encoding and
+therefore payload presence; an empty payload may still be present. Unknown
+tokens remain opaque. Equality of tokens does not authorize typed access.
+
+This extends the **unreleased v1 candidate**. Historical readers with mask
+`0xFF` reject the new presence bit. Native candidate routes require matching
+profile implementations; this change does not declare a production cutover.
+Token-free field blocks and fixed-profile images retain their existing bytes.
+
+The variable field block appends four bytes after the encoding ID. The fixed
+928-byte ABI instead uses offset 28 (formerly `reserved1`) with the same presence
+bit. Fixed storage MUST be zero when absent. The other reserved fields and unknown
+bits remain rejected. A fixed slot is not a substitute for field-block carriage.
+
+Scoped `NativeProfile` agreement covers domain, version, explicit table/contract
+mode and canonical content. A table allocates private 16-bit IDs to complete native
+representations; contract-defined mode explicitly uses ID zero. The structural
+token algorithm and canonical descriptors are documented in `frame::native`.
+Before a native token is removed for classic carriage, the carried pair and
+peer agreement MUST be checked. The reverse projection recovers identity from the
+agreed ID mapping/operation contract, never from bytes or a requested output type.
 
 ## 2. Native whole-frame envelope ("UPFE"), version 1
 
@@ -142,7 +168,8 @@ projection is value-preserving.
 | 5   | FIELD_TOKEN              |
 | 6   | FIELD_TRACEPARENT        |
 | 7   | FIELD_PAYLOAD_ENCODING   |
-| 8..=31 | reserved (MUST be 0 in v1) |
+| 8   | FIELD_NATIVE_TYPE_TOKEN  |
+| 9..=31 | reserved (MUST be 0 in this candidate) |
 
 ### 3.4 Payload encoding registry ids
 

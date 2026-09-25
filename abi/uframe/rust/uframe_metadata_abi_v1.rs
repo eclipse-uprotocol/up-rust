@@ -43,7 +43,8 @@ pub const UFRAME_FIELD_PERMISSION_LEVEL: u32 = 1 << 4;
 pub const UFRAME_FIELD_TOKEN: u32 = 1 << 5;
 pub const UFRAME_FIELD_TRACEPARENT: u32 = 1 << 6;
 pub const UFRAME_FIELD_PAYLOAD_ENCODING: u32 = 1 << 7;
-pub const UFRAME_FIELD_MASK_V1: u32 = 0xFF;
+pub const UFRAME_FIELD_NATIVE_TYPE_TOKEN: u32 = 1 << 8;
+pub const UFRAME_FIELD_MASK_V1: u32 = 0x1FF;
 
 // frame message kind wire codes (normative UFrame registry)
 pub const UFRAME_KIND_PUBLISH: u8 = 1;
@@ -122,7 +123,8 @@ pub struct UFrameMetadataAbiV1 {
     // scalars: 16..32
     pub ttl_ns: u64,
     pub permission_level: u32,
-    pub reserved1: u32,
+    /// Meaningful iff UFRAME_FIELD_NATIVE_TYPE_TOKEN; zero when absent.
+    pub native_type_token: u32,
 
     // identifiers: 32..64
     pub id: UUuidAbi,
@@ -169,7 +171,7 @@ const _: () = {
     assert!(offset_of!(UFrameMetadataAbiV1, reserved0) == 15);
     assert!(offset_of!(UFrameMetadataAbiV1, ttl_ns) == 16);
     assert!(offset_of!(UFrameMetadataAbiV1, permission_level) == 24);
-    assert!(offset_of!(UFrameMetadataAbiV1, reserved1) == 28);
+    assert!(offset_of!(UFrameMetadataAbiV1, native_type_token) == 28);
     assert!(offset_of!(UFrameMetadataAbiV1, id) == 32);
     assert!(offset_of!(UFrameMetadataAbiV1, reqid) == 48);
     assert!(offset_of!(UFrameMetadataAbiV1, payload_size) == 64);
