@@ -81,6 +81,7 @@ protobuf = { version = "3.7.2", features = ["with-bytes"], optional = true }
 rand = { version = "0.10.3" }
 serde = { version = "1.0.228", optional = true }
 serde_json = { version = "1.0.150", optional = true }
+sha2 = { version = "0.11.0" }
 symphony = { version = "0.1.5", optional = true }
 thiserror = { version = "2.0.20" }
 tokio = { version = "1.53.1", default-features = false, optional = true }

@@ -28,3 +28,4 @@ pub mod codec;
 #[cfg(feature = "owned-frame-transport")]
 pub mod envelope;
 pub mod metadata;
+pub mod native;
