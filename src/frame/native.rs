@@ -194,6 +194,16 @@ impl NativeRepresentation {
         &self.name
     }
 
+    /// Returns the declared representation revision.
+    pub fn revision(&self) -> u32 {
+        self.revision
+    }
+
+    /// Returns the scalar byte order of this target representation.
+    pub fn byte_order(&self) -> NativeByteOrder {
+        self.byte_order
+    }
+
     /// Returns the complete object size in bytes, including padding.
     pub fn size(&self) -> u64 {
         self.size

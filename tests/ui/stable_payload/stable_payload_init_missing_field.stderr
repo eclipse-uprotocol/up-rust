@@ -1,0 +1,15 @@
+error[E0599]: no method named `finish` found for struct `__UpRustStablePayloadInitForInitMissingField<'_, StablePayloadInitSet, StablePayloadInitUnset>` in the current scope
+  --> tests/ui/stable_payload/stable_payload_init_missing_field.rs:21:25
+   |
+ 5 | #[derive(up_rust::StablePayload, up_rust::StablePayloadInit)]
+   |                                  -------------------------- method `finish` not found for this struct
+...
+21 |     let _ = init.tag(1).finish();
+   |                         ^^^^^^ method not found in `__UpRustStablePayloadInitForInitMissingField<'_, StablePayloadInitSet, StablePayloadInitUnset>`
+   |
+   = note: the method was found for
+           - `__UpRustStablePayloadInitForInitMissingField<'__up_rust_payload, StablePayloadInitSet, StablePayloadInitSet>`
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following traits define an item `finish`, perhaps you need to implement one of them:
+           candidate #1: `Hasher`
+           candidate #2: `tracing_subscriber::field::VisitOutput`

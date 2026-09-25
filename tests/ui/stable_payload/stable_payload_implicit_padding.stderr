@@ -1,0 +1,13 @@
+error[E0080]: evaluation panicked: StablePayload requires explicit padding fields
+ --> tests/ui/stable_payload/stable_payload_implicit_padding.rs:4:10
+  |
+4 | #[derive(StablePayload)]
+  |          ^^^^^^^^^^^^^ evaluation of `<Padding as up_rust::StablePayloadField>::FIELD_BITS_ALWAYS_VALID` failed here
+
+note: erroneous constant encountered
+ --> tests/ui/stable_payload/stable_payload_implicit_padding.rs:4:10
+  |
+4 | #[derive(StablePayload)]
+  |          ^^^^^^^^^^^^^
+  |
+  = note: this note originates in the derive macro `StablePayload` (in Nightly builds, run with -Z macro-backtrace for more info)

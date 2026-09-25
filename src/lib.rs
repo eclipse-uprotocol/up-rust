@@ -80,6 +80,9 @@ None of the following features are enabled by default, so you can pick and choos
 
 */
 
+#[cfg(feature = "zero-copy-transport")]
+extern crate self as up_rust;
+
 #[cfg(feature = "cloudevents")]
 mod cloudevents;
 #[cfg(feature = "cloudevents")]
@@ -213,15 +216,39 @@ pub use validation_state::{Unvalidated, Validated};
 /// the read-side frame view contract.
 pub mod frame;
 pub use frame::metadata::{FrameMessageKind, FramePriority, UFrameMetadata, UFrameMetadataError};
+pub use frame::native::{
+    NativeByteOrder, NativeContract, NativeField, NativePayloadIdentity, NativeProfile,
+    NativeProfileAgreement, NativeProfileError, NativeProfileMode, NativeProfileTable,
+    NativeRepresentation, NativeTypeToken,
+};
 pub use frame::{validate_frame_view_for_transport, UFrameView};
 
 /// Payload codec contracts shared by the frame families.
 pub mod payload;
 pub use payload::codec::{
-    DecodePayload, EncodePayload, PayloadCodec, PayloadCodecIdentity, PayloadLayout,
-    ProtobufPayload, ReadDecodePayload,
+    DecodePayload, EncodePayload, PayloadCodec, PayloadCodecIdentity, PayloadDecodeLimit,
+    PayloadIdentity, PayloadLayout, ProtobufPayload, ReadDecodePayload,
+};
+#[cfg(feature = "zero-copy-transport")]
+pub use payload::loan::BorrowPayload;
+#[cfg(feature = "zero-copy-transport")]
+pub use payload::stable::{
+    InitializedStablePayload, StableContainerPayload, StablePayload, StablePayloadField,
+    StablePayloadInit, StablePayloadInitSet, StablePayloadInitUnset,
 };
 pub use payload::UWireError;
+#[cfg(feature = "zero-copy-transport")]
+pub use up_rust_macros::{StablePayload, StablePayloadInit};
+
+#[cfg(feature = "zero-copy-transport")]
+mod zero_copy;
+#[cfg(feature = "zero-copy-transport")]
+pub use zero_copy::{
+    LoanedPayload, PayloadAlignment, PayloadLoanProvenance, ULoanedContiguousZeroCopyRxFrame,
+    UTxBuffer, UTxLoanSpec, UTxPayloadSpec, UUninitTxBuffer, UVecRxLease, UVecTxBuffer,
+    UVecUninitTxBuffer, UZeroCopyListener, UZeroCopyRxLease, UZeroCopyTransport,
+    UZeroCopyTransportExt, UZeroCopyTransportImpl, UZeroCopyUninitTransportImpl,
+};
 
 // ---- owned-frame transport family ----
 

@@ -43,7 +43,9 @@ impl UWire for DemoU32Wire {
 
 impl PayloadCodec for DemoU32Wire {
     fn codec_name() -> &'static str { "demo-u32-le" }
-    fn payload_encoding() -> PayloadEncoding { PayloadEncoding::RAW }
+    fn payload_identity(_profile: Option<&up_rust::NativeProfileAgreement>) -> Result<up_rust::PayloadIdentity, UWireError> {
+        Ok(up_rust::PayloadIdentity::Fixed(PayloadEncoding::RAW))
+    }
 }
 
 impl EncodePayload<u32> for DemoU32Wire {

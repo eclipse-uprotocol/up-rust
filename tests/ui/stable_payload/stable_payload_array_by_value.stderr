@@ -1,0 +1,16 @@
+error[E0599]: no method named `bytes` found for struct `__UpRustStablePayloadInitForArrayByValue<'__up_rust_payload, __UpRustField0>` in the current scope
+  --> tests/ui/stable_payload/stable_payload_array_by_value.rs:20:18
+   |
+ 5 | #[derive(up_rust::StablePayload, up_rust::StablePayloadInit)]
+   |                                  -------------------------- method `bytes` not found for this struct
+...
+20 |     let _ = init.bytes(*b"nope");
+   |                  ^^^^^
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `bytes`, perhaps you need to implement it:
+           candidate #1: `std::io::Read`
+help: there is a method `bytes_fill` with a similar name
+   |
+20 |     let _ = init.bytes_fill(*b"nope");
+   |                       +++++

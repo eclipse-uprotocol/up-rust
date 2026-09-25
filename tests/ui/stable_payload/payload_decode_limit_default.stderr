@@ -1,0 +1,11 @@
+error[E0599]: no function or associated item named `default` found for struct `PayloadDecodeLimit` in the current scope
+ --> tests/ui/stable_payload/payload_decode_limit_default.rs:4:33
+  |
+4 |     let _ = PayloadDecodeLimit::default();
+  |                                 ^^^^^^^ function or associated item not found in `PayloadDecodeLimit`
+  |
+note: if you're trying to build a new `PayloadDecodeLimit`, consider using `PayloadDecodeLimit::new` which returns `PayloadDecodeLimit`
+ --> src/payload/codec.rs
+  |
+  |     pub const fn new(max_payload_bytes: usize) -> Self {
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

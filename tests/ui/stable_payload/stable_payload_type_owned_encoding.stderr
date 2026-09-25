@@ -1,0 +1,5 @@
+error: encoding IDs belong to NativeProfile, not a payload type
+ --> tests/ui/stable_payload/stable_payload_type_owned_encoding.rs:5:50
+  |
+5 | #[stable_payload(type_name = "test.TypeOwnedId", payload_encoding_id = 0xF000)]
+  |                                                  ^^^^^^^^^^^^^^^^^^^

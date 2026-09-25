@@ -1,0 +1,7 @@
+error[E0277]: the trait bound `PayloadDecodeLimit: From<usize>` is not satisfied
+ --> tests/ui/stable_payload/payload_decode_limit_from_usize.rs:4:44
+  |
+4 |     let _: PayloadDecodeLimit = 1024_usize.into();
+  |                                            ^^^^ the trait `From<usize>` is not implemented for `PayloadDecodeLimit`
+  |
+  = note: required for `usize` to implement `Into<PayloadDecodeLimit>`

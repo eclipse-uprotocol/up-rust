@@ -13,10 +13,17 @@
 
 use std::{error::Error, fmt::Display};
 
+use crate::frame::native::{NativeProfileError, NativeTypeToken};
 use crate::{PayloadEncoding, UCode, UStatus};
 
 /// Payload codec traits: measure, encode, and decode typed payloads.
 pub mod codec;
+#[cfg(feature = "zero-copy-transport")]
+/// Checked typed borrowing contracts for contiguous payload bytes.
+pub mod loan;
+#[cfg(feature = "zero-copy-transport")]
+/// Stable-memory payload representation and identity contracts.
+pub mod stable;
 
 /// Error type used by serialization-neutral payload helpers.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -44,6 +51,15 @@ pub enum UWireError {
     },
     /// Serializer or deserializer implementation failed.
     SerializationError(String),
+    /// The carried native token is missing, unexpected or foreign to this codec.
+    UnsupportedNativeTypeToken {
+        /// Token resolved under the codec's agreed representation, if native.
+        expected: Option<NativeTypeToken>,
+        /// Token carried by the frame, if any.
+        actual: Option<NativeTypeToken>,
+    },
+    /// Resolving the scoped native representation failed.
+    NativeProfile(NativeProfileError),
 }
 
 impl UWireError {
@@ -89,11 +105,22 @@ impl Display for UWireError {
             Self::SerializationError(message) => {
                 f.write_fmt(format_args!("serialization error: {message}"))
             }
+            Self::UnsupportedNativeTypeToken { expected, actual } => write!(
+                f,
+                "native type token mismatch: expected {expected:?}; got {actual:?}"
+            ),
+            Self::NativeProfile(error) => Display::fmt(error, f),
         }
     }
 }
 
 impl Error for UWireError {}
+
+impl From<NativeProfileError> for UWireError {
+    fn from(value: NativeProfileError) -> Self {
+        Self::NativeProfile(value)
+    }
+}
 
 impl From<UWireError> for UStatus {
     fn from(value: UWireError) -> Self {

@@ -34,7 +34,9 @@ use std::{error::Error, fmt::Display};
 
 use crate::payload::codec::{DecodePayload, EncodePayload, PayloadCodec, ReadDecodePayload};
 #[cfg(feature = "protobuf-support")]
-use crate::payload::codec::{PayloadCodecIdentity, PayloadLayout, ProtobufPayload};
+use crate::payload::codec::{
+    PayloadCodecIdentity, PayloadDecodeLimit, PayloadLayout, ProtobufPayload,
+};
 #[cfg(feature = "protobuf-support")]
 use crate::payload::UWireError;
 #[cfg(any(feature = "protobuf-support", feature = "up-core-api"))]
@@ -361,8 +363,12 @@ impl<T> ReadDecodePayload<T> for ProtobufWire
 where
     T: ProtobufMappable,
 {
-    fn decode_payload_from_reader<R: Read>(reader: R, payload_len: usize) -> Result<T, UWireError> {
-        ProtobufPayload::decode_payload_from_reader(reader, payload_len)
+    fn decode_payload_from_reader<R: Read>(
+        reader: R,
+        payload_len: usize,
+        limit: PayloadDecodeLimit,
+    ) -> Result<T, UWireError> {
+        ProtobufPayload::decode_payload_from_reader(reader, payload_len, limit)
     }
 }
 
@@ -800,7 +806,7 @@ impl<'a> MetadataReader<'a> {
 /// # }
 /// # impl PayloadCodec for MyWire {
 /// #     fn codec_name() -> &'static str { "demo-self-codec" }
-/// #     fn payload_encoding() -> PayloadEncoding { PayloadEncoding::RAW }
+/// #     fn payload_identity(_profile: Option<&up_rust::NativeProfileAgreement>) -> Result<up_rust::PayloadIdentity, up_rust::UWireError> { Ok(up_rust::PayloadIdentity::Fixed(PayloadEncoding::RAW)) }
 /// # }
 /// # impl EncodePayload<A> for MyWire {
 /// #     fn payload_layout(_: &A) -> Result<PayloadLayout, UWireError> { PayloadLayout::new(4, 4) }
@@ -856,6 +862,7 @@ mod tests {
     use protobuf::well_known_types::wrappers::StringValue;
 
     use super::*;
+    #[cfg(feature = "protobuf-support")]
     use crate::payload::codec::PayloadCodec;
 
     #[test]
@@ -889,8 +896,8 @@ mod tests {
             ProtobufWire::decode_payload(&encoded).expect("decode protobuf wire");
         assert_eq!(decoded.value, "wire");
         assert_eq!(
-            ProtobufWire::payload_encoding(),
-            ProtobufPayload::payload_encoding()
+            ProtobufWire::payload_encoding(None).unwrap(),
+            ProtobufPayload::payload_encoding(None).unwrap()
         );
     }
 }

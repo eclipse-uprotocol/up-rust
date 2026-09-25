@@ -59,13 +59,12 @@ use bytes::Bytes;
 #[cfg(any(feature = "zero-copy-transport", feature = "owned-frame-transport"))]
 use tracing::warn;
 
-#[cfg(feature = "zero-copy-transport")]
-use crate::payload::loan::BorrowPayload;
-use crate::payload::{codec::ReadDecodePayload, UWireError};
+use crate::payload::{
+    codec::{PayloadDecodeLimit, ReadDecodePayload},
+    UWireError,
+};
 use crate::wire::NativePrefixFrameMetadataCodec;
 use crate::wire::ProtobufWire;
-#[cfg(feature = "zero-copy-transport")]
-use crate::wire::StableContainerWireFormat;
 use crate::wire::{UWire, UWireMetadataCodecFor, UWirePayload};
 use crate::{validate_frame_view_for_transport, UFrameMetadata, UFrameView, UStatus};
 #[cfg(feature = "zero-copy-transport")]
@@ -165,11 +164,6 @@ pub type UNativePrefixWireTransport<TCore, W> =
 /// Protocol Buffers selected-wire transport with canonical metadata.
 pub type ProtobufWireTransport<TCore> = UNativePrefixWireTransport<TCore, ProtobufWire>;
 
-/// Stable-container selected-wire transport with canonical metadata.
-#[cfg(feature = "zero-copy-transport")]
-pub type StableContainerWireTransport<TCore> =
-    UNativePrefixWireTransport<TCore, StableContainerWireFormat>;
-
 /// Convenience constructors for canonical native-prefix selected-wire transports.
 pub trait UWithNativePrefixWire: Sized {
     /// Wraps this core with an external or deployment-specific selected wire using canonical metadata.
@@ -181,11 +175,6 @@ pub trait UWithNativePrefixWire: Sized {
     /// Wraps this core with the Protocol Buffers selected-wire profile.
     #[must_use]
     fn into_protobuf_transport(self) -> ProtobufWireTransport<Self>;
-
-    /// Wraps this core with the stable-container selected-wire profile.
-    #[must_use]
-    #[cfg(feature = "zero-copy-transport")]
-    fn into_stable_container_transport(self) -> StableContainerWireTransport<Self>;
 }
 
 impl<TCore> UWithNativePrefixWire for TCore {
@@ -198,11 +187,6 @@ impl<TCore> UWithNativePrefixWire for TCore {
 
     fn into_protobuf_transport(self) -> ProtobufWireTransport<Self> {
         self.into_native_prefix_wire_transport(ProtobufWire)
-    }
-
-    #[cfg(feature = "zero-copy-transport")]
-    fn into_stable_container_transport(self) -> StableContainerWireTransport<Self> {
-        self.into_native_prefix_wire_transport(StableContainerWireFormat)
     }
 }
 
@@ -485,13 +469,14 @@ where
     ///
     /// Returns an error if the frame has missing or incompatible payload encoding,
     /// has no payload, or if the selected wire cannot decode the payload bytes.
-    pub fn decode_payload<T>(&self) -> Result<T, UWireError>
+    pub fn decode_payload<T>(&self, limit: PayloadDecodeLimit) -> Result<T, UWireError>
     where
         W: UWirePayload<T>,
         <W as UWirePayload<T>>::Codec: ReadDecodePayload<T>,
     {
-        <<W as UWirePayload<T>>::Codec as crate::payload::codec::PayloadCodec>::verify_encoding(
-            self.metadata.payload_encoding(),
+        <<W as UWirePayload<T>>::Codec as crate::payload::codec::PayloadCodec>::verify_metadata(
+            &self.metadata,
+            None,
         )?;
         if !self.has_payload() {
             return Err(UWireError::MissingPayload);
@@ -499,34 +484,8 @@ where
         <W as UWirePayload<T>>::Codec::decode_payload_from_reader(
             self.payload_reader(),
             self.payload_len(),
+            limit,
         )
-    }
-}
-
-#[cfg(feature = "zero-copy-transport")]
-impl<Rx, W, C> UWireRx<Rx, W, C>
-where
-    Rx: UEncodedLoanedRxFrame,
-    W: UWire,
-    C: UWireMetadataCodecFor<W>,
-{
-    /// Borrows this frame's payload using the selected wire's payload mapping.
-    ///
-    /// This is the selected-wire true zero-copy receive helper. It requires the
-    /// raw receive frame to prove that the contiguous payload is loan-backed and
-    /// requires the selected wire's mapped codec to support typed borrowing.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the frame has no payload, has missing or incompatible
-    /// payload encoding, cannot expose one loan-backed contiguous payload, or if
-    /// the selected codec cannot borrow `T` from those bytes.
-    pub fn borrow_payload<T>(&self) -> Result<&T, UWireError>
-    where
-        W: UWirePayload<T>,
-        <W as UWirePayload<T>>::Codec: BorrowPayload<T>,
-    {
-        self.borrow_payload_as::<<W as UWirePayload<T>>::Codec, T>()
     }
 }
 
@@ -1342,19 +1301,17 @@ mod tests {
     #[cfg(feature = "zero-copy-transport")]
     use std::sync::Arc;
 
+    #[cfg(feature = "protobuf-support")]
     use protobuf::well_known_types::wrappers::StringValue;
 
     use super::*;
-    #[cfg(feature = "zero-copy-transport")]
-    use crate::test_support::StableTestBytes as WireStableBytes;
-    use crate::{
-        EncodePayload, PayloadEncoding, ProtobufPayload, ProtobufWire, UMessageBuilder,
-        UProtocolNativeWire, UWireMetadataCodec,
-    };
+    use crate::wire::{UProtocolNativeWire, UWireMetadataCodec};
+    #[cfg(feature = "protobuf-support")]
+    use crate::{EncodePayload, ProtobufPayload};
+    use crate::{PayloadEncoding, UMessageBuilder};
     #[cfg(feature = "zero-copy-transport")]
     use crate::{
-        PayloadLoanProvenance, StableContainerPayload, StableContainerWireFormat, StablePayload,
-        UTxPayloadSpec, UVecRxLease, UVecTxBuffer, UVecUninitTxBuffer, UZeroCopyTransportExt,
+        PayloadLoanProvenance, UTxPayloadSpec, UVecRxLease, UVecTxBuffer, UVecUninitTxBuffer,
     };
     use test_case::test_case;
 
@@ -1730,17 +1687,6 @@ mod tests {
         .expect("metadata")
     }
 
-    #[cfg(feature = "zero-copy-transport")]
-    fn stable_metadata<T: StablePayload>() -> UFrameMetadata {
-        let topic = UUri::try_from_parts("vehicle", 0x4210, 0x01, 0x9000).expect("topic URI");
-        let message = UMessageBuilder::publish(topic).build().expect("message");
-        crate::frame::metadata::try_project_attributes_to_frame_metadata(
-            message.attributes(),
-            Some(StableContainerPayload::<T>::encoding()),
-        )
-        .expect("metadata")
-    }
-
     fn raw_frame_for_topic(resource_id: u16, payload: &[u8]) -> RawRx {
         let metadata = metadata_with_topic_and_payload_encoding(resource_id, PayloadEncoding::RAW);
         RawRx {
@@ -1755,16 +1701,6 @@ mod tests {
     {
         NativePrefixFrameMetadataCodec
             .encode_frame_metadata(W::metadata_context(), metadata)
-            .unwrap()
-    }
-
-    #[cfg(feature = "zero-copy-transport")]
-    fn decode_metadata<W>(encoded: &[u8]) -> UFrameMetadata
-    where
-        W: UWire,
-    {
-        NativePrefixFrameMetadataCodec
-            .decode_frame_metadata(W::metadata_context(), encoded)
             .unwrap()
     }
 
@@ -1788,6 +1724,7 @@ mod tests {
         assert_eq!(rx.try_contiguous_payload(), Some(&b"abc"[..]));
     }
 
+    #[cfg(feature = "protobuf-support")]
     #[test]
     fn wire_rx_decodes_payload_with_selected_wire() {
         let value = StringValue {
@@ -1807,76 +1744,9 @@ mod tests {
             &NativePrefixFrameMetadataCodec,
         )
         .unwrap();
-        let decoded: StringValue = rx.decode_payload().unwrap();
+        let decoded: StringValue = rx.decode_payload(PayloadDecodeLimit::new(1024)).unwrap();
 
         assert_eq!(decoded.value, "selected-wire");
-    }
-
-    #[cfg(feature = "zero-copy-transport")]
-    #[test]
-    fn stable_borrow_accepts_wire_rx_with_loaned_raw_frame() {
-        fn assert_loaned_rx<T: ULoanedContiguousZeroCopyRxFrame>() {}
-        assert_loaned_rx::<UWireRx<RawRx, UProtocolNativeWire, NativePrefixFrameMetadataCodec>>();
-
-        let value = WireStableBytes { bytes: *b"wire" };
-        let metadata = stable_metadata::<WireStableBytes>();
-        let encoded_metadata = encode_metadata::<UProtocolNativeWire>(&metadata);
-        let raw = RawRx {
-            encoded_metadata,
-            payload: value.bytes.to_vec(),
-        };
-
-        let rx = UWireRx::<RawRx, UProtocolNativeWire, NativePrefixFrameMetadataCodec>::try_from_encoded(
-            raw,
-            &NativePrefixFrameMetadataCodec,
-        )
-        .unwrap();
-        let borrowed = rx.borrow_stable_payload::<WireStableBytes>().unwrap();
-
-        assert_eq!(borrowed, &value);
-        assert_eq!(
-            rx.payload_loan_provenance().unwrap(),
-            PayloadLoanProvenance::OpaqueTransportLoan
-        );
-    }
-
-    #[cfg(feature = "zero-copy-transport")]
-    #[tokio::test]
-    async fn stable_initialized_tx_helper_sends_through_selected_wire_transport() {
-        let transport =
-            RecordingCore::default().into_native_prefix_wire_transport(StableContainerWireFormat);
-
-        transport
-            .send_loaned_payload::<WireStableBytes>(
-                stable_metadata::<WireStableBytes>(),
-                |payload| payload.bytes.copy_from_slice(b"wire"),
-            )
-            .await
-            .expect("send initialized stable payload through selected wire");
-
-        let prepared = transport.core().prepared.lock().unwrap();
-        assert_eq!(prepared.len(), 1);
-        let prepared_frame = prepared.first().expect("one prepared frame");
-        let decoded =
-            decode_metadata::<StableContainerWireFormat>(prepared_frame.encoded_metadata());
-        assert_eq!(
-            decoded.payload_encoding(),
-            Some(&StableContainerPayload::<WireStableBytes>::encoding())
-        );
-        drop(prepared);
-
-        let sent = transport.core().sent.lock().unwrap();
-        assert_eq!(sent.len(), 1);
-        let sent_frame = sent.first().expect("one sent frame");
-        let frame = UVecRxLease::new(
-            sent_frame.metadata().clone(),
-            Some(sent_frame.payload().to_vec()),
-        )
-        .expect("sent stable frame");
-        assert_eq!(
-            frame.borrow_stable_payload::<WireStableBytes>().unwrap(),
-            &WireStableBytes { bytes: *b"wire" }
-        );
     }
 
     #[cfg(feature = "zero-copy-transport")]

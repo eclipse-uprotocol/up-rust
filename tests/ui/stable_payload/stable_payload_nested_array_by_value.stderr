@@ -1,0 +1,14 @@
+error[E0599]: no method named `leaves_value` found for struct `__UpRustStablePayloadInitForParent<'__up_rust_payload, __UpRustField0>` in the current scope
+  --> tests/ui/stable_payload/stable_payload_nested_array_by_value.rs:27:18
+   |
+12 | #[derive(up_rust::StablePayload, up_rust::StablePayloadInit)]
+   |                                  -------------------------- method `leaves_value` not found for this struct
+...
+27 |     let _ = init.leaves_value([Leaf { value: 1 }, Leaf { value: 2 }]);
+   |                  ^^^^^^^^^^^^
+   |
+help: there is a method `leaves_fill` with a similar name
+   |
+27 -     let _ = init.leaves_value([Leaf { value: 1 }, Leaf { value: 2 }]);
+27 +     let _ = init.leaves_fill([Leaf { value: 1 }, Leaf { value: 2 }]);
+   |

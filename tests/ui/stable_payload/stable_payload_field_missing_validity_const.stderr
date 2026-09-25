@@ -1,0 +1,7 @@
+error[E0046]: not all trait items implemented, missing: `FIELD_BITS_ALWAYS_VALID`
+ --> tests/ui/stable_payload/stable_payload_field_missing_validity_const.rs:5:1
+  |
+5 | unsafe impl StablePayloadField for Manual {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `FIELD_BITS_ALWAYS_VALID` in implementation
+  |
+  = help: implement the missing item: `const FIELD_BITS_ALWAYS_VALID: bool = false;`

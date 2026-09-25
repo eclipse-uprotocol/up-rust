@@ -1,0 +1,16 @@
+[package]
+name = "up-rust-macros"
+version = "0.10.0-SNAPSHOT"
+edition = "2021"
+rust-version = "1.88"
+license = "Apache-2.0"
+description = "Derive macros for up-rust payload contracts"
+repository = "https://github.com/eclipse-uprotocol/up-rust"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

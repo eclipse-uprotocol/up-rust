@@ -15,9 +15,10 @@ use std::io::Read;
 
 use bytes::Bytes;
 
-use crate::PayloadEncoding;
+use crate::frame::native::{NativePayloadIdentity, NativeProfileAgreement, NativeTypeToken};
 #[cfg(feature = "protobuf-support")]
 use crate::ProtobufMappable;
+use crate::{PayloadEncoding, UFrameMetadata};
 
 use super::UWireError;
 
@@ -26,6 +27,27 @@ use super::UWireError;
 pub struct PayloadLayout {
     len: usize,
     align: usize,
+}
+
+/// Explicit maximum number of encoded payload bytes accepted from a reader.
+///
+/// This limit bounds encoded input only. It does not bound allocations made by
+/// a decoder while constructing its output value.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PayloadDecodeLimit(usize);
+
+impl PayloadDecodeLimit {
+    /// Creates an encoded-input limit.
+    #[must_use]
+    pub const fn new(max_payload_bytes: usize) -> Self {
+        Self(max_payload_bytes)
+    }
+
+    /// Returns the maximum accepted encoded payload length.
+    #[must_use]
+    pub const fn max_payload_bytes(self) -> usize {
+        self.0
+    }
 }
 
 impl PayloadLayout {
@@ -67,7 +89,8 @@ impl PayloadLayout {
     }
 }
 
-/// Compile-time identity for an application payload codec.
+/// Fixed encoding identity for an application payload codec.
+/// Native codecs instead implement [`PayloadCodec`] to resolve deployment context.
 ///
 /// ```rust
 /// use up_rust::{payload::codec::PayloadCodecIdentity, PayloadEncoding};
@@ -92,30 +115,121 @@ pub trait PayloadCodecIdentity {
     fn encoding() -> PayloadEncoding;
 }
 
-/// Payload-layer codec identity used by typed frame helpers.
-pub trait PayloadCodec {
-    /// Stable codec name for logs, diagnostics, and configuration.
-    fn codec_name() -> &'static str;
+/// Resolved identity of a codec under an explicit deployment context.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PayloadIdentity {
+    /// An encoding with no native representation claim.
+    Fixed(PayloadEncoding),
+    /// A native representation resolved from an agreed table or operation contract.
+    Native(NativePayloadIdentity),
+}
 
-    /// Payload encoding metadata written into frames that use this codec.
-    fn payload_encoding() -> PayloadEncoding;
+impl PayloadIdentity {
+    /// Returns the encoding to carry with the payload, including explicit zero.
+    pub fn encoding(self) -> PayloadEncoding {
+        match self {
+            Self::Fixed(encoding) => encoding,
+            Self::Native(identity) => identity.encoding(),
+        }
+    }
 
-    /// Verifies frame encoding metadata against this codec.
+    /// Returns the independent native token when the codec uses native memory.
+    pub fn native_type_token(self) -> Option<NativeTypeToken> {
+        match self {
+            Self::Fixed(_) => None,
+            Self::Native(identity) => Some(identity.token()),
+        }
+    }
+
+    /// Checks both carried identity components before any typed payload access.
     ///
     /// # Errors
     ///
-    /// Returns an error if the frame is missing payload encoding metadata or if
-    /// the metadata is incompatible with this codec.
-    fn verify_encoding(actual: Option<&PayloadEncoding>) -> Result<(), UWireError> {
-        let expected = Self::payload_encoding();
-        let actual = actual.ok_or(UWireError::MissingEncoding)?;
+    /// Rejects absent/foreign encodings and missing, foreign or unexpected tokens.
+    pub fn verify(
+        self,
+        encoding: Option<&PayloadEncoding>,
+        token: Option<NativeTypeToken>,
+    ) -> Result<(), UWireError> {
+        let expected = self.encoding();
+        let actual = encoding.ok_or(UWireError::MissingEncoding)?;
         if actual != &expected {
             return Err(UWireError::UnsupportedEncoding {
                 expected: Box::new(expected),
                 actual: Box::new(*actual),
             });
         }
+        if token != self.native_type_token() {
+            return Err(UWireError::UnsupportedNativeTypeToken {
+                expected: self.native_type_token(),
+                actual: token,
+            });
+        }
         Ok(())
+    }
+
+    /// Sets a resolved identity on metadata for a new encoded payload.
+    ///
+    /// # Errors
+    ///
+    /// Rejects invalid metadata and attempts to replace a native claim with a
+    /// fixed codec without explicitly rebuilding the payload-free metadata.
+    pub fn apply_to(self, metadata: UFrameMetadata) -> Result<UFrameMetadata, UWireError> {
+        let result = match self {
+            Self::Fixed(encoding) => {
+                if metadata.native_type_token().is_some() {
+                    return Err(UWireError::invalid_payload(
+                        "fixed codec cannot retain a native type token",
+                    ));
+                }
+                metadata.with_payload_encoding(encoding)
+            }
+            Self::Native(identity) => metadata.with_native_payload_identity(identity),
+        };
+        result.map_err(|error| UWireError::invalid_payload(error.to_string()))
+    }
+}
+
+/// Payload-layer codec identity used by typed frame helpers.
+pub trait PayloadCodec {
+    /// Stable codec name for logs, diagnostics, and configuration.
+    fn codec_name() -> &'static str;
+
+    /// Resolves identity under the caller's scoped deployment agreement.
+    ///
+    /// Fixed codecs may ignore the context. Native codecs must reject its absence
+    /// and resolve the complete representation, never hash or truncate an ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing context or an unagreed representation.
+    fn payload_identity(
+        profile: Option<&NativeProfileAgreement>,
+    ) -> Result<PayloadIdentity, UWireError>;
+
+    /// Resolves the encoding component of this codec's identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same context/membership errors as [`Self::payload_identity`].
+    fn payload_encoding(
+        profile: Option<&NativeProfileAgreement>,
+    ) -> Result<PayloadEncoding, UWireError> {
+        Self::payload_identity(profile).map(PayloadIdentity::encoding)
+    }
+
+    /// Verifies complete frame payload identity against this codec and context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frame is missing payload encoding metadata or if
+    /// the metadata is incompatible with this codec.
+    fn verify_metadata(
+        metadata: &UFrameMetadata,
+        profile: Option<&NativeProfileAgreement>,
+    ) -> Result<(), UWireError> {
+        Self::payload_identity(profile)?
+            .verify(metadata.payload_encoding(), metadata.native_type_token())
     }
 }
 
@@ -127,8 +241,12 @@ where
         <F as PayloadCodecIdentity>::name()
     }
 
-    fn payload_encoding() -> PayloadEncoding {
-        <F as PayloadCodecIdentity>::encoding()
+    fn payload_identity(
+        _profile: Option<&NativeProfileAgreement>,
+    ) -> Result<PayloadIdentity, UWireError> {
+        Ok(PayloadIdentity::Fixed(
+            <F as PayloadCodecIdentity>::encoding(),
+        ))
     }
 }
 
@@ -199,7 +317,11 @@ pub trait ReadDecodePayload<T>: PayloadCodec {
     ///
     /// Returns an error if the reader fails, yields an unexpected byte count, or
     /// contains malformed payload bytes for this codec.
-    fn decode_payload_from_reader<R: Read>(reader: R, payload_len: usize) -> Result<T, UWireError>;
+    fn decode_payload_from_reader<R: Read>(
+        reader: R,
+        payload_len: usize,
+        limit: PayloadDecodeLimit,
+    ) -> Result<T, UWireError>;
 }
 
 /// Marker trait for byte-oriented payload codecs.
@@ -266,8 +388,9 @@ impl ReadDecodePayload<Vec<u8>> for RawBytes {
     fn decode_payload_from_reader<R: Read>(
         reader: R,
         payload_len: usize,
+        limit: PayloadDecodeLimit,
     ) -> Result<Vec<u8>, UWireError> {
-        read_exact_payload(reader, payload_len)
+        read_exact_payload(reader, payload_len, limit)
     }
 }
 
@@ -275,8 +398,9 @@ impl ReadDecodePayload<Bytes> for RawBytes {
     fn decode_payload_from_reader<R: Read>(
         reader: R,
         payload_len: usize,
+        limit: PayloadDecodeLimit,
     ) -> Result<Bytes, UWireError> {
-        read_exact_payload(reader, payload_len).map(Bytes::from)
+        read_exact_payload(reader, payload_len, limit).map(Bytes::from)
     }
 }
 
@@ -343,8 +467,12 @@ impl<T> ReadDecodePayload<T> for ProtobufPayload
 where
     T: ProtobufMappable,
 {
-    fn decode_payload_from_reader<R: Read>(reader: R, payload_len: usize) -> Result<T, UWireError> {
-        let bytes = read_exact_payload(reader, payload_len)?;
+    fn decode_payload_from_reader<R: Read>(
+        reader: R,
+        payload_len: usize,
+        limit: PayloadDecodeLimit,
+    ) -> Result<T, UWireError> {
+        let bytes = read_exact_payload(reader, payload_len, limit)?;
         T::parse_from_protobuf_bytes(&bytes)
             .map_err(|error| UWireError::invalid_payload(error.to_string()))
     }
@@ -409,8 +537,12 @@ impl<T> ReadDecodePayload<T> for ProtobufAnyPayload
 where
     T: ProtobufMappable,
 {
-    fn decode_payload_from_reader<R: Read>(reader: R, payload_len: usize) -> Result<T, UWireError> {
-        let bytes = read_exact_payload(reader, payload_len)?;
+    fn decode_payload_from_reader<R: Read>(
+        reader: R,
+        payload_len: usize,
+        limit: PayloadDecodeLimit,
+    ) -> Result<T, UWireError> {
+        let bytes = read_exact_payload(reader, payload_len, limit)?;
         T::parse_from_packed_protobuf_bytes(&bytes)
             .map_err(|error| UWireError::invalid_payload(error.to_string()))
     }
@@ -426,22 +558,46 @@ fn copy_encoded_payload(bytes: Bytes, dst: &mut [u8]) -> Result<(), UWireError> 
     Ok(())
 }
 
-fn read_exact_payload<R: Read>(mut reader: R, payload_len: usize) -> Result<Vec<u8>, UWireError> {
-    let mut bytes = Vec::with_capacity(payload_len);
-    reader
-        .read_to_end(&mut bytes)
-        .map_err(|error| UWireError::invalid_payload(error.to_string()))?;
-    if bytes.len() != payload_len {
+fn read_exact_payload<R: Read>(
+    reader: R,
+    payload_len: usize,
+    limit: PayloadDecodeLimit,
+) -> Result<Vec<u8>, UWireError> {
+    if payload_len > limit.max_payload_bytes() {
         return Err(UWireError::invalid_payload(format!(
-            "payload reader yielded {} bytes but payload_len returned {payload_len} bytes",
-            bytes.len()
+            "advertised payload length {payload_len} exceeds configured input limit {}",
+            limit.max_payload_bytes()
         )));
     }
-    Ok(bytes)
+    let probe_len = payload_len.checked_add(1).ok_or_else(|| {
+        UWireError::invalid_payload("payload length cannot reserve an overrun sentinel")
+    })?;
+    let reader_limit = u64::try_from(probe_len)
+        .map_err(|_| UWireError::invalid_payload("payload probe length exceeds reader capacity"))?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(probe_len).map_err(|error| {
+        UWireError::serialization_error(format!("failed to reserve payload probe: {error}"))
+    })?;
+    reader
+        .take(reader_limit)
+        .read_to_end(&mut bytes)
+        .map_err(|error| UWireError::serialization_error(error.to_string()))?;
+    match bytes.len().cmp(&payload_len) {
+        core::cmp::Ordering::Less => Err(UWireError::invalid_payload(format!(
+            "payload reader ended early: expected {payload_len} bytes, got {}",
+            bytes.len()
+        ))),
+        core::cmp::Ordering::Equal => Ok(bytes),
+        core::cmp::Ordering::Greater => Err(UWireError::invalid_payload(format!(
+            "payload reader yielded more than advertised {payload_len} bytes"
+        ))),
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     #[cfg(feature = "protobuf-support")]
     use protobuf::well_known_types::wrappers::StringValue;
 
@@ -477,6 +633,59 @@ mod tests {
                 expected: 7,
                 actual: 3,
             }
+        );
+    }
+
+    #[test]
+    fn bounded_reader_distinguishes_limit_eof_exact_and_overrun() {
+        let policy = PayloadDecodeLimit::new(3);
+        assert!(matches!(
+            <RawBytes as ReadDecodePayload<Vec<u8>>>::decode_payload_from_reader(
+                &b"abc"[..], 4, policy
+            ),
+            Err(UWireError::InvalidPayload(message)) if message.contains("exceeds configured input limit")
+        ));
+        assert!(matches!(
+            <RawBytes as ReadDecodePayload<Vec<u8>>>::decode_payload_from_reader(
+                &b"ab"[..], 3, policy
+            ),
+            Err(UWireError::InvalidPayload(message)) if message.contains("ended early")
+        ));
+        assert_eq!(
+            <RawBytes as ReadDecodePayload<Vec<u8>>>::decode_payload_from_reader(
+                &b"abc"[..],
+                3,
+                policy
+            )
+            .unwrap(),
+            b"abc"
+        );
+        assert!(matches!(
+            <RawBytes as ReadDecodePayload<Vec<u8>>>::decode_payload_from_reader(
+                &b"abcd"[..], 3, policy
+            ),
+            Err(UWireError::InvalidPayload(message)) if message.contains("more than advertised")
+        ));
+        assert!(
+            <RawBytes as ReadDecodePayload<Vec<u8>>>::decode_payload_from_reader(
+                io::repeat(0),
+                3,
+                PayloadDecodeLimit::new(3)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn bounded_reader_accepts_explicit_zero_policy_for_empty_payload() {
+        assert_eq!(
+            <RawBytes as ReadDecodePayload<Vec<u8>>>::decode_payload_from_reader(
+                io::empty(),
+                0,
+                PayloadDecodeLimit::new(0)
+            )
+            .unwrap(),
+            Vec::<u8>::new()
         );
     }
 
