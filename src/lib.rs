@@ -131,6 +131,16 @@ pub mod guide {
     pub mod utransport {}
 
     #[cfg_attr(
+        feature = "owned-frame-transport",
+        doc = include_str!("guide/owned.md")
+    )]
+    #[cfg_attr(
+        not(feature = "owned-frame-transport"),
+        doc = "Enable `owned-frame-transport` for the runnable owned-frame guide."
+    )]
+    pub mod owned {}
+
+    #[cfg_attr(
         feature = "communication",
         doc = include_str!("guide/trait_map.md")
     )]
@@ -139,7 +149,11 @@ pub mod guide {
         doc = include_str!("guide/trait_map_core.md")
     )]
     pub mod trait_map {}
-    #[doc = include_str!("guide/wires.md")]
+    #[cfg_attr(feature = "wire-implementer-api", doc = include_str!("guide/wires.md"))]
+    #[cfg_attr(
+        not(feature = "wire-implementer-api"),
+        doc = "Enable `wire-implementer-api` for the runnable wire implementation guide."
+    )]
     pub mod wires {}
 }
 

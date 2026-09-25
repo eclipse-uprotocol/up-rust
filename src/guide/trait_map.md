@@ -56,8 +56,28 @@ The `communication` Cargo feature enables the ready-made role implementations:
 * [`ProtobufMappable`](crate::ProtobufMappable) integrates protobuf-generated
   payload types when the `protobuf-support` feature is enabled.
 
+## Owned-frame capabilities
+
+The `owned-frame-transport` feature adds validated whole-frame carriage:
+
+| You implement | You call | You receive with | What flows |
+| --- | --- | --- | --- |
+| `UOwnedTransportImpl` | `UOwnedTransport` | `UOwnedListener` | `UOwnedFrame<Validated>` |
+| `UOwnedTransportCore` | `UWireTransport` with a selected wire and metadata codec | `UOwnedListener` | Encoded metadata and payload at the core boundary |
+
+`UFrameView` provides the shared metadata and ordered-payload read vocabulary.
+With `communication` enabled, `communication::owned::Endpoint` provides publisher,
+subscriber, notifier, RPC client, and RPC server facades over owned carriage.
+The subscriber still requires a uSubscription client.
+
+See [the owned-frame guide](crate::guide::owned) for boundary validation and
+[the wire guide](crate::guide::wires) for payload codecs and selected-wire
+composition. A transport offers these capabilities when its technology supports
+the corresponding storage and lifetime contracts.
+
 ## Related guides
 
-Applications: [the application tutorial](crate::guide::applications).
-Transport users: [the Transport Layer tutorial](crate::guide::applications::transport).
+Applications: [the application tutorial](crate::guide::applications). Transport
+users: [the Transport Layer tutorial](crate::guide::applications::transport).
 Transport authors: [the transport implementation tutorial](crate::guide::utransport).
+Wire and payload authors: [the wire tutorial](crate::guide::wires).
