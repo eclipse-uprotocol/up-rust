@@ -474,22 +474,27 @@ impl UWireMetadataCodec for NativePrefixFrameMetadataCodec {
         metadata: &UFrameMetadata,
     ) -> Result<Vec<u8>, UWireMetadataError> {
         let context = context.with_metadata_layout(Self::METADATA_LAYOUT_ID);
-        let fields = crate::frame::codec::encode_frame_metadata_fields(metadata)
+        let fields_len = crate::frame::codec::frame_metadata_fields_len(metadata)
             .map_err(|error| UWireMetadataError::FrameMetadata(error.to_string()))?;
-        let mut out = Vec::with_capacity(
-            NATIVE_PREFIX_MAGIC.len()
-                + (3 * (1 + std::mem::size_of::<u16>()))
-                + (2 * std::mem::size_of::<u16>())
-                + std::mem::size_of::<u32>()
-                + fields.len(),
-        );
+        let prefix_len = NATIVE_PREFIX_MAGIC.len()
+            + (3 * (1 + std::mem::size_of::<u16>()))
+            + (2 * std::mem::size_of::<u16>())
+            + std::mem::size_of::<u32>();
+        let capacity = prefix_len
+            .checked_add(fields_len)
+            .ok_or_else(|| UWireMetadataError::FrameMetadata("metadata length overflow".into()))?;
+        let mut out = Vec::with_capacity(capacity);
         out.extend_from_slice(NATIVE_PREFIX_MAGIC);
         write_identity_ref(&mut out, context.metadata_layout_id);
         write_u16(&mut out, context.format_version);
         write_identity_ref(&mut out, context.wire_id);
         write_identity_ref(&mut out, context.payload_family_id);
         write_u16(&mut out, 0);
-        write_len_prefixed_bytes(&mut out, &fields)?;
+        let fields_len = u32::try_from(fields_len)
+            .map_err(|_| UWireMetadataError::FrameMetadata("metadata is too long".into()))?;
+        write_u32(&mut out, fields_len);
+        crate::frame::codec::encode_frame_metadata_fields_into(metadata, &mut out)
+            .map_err(|error| UWireMetadataError::FrameMetadata(error.to_string()))?;
         Ok(out)
     }
 
@@ -705,19 +710,6 @@ fn read_and_check_native_prefix(
 fn write_identity_ref(out: &mut Vec<u8>, identity: WireIdentity) {
     out.push(ID_REF_COMPACT);
     write_u16(out, identity.compact_id());
-}
-
-#[cfg(feature = "selected-wire-codec-core")]
-fn write_len_prefixed_bytes(out: &mut Vec<u8>, value: &[u8]) -> Result<(), UWireMetadataError> {
-    let len = u32::try_from(value.len()).map_err(|_| {
-        UWireMetadataError::MalformedMetadata(format!(
-            "length {} exceeds u32 native-prefix limit",
-            value.len()
-        ))
-    })?;
-    write_u32(out, len);
-    out.extend_from_slice(value);
-    Ok(())
 }
 
 #[cfg(feature = "selected-wire-codec-core")]

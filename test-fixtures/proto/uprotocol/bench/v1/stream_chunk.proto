@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package uprotocol.bench.v1;
+
+import "uprotocol/bench/v1/common.proto";
+
+message StreamChunk {
+  BenchHeader header = 1;
+  fixed64 stream_id = 2;
+  uint32 codec = 3;
+  uint32 flags = 4;
+  uint64 byte_offset = 5;
+  uint32 chunk_index = 6;
+  uint32 chunk_count = 7;
+  uint64 source_timestamp_ns = 8;
+  bytes chunk = 9;
+  uint32 checksum = 10;
+}

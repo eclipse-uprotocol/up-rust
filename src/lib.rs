@@ -48,8 +48,28 @@ The [`guide`] provides:
 
 * [application role examples](crate::guide::applications::communication),
 * [direct Transport Layer examples](crate::guide::applications::transport),
-* [transport implementation guidance](crate::guide::utransport), and
+* [transport implementation guidance](crate::guide::utransport),
+* [selected-wire implementation guidance](crate::guide::wires), and
 * [a public trait map](crate::guide::trait_map).
+
+## Vocabulary
+
+Five terms define the layering used throughout this crate:
+
+* **Role**: application-facing publish, subscribe, notify, or RPC behavior.
+* **Message**: the classic owned uProtocol metadata-and-payload value.
+* **Frame**: serialization-neutral semantic metadata plus a payload view.
+* **Wire**: the selected payload codec and metadata byte profile.
+* **Transport**: physical carriage; encoded-core transports do not reinterpret a wire.
+
+## Module map
+
+* `communication` contains up-L2 traits and enabled role implementations.
+* [`frame`] contains native metadata, validation, and read-side frame contracts.
+* [`payload`] contains codec, stable-memory, and typed borrowing contracts.
+* `wire` contains selected-wire identities and metadata codecs when the
+  wire-implementer door is enabled.
+* [`guide`] contains audience-oriented tutorials and feature recipes.
 
 ## Features
 
@@ -68,6 +88,12 @@ None of the following features are enabled by default, so you can pick and choos
 * `up-l2-subscriber` Enables a default implementation of the `Subscriber` trait on top of the Transport Layer API.
 * `up-l2-rpc-client` Enables a default implementation of the `RpcClient` trait on top of the Transport Layer API.
 * `up-l2-rpc-server` Enables a default implementation of the `RpcServer` trait on top of the Transport Layer API.
+* `payload-contract-fixtures` exposes shared representative payload fixtures for transport tests and benchmarks. Large sensor and simulator-native payloads require the corresponding `payload-contract-large-fixtures` and `payload-contract-simulator-fixtures` features.
+* `up-l2-zero-copy` Enables selected-wire stable-payload communication roles that initialize transport-owned loans directly.
+* `zero-copy-transport` Enables initialized/uninitialized transmit loans and zero-copy receive leases.
+* `selected-wire-user-api` Enables application-facing selected-wire transport adapters.
+* `wire-implementer-api` Enables selected-wire codec implementation contracts.
+* `transport-implementer-api` Enables encoded transport-core implementation contracts.
 * `udiscovery` Enables support for types required to interact with [uDiscovery service](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l3/udiscovery/v3/README.adoc)
   implementations.
 * `usubscription` Enables support for types required to interact with [uSubscription service](https://github.com/eclipse-uprotocol/up-spec/blob/v1.6.0-alpha.7/up-l3/usubscription/v3/README.adoc)
@@ -102,6 +128,9 @@ pub mod local_transport;
 mod listener_admission;
 #[cfg(feature = "util")]
 pub use listener_admission::ListenerAdmission;
+
+#[cfg(feature = "payload-contract-fixtures")]
+pub mod bench_fixtures;
 
 /// Audience-oriented examples and implementation guidance.
 pub mod guide {

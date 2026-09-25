@@ -17,12 +17,15 @@ description = "The Eclipse uProtocol Rust Language Library"
 edition = "2021"
 include = [
     "/abi/*",
+    "/benches/*",
     "/build.rs",
     "/Cargo.toml",
     "/examples/*",
     "/proto/*",
     "/README.md",
     "/src/*",
+    "/test-fixtures/**",
+    "/tests/**",
     "/up-spec/up-core-api/uprotocol/*",
 ]
 keywords = ["uProtocol", "SDK", "communication"]
@@ -48,6 +51,15 @@ communication = [
     "up-l2-rpc-server",
 ]
 protobuf-support = ["dep:protobuf"]
+payload-contract-fixtures = [
+    "protobuf-wire",
+    "zero-copy-transport",
+    "dep:serde",
+    "serde/derive",
+    "dep:serde_json",
+]
+payload-contract-large-fixtures = ["payload-contract-fixtures"]
+payload-contract-simulator-fixtures = ["payload-contract-large-fixtures"]
 symphony = ["up-l2-rpc-server", "dep:serde", "dep:serde_json", "dep:symphony"]
 test-util = ["dep:mockall"]
 up-core-api = ["protobuf-support"]
@@ -69,6 +81,12 @@ up-l2-publisher = ["communication-api"]
 up-l2-subscriber = ["communication-api", "usubscription"]
 up-l2-rpc-client = ["communication-api", "up-core-api", "tokio/sync", "tokio/time"]
 up-l2-rpc-server = ["communication-api", "up-core-api", "tokio/sync", "tokio/time"]
+up-l2-zero-copy = [
+    "communication-api",
+    "selected-wire-user-api",
+    "transport-implementer-api",
+    "zero-copy-transport",
+]
 udiscovery = ["up-l2-rpc-client"]
 usubscription = ["up-l2-rpc-client"]
 util = ["tokio/sync"]
@@ -143,6 +161,9 @@ skip_feature_sets = [
     ["communication", "up-core-api"],
     ["communication", "protobuf-support"],
     ["communication", "usubscription"],
+    ["payload-contract-large-fixtures", "payload-contract-fixtures"],
+    ["payload-contract-simulator-fixtures", "payload-contract-large-fixtures"],
+    ["payload-contract-simulator-fixtures", "payload-contract-fixtures"],
     ["up-l2-notifier", "communication-api"],
     ["up-l2-publisher", "communication-api"],
     ["up-l2-subscriber", "communication-api"],
@@ -219,3 +240,12 @@ required-features = ["wire-implementer-api", "up-core-api"]
 [[test]]
 name = "wire_metadata_golden"
 required-features = ["wire-implementer-api", "up-core-api"]
+
+[[test]]
+name = "fake_external_wire"
+required-features = ["wire-implementer-api"]
+
+[[bench]]
+name = "payload_contract"
+harness = false
+required-features = ["payload-contract-fixtures", "up-l2-zero-copy", "wire-implementer-api"]

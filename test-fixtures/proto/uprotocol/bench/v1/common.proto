@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package uprotocol.bench.v1;
+
+message BenchHeader {
+  uint32 case_id = 1;
+  uint32 sequence = 2;
+  uint32 semantic_reference_len = 3;
+  uint32 schema_version = 4;
+}
+
+message Vector3f {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message Quaternionf {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  float w = 4;
+}
+
+message Pose3d {
+  Vector3f translation_m = 1;
+  Quaternionf rotation = 2;
+}
+
+message CameraIntrinsics {
+  float fx = 1;
+  float fy = 2;
+  float cx = 3;
+  float cy = 4;
+  float skew = 5;
+  uint32 distortion_model = 6;
+  repeated float distortion = 7;
+}
+
+message Roi {
+  uint32 x = 1;
+  uint32 y = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+}

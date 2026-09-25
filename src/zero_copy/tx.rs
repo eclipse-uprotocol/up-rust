@@ -27,9 +27,12 @@ pub enum UTxPayloadSpec {
 /// Validated semantic transmit-loan request.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UTxLoanSpec {
-    metadata: UFrameMetadata,
+    metadata: ValidatedFrameMetadata,
     payload: UTxPayloadSpec,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+struct ValidatedFrameMetadata(UFrameMetadata);
 
 impl UTxLoanSpec {
     /// Validates metadata and payload presence for a transmit loan.
@@ -48,7 +51,10 @@ impl UTxLoanSpec {
                 "payload presence must match payload encoding metadata",
             ));
         }
-        Ok(Self { metadata, payload })
+        Ok(Self {
+            metadata: ValidatedFrameMetadata(metadata),
+            payload,
+        })
     }
 
     /// Creates a request carrying payload bytes.
@@ -77,7 +83,7 @@ impl UTxLoanSpec {
     /// Returns frame metadata.
     #[must_use]
     pub fn metadata(&self) -> &UFrameMetadata {
-        &self.metadata
+        &self.metadata.0
     }
 
     /// Returns visible payload length.
@@ -96,6 +102,11 @@ impl UTxLoanSpec {
             UTxPayloadSpec::Absent => PayloadAlignment(1),
             UTxPayloadSpec::Present { alignment, .. } => alignment,
         }
+    }
+
+    /// Consumes this request into already-validated metadata and payload layout.
+    pub(crate) fn into_parts(self) -> (UFrameMetadata, UTxPayloadSpec) {
+        (self.metadata.0, self.payload)
     }
 }
 

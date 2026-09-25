@@ -334,6 +334,11 @@ impl CallOptions {
     pub fn priority(&self) -> Option<UPriority> {
         self.priority
     }
+
+    #[cfg(feature = "up-l2-zero-copy")]
+    pub(crate) fn into_parts(self) -> (u32, Option<UUID>, Option<String>, Option<UPriority>) {
+        (self.ttl, self.message_id, self.token, self.priority)
+    }
 }
 
 /// A wrapper around raw message payload data and its payload encoding.
@@ -448,9 +453,9 @@ impl UPayload {
 }
 
 #[cfg(all(
-    feature = "owned-frame-transport",
     feature = "usubscription",
-    feature = "selected-wire-transport-core"
+    feature = "selected-wire-transport-core",
+    any(feature = "owned-frame-transport", feature = "up-l2-zero-copy")
 ))]
 pub(crate) fn validate_listener_topic(topic: &crate::UUri) -> Result<(), RegistrationError> {
     topic
@@ -464,3 +469,6 @@ pub(crate) fn validate_listener_topic(topic: &crate::UUri) -> Result<(), Registr
     feature = "selected-wire-transport-core"
 ))]
 pub mod owned;
+
+#[cfg(feature = "up-l2-zero-copy")]
+pub mod zero_copy;

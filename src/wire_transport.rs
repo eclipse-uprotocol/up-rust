@@ -60,9 +60,11 @@ use bytes::Bytes;
 use tracing::warn;
 
 #[cfg(feature = "zero-copy-transport")]
+use crate::payload::codec::{EncodePayload, PayloadCodec};
+#[cfg(feature = "zero-copy-transport")]
 use crate::payload::loan::BorrowPayload;
 use crate::payload::{
-    codec::{EncodePayload, PayloadCodec, PayloadDecodeLimit, ReadDecodePayload},
+    codec::{PayloadDecodeLimit, ReadDecodePayload},
     UWireError,
 };
 use crate::wire::NativePrefixFrameMetadataCodec;
@@ -70,12 +72,14 @@ use crate::wire::ProtobufWire;
 #[cfg(feature = "zero-copy-transport")]
 use crate::wire::StableContainerWireFormat;
 use crate::wire::{UWire, UWireMetadataCodecFor, UWirePayload};
+#[cfg(all(feature = "zero-copy-transport", feature = "transport-implementer-api"))]
+use crate::UZeroCopyTransport;
 use crate::{validate_frame_view_for_transport, UFrameMetadata, UFrameView, UStatus};
 #[cfg(feature = "zero-copy-transport")]
 use crate::{
     LoanedPayload, PayloadAlignment, ULoanedContiguousZeroCopyRxFrame, UTxBuffer, UTxLoanSpec,
-    UUninitTxBuffer, UZeroCopyListener, UZeroCopyRxLease, UZeroCopyTransport,
-    UZeroCopyTransportImpl, UZeroCopyUninitTransportImpl,
+    UUninitTxBuffer, UZeroCopyListener, UZeroCopyRxLease, UZeroCopyTransportImpl,
+    UZeroCopyUninitTransportImpl,
 };
 #[cfg(any(feature = "zero-copy-transport", feature = "owned-frame-transport"))]
 use crate::{UCode, UUri};
@@ -305,14 +309,14 @@ where
     }
 }
 
-#[cfg(feature = "zero-copy-transport")]
+#[cfg(all(feature = "zero-copy-transport", feature = "transport-implementer-api"))]
 /// Marker trait for zero-copy transports with a statically selected wire.
 pub trait USelectedWireZeroCopyTransport: UZeroCopyTransport + UHasWire {
     /// Metadata codec used with the selected wire.
     type MetadataCodec: UWireMetadataCodecFor<Self::Wire>;
 }
 
-#[cfg(feature = "zero-copy-transport")]
+#[cfg(all(feature = "zero-copy-transport", feature = "transport-implementer-api"))]
 impl<TCore, W, C> USelectedWireZeroCopyTransport for UWireTransport<TCore, W, C>
 where
     TCore: UZeroCopyTransportCore,
@@ -344,13 +348,15 @@ impl PreparedTxLoanSpec {
         W: UWire,
         C: UWireMetadataCodecFor<W>,
     {
-        let encoded_metadata =
-            codec.encode_frame_metadata(W::metadata_context(), spec.metadata())?;
+        let payload_len = spec.payload_len();
+        let payload_alignment = spec.payload_alignment_proof();
+        let (metadata, _) = spec.into_parts();
+        let encoded_metadata = codec.encode_frame_metadata(W::metadata_context(), &metadata)?;
         Ok(Self {
-            metadata: spec.metadata().clone(),
+            metadata,
             encoded_metadata,
-            payload_len: spec.payload_len(),
-            payload_alignment: spec.payload_alignment_proof(),
+            payload_len,
+            payload_alignment,
         })
     }
 
@@ -390,11 +396,14 @@ impl PreparedTxLoanSpec {
             }
             UTxLoanSpec::no_payload(metadata)?
         };
+        let payload_len = spec.payload_len();
+        let payload_alignment = spec.payload_alignment_proof();
+        let (metadata, _) = spec.into_parts();
         Ok(Self {
-            metadata: spec.metadata().clone(),
+            metadata,
             encoded_metadata: encoded_metadata.into(),
-            payload_len: spec.payload_len(),
-            payload_alignment: spec.payload_alignment_proof(),
+            payload_len,
+            payload_alignment,
         })
     }
 
@@ -1609,7 +1618,10 @@ mod tests {
     use std::{collections::VecDeque, io::Cursor, sync::Mutex as StdMutex};
 
     #[cfg(feature = "zero-copy-transport")]
-    use std::sync::Arc;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
 
     #[cfg(feature = "protobuf-support")]
     use protobuf::well_known_types::wrappers::StringValue;
@@ -2079,6 +2091,74 @@ mod tests {
             "None means no sink, not any sink"
         );
         assert_eq!(notifications.frames.lock().unwrap().len(), 1);
+    }
+
+    #[cfg(feature = "zero-copy-transport")]
+    #[derive(Default)]
+    struct LifecycleCore {
+        fail_register: AtomicBool,
+        fail_unregister: AtomicBool,
+        listener: StdMutex<Option<Arc<dyn UEncodedZeroCopyListener<RawRx>>>>,
+    }
+
+    #[cfg(feature = "zero-copy-transport")]
+    #[async_trait]
+    impl UZeroCopyTransportCore for LifecycleCore {
+        type Tx = UVecTxBuffer;
+        type Rx = RawRx;
+
+        async fn loan_prepared_tx(&self, spec: PreparedTxLoanSpec) -> Result<Self::Tx, UStatus> {
+            UVecTxBuffer::with_alignment(
+                spec.metadata().clone(),
+                spec.payload_len(),
+                spec.payload_alignment(),
+            )
+        }
+
+        async fn send_prepared_zero_copy(&self, _buffer: Self::Tx) -> Result<(), UStatus> {
+            Ok(())
+        }
+
+        async fn register_encoded_zero_copy_listener(
+            &self,
+            _source_filter: &UUri,
+            _sink_filter: Option<&UUri>,
+            listener: Arc<dyn UEncodedZeroCopyListener<Self::Rx>>,
+        ) -> Result<(), UStatus> {
+            if self.fail_register.load(Ordering::Relaxed) {
+                return Err(UStatus::fail_with_code(
+                    UCode::Unavailable,
+                    "injected registration failure",
+                ));
+            }
+            let mut registered = self.listener.lock().unwrap();
+            if registered.is_some() {
+                return Err(UStatus::fail_with_code(
+                    UCode::AlreadyExists,
+                    "listener already registered",
+                ));
+            }
+            *registered = Some(listener);
+            Ok(())
+        }
+
+        async fn unregister_encoded_zero_copy_listener(
+            &self,
+            _source_filter: &UUri,
+            _sink_filter: Option<&UUri>,
+            _listener: Arc<dyn UEncodedZeroCopyListener<Self::Rx>>,
+        ) -> Result<(), UStatus> {
+            if self.fail_unregister.load(Ordering::Relaxed) {
+                return Err(UStatus::fail_with_code(
+                    UCode::Unavailable,
+                    "injected unregistration failure",
+                ));
+            }
+            self.listener.lock().unwrap().take().map_or_else(
+                || Err(UStatus::fail_with_code(UCode::NotFound, "no listener")),
+                |_| Ok(()),
+            )
+        }
     }
 
     struct CompileCore;
@@ -2923,6 +3003,96 @@ mod tests {
     }
 
     #[cfg(feature = "zero-copy-transport")]
+    #[tokio::test]
+    async fn listener_registry_releases_on_failed_register_and_successful_unregister() {
+        let source_filter = UUri::try_from_parts("vehicle", 0x4210, 0x01, 0x9000).unwrap();
+        let core = LifecycleCore::default();
+        core.fail_register.store(true, Ordering::Relaxed);
+        let transport = core.into_native_prefix_wire_transport(UProtocolNativeWire);
+        let listener = Arc::new(RecordingZeroCopyListener::default());
+
+        assert!(transport
+            .register_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .is_err());
+        assert_eq!(Arc::strong_count(&listener), 1);
+
+        transport
+            .core()
+            .fail_register
+            .store(false, Ordering::Relaxed);
+        transport
+            .register_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .unwrap();
+        assert_eq!(Arc::strong_count(&listener), 2);
+
+        transport
+            .unregister_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .unwrap();
+        assert_eq!(Arc::strong_count(&listener), 1);
+    }
+
+    #[cfg(feature = "zero-copy-transport")]
+    #[tokio::test]
+    async fn listener_registry_retains_failed_unregister_for_retry() {
+        let source_filter = UUri::try_from_parts("vehicle", 0x4210, 0x01, 0x9000).unwrap();
+        let transport =
+            LifecycleCore::default().into_native_prefix_wire_transport(UProtocolNativeWire);
+        let listener = Arc::new(RecordingZeroCopyListener::default());
+        transport
+            .register_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .unwrap();
+
+        transport
+            .core()
+            .fail_unregister
+            .store(true, Ordering::Relaxed);
+        assert!(transport
+            .unregister_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .is_err());
+        assert_eq!(Arc::strong_count(&listener), 2);
+
+        transport
+            .core()
+            .fail_unregister
+            .store(false, Ordering::Relaxed);
+        transport
+            .unregister_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .unwrap();
+        assert_eq!(Arc::strong_count(&listener), 1);
+    }
+
+    #[cfg(feature = "zero-copy-transport")]
+    #[tokio::test]
+    async fn listener_registry_is_instance_owned_and_released_with_transport() {
+        let source_filter = UUri::try_from_parts("vehicle", 0x4210, 0x01, 0x9000).unwrap();
+        let first = LifecycleCore::default().into_native_prefix_wire_transport(UProtocolNativeWire);
+        let second =
+            LifecycleCore::default().into_native_prefix_wire_transport(UProtocolNativeWire);
+        let listener = Arc::new(RecordingZeroCopyListener::default());
+
+        first
+            .register_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .unwrap();
+        second
+            .register_validated_zero_copy_listener(&source_filter, None, listener.clone())
+            .await
+            .unwrap();
+        assert_eq!(Arc::strong_count(&listener), 3);
+
+        drop(first);
+        assert_eq!(Arc::strong_count(&listener), 2);
+        drop(second);
+        assert_eq!(Arc::strong_count(&listener), 1);
+    }
+
+    #[cfg(feature = "zero-copy-transport")]
     #[test]
     fn wire_transport_fits_zero_copy_blanket_boundaries() {
         fn assert_zero_copy_impl<T: UZeroCopyTransportImpl>() {}
@@ -2938,8 +3108,10 @@ mod tests {
     #[test]
     fn prepared_tx_spec_carries_metadata_bytes_and_layout() {
         let metadata = metadata_with_payload();
+        let expected = metadata.clone();
+        let authority_address = metadata.source().authority_name().as_ptr();
         let spec = crate::UTxLoanSpec::new(
-            metadata.clone(),
+            metadata,
             UTxPayloadSpec::Present {
                 len: 4,
                 alignment: crate::PayloadAlignment::new(2).unwrap(),
@@ -2953,7 +3125,12 @@ mod tests {
         >(spec, &NativePrefixFrameMetadataCodec)
         .unwrap();
 
-        assert_eq!(prepared.metadata(), &metadata);
+        assert_eq!(prepared.metadata(), &expected);
+        assert_eq!(
+            prepared.metadata().source().authority_name().as_ptr(),
+            authority_address,
+            "prepared metadata must retain the moved URI allocation"
+        );
         assert_eq!(prepared.payload_len(), 4);
         assert_eq!(prepared.payload_alignment(), 2);
         assert_eq!(
