@@ -57,6 +57,11 @@ pub trait ULoanedContiguousZeroCopyRxFrame: UZeroCopyRxLease {
     where
         T: StablePayload,
     {
+        if let Some(retained) = self.native_profile() {
+            if retained.profile() != profile.profile() {
+                return Err(crate::NativeProfileError::ProfileMismatch.into());
+            }
+        }
         StableContainerPayload::<T>::verify_metadata(self.metadata(), Some(profile))?;
         let payload = self.loaned_contiguous_payload()?;
         StableContainerPayload::<T>::borrow_payload(payload.bytes())

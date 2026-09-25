@@ -1,0 +1,7 @@
+error[E0133]: call to unsafe function `UWireRx::<Rx, W, C>::borrow_payload_unchecked` is unsafe and requires unsafe function or block
+  --> tests/ui/selected_wire_payload/unchecked_borrow_requires_unsafe.rs:34:13
+   |
+34 |     let _ = frame.borrow_payload_unchecked::<Payload>();
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+   |
+   = note: consult the function's documentation for information on how to avoid undefined behavior

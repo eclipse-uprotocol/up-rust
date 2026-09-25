@@ -90,6 +90,16 @@ pub const XCDR_V2_WIRE_ID: WireIdentity =
 /// Payload-family identity reserved for external XCDRv2 payload bytes.
 pub const XCDR_V2_PAYLOAD_FAMILY_ID: WireIdentity = WireIdentity::new("xcdr-v2", 0x0003);
 
+/// Deployment-private stable-container selected-wire identity.
+#[cfg(feature = "zero-copy-transport")]
+pub const STABLE_CONTAINER_WIRE_ID: WireIdentity =
+    WireIdentity::new("org.eclipse.uprotocol.wire.stable-container", 0x8000);
+
+/// Deployment-private stable-container payload-family identity.
+#[cfg(feature = "zero-copy-transport")]
+pub const STABLE_CONTAINER_PAYLOAD_FAMILY_ID: WireIdentity =
+    WireIdentity::new("stable-container", 0x8001);
+
 /// Identity for the first-wave native-prefix metadata layout.
 pub const NATIVE_PREFIX_METADATA_LAYOUT_ID: WireIdentity =
     WireIdentity::new("org.eclipse.uprotocol.metadata.native-prefix", 0x0001);
@@ -321,6 +331,27 @@ impl UWire for ProtobufWire {
     const PAYLOAD_FAMILY_ID: WireIdentity = PROTOBUF_PAYLOAD_FAMILY_ID;
     const METADATA_LAYOUT_ID: WireIdentity = NATIVE_PREFIX_METADATA_LAYOUT_ID;
     const FORMAT_VERSION: u16 = FORMAT_VERSION;
+}
+
+/// Selected wire for deployment-private stable in-memory payloads.
+#[cfg(feature = "zero-copy-transport")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StableContainerWireFormat;
+
+#[cfg(feature = "zero-copy-transport")]
+impl UWire for StableContainerWireFormat {
+    const WIRE_ID: WireIdentity = STABLE_CONTAINER_WIRE_ID;
+    const PAYLOAD_FAMILY_ID: WireIdentity = STABLE_CONTAINER_PAYLOAD_FAMILY_ID;
+    const METADATA_LAYOUT_ID: WireIdentity = NATIVE_PREFIX_METADATA_LAYOUT_ID;
+    const FORMAT_VERSION: u16 = FORMAT_VERSION;
+}
+
+#[cfg(feature = "zero-copy-transport")]
+impl<T> UWirePayload<T> for StableContainerWireFormat
+where
+    T: crate::StablePayload,
+{
+    type Codec = crate::StableContainerPayload<T>;
 }
 
 #[cfg(feature = "protobuf-support")]
@@ -865,6 +896,14 @@ mod tests {
     #[cfg(feature = "protobuf-support")]
     use crate::payload::codec::PayloadCodec;
 
+    #[cfg(feature = "zero-copy-transport")]
+    #[repr(C)]
+    #[derive(crate::StablePayload)]
+    #[stable_payload(type_name = "uprotocol.test.WireMapping")]
+    struct WireMapping {
+        value: u32,
+    }
+
     #[test]
     fn first_wave_wire_identity_constants_match_register() {
         assert_eq!(
@@ -881,6 +920,33 @@ mod tests {
         assert_eq!(XCDR_V2_WIRE_ID.compact_id(), 0x0003);
         assert_eq!(XCDR_V2_PAYLOAD_FAMILY_ID.literal_id(), "xcdr-v2");
         assert_eq!(XCDR_V2_PAYLOAD_FAMILY_ID.compact_id(), 0x0003);
+
+        #[cfg(feature = "zero-copy-transport")]
+        {
+            assert_eq!(
+                STABLE_CONTAINER_WIRE_ID.literal_id(),
+                "org.eclipse.uprotocol.wire.stable-container"
+            );
+            assert_eq!(STABLE_CONTAINER_WIRE_ID.compact_id(), 0x8000);
+            assert_eq!(
+                STABLE_CONTAINER_PAYLOAD_FAMILY_ID.literal_id(),
+                "stable-container"
+            );
+            assert_eq!(STABLE_CONTAINER_PAYLOAD_FAMILY_ID.compact_id(), 0x8001);
+        }
+    }
+
+    #[cfg(feature = "zero-copy-transport")]
+    #[test]
+    fn stable_container_wire_maps_stable_payload_codec() {
+        fn assert_mapping<T>()
+        where
+            T: crate::StablePayload,
+            StableContainerWireFormat: UWirePayload<T, Codec = crate::StableContainerPayload<T>>,
+        {
+        }
+
+        assert_mapping::<WireMapping>();
     }
 
     #[cfg(feature = "protobuf-support")]

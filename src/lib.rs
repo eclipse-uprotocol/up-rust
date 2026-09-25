@@ -280,6 +280,10 @@ pub use wire::{
     PROTOBUF_PAYLOAD_FAMILY_ID, PROTOBUF_WIRE_ID, UFRAME_FIELDS_METADATA_LAYOUT_ID,
     UPROTOCOL_NATIVE_WIRE_ID, XCDR_V2_PAYLOAD_FAMILY_ID, XCDR_V2_WIRE_ID,
 };
+#[cfg(feature = "zero-copy-transport")]
+pub use wire::{
+    StableContainerWireFormat, STABLE_CONTAINER_PAYLOAD_FAMILY_ID, STABLE_CONTAINER_WIRE_ID,
+};
 #[cfg(feature = "wire-implementer-api")]
 pub use wire::{
     UWire, UWireDecode, UWireEncode, UWireMetadataCodec, UWireMetadataCodecFor,
@@ -315,8 +319,18 @@ pub mod wire_transport;
 ))]
 mod wire_transport;
 
+#[cfg(all(
+    feature = "zero-copy-transport",
+    feature = "selected-wire-transport-core"
+))]
+pub use wire_transport::StableContainerWireTransport;
 #[cfg(feature = "transport-implementer-api")]
 pub use wire_transport::UEncodedRxFrame;
+#[cfg(all(
+    feature = "zero-copy-transport",
+    feature = "selected-wire-transport-core"
+))]
+pub use wire_transport::USelectedWireStablePayloadInit;
 #[cfg(all(
     feature = "selected-wire-transport-core",
     any(
@@ -331,6 +345,11 @@ pub use wire_transport::UWireTransport;
 ))]
 pub use wire_transport::{
     EncodedOwnedFrame, PreparedOwnedFrame, UEncodedOwnedListener, UOwnedTransportCore,
+};
+#[cfg(all(feature = "zero-copy-transport", feature = "transport-implementer-api"))]
+pub use wire_transport::{
+    PreparedTxLoanSpec, UEncodedLoanedRxFrame, UEncodedZeroCopyListener,
+    USelectedWireZeroCopyTransport, UZeroCopyTransportCore, UZeroCopyUninitTransportCore,
 };
 #[cfg(feature = "selected-wire-user-api")]
 pub use wire_transport::{

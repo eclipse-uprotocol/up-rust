@@ -78,6 +78,12 @@ pub trait UFrameView {
     /// Returns the native frame metadata.
     fn metadata(&self) -> &UFrameMetadata;
 
+    /// Returns the immutable route agreement retained by this view, if configured.
+    /// Opaque frames do not acquire a profile by recognizing an encoding ID.
+    fn native_profile(&self) -> Option<&crate::NativeProfileAgreement> {
+        None
+    }
+
     /// Returns the number of application payload bytes visible through this view.
     fn payload_len(&self) -> usize;
 
@@ -113,7 +119,7 @@ pub trait UFrameView {
     where
         C: PayloadCodec + ReadDecodePayload<T>,
     {
-        C::verify_metadata(self.metadata(), None)?;
+        C::verify_metadata(self.metadata(), self.native_profile())?;
         if !self.has_payload() {
             return Err(UWireError::MissingPayload);
         }

@@ -90,6 +90,33 @@ where
         // validator proved every field's bit validity before this cast.
         Ok(unsafe { cast_validated_payload(src) })
     }
+
+    /// Borrows without recursively validating field bits.
+    ///
+    /// # Safety
+    ///
+    /// The caller must prove typed producer construction of this exact `T`,
+    /// matching native representation/endianness, and valid bits for every field.
+    /// Exact length, alignment and the Rust representation descriptor are checked.
+    unsafe fn borrow_payload_unchecked(src: &[u8]) -> Result<&T, UWireError> {
+        StableContainerPayload::<T>::validate_representation()?;
+        if src.len() != mem::size_of::<T>() {
+            return Err(UWireError::invalid_payload_length(
+                mem::size_of::<T>(),
+                src.len(),
+            ));
+        }
+        if !(src.as_ptr() as usize).is_multiple_of(mem::align_of::<T>()) {
+            return Err(UWireError::invalid_payload(format!(
+                "payload address is not aligned to {} bytes",
+                mem::align_of::<T>()
+            )));
+        }
+        // SAFETY: The caller proves the exact type, ABI/endianness domain and
+        // recursive bit validity. This override still enforces representation, size
+        // and alignment and elides only the recursive field validator.
+        Ok(unsafe { cast_validated_payload(src) })
+    }
 }
 
 impl<'a, T> DecodePayload<'a, &'a T> for StableContainerPayload<T>
