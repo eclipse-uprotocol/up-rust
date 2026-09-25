@@ -260,3 +260,68 @@ pub mod wire_implementer_api {
         UPROTOCOL_NATIVE_WIRE_ID, XCDR_V2_PAYLOAD_FAMILY_ID, XCDR_V2_WIRE_ID,
     };
 }
+
+// ---- selected-wire transport ----
+
+#[cfg(all(
+    feature = "selected-wire-transport-core",
+    feature = "transport-implementer-api"
+))]
+pub mod wire_transport;
+#[cfg(all(
+    feature = "selected-wire-transport-core",
+    not(feature = "transport-implementer-api")
+))]
+mod wire_transport;
+
+#[cfg(feature = "transport-implementer-api")]
+pub use wire_transport::UEncodedRxFrame;
+#[cfg(all(
+    feature = "selected-wire-transport-core",
+    any(
+        feature = "transport-implementer-api",
+        feature = "wire-implementer-api"
+    )
+))]
+pub use wire_transport::UWireTransport;
+#[cfg(all(
+    feature = "owned-frame-transport",
+    feature = "transport-implementer-api"
+))]
+pub use wire_transport::{
+    EncodedOwnedFrame, PreparedOwnedFrame, UEncodedOwnedListener, UOwnedTransportCore,
+};
+#[cfg(feature = "selected-wire-user-api")]
+pub use wire_transport::{
+    ProtobufWireTransport, UNativePrefixWireTransport, UWithNativePrefixWire,
+};
+#[cfg(feature = "selected-wire-user-api")]
+pub use wire_transport::{UHasWire, UWireRx};
+
+/// Compatibility import surface for selected-wire users.
+///
+/// The crate root remains canonical; this role-oriented module groups the same
+/// public contracts for existing applications and focused imports.
+#[cfg(feature = "selected-wire-user-api")]
+pub mod selected_wire_user_api {
+    pub use crate::{
+        ProtobufWire, ProtobufWireTransport, UHasWire, UNativePrefixWireTransport,
+        UProtocolNativeWire, UWireRx, UWithNativePrefixWire, WireCompatibility, WireIdentity,
+        WireIdentityRef,
+    };
+}
+
+/// Compatibility import surface for transport implementers.
+///
+/// The crate root remains canonical; this role-oriented module groups the same
+/// encoded-core contracts for existing transports and focused imports.
+#[cfg(feature = "transport-implementer-api")]
+pub mod transport_implementer_api {
+    #[cfg(feature = "util")]
+    pub use crate::ListenerAdmission;
+    #[cfg(feature = "owned-frame-transport")]
+    pub use crate::{
+        EncodedOwnedFrame, PreparedOwnedFrame, UEncodedOwnedListener, UOwnedTransportCore,
+    };
+    pub use crate::{UEncodedRxFrame, UWireTransport};
+}
