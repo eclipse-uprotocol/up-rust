@@ -60,6 +60,7 @@ impl RequestHandler for EchoOperation {
     }
 }
 
+/// Runs the colocated RPC client-and-server example.
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     const METHOD_RESOURCE_ID: u16 = 0x00a0;

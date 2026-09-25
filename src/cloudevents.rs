@@ -32,6 +32,7 @@ include!(concat!(env!("OUT_DIR"), "/cloudevents/mod.rs"));
 
 // The _official_ content type to use for CloudEvents serialized using the
 // protobuf format.
+/// MIME content type for protobuf-encoded CloudEvents.
 pub const CONTENT_TYPE_CLOUDEVENTS_PROTOBUF: &str = "application/cloudevents+protobuf";
 
 const CLOUDEVENTS_SPEC_VERSION: &str = "1.0";

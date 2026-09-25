@@ -49,15 +49,25 @@ impl std::error::Error for UPayloadError {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
+/// Payload serialization formats defined by the uProtocol specification.
 pub enum UPayloadFormat {
+    /// No format specified; receivers must not assume a serialization.
     Unspecified = 0,
+    /// Protobuf message wrapped in `google.protobuf.Any`.
     ProtobufWrappedInAny = 1,
+    /// Protobuf message bytes.
     Protobuf = 2,
+    /// JSON text.
     Json = 3,
+    /// SOME/IP serialized payload.
     Someip = 4,
+    /// SOME/IP TLV serialized payload.
     SomeipTlv = 5,
+    /// Raw application-defined bytes.
     Raw = 6,
+    /// UTF-8 text.
     Text = 7,
+    /// Shared-memory reference payload.
     Shm = 8,
 }
 
@@ -68,6 +78,11 @@ impl UPayloadFormat {
         *self as i32
     }
 
+    /// Converts from the protobuf wire value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` is not a defined format.
     pub fn try_from_i32(value: i32) -> Result<UPayloadFormat, SerializationError> {
         match value {
             x if x == UPayloadFormat::Unspecified as i32 => Ok(UPayloadFormat::Unspecified),
@@ -153,7 +168,7 @@ impl UPayloadFormat {
     }
 }
 
-#[cfg(feature = "up-core-types")]
+#[cfg(feature = "up-core-api")]
 mod core_types_support {
     use super::*;
     use crate::up_core_api::uattributes::UPayloadFormat as UPayloadFormatProto;

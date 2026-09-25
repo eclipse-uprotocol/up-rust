@@ -14,6 +14,8 @@
 use super::SerializationError;
 use protobuf::{well_known_types::any::Any, Message, MessageFull};
 
+/// *Role: standalone utility letting protobuf-generated types ride as payloads implicitly; blanket-implemented for `protobuf` types — see the trait map.*
+///
 /// A type that can be mapped to and from a protobuf.
 pub trait ProtobufMappable: Sized {
     /// Parses an instance of this type from the given protobuf bytes.

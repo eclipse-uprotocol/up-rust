@@ -92,10 +92,15 @@ pub fn validate_rpc_priority(attributes: &UAttributes) -> Result<(), UAttributes
 }
 
 /// Enum that hold the implementations of uattributesValidator according to type.
+#[derive(Debug)]
 pub enum UAttributesValidators {
+    /// Validates publish-message attributes.
     Publish,
+    /// Validates notification-message attributes.
     Notification,
+    /// Validates request-message attributes.
     Request,
+    /// Validates response-message attributes.
     Response,
 }
 
@@ -172,6 +177,7 @@ impl UAttributesValidators {
 }
 
 /// Validates attributes describing a Publish message.
+#[derive(Debug)]
 pub struct PublishValidator;
 
 impl UAttributesValidator for PublishValidator {
@@ -240,6 +246,7 @@ impl UAttributesValidator for PublishValidator {
 }
 
 /// Validates attributes describing a Notification message.
+#[derive(Debug)]
 pub struct NotificationValidator;
 
 impl UAttributesValidator for NotificationValidator {
@@ -320,6 +327,7 @@ impl UAttributesValidator for NotificationValidator {
 }
 
 /// Validate `UAttributes` with type `UMessageType::Request`
+#[derive(Debug)]
 pub struct RequestValidator;
 
 impl RequestValidator {
@@ -413,6 +421,7 @@ impl UAttributesValidator for RequestValidator {
 }
 
 /// Validate `UAttributes` with type `UMessageType::Response`
+#[derive(Debug)]
 pub struct ResponseValidator;
 
 impl ResponseValidator {

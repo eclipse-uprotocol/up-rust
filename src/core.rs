@@ -15,6 +15,8 @@ Default client implementations for interacting with [uProtocol's Core entities](
 */
 
 #[cfg(feature = "udiscovery")]
+/// Client API for the uDiscovery core service.
 pub mod udiscovery;
 #[cfg(feature = "usubscription")]
+/// Client API for the uSubscription core service.
 pub mod usubscription;

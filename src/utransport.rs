@@ -81,6 +81,7 @@ pub trait LocalUriProvider: Send + Sync {
 }
 
 /// A URI provider that is statically configured with the uEntity's authority, entity ID and version.
+#[derive(Debug)]
 pub struct StaticUriProvider {
     local_uri: UUri,
 }
@@ -293,8 +294,23 @@ mockall::mock! {
     /// This extra struct is necessary in order to comply with mockall's requirements regarding the parameter lifetimes
     /// see <https://github.com/asomers/mockall/issues/571>
     pub Transport {
+        /// Mock hook backing [`UTransport::send`]; configure with mockall expectations.
+        ///
+        /// # Errors
+        ///
+        /// Returns whatever the test's expectations are configured to return.
         pub async fn do_send(&self, message: UMessage) -> Result<(), UStatus>;
+        /// Mock hook backing [`UTransport::register_listener`]; configure with mockall expectations.
+        ///
+        /// # Errors
+        ///
+        /// Returns whatever the test's expectations are configured to return.
         pub async fn do_register_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
+        /// Mock hook backing [`UTransport::unregister_listener`]; configure with mockall expectations.
+        ///
+        /// # Errors
+        ///
+        /// Returns whatever the test's expectations are configured to return.
         pub async fn do_unregister_listener<'a>(&'a self, source_filter: &'a UUri, sink_filter: Option<&'a UUri>, listener: Arc<dyn UListener>) -> Result<(), UStatus>;
     }
 }
@@ -348,6 +364,22 @@ pub struct ComparableListener {
 }
 
 impl ComparableListener {
+    /// Creates a new URI provider from static information.
+    ///
+    /// # Arguments
+    ///
+    /// * `authority` - The uEntity's authority name.
+    /// * `entity_id` - The entity identifier.
+    /// * `major_version` - The uEntity's major version.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{LocalUriProvider, StaticUriProvider};
+    ///
+    /// let provider = StaticUriProvider::new("my-vehicle", 0x4210, 0x05).unwrap();
+    /// assert_eq!(provider.get_authority(), "my-vehicle");
+    /// ```
     pub fn new(listener: Arc<dyn UListener>) -> Self {
         Self { listener }
     }
@@ -555,15 +587,15 @@ mod tests {
         assert!(transport
             .receive(&UUri::any(), None)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Unimplemented));
+            .is_err_and(|e| e.code() == UCode::Unimplemented));
         assert!(transport
             .register_listener(&UUri::any(), None, listener.clone())
             .await
-            .is_err_and(|e| e.get_code() == UCode::Unimplemented));
+            .is_err_and(|e| e.code() == UCode::Unimplemented));
         assert!(transport
             .unregister_listener(&UUri::any(), None, listener)
             .await
-            .is_err_and(|e| e.get_code() == UCode::Unimplemented));
+            .is_err_and(|e| e.code() == UCode::Unimplemented));
     }
 
     #[test]
@@ -639,6 +671,6 @@ mod tests {
         "sink is empty but source has non-topic resource ID")]
     fn test_verify_filter_criteria_fails_for(source_filter: UUri, sink_filter: Option<UUri>) {
         assert!(verify_filter_criteria(&source_filter, sink_filter.as_ref())
-            .is_err_and(|err| matches!(err.get_code(), UCode::InvalidArgument)));
+            .is_err_and(|err| matches!(err.code(), UCode::InvalidArgument)));
     }
 }

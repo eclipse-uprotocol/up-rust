@@ -30,6 +30,12 @@ pub struct SimplePublisher<T, P> {
     uri_provider: Arc<P>,
 }
 
+impl<T, P> core::fmt::Debug for SimplePublisher<T, P> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SimplePublisher").finish_non_exhaustive()
+    }
+}
+
 impl<T: UTransport, P: LocalUriProvider> SimplePublisher<T, P> {
     /// Creates a new client.
     ///

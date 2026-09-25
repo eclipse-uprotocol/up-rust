@@ -203,7 +203,13 @@ pub struct InMemorySubscriber<T, S, N> {
     subscription_change_listener: Arc<SubscriptionChangeListener>,
 }
 
-#[cfg(feature = "up-l2-notifier")]
+impl<T, S, N> core::fmt::Debug for InMemorySubscriber<T, S, N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("InMemorySubscriber").finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "communication")]
 impl<T: UTransport + 'static, P: crate::LocalUriProvider + 'static>
     InMemorySubscriber<
         T,

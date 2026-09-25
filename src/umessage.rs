@@ -14,7 +14,7 @@
 use bytes::Bytes;
 use thiserror::Error;
 
-#[cfg(all(feature = "up-l2-api", feature = "protobuf-support"))]
+#[cfg(all(feature = "communication-api", feature = "protobuf-support"))]
 pub(crate) use protobuf_support::deserialize_protobuf_bytes;
 pub use umessagebuilder::*;
 
@@ -27,12 +27,16 @@ mod umessagebuilder;
 
 pub(crate) type Payload = Bytes;
 
+/// Errors produced when building or converting a [`UMessage`].
 #[derive(Debug, Error)]
 pub enum UMessageError {
+    /// The message attributes failed validation.
     #[error("Attributes validation error: {0}")]
     AttributesValidationError(UAttributesError),
+    /// The payload could not be (de)serialized.
     #[error("Failed to serialize message: {0}")]
     DataSerializationError(SerializationError),
+    /// The payload is inconsistent with the message (wrong format or presence).
     #[error("UMessage payload error: {0}")]
     PayloadError(String),
 }
@@ -70,6 +74,7 @@ impl From<&str> for UMessageError {
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(C)]
+/// One uProtocol message: attributes plus optional payload bytes.
 pub struct UMessage {
     attributes: UAttributes,
     payload: Option<Payload>,
@@ -583,6 +588,7 @@ impl UMessage {
     }
 
     #[must_use]
+    /// Returns the payload bytes, if the message carries any.
     pub fn payload(&self) -> Option<Bytes> {
         self.payload.clone()
     }
@@ -928,7 +934,7 @@ mod protobuf_support {
     }
 }
 
-#[cfg(feature = "up-core-types")]
+#[cfg(feature = "up-core-api")]
 mod core_types_support {
     use protobuf::{well_known_types::any::Any, Message};
 

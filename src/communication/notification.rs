@@ -24,7 +24,8 @@ use super::{CallOptions, RegistrationError, UPayload};
 // [impl->dsn~communication-layer-api-declaration~1]
 #[derive(Debug, Error)]
 pub enum NotificationError {
-    /// Indicates that the given message cannot be sent because it is not a [valid Notification message](crate::NotificationValidator).
+    /// Indicates that the given message cannot be sent because it is not a
+    /// [valid Notification message](crate::UAttributesValidators::Notification).
     #[error("invalid argument: {0}")]
     InvalidArgument(String),
     /// Indicates an unspecific error that occurred at the Transport Layer while trying to send a notification.
@@ -52,7 +53,7 @@ pub trait Notifier: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the given message is not a valid
-    /// [uProtocol Notification message](`crate::NotificationValidator`).
+    /// [uProtocol Notification message](`crate::UAttributesValidators::Notification`).
     async fn notify(
         &self,
         resource_id: u16,

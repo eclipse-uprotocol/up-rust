@@ -11,6 +11,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 
+//! uProtocol TCK conformance rows for UUri behavior.
+
 use std::str::FromStr;
 
 use cucumber::{given, then, when};

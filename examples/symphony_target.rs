@@ -60,6 +60,7 @@ impl DeploymentTarget for ExampleDeploymentTarget {
     }
 }
 
+/// Runs the example Symphony deployment target.
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transport = Arc::new(LocalTransport::default());

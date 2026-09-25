@@ -30,17 +30,22 @@ pub(crate) const UPRIORITY_DEFAULT: UPriority = UPriority::CS1;
 pub(crate) type TokenString = String;
 pub(crate) type TraceparentString = String;
 
+/// Errors produced when building or validating [`UAttributes`].
 #[derive(Debug, Error)]
 pub enum UAttributesError {
+    /// The attributes violate a validation rule for their message type.
     #[error("Validation failure: {0}")]
     ValidationError(String),
+    /// The message's time-to-live has elapsed.
     #[error("Message expired")]
     ExpiredError,
+    /// The attributes could not be parsed from their serialized form.
     #[error("Parsing error: {0}")]
     ParsingError(String),
 }
 
 impl UAttributesError {
+    /// Creates a validation error with the given message.
     pub fn validation_error<T>(message: T) -> UAttributesError
     where
         T: Into<String>,
@@ -48,6 +53,7 @@ impl UAttributesError {
         Self::ValidationError(message.into())
     }
 
+    /// Creates a parsing error with the given message.
     pub fn parsing_error<T>(message: T) -> UAttributesError
     where
         T: Into<String>,
@@ -345,7 +351,7 @@ impl UAttributes {
     }
 }
 
-#[cfg(feature = "up-core-types")]
+#[cfg(feature = "up-core-api")]
 mod core_types_support {
     use protobuf::{well_known_types::any::Any, Message};
 

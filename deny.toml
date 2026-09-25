@@ -21,6 +21,12 @@ private = { ignore = true }
 exceptions = [{ name = "unicode-ident", allow = ["Unicode-3.0"] }]
 unused-allowed-license = "deny"
 
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml is dev-only through cucumber's JUnit writer; the vulnerable XML parsing path is not used" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml is dev-only through cucumber's JUnit writer; the vulnerable namespace parser is not used" },
+]
+
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"

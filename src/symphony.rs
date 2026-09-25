@@ -28,8 +28,11 @@ use crate::{
     UAttributes, UPayloadFormat,
 };
 
+/// Resource id of the symphony `get` method.
 pub const METHOD_GET_RESOURCE_ID: u16 = 0x0001;
+/// Resource id of the symphony `update` method.
 pub const METHOD_UPDATE_RESOURCE_ID: u16 = 0x0002;
+/// Resource id of the symphony `delete` method.
 pub const METHOD_DELETE_RESOURCE_ID: u16 = 0x0003;
 
 /// Registers RPC endpoints for managing a deployment target via Eclipse Symphony's uProtocol
@@ -73,6 +76,7 @@ pub async fn register_target_provider_endpoints<R: RpcServer, T: DeploymentTarge
 
 #[cfg_attr(any(test, feature = "test-util"), mockall::automock)]
 #[async_trait]
+/// Deployment-side hooks a symphony target implements to apply resource changes.
 pub trait DeploymentTarget: Send + Sync {
     /// Retrieves the current status of components within a deployment.
     ///
