@@ -25,4 +25,6 @@ pub mod view;
 pub use view::{validate_frame_view_for_transport, UFrameView};
 pub mod abi;
 pub mod codec;
+#[cfg(feature = "owned-frame-transport")]
+pub mod envelope;
 pub mod metadata;

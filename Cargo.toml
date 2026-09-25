@@ -50,6 +50,9 @@ test-util = ["dep:mockall"]
 up-core-api = ["protobuf-support"]
 # Hard-renamed from up-core-types: this gates the generated up_core_api module,
 # not the unconditional core types.
+selected-wire-codec-core = []
+wire-implementer-api = ["selected-wire-codec-core"]
+protobuf-wire = ["up-core-api"]
 communication-api = []
 # Hard-renamed from up-l2-api to match the communication layer's name.
 up-l2-notifier = ["communication-api"]
@@ -186,7 +189,7 @@ missing_docs = "deny"
 missing_debug_implementations = "deny"
 # this prevents cargo from complaining about code blocks
 # excluded from tarpaulin coverage checks
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)', 'cfg(feature, values("owned-frame-transport", "selected-wire-user-api"))'] }
 
 [lints.clippy]
 # see https://corrode.dev/blog/defensive-programming/#clippy-lints-for-defensive-programming
