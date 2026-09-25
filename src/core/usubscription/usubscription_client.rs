@@ -36,6 +36,7 @@ use crate::{
 /// The client requires an [`RpcClient`] for performing the remote procedure calls.
 pub struct RpcClientUSubscription {
     rpc_client: Arc<dyn RpcClient>,
+    usubscription_authority: Option<String>,
 }
 
 impl RpcClientUSubscription {
@@ -44,8 +45,12 @@ impl RpcClientUSubscription {
     /// # Arguments
     ///
     /// * `rpc_client` - The client to use for performing the remote procedure calls on the USubscription service.
-    pub fn new(rpc_client: Arc<dyn RpcClient>) -> Self {
-        RpcClientUSubscription { rpc_client }
+    /// * `usubscription_authority` - (Optional) authority of USubscription service to address - will default to local authority ("") if None.
+    pub fn new(rpc_client: Arc<dyn RpcClient>, usubscription_authority: Option<String>) -> Self {
+        RpcClientUSubscription {
+            rpc_client,
+            usubscription_authority,
+        }
     }
 
     fn default_call_options() -> CallOptions {
@@ -67,7 +72,10 @@ impl USubscription for RpcClientUSubscription {
         Ok(self
             .rpc_client
             .invoke_proto_method::<_, SubscribeResponse>(
-                usubscription_uri(RESOURCE_ID_SUBSCRIBE),
+                usubscription_uri(
+                    self.usubscription_authority.as_deref(),
+                    RESOURCE_ID_SUBSCRIBE,
+                ),
                 Self::default_call_options(),
                 subscribe_request,
             )
@@ -81,7 +89,10 @@ impl USubscription for RpcClientUSubscription {
         };
         self.rpc_client
             .invoke_proto_method::<_, UnsubscribeResponseProto>(
-                usubscription_uri(RESOURCE_ID_UNSUBSCRIBE),
+                usubscription_uri(
+                    self.usubscription_authority.as_deref(),
+                    RESOURCE_ID_UNSUBSCRIBE,
+                ),
                 Self::default_call_options(),
                 unsubscribe_request,
             )
@@ -98,7 +109,10 @@ impl USubscription for RpcClientUSubscription {
         Ok(self
             .rpc_client
             .invoke_proto_method::<_, FetchSubscriptionsResponse>(
-                usubscription_uri(RESOURCE_ID_FETCH_SUBSCRIPTIONS),
+                usubscription_uri(
+                    self.usubscription_authority.as_deref(),
+                    RESOURCE_ID_FETCH_SUBSCRIPTIONS,
+                ),
                 Self::default_call_options(),
                 FetchSubscriptionsRequest {
                     topic_filter,
@@ -112,7 +126,10 @@ impl USubscription for RpcClientUSubscription {
     async fn register_for_notifications(&self) -> Result<(), UStatus> {
         self.rpc_client
             .invoke_proto_method::<_, NotificationResponseProto>(
-                usubscription_uri(RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS),
+                usubscription_uri(
+                    self.usubscription_authority.as_deref(),
+                    RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS,
+                ),
                 Self::default_call_options(),
                 crate::up_core_api::usubscription::NotificationsRequest::default(),
             )
@@ -124,7 +141,10 @@ impl USubscription for RpcClientUSubscription {
     async fn unregister_for_notifications(&self) -> Result<(), UStatus> {
         self.rpc_client
             .invoke_proto_method::<_, NotificationResponseProto>(
-                usubscription_uri(RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS),
+                usubscription_uri(
+                    self.usubscription_authority.as_deref(),
+                    RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS,
+                ),
                 Self::default_call_options(),
                 crate::up_core_api::usubscription::NotificationsRequest::default(),
             )
@@ -136,7 +156,7 @@ impl USubscription for RpcClientUSubscription {
     async fn reset(&self) -> Result<(), UStatus> {
         self.rpc_client
             .invoke_proto_method::<_, ResetResponseProto>(
-                usubscription_uri(RESOURCE_ID_RESET),
+                usubscription_uri(self.usubscription_authority.as_deref(), RESOURCE_ID_RESET),
                 Self::default_call_options(),
                 crate::up_core_api::usubscription::ResetRequest::default(),
             )
@@ -177,7 +197,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(|method, _options, payload| {
-                method == &usubscription_uri(RESOURCE_ID_SUBSCRIBE) && payload.is_some()
+                method == &usubscription_uri(None, RESOURCE_ID_SUBSCRIBE) && payload.is_some()
             })
             .return_const(Err(crate::communication::ServiceInvocationError::Internal(
                 "internal error".to_string(),
@@ -194,7 +214,8 @@ mod tests {
                     .unwrap()
                     .extract_protobuf::<SubscribeRequest>()
                     .unwrap();
-                request == expected_request && method == &usubscription_uri(RESOURCE_ID_SUBSCRIBE)
+                request == expected_request
+                    && method == &usubscription_uri(None, RESOURCE_ID_SUBSCRIBE)
             })
             .returning(move |_method, _options, _payload| {
                 let response = SubscribeResponse {
@@ -204,7 +225,7 @@ mod tests {
                 Ok(Some(UPayload::try_from_protobuf(response).unwrap()))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
 
         assert!(usubscription_client
             .subscribe(&topic, None, None)
@@ -232,7 +253,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(|method, _options, payload| {
-                method == &usubscription_uri(RESOURCE_ID_UNSUBSCRIBE) && payload.is_some()
+                method == &usubscription_uri(None, RESOURCE_ID_UNSUBSCRIBE) && payload.is_some()
             })
             .return_const(Err(crate::communication::ServiceInvocationError::Internal(
                 "internal error".to_string(),
@@ -247,7 +268,8 @@ mod tests {
                     .unwrap()
                     .extract_protobuf::<UnsubscribeRequest>()
                     .unwrap();
-                request == expected_request && method == &usubscription_uri(RESOURCE_ID_UNSUBSCRIBE)
+                request == expected_request
+                    && method == &usubscription_uri(None, RESOURCE_ID_UNSUBSCRIBE)
             })
             .returning(move |_method, _options, _payload| {
                 Ok(Some(
@@ -255,7 +277,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
 
         assert!(usubscription_client
             .unsubscribe(&topic)
@@ -281,7 +303,8 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(|method, _options, payload| {
-                method == &usubscription_uri(RESOURCE_ID_FETCH_SUBSCRIPTIONS) && payload.is_some()
+                method == &usubscription_uri(None, RESOURCE_ID_FETCH_SUBSCRIPTIONS)
+                    && payload.is_some()
             })
             .return_const(Err(crate::communication::ServiceInvocationError::Internal(
                 "internal error".to_string(),
@@ -298,7 +321,7 @@ mod tests {
                     .unwrap();
 
                 request == expected_request
-                    && method == &usubscription_uri(RESOURCE_ID_FETCH_SUBSCRIPTIONS)
+                    && method == &usubscription_uri(None, RESOURCE_ID_FETCH_SUBSCRIPTIONS)
             })
             .returning(move |_method, _options, _payload| {
                 let response = FetchSubscriptionsResponse {
@@ -307,7 +330,7 @@ mod tests {
                 Ok(Some(UPayload::try_from_protobuf(response).unwrap()))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
 
         assert!(usubscription_client
             .fetch_subscriptions(Some(topic_filter.clone()), None)
@@ -331,7 +354,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(|method, _options, payload| {
-                method == &usubscription_uri(RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS)
+                method == &usubscription_uri(None, RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS)
                     && payload.is_some()
             })
             .return_const(Err(crate::communication::ServiceInvocationError::Internal(
@@ -342,7 +365,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(move |method, _options, _payload| {
-                method == &usubscription_uri(RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS)
+                method == &usubscription_uri(None, RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS)
             })
             .returning(move |_method, _options, _payload| {
                 Ok(Some(
@@ -350,7 +373,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
 
         assert!(usubscription_client
             .register_for_notifications()
@@ -374,7 +397,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(|method, _options, payload| {
-                method == &usubscription_uri(RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS)
+                method == &usubscription_uri(None, RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS)
                     && payload.is_some()
             })
             .return_const(Err(crate::communication::ServiceInvocationError::Internal(
@@ -385,7 +408,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(move |method, _options, _payload| {
-                method == &usubscription_uri(RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS)
+                method == &usubscription_uri(None, RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS)
             })
             .returning(move |_method, _options, _payload| {
                 Ok(Some(
@@ -393,7 +416,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
 
         assert!(usubscription_client
             .unregister_for_notifications()
@@ -417,7 +440,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(|method, _options, payload| {
-                method == &usubscription_uri(RESOURCE_ID_RESET) && payload.is_some()
+                method == &usubscription_uri(None, RESOURCE_ID_RESET) && payload.is_some()
             })
             .return_const(Err(crate::communication::ServiceInvocationError::Internal(
                 "internal error".to_string(),
@@ -427,7 +450,7 @@ mod tests {
             .once()
             .in_sequence(&mut seq)
             .withf(move |method, _options, _payload| {
-                method == &usubscription_uri(RESOURCE_ID_RESET)
+                method == &usubscription_uri(None, RESOURCE_ID_RESET)
             })
             .returning(move |_method, _options, _payload| {
                 Ok(Some(
@@ -435,7 +458,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client));
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
 
         assert!(usubscription_client
             .reset()

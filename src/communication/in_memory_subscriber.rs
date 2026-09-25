@@ -227,7 +227,7 @@ impl<T: UTransport + 'static, P: crate::LocalUriProvider + 'static>
                 .await
                 .map(Arc::new)?;
         let usubscription_client = Arc::new(
-            crate::core::usubscription::RpcClientUSubscription::new(rpc_client),
+            crate::core::usubscription::RpcClientUSubscription::new(rpc_client, None),
         );
         let notifier = Arc::new(crate::communication::SimpleNotifier::new(
             transport.clone(),
@@ -262,7 +262,10 @@ impl<T: UTransport, S: USubscription, N: Notifier> InMemorySubscriber<T, S, N> {
         });
         notifier
             .start_listening(
-                &usubscription::usubscription_uri(usubscription::RESOURCE_ID_SUBSCRIPTION_CHANGE),
+                &usubscription::usubscription_uri(
+                    None,
+                    usubscription::RESOURCE_ID_SUBSCRIPTION_CHANGE,
+                ),
                 subscription_change_listener.clone(),
             )
             .await?;
@@ -284,7 +287,10 @@ impl<T: UTransport, S: USubscription, N: Notifier> InMemorySubscriber<T, S, N> {
     pub async fn stop(&self) -> Result<(), RegistrationError> {
         self.notifier
             .stop_listening(
-                &usubscription::usubscription_uri(usubscription::RESOURCE_ID_SUBSCRIPTION_CHANGE),
+                &usubscription::usubscription_uri(
+                    None,
+                    usubscription::RESOURCE_ID_SUBSCRIPTION_CHANGE,
+                ),
                 self.subscription_change_listener.clone(),
             )
             .await

@@ -25,7 +25,7 @@ use protobuf::{
 use crate::{
     core::usubscription::{
         FetchSubscriptionsRequest, FetchSubscriptionsResponse, SubscribeRequest, SubscribeResponse,
-        SubscriptionInfo, SubscriptionStatus, UnsubscribeRequest, UnsubscribeResponse,
+        SubscriptionInfo, SubscriptionStatus, UnsubscribeRequest,
     },
     up_core_api::{
         uri::UUri as UUriProto,
@@ -39,7 +39,6 @@ use crate::{
                 STATUS_UNSUBSCRIBED, STATUS_UNSUBSCRIBE_PENDING,
             },
             UnsubscribeRequest as UnsubscribeRequestProto,
-            UnsubscribeResponse as UnsubscribeResponseProto,
         },
     },
     ProtobufMappable, SerializationError, UCode, UStatus, UUri,
@@ -110,7 +109,6 @@ pub(crate) fn protobuf_timestamp_as_system_time(
 }
 
 // SubscriptionStatus conversions
-
 impl TryFrom<&SubscriptionStatusProto> for SubscriptionStatus {
     type Error = UStatus;
 
@@ -140,7 +138,6 @@ impl From<&SubscriptionStatus> for SubscriptionStatusProto {
 }
 
 // SubscriptionInfo conversions
-
 impl TryFrom<&SubscriptionInfo> for SubscriptionInfoProto {
     type Error = UStatus;
 
@@ -222,7 +219,6 @@ impl ProtobufMappable for SubscriptionInfo {
 }
 
 // SubscribeRequest conversions
-
 impl TryFrom<&SubscribeRequest> for SubscribeRequestProto {
     type Error = UStatus;
 
@@ -293,7 +289,6 @@ impl ProtobufMappable for SubscribeRequest {
 }
 
 // SubscriptionResponse conversions
-
 impl From<&SubscribeResponse> for SubscribeResponseProto {
     fn from(value: &SubscribeResponse) -> Self {
         SubscribeResponseProto {
@@ -348,43 +343,7 @@ impl ProtobufMappable for SubscribeResponse {
     }
 }
 
-// UnsubscribeResponse conversions
-// (though empty, these empty types are still needed to use RpcClient::invoke_method() with empty request/response objects)
-impl From<&UnsubscribeResponse> for UnsubscribeResponseProto {
-    fn from(_value: &UnsubscribeResponse) -> Self {
-        UnsubscribeResponseProto::default()
-    }
-}
-
-// [impl->req~usubscription-unsubscribe-response-signature~1]
-impl From<&UnsubscribeResponseProto> for UnsubscribeResponse {
-    fn from(_proto: &UnsubscribeResponseProto) -> Self {
-        UnsubscribeResponse {}
-    }
-}
-
-impl ProtobufMappable for UnsubscribeResponse {
-    fn parse_from_packed_protobuf_bytes(_proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        Ok(UnsubscribeResponse {})
-    }
-
-    fn parse_from_protobuf_bytes(_proto: &[u8]) -> Result<Self, crate::SerializationError> {
-        Ok(UnsubscribeResponse {})
-    }
-
-    fn write_to_packed_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Any::pack(&UnsubscribeResponseProto::from(self))
-            .map_err(|e| crate::SerializationError::new(format!("failed to pack: {e}")))
-            .and_then(|any| any.write_to_protobuf_bytes())
-    }
-
-    fn write_to_protobuf_bytes(&self) -> Result<Vec<u8>, crate::SerializationError> {
-        Ok(UnsubscribeResponseProto::from(self).write_to_bytes()?)
-    }
-}
-
 // UnsubscribeRequest conversions
-
 impl TryFrom<&UnsubscribeRequest> for UnsubscribeRequestProto {
     type Error = UStatus;
 
@@ -445,7 +404,6 @@ impl ProtobufMappable for UnsubscribeRequest {
 }
 
 // FetchSubscriptionsRequest conversions
-
 impl From<&FetchSubscriptionsRequest> for FetchSubscriptionsRequestProto {
     fn from(value: &FetchSubscriptionsRequest) -> Self {
         FetchSubscriptionsRequestProto {
@@ -521,7 +479,6 @@ impl ProtobufMappable for FetchSubscriptionsRequest {
 }
 
 // FetchSubscriptionsResponse conversions
-
 impl TryFrom<&FetchSubscriptionsResponse> for FetchSubscriptionsResponseProto {
     type Error = UStatus;
 

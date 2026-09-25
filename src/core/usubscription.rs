@@ -240,9 +240,6 @@ pub struct UnsubscribeRequest {
     pub topic: UUri,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct UnsubscribeResponse {}
-
 /// A request to fetch subscription information.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FetchSubscriptionsRequest {
@@ -259,7 +256,12 @@ pub struct FetchSubscriptionsResponse {
     pub subscriptions: Vec<SubscriptionInfo>,
 }
 
-/// Gets a UUri referring to one of the local uSubscription service's resources.
+/// Gets a UUri referring to a uSubscription service's resource.
+///
+/// # Arguments
+///
+/// * `authority` - (Optional) authority of USubscription service to address - will default to local authority ("") if None.
+/// * `resource_id` - Desired USubscription endpoint resource ID.
 ///
 /// # Examples
 ///
@@ -270,9 +272,9 @@ pub struct FetchSubscriptionsResponse {
 /// assert_eq!(uuri.resource_id(), 0x0001);
 /// ```
 #[must_use]
-pub fn usubscription_uri(resource_id: u16) -> UUri {
+pub fn usubscription_uri(authority: Option<&str>, resource_id: u16) -> UUri {
     UUri::try_from_parts(
-        "",
+        authority.unwrap_or(""),
         USUBSCRIPTION_TYPE_ID as u32,
         USUBSCRIPTION_VERSION_MAJOR,
         resource_id,

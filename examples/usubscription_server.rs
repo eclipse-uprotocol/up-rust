@@ -137,7 +137,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ends up in `SubscribeRequest::subscriber` on the server side.
     let client_uri_provider = Arc::new(StaticUriProvider::new("my-vehicle", 0xABCD, 0x01)?);
     let rpc_client = Arc::new(InMemoryRpcClient::new(transport, client_uri_provider).await?);
-    let usubscription = RpcClientUSubscription::new(rpc_client);
+    let usubscription = RpcClientUSubscription::new(rpc_client, None);
 
     let topic = UUri::try_from_parts("my-vehicle", 0x0000_800A, 0x01, 0x8001)?;
 
