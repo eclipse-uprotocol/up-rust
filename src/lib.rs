@@ -29,7 +29,7 @@ listeners for push, [`UTransport::receive`] for pull, or both. A transport maps
 the contract to its broker, bus, or peer-to-peer protocol.
 
 ```rust
-use up_rust::{UMessageBuilder, UPayloadFormat, UStatus, UTransport, UUri};
+use up_rust::{PayloadEncoding, UMessageBuilder, UStatus, UTransport, UUri};
 
 async fn publish_engine_temp(
     transport: &dyn UTransport,
@@ -37,7 +37,7 @@ async fn publish_engine_temp(
     let topic = UUri::try_from_parts("my-vehicle", 0x1_0001, 1, 0x8001)
         .expect("valid topic URI");
     let message = UMessageBuilder::publish(topic)
-        .build_with_payload("92.5", UPayloadFormat::Text)
+        .build_with_payload("92.5", PayloadEncoding::TEXT)
         .expect("valid publish message");
 
     transport.send(message).await
@@ -141,9 +141,9 @@ pub mod symphony;
 
 mod uattributes;
 pub use uattributes::{
-    NotificationValidator, PublishValidator, RequestValidator, ResponseValidator, UAttributes,
-    UAttributesError, UAttributesValidator, UAttributesValidators, UMessageType, UPayloadFormat,
-    UPriority,
+    NotificationValidator, PayloadEncoding, PublishValidator, RequestValidator, ResponseValidator,
+    UAttributes, UAttributesError, UAttributesValidator, UAttributesValidators, UMessageType,
+    UPriority, PAYLOAD_ENCODING_PRIVATE_USE_MIN,
 };
 
 mod umessage;

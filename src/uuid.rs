@@ -264,7 +264,7 @@ impl UUID {
     /// Returns an error if the time-to-live is greater than 0, but
     /// * the current system time cannot be determined, or
     /// * the timestamp extracted from this UUID plus the time-to-live value
-    ///   is less than or equal to the current system time.
+    ///   is less than the current system time.
     pub fn check_expired(&self, ttl: u32) -> Result<(), UAttributesError> {
         // messages with a TTL of 0 are considered to never expire, so we can skip the check in that case
         if ttl == 0 {
@@ -292,7 +292,7 @@ impl UUID {
     /// Returns an error if the time-to-live is greater than 0, but
     /// * the current system time cannot be determined, or
     /// * the timestamp extracted from this UUID plus the time-to-live value
-    ///   is less than or equal to the given reference time.
+    ///   is less than the given reference time.
     pub fn check_expired_for_reference(
         &self,
         ttl: u32,
@@ -302,7 +302,7 @@ impl UUID {
         if ttl == 0 {
             return Ok(());
         }
-        if (self.time() as u128).saturating_add(ttl as u128) <= reference_time {
+        if (self.time() as u128).saturating_add(ttl as u128) < reference_time {
             return Err(UAttributesError::ExpiredError);
         }
         Ok(())
@@ -530,11 +530,22 @@ impl FromStr for UUID {
 
 #[cfg(test)]
 mod tests {
-
     use std::time::UNIX_EPOCH;
 
     use super::*;
     use test_case::test_case;
+
+    #[test_case(500, 1_499 => matches Ok(()); "before deadline")]
+    #[test_case(500, 1_500 => matches Ok(()); "exactly at deadline")]
+    #[test_case(500, 1_501 => matches Err(UAttributesError::ExpiredError); "after deadline")]
+    #[test_case(0, u128::MAX => matches Ok(()); "zero is unlimited")]
+    fn expiration_at_reference_time(
+        ttl: u32,
+        reference_time: u128,
+    ) -> Result<(), UAttributesError> {
+        let id = UUID::build_for_timestamp(Duration::from_millis(1_000));
+        id.check_expired_for_reference(ttl, reference_time)
+    }
 
     // [utest->dsn~uuid-spec~1]
     // [utest->req~uuid-type~1]

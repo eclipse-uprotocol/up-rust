@@ -18,7 +18,7 @@ Traits representing uProtocol's [Communication Layer API](https://github.com/ecl
 use bytes::Bytes;
 use thiserror::Error;
 
-use crate::{UCode, UPayloadFormat, UPriority, UStatus, UUID};
+use crate::{PayloadEncoding, UCode, UPriority, UStatus, UUID};
 
 mod notification;
 #[cfg(any(test, feature = "test-util"))]
@@ -92,7 +92,7 @@ pub(crate) fn build_message<S: crate::umessage::BuilderState>(
     payload: Option<UPayload>,
 ) -> Result<crate::UMessage, crate::UMessageError> {
     if let Some(pl) = payload {
-        let format = pl.payload_format();
+        let format = pl.payload_encoding();
         message_builder.build_with_payload(pl.payload, format)
     } else {
         message_builder.build()
@@ -336,10 +336,10 @@ impl CallOptions {
     }
 }
 
-/// A wrapper around (raw) message payload data and the corresponding payload format.
+/// A wrapper around raw message payload data and its payload encoding.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UPayload {
-    payload_format: UPayloadFormat,
+    payload_encoding: PayloadEncoding,
     payload: Bytes,
 }
 
@@ -349,24 +349,24 @@ impl UPayload {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::UPayloadFormat;
+    /// use up_rust::PayloadEncoding;
     /// use up_rust::communication::UPayload;
     ///
     /// let data: Vec<u8> = vec![0x00_u8, 0x01_u8, 0x02_u8];
-    /// let payload = UPayload::new(data, UPayloadFormat::Raw);
-    /// assert_eq!(payload.payload_format(), UPayloadFormat::Raw);
+    /// let payload = UPayload::new(data, PayloadEncoding::RAW);
+    /// assert_eq!(payload.payload_encoding(), PayloadEncoding::RAW);
     /// assert_eq!(payload.payload().len(), 3);
     /// ```
-    pub fn new<T: Into<Bytes>>(payload: T, payload_format: UPayloadFormat) -> Self {
+    pub fn new<T: Into<Bytes>>(payload: T, payload_encoding: PayloadEncoding) -> Self {
         UPayload {
-            payload_format,
+            payload_encoding,
             payload: payload.into(),
         }
     }
 
     /// Creates a new UPayload from an object that can be mapped to/from a protobuf.
     ///
-    /// The resulting payload will have `UPayloadType::UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`.
+    /// The resulting payload declares [`PayloadEncoding::PROTOBUF_WRAPPED_IN_ANY`].
     ///
     /// # Errors
     ///
@@ -375,13 +375,13 @@ impl UPayload {
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{communication::UPayload, UPayloadFormat};
+    /// use up_rust::{communication::UPayload, PayloadEncoding};
     /// use protobuf::{well_known_types::wrappers::StringValue};
     ///
     /// let mut data = StringValue::new();
     /// data.value = "hello world".to_string();
     /// assert!(UPayload::try_from_protobuf(data).is_ok_and(|pl|
-    ///     pl.payload_format() == UPayloadFormat::ProtobufWrappedInAny
+    ///     pl.payload_encoding() == PayloadEncoding::PROTOBUF_WRAPPED_IN_ANY
     ///         && pl.payload().len() > 0));
     /// ```
     #[cfg(feature = "protobuf-support")]
@@ -390,17 +390,17 @@ impl UPayload {
         T: crate::ProtobufMappable,
     {
         obj.write_to_packed_protobuf_bytes()
-            .map(|buf| UPayload::new(buf, UPayloadFormat::ProtobufWrappedInAny))
+            .map(|buf| UPayload::new(buf, PayloadEncoding::PROTOBUF_WRAPPED_IN_ANY))
             .map_err(crate::UMessageError::from)
     }
 
-    /// Gets the payload format.
+    /// Gets the payload encoding.
     ///
     /// # Returns
     ///
     /// payload value of `UPayload`.
-    pub fn payload_format(&self) -> UPayloadFormat {
-        self.payload_format
+    pub fn payload_encoding(&self) -> PayloadEncoding {
+        self.payload_encoding
     }
 
     /// Gets the payload data.
@@ -421,14 +421,14 @@ impl UPayload {
     ///
     /// # Errors
     ///
-    /// * Returns an error if the unpacking process fails, for example if the payload format
-    ///   is neither [`UPayloadFormat::Protobuf`] nor [`UPayloadFormat::ProtobufWrappedInAny`],
+    /// * Returns an error if the unpacking process fails, for example if the payload encoding
+    ///   is neither [`PayloadEncoding::PROTOBUF`] nor [`PayloadEncoding::PROTOBUF_WRAPPED_IN_ANY`],
     ///   or if the payload could not be deserialized into the target type `T`.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use up_rust::{communication::UPayload, UPayloadFormat};
+    /// use up_rust::{communication::UPayload, PayloadEncoding};
     /// use protobuf::{well_known_types::wrappers::StringValue};
     ///
     /// let mut data = StringValue::new();
@@ -443,6 +443,6 @@ impl UPayload {
     where
         T: crate::ProtobufMappable,
     {
-        crate::umessage::deserialize_protobuf_bytes(&self.payload, &self.payload_format)
+        crate::umessage::deserialize_protobuf_bytes(&self.payload, self.payload_encoding)
     }
 }

@@ -35,12 +35,16 @@ fn handle_response_message(response: UMessage) -> Result<Option<UPayload>, Servi
     match response.commstatus() {
         Some(UCode::Ok) | None => {
             // successful invocation
-            let payload_format = response
-                .payload_format()
-                .unwrap_or(crate::UPayloadFormat::Unspecified);
-            Ok(response
-                .payload()
-                .map(|payload| UPayload::new(payload, payload_format)))
+            let response_payload = match (response.payload(), response.payload_encoding()) {
+                (Some(data), Some(encoding)) => Some(UPayload::new(data, encoding)),
+                (Some(_), None) => {
+                    return Err(ServiceInvocationError::InvalidArgument(
+                        "message carries a payload without a declared payload encoding".to_string(),
+                    ))
+                }
+                (None, _) => None,
+            };
+            Ok(response_payload)
         }
         Some(code) => {
             // try to extract UStatus from response payload

@@ -216,7 +216,7 @@ mod tests {
             .return_const(Ok(()));
         let notifier = SimpleNotifier::new(Arc::new(transport), uri_provider);
 
-        let payload = UPayload::new(value.as_slice(), crate::UPayloadFormat::Raw);
+        let payload = UPayload::new(value.as_slice(), crate::PayloadEncoding::RAW);
         let options =
             CallOptions::for_notification(Some(10_000), Some(message_id), Some(UPriority::CS2));
         let result = notifier

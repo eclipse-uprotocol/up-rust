@@ -9,13 +9,13 @@ supports at least one delivery mode and may support both.
 ## Send a message
 
 ```rust
-use up_rust::{UMessageBuilder, UPayloadFormat, UStatus, UTransport, UUri};
+use up_rust::{PayloadEncoding, UMessageBuilder, UStatus, UTransport, UUri};
 
 async fn publish(transport: &dyn UTransport) -> Result<(), UStatus> {
     let topic = UUri::try_from_parts("my-vehicle", 0x1_0001, 1, 0x8001)
         .expect("valid topic URI");
     let message = UMessageBuilder::publish(topic)
-        .build_with_payload("92.5", UPayloadFormat::Text)
+        .build_with_payload("92.5", PayloadEncoding::TEXT)
         .expect("valid publish message");
     transport.send(message).await
 }

@@ -43,12 +43,16 @@ impl<T: UTransport> RequestListener<T> {
 
         let request_message_id = request_message.id().to_hyphenated_string();
         let request_timeout = request_message.ttl_unchecked();
-        let payload_format = request_message
-            .payload_format()
-            .unwrap_or(crate::UPayloadFormat::Unspecified);
-        let request_payload = request_message
-            .payload()
-            .map(|data| UPayload::new(data, payload_format));
+        let request_payload = match (
+            request_message.payload(),
+            request_message.payload_encoding(),
+        ) {
+            (Some(data), Some(encoding)) => Some(UPayload::new(data, encoding)),
+            // This dispatcher has no error return; an undeclared payload
+            // cannot be exposed as a valid UPayload to the request handler.
+            (Some(_), None) => None,
+            (None, _) => None,
+        };
 
         debug!(
             ttl = request_timeout,
@@ -409,7 +413,7 @@ mod tests {
                 })
             })
             .returning(|_resource_id, _message_attributes, _request_payload| {
-                let response_payload = UPayload::new(value.as_slice(), crate::UPayloadFormat::Raw);
+                let response_payload = UPayload::new(value.as_slice(), crate::PayloadEncoding::RAW);
                 Ok(Some(response_payload))
             });
         transport
@@ -433,7 +437,7 @@ mod tests {
             5_000,
         )
         .with_message_id(message_id)
-        .build_with_payload(value.as_slice(), crate::UPayloadFormat::Raw)
+        .build_with_payload(value.as_slice(), crate::PayloadEncoding::RAW)
         .unwrap();
 
         let request_listener = RequestListener {

@@ -25,7 +25,7 @@ use up_rust::{
     communication::{CallOptions, InMemoryRpcClient, InMemoryRpcServer, RpcClient, UPayload},
     local_transport::LocalTransport,
     symphony::DeploymentTarget,
-    StaticUriProvider, UPayloadFormat, UUri,
+    PayloadEncoding, StaticUriProvider, UUri,
 };
 
 struct ExampleDeploymentTarget(Arc<Notify>, Arc<Notify>, Arc<Notify>);
@@ -115,7 +115,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     let payload = UPayload::new(
         serde_json::to_vec(&request_payload).expect("failed to create request payload"),
-        UPayloadFormat::Json,
+        PayloadEncoding::JSON,
     );
     let call_options = CallOptions::for_rpc_request(0x1000, None, None, None);
     rpc_client

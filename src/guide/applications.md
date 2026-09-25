@@ -17,7 +17,7 @@ The application-facing APIs are:
 use std::sync::Arc;
 use up_rust::communication::{CallOptions, PubSubError, Publisher, SimplePublisher, UPayload};
 use up_rust::local_transport::LocalTransport;
-use up_rust::{StaticUriProvider, UPayloadFormat};
+use up_rust::{StaticUriProvider, PayloadEncoding};
 
 #[tokio::main]
 async fn main() -> Result<(), PubSubError> {
@@ -31,7 +31,7 @@ async fn main() -> Result<(), PubSubError> {
         .publish(
             0x8001,
             CallOptions::for_publish(None, None, None),
-            Some(UPayload::new("92.5", UPayloadFormat::Text)),
+            Some(UPayload::new("92.5", PayloadEncoding::TEXT)),
         )
         .await?;
     Ok(())

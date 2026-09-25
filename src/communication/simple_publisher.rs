@@ -169,7 +169,7 @@ mod tests {
             .publish(
                 0x9A00,
                 call_options,
-                Some(UPayload::new(value.as_slice(), crate::UPayloadFormat::Raw)),
+                Some(UPayload::new(value.as_slice(), crate::PayloadEncoding::RAW)),
             )
             .await;
 

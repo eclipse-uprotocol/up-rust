@@ -26,7 +26,7 @@ this in-process transport:
 use std::sync::Arc;
 use up_rust::communication::{CallOptions, PubSubError, Publisher, SimplePublisher, UPayload};
 use up_rust::local_transport::LocalTransport;
-use up_rust::{StaticUriProvider, UPayloadFormat};
+use up_rust::{StaticUriProvider, PayloadEncoding};
 
 #[tokio::main]
 async fn main() -> Result<(), PubSubError> {
@@ -37,7 +37,7 @@ async fn main() -> Result<(), PubSubError> {
     );
 
     let publisher = SimplePublisher::new(transport, identity);
-    let payload = UPayload::new("92.5", UPayloadFormat::Text);
+    let payload = UPayload::new("92.5", PayloadEncoding::TEXT);
     publisher
         .publish(
             0x8001,
@@ -107,7 +107,7 @@ use up_rust::communication::{
     CallOptions, NotificationError, Notifier, SimpleNotifier, UPayload,
 };
 use up_rust::local_transport::LocalTransport;
-use up_rust::{StaticUriProvider, UPayloadFormat, UUri};
+use up_rust::{StaticUriProvider, PayloadEncoding, UUri};
 
 #[tokio::main]
 async fn main() -> Result<(), NotificationError> {
@@ -125,7 +125,7 @@ async fn main() -> Result<(), NotificationError> {
             0x8002,
             &destination,
             CallOptions::for_notification(None, None, None),
-            Some(UPayload::new("door open", UPayloadFormat::Text)),
+            Some(UPayload::new("door open", PayloadEncoding::TEXT)),
         )
         .await?;
     Ok(())
@@ -204,7 +204,7 @@ use up_rust::communication::{
     ServiceInvocationError, UPayload,
 };
 use up_rust::local_transport::LocalTransport;
-use up_rust::{LocalUriProvider, StaticUriProvider, UAttributes, UPayloadFormat};
+use up_rust::{LocalUriProvider, StaticUriProvider, UAttributes, PayloadEncoding};
 
 # struct EchoHandler;
 # #[async_trait::async_trait]
@@ -234,7 +234,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_method(
             service.get_resource_uri(0x00A1),
             CallOptions::for_rpc_request(5_000, None, None, None),
-            Some(UPayload::new("ping", UPayloadFormat::Text)),
+            Some(UPayload::new("ping", PayloadEncoding::TEXT)),
         )
         .await?;
 
