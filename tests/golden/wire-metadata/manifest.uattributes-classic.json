@@ -1,0 +1,4 @@
+[
+  {"fixture": "classic-publish-raw-payload", "profile": "uattributes-classic", "file": "classic-publish-raw-payload.uattributes-classic.hex", "len": 45},
+  {"fixture": "classic-publish-private-use-xcdr2-payload", "profile": "uattributes-classic", "file": "classic-publish-private-use-xcdr2-payload.uattributes-classic.hex", "len": 47}
+]

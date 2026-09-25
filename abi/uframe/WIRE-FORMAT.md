@@ -70,10 +70,12 @@ u8   authority_name_len
 
 ### 1.2 Payload encoding identifier
 
-A payload encoding is identified by one nonzero registry or private-use value.
+A payload encoding is a 16-bit identifier in a four-byte physical slot.
+Presence is controlled by `FIELD_PAYLOAD_ENCODING`, independently of its value.
+Present zero is contract-defined encoding; absent encoding means no payload.
 
 ```text
-u32  payload_encoding_id  little-endian; zero is reserved
+u32  payload_encoding_id  little-endian; value must be at most 65535
 ```
 
 ## 2. Native whole-frame envelope ("UPFE"), version 1
@@ -95,7 +97,7 @@ offset  size  field
 20+m    p     payload bytes, p = payload_len
 ```
 
-Content type: `application/vnd.uprotocol.uframe;version=1`.
+Experimental profile content-type label: `application/vnd.uprotocol.uframe;version=1`.
 
 Decoders MUST verify that the input length equals `20 + metadata_len +
 payload_len`, that presence and `payload_len` agree, and that the decoded
@@ -107,9 +109,9 @@ the metadata declares a payload encoding (a present *empty* payload — the
 
 ### 3.1 Frame message kind wire codes
 
-Defined by the UFrame specification. The numbering deliberately coincides
-with the legacy protobuf `UMessageType` values so the projection is
-value-preserving; the UFrame registry below is normative from here on.
+Defined by this experimental native representation profile. The numbering
+deliberately coincides with the protobuf `UMessageType` values so the
+projection is value-preserving.
 
 | code | kind         | legacy `UMessageType` projection |
 |------|--------------|----------------------------------|
@@ -144,23 +146,9 @@ value-preserving; the UFrame registry below is normative from here on.
 
 ### 3.4 Payload encoding registry ids
 
-| id | encoding | media type |
-|----|----------|------------|
-| 0  | reserved (never valid) | — |
-| 1  | Protobuf wrapped in `google.protobuf.Any` | `application/x-protobuf` |
-| 2  | Protobuf | `application/protobuf` |
-| 3  | JSON | `application/json` |
-| 4  | SOME/IP | `application/x-someip` |
-| 5  | SOME/IP TLV | `application/x-someip_tlv` |
-| 6  | raw bytes | `application/octet-stream` |
-| 7  | UTF-8 text | `text/plain` |
-| 8  | shared-memory reference | `application/x-shm` |
-| 9  | XCDR v2 (proposed) | `application/vnd.uprotocol.xcdr-v2` |
-| 10 | Arrow IPC (proposed) | `application/vnd.apache.arrow.stream` |
-| 11 | OMG IDL CDR (proposed) | `application/vnd.uprotocol.omg-idl-cdr` |
-| 12..=0x0FFF_FFFF | future registered encodings | |
-| 0x1000_0000..=0xFFFF_FFFF | private use | |
-
-Ids 1..=8 are permanently assigned with the values of the retired
-`UPayloadFormat` enum. Private-use values require deployment agreement and are
-opaque to intermediaries.
+The authoritative assignment and allocation policy lives in
+`up-spec/basics/payload_encoding_registry.adoc` in the pinned specification.
+This profile carries every structurally valid 16-bit identifier unchanged,
+including zero, unknown, reserved and private values; it does not assign IDs
+or prove decoder support. Private-use interpretation requires an applicable
+deployment contract. Test-fixture private identifiers are not public allocations.

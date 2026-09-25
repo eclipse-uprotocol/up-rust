@@ -199,3 +199,11 @@ wildcard_enum_match_arm = "deny"
 unneeded_field_pattern = "deny"
 fn_params_excessive_bools = "deny"
 must_use_candidate = "allow"
+
+[[test]]
+name = "wire_metadata_conformance"
+required-features = ["wire-implementer-api", "up-core-api"]
+
+[[test]]
+name = "wire_metadata_golden"
+required-features = ["wire-implementer-api", "up-core-api"]
