@@ -348,10 +348,13 @@ mod tests {
         assert_eq!(decoded, frame);
     }
 
-    #[test]
-    fn protobuf_umessage_frame_round_trips_private_use_payload_encoding() {
+    #[test_case::test_case(0; "contract defined")]
+    #[test_case::test_case(8; "unassigned")]
+    #[test_case::test_case(0xEFFF; "reserved")]
+    #[test_case::test_case(0xFBEE; "private")]
+    fn protobuf_umessage_frame_round_trips_opaque_encoding(id: u32) {
         let message = UMessageBuilder::publish(topic()).build().expect("message");
-        let encoding = PayloadEncoding::from_id(0x1000_0BEE).expect("private-use id");
+        let encoding = PayloadEncoding::from_id(id).expect("structural identifier");
         let metadata = crate::frame::metadata::try_project_attributes_to_frame_metadata(
             message.attributes(),
             Some(encoding),
@@ -404,10 +407,13 @@ mod tests {
         assert!(!decoded.has_payload());
     }
 
-    #[test]
-    fn native_envelope_round_trips_private_use_encoding_frame() {
+    #[test_case::test_case(0; "contract defined")]
+    #[test_case::test_case(8; "unassigned")]
+    #[test_case::test_case(0xEFFF; "reserved")]
+    #[test_case::test_case(0xFBEE; "private")]
+    fn native_envelope_round_trips_opaque_encoding(id: u32) {
         let metadata = UFrameMetadata::publish(topic())
-            .with_payload_encoding(PayloadEncoding::from_id(0x1000_0BEE).expect("private-use id"))
+            .with_payload_encoding(PayloadEncoding::from_id(id).expect("structural identifier"))
             .build()
             .expect("metadata");
         let frame = UOwnedFrame::with_payload(metadata, Bytes::from_static(b"native payload"))
@@ -450,18 +456,15 @@ mod tests {
         assert_eq!(decoded, frame);
     }
 
-    #[test]
-    fn native_envelope_rejects_corrupted_input() {
+    #[test_case::test_case(|bytes| *bytes.first_mut().unwrap() = b'X'; "wrong magic")]
+    #[test_case::test_case(|bytes| bytes.push(0); "trailing byte")]
+    fn native_envelope_rejects_corrupted_input(mutate: fn(&mut Vec<u8>)) {
         let metadata = UFrameMetadata::publish(topic()).build().expect("metadata");
         let frame = UOwnedFrame::without_payload(metadata).expect("frame");
         let encoded = NativeUFrameEnvelope::serialize_frame(&frame).expect("serialize");
 
         let mut bad = encoded.to_vec();
-        *bad.first_mut().expect("magic byte") = b'X';
-        assert!(NativeUFrameEnvelope::deserialize_frame(&bad).is_err());
-
-        let mut bad = encoded.to_vec();
-        bad.push(0);
+        mutate(&mut bad);
         assert!(NativeUFrameEnvelope::deserialize_frame(&bad).is_err());
     }
 }

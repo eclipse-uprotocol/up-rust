@@ -50,9 +50,12 @@ test-util = ["dep:mockall"]
 up-core-api = ["protobuf-support"]
 # Hard-renamed from up-core-types: this gates the generated up_core_api module,
 # not the unconditional core types.
+transport-implementer-api = ["selected-wire-transport-core"]
+selected-wire-transport-core = ["selected-wire-codec-core"]
 selected-wire-codec-core = []
 wire-implementer-api = ["selected-wire-codec-core"]
 protobuf-wire = ["up-core-api"]
+owned-frame-transport = ["selected-wire-transport-core", "up-core-api"]
 communication-api = []
 # Hard-renamed from up-l2-api to match the communication layer's name.
 up-l2-notifier = ["communication-api"]

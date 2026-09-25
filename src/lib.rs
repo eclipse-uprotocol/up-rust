@@ -95,6 +95,11 @@ pub mod core;
 #[cfg(feature = "util")]
 pub mod local_transport;
 
+#[cfg(feature = "util")]
+mod listener_admission;
+#[cfg(feature = "util")]
+pub use listener_admission::ListenerAdmission;
+
 /// Audience-oriented examples and implementation guidance.
 pub mod guide {
     #![doc = include_str!("guide/README.md")]
@@ -203,6 +208,21 @@ pub use payload::codec::{
     ProtobufPayload, ReadDecodePayload,
 };
 pub use payload::UWireError;
+
+// ---- owned-frame transport family ----
+
+#[cfg(feature = "owned-frame-transport")]
+pub use frame::envelope::{UFrameWireError, UFrameWireFormat};
+
+#[cfg(feature = "owned-frame-transport")]
+mod owned_frame;
+#[cfg(all(feature = "owned-frame-transport", any(test, feature = "test-util")))]
+pub use owned_frame::InMemoryOwnedTransport;
+#[cfg(feature = "owned-frame-transport")]
+pub use owned_frame::UOwnedFrame;
+
+#[cfg(feature = "owned-frame-transport")]
+pub use utransport::{UOwnedListener, UOwnedTransport, UOwnedTransportImpl};
 
 // ---- wire formats ----
 
