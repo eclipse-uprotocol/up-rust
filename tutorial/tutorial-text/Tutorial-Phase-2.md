@@ -1,8 +1,8 @@
 ### Prologue
 
 This is the second phase of the tutorial where we will build on everything that was established in Phase-1 (the previous chapter) and then some. So, if we
-have not read the previous tutorial [Phase 1 tutorial](Tutorial-Phase-1.md), please do so. The code 
-corresponding to that (previous) tutorial is in `phases/01_raw_sockets/`. This chapter's 
+have not read the previous tutorial [Phase 1 tutorial](Tutorial-Phase-1.md), please do so. The code
+corresponding to that (previous) tutorial is in `phases/01_raw_sockets/`. This chapter's
 code lives in `phases/02_uprotocol_semantics/`.
 
 
@@ -24,9 +24,9 @@ Let's dive in.
 
 ### Chapter 1: Where Phase-1 left us
 
-In Phase-1, we successfully sent a `UMessage` from the battery-telemetry-publisher to the 
-telemetry-subscriber over a Unix Domain Socket. We packed SoC and temperature into 8 RAW bytes 
-using `pack_bms_can_frame` and unpacked with `unpack_bms_can_frame`. It worked.
+In Phase-1, we successfully sent a `UMessage` from the battery-telemetry-publisher to the
+telemetry-subscriber over a Unix Domain Socket. We packed SoC and temperature into 8 RAW bytes
+using `pack_bms_can_frame` and unpacked with `unpack_bms_can_frame`. The two processes exchanged messages.
 
 But, let's re-read the subscriber code from Phase-1:
 
@@ -53,7 +53,7 @@ let message = UMessageBuilder::publish(source_uri)
     .with_ttl(5000)
     .build_with_payload(
         pack_bms_can_frame(battery_pct, temp_c).to_vec(),
-        UPayloadFormat::UPAYLOAD_FORMAT_RAW,
+        UPayloadFormat::Raw,
     )?;
 let framed = serialize_for_unix_socket(&message)?;
 let socket_path = up_frame_codec::socket_path()?;
@@ -85,7 +85,7 @@ Both binaries embed transport details that do not belong in battery telemetry co
 - The **subscriber** does three jobs: accept a connection, read+decode a frame, interpret the payload
 - If we want a second consumer for the same telemetry (say, a thermal management logging engine),
   we cannot give it access to the subscriber's socket — there is only one accept loop.
-- The **payload** is RAW bytes with a secret CAN-byte layout. If we change the layout, then both 
+- The **payload** is RAW bytes with a secret CAN-byte layout. If we change the layout, then both
   sides must be updated in lockstep.
 
 Phase-2 fixes these using uProtocol's own facilities: L1 Transport, L2 Communication patterns,
@@ -130,7 +130,8 @@ length-prefix framing — wrapped behind those abstractions. L3 application serv
 [uP-L1 (Transport)](https://github.com/eclipse-uprotocol/up-spec/tree/main/up-l1),
 [uP-L2 (Communication)](https://github.com/eclipse-uprotocol/up-spec/tree/main/up-l2), and
 [uP-L3 (Application)](https://github.com/eclipse-uprotocol/up-spec/tree/main/up-l3).
-Crates under `phases/02_uprotocol_semantics/` keep the same pin as Phase 1: `up-rust = "0.9.0"`.
+Crates under `phases/02_uprotocol_semantics/` path-depend on the `up-rust` crate in this
+repository checkout (not a crates.io pin).
 
 Both processes attach the **same** L1 type. Socket bind vs connect is wire setup, not a Client/Server
 split in the application model. L2 appears only on the publish path in this demo (`SimplePublisher`);
@@ -142,7 +143,7 @@ we do not use it here (same-transport interest does not need it).
 │  Phase 2 — peer apps; same L1 transport on both sides                              │
 │                                                                                    │
 │  Publisher app                         Subscriber app                              │
-│  ┌───────────────────────────┐         ┌────────────────────────────────┐          
+│  ┌───────────────────────────┐         ┌────────────────────────────────┐
 │  │ BatteryTelemetry          │         │ BatteryTelemetryListener       │          │
 │  │ + UPayload                │         │ (impl UListener)               │          │
 │  └─────────────┬─────────────┘         └─────────────▲──────────────────┘          │
@@ -183,20 +184,20 @@ phases/02_uprotocol_semantics/
 ### Chapter 4: `up-bms-proto` — why typed protobuf payloads
 
 Phase 1 deliberately avoided `UPayload`. The L1 path builds a `UMessage` with
-`UMessageBuilder::build_with_payload(raw_bytes, UPAYLOAD_FORMAT_RAW)`. The application still had
+`UMessageBuilder::build_with_payload(raw_bytes, UPayloadFormat::Raw)`. The application still had
 to invent a byte layout:
 
 ```rust
 // Phase 1 — RAW bytes in the envelope; no UPayload type
 .build_with_payload(
     pack_bms_can_frame(battery_pct, temp_c).to_vec(),
-    UPayloadFormat::UPAYLOAD_FORMAT_RAW,
+    UPayloadFormat::Raw,
 )
 ```
 And on the subscriber side:
 
 ```rust
-let payload = msg.payload.unwrap();
+let payload = msg.payload().unwrap();
 let (pct, temp) = unpack_bms_can_frame(&payload);
 ```
 `pack_bms_can_frame` and `unpack_bms_can_frame` are **C code in Rust clothing**. They exist
@@ -219,7 +220,7 @@ fn pack_bms_can_frame(soc_pct: f32, temp_c: f32) -> [u8; 8] {
 ```
 We can spot the problems:
 
-1. **Scale factors are buried in code.** `0.5` and `10.0` are kind of, magic numbers. If we 
+1. **Scale factors are buried in code.** `0.5` and `10.0` are kind of, magic numbers. If we
    change the SoC resolution from 0.5% to 0.1%, we must find and update both pack *and* unpack functions
    in lockstep. If we miss one, the subscriber prints garbage.
 
@@ -302,7 +303,7 @@ constants crate plus the shared frame-codec helpers keep the demo honest.
 
 ### Chapter 5: What does the Phase-1 subscriber *actually* do?
 
-Before we look at `up-unix-domain-socket-transport`, let's visit Phase-1 subscriber code 
+Before we look at `up-unix-domain-socket-transport`, let's visit Phase-1 subscriber code
 and trace what it does for every incoming message. The key section here:
 
 ```rust
@@ -320,7 +321,7 @@ loop {
         if stream.read_exact(&mut body_bytes).await.is_err() { return; }
 
         // Step 3 — deserialise the protobuf UMessage
-        let msg = UMessage::parse_from_bytes(&body_bytes[..]).ok()?;
+        let msg = UMessage::parse_from_protobuf_bytes(&body_bytes[..]).ok()?;
 
         // Step 4 — extract the CAN payload and interpret
         let payload = msg.payload?;
@@ -341,8 +342,8 @@ Let's count the implicit responsibilities in that one spawned closure:
 Three responsibilities. Two of them have nothing to do with battery telemetry.
 
 If we wanted to add a second consumer — say, a thermal management logging engine — we would have
-to copy the socket-reading code. If we wanted to switch from Unix Domain Socket to another 
-transport - say, Zenoh - we would rewrite the socket-reading code. If we wanted to run two 
+to copy the socket-reading code. If we wanted to switch from Unix Domain Socket to another
+transport - say, Zenoh - we would rewrite the socket-reading code. If we wanted to run two
 listeners inside the same process (one for SoC, one for temperature), we would need to duplicate the accept loop or build our own dispatch table.
 
 **This is where a transport crate enters the story.**
@@ -386,7 +387,8 @@ Let's look at `up-unix-domain-socket-transport` carefully.
 `UTransport` type:
 
 **`UnixDomainSocketTransport::bind`** — binds a socket path, spawns an accept loop, reads framed
-messages, and dispatches to registered listeners:
+messages, and dispatches to registered listeners. The method returns `Self`. The accept loop clones the
+listener table, not the transport; wrap in `Arc` only at a call site that needs a shared handle.
 
 ```rust
 let socket_path = up_frame_codec::ensure_socket_dir()?;
@@ -398,17 +400,44 @@ transport
 The dispatch logic (simplified from the crate):
 
 ```rust
-for registered in listeners.iter() {
-    if registered.matches_msg(&message) {
-        registered.on_receive(message.clone()).await;
-    }
+let matching: Vec<_> = {
+    let table = listeners.read().await;
+    table.iter().filter(|r| r.matches_msg_source(&message)).cloned().collect()
+}; // read guard dropped here
+
+for registered in matching {
+    registered.on_receive(message.clone()).await;
 }
 ```
-Where `matches_msg` uses `up-rust`'s `UUri::matches` — the same URI matching rules that
+Where `matches_msg_source` uses `up-rust`'s `UUri::matches` — the same URI matching rules that
 `LocalTransport` uses. A listener fires when the source filter matches the message's source URI.
+Matching runs under the read lock; `on_receive` runs after that lock is dropped, so listener
+work does not stall `register_listener` / `unregister_listener`.
+
+#### Point of interest — “start the subscriber first” is not a `dispatch_to` invariant
+
+Look at the two calls above: `bind` then `register_listener`. `bind` **already spawned the accept
+loop**. From that moment the socket will accept a publisher, decode a framed `UMessage`, and call
+`dispatch_to`. `register_listener` has not run yet.
+
+`dispatch_to` does **not** return `Result`. It takes a read lock only long enough to snapshot
+matching listeners, drops the lock, then `await`s those `on_receive` calls. If the table is
+empty, or no filter matches, it simply returns — the payload is dropped, nothing `Err`s. Decode
+problems inside a listener are the listener's concern; they do not make dispatch fail.
+
+So registration-before-payload is **not** something this transport enforces. A publisher that
+connects in the gap (or that you start before the subscriber) is not a protocol error; those
+messages vanish. Starting the subscriber first — as Chapter 9 asks — is an **operational
+convention**: it shrinks that window. It is not a guarantee that `dispatch_to` can never run
+against an empty set.
+
+Phase 3's `LocalTransport` has no such window: both listeners are registered in the same process
+before `SimplePublisher` sends. That is a property of that demo's control flow, not of L1 in
+general.
 
 **`UnixDomainSocketTransport::connect`** — send-only attachment: connect per `send`, frame via
-`up-frame-codec`, write bytes:
+`up-frame-codec`, write bytes. The method returns `Self`. `SimplePublisher` needs `Arc<T>`, so the publisher
+binary wraps with `Arc::new(...)`.
 
 ```rust
 let socket_path = up_frame_codec::socket_path()?;
@@ -446,7 +475,7 @@ Let's look at the publisher code. Compare it with the Phase-1 version from the p
 use up_bms_proto::constants::*;
 use up_bms_proto::BatteryTelemetry;
 use up_rust::communication::{CallOptions, Publisher, SimplePublisher, UPayload};
-use up_rust::{StaticUriProvider, UTransport};
+use up_rust::StaticUriProvider;
 use up_unix_domain_socket_transport::UnixDomainSocketTransport;
 
 #[tokio::main]
@@ -458,10 +487,10 @@ async fn main() -> Result<(), anyhow::Error> {
         AUTHORITY_NAME,
         PUBLISHER_UE_ID,
         PUBLISHER_UE_VERSION,
-    ));
+    )?);
     let socket_path = up_frame_codec::socket_path()?;
-    let transport: Arc<dyn UTransport> =
-        UnixDomainSocketTransport::connect(&socket_path);
+    // SimplePublisher stores Arc<T>; wrapping is the call site's choice, not connect()'s.
+    let transport = Arc::new(UnixDomainSocketTransport::connect(&socket_path));
     let publisher = SimplePublisher::new(transport, uri_provider);
 
     let mut rng = rand::rng();
@@ -517,7 +546,7 @@ options such as TTL (`CallOptions`), and payload bytes + format (`UPayload`). Me
 
 **We no longer pack CAN bytes.** `UPayload::try_from_protobuf(telemetry)` serialises the
 `BatteryTelemetry` protobuf message and wraps it with format hint
-`UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`. No DBC offsets, no bit-shifting.
+`UPAYLOAD_FORMAT_PROTOBUF_WRAPPED_IN_ANY`. There are no DBC offsets and no bit-shifting.
 
 **We no longer connect and write to the socket.** That is inside
 `UnixDomainSocketTransport::send` (after `connect`), which implements `UTransport::send`. The
@@ -527,7 +556,7 @@ publisher only says "publish this data"; the how of moving bytes lives in the tr
 
 ### Chapter 8: Refactored subscriber — `UListener` + `UnixDomainSocketTransport::bind`
 
-Now the subscriber. This is a bigger change. The entire socket loop is gone.
+Now the subscriber. This is a bigger change: the entire socket loop is gone.
 
 ```
 ╔════════════════════════════════╗
@@ -579,7 +608,7 @@ async fn main() -> Result<(), anyhow::Error> {
         AUTHORITY_NAME,
         PUBLISHER_UE_ID,
         PUBLISHER_UE_VERSION,
-    );
+    )?;
     let source_filter = uri_provider.get_resource_uri(BATTERY_TELEMETRY_RESOURCE_ID);
 
     let received = Arc::new(AtomicU32::new(0));
@@ -606,6 +635,29 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 ```
+
+#### Point of interest — we exit without `unregister_listener`
+
+After `shutdown.notified().await`, the Nth `on_receive` has finished. That is the completion
+handshake: `main` and the listener agree “expected work is done.” This demo then **returns from
+`main`**. There is no `unregister_listener`. Tokio tears down the runtime; the accept loop spawned
+in `bind` dies with the process; the socket file goes away with it.
+
+That is a **shortcut**, not production lifecycle.
+
+In production-grade code, after the same wait:
+
+1. **`unregister_listener`** — L1 barrier: this registration must not get later messages. Keep an
+   `Arc` clone of the listener; `register_listener` takes `Arc` by value (Phase 3 does this).
+2. **Stop taking publisher input** — `bind`’s accept loop is a detached `tokio::spawn`. Dropping
+   the `UnixDomainSocketTransport` value does **not** abort that task. You need an explicit
+   shutdown (cancellation token / `JoinHandle`, then unlink the socket path). This tutorial crate
+   does not expose one.
+3. **Do not unregister from `on_receive`.** Signal `main` (as here); `main` unregisters.
+
+Phase 3’s in-process demo calls `unregister_listener` after publish returns — same idea, no
+socket to unlink.
+
 #### What changed from Phase-1?
 
 Every line related to socket I/O is gone. In its place:
@@ -631,12 +683,15 @@ the socket. Phase-2's subscriber says "only nudge me for resource 0x8001 from th
 # From the repo root
 cargo build --manifest-path phases/02_uprotocol_semantics/Cargo.toml
 
-# Terminal 1 — subscriber
+# Terminal 1 — subscriber (start this first)
 cargo run --manifest-path phases/02_uprotocol_semantics/Cargo.toml -p up-telemetry-subscriber
 
 # Terminal 2 — publisher
 cargo run --manifest-path phases/02_uprotocol_semantics/Cargo.toml -p up-battery-telemetry-publisher
 ```
+Start the subscriber first. That is the same operational convention as the README: the publisher
+sends a short burst and exits, and `bind` is already accepting before `register_listener` (see the
+Point of interest in Chapter 6). It is not an invariant of `dispatch_to`.
 Expected output (subscriber):
 
 ```
@@ -733,30 +788,32 @@ no way to spin up a subscriber on a different ECU without changing the transport
 
 `register_listener` is a local, in-process registration on the bind-side transport. It is not
 vehicle-wide topic discovery. A new uEntity cannot find our battery telemetry event without
-out-of-band configuration. (Phase 3 will touch topology; L3 services such as uDiscovery are a
-later story.)
+out-of-band configuration. L3 services such as uDiscovery are a later story.
 
 ----
 
 ### Chapter 12: Looking ahead — Phase 3
 
 The four limitations above trace to one root cause: Unix Domain Socket is a local, point-to-point transport.
-uProtocol's trait-based design lets us swap it without touching publisher or subscriber
+uProtocol's trait-based design lets us swap the L1 plugin without rewriting publisher or subscriber
 business logic.
 
-#### What Phase 3 will bring
+Phase 3 stays **inside this crate**. It uses `LocalTransport` — same `SimplePublisher` / `UListener`
+types, two listeners on one URI, **one process**. That does not give independent processes or
+location transparency. Those need a networked `UTransport` (see the Phase 3 text and
+[nsengupta/tutorial_uprotocol](https://github.com/nsengupta/tutorial_uprotocol)).
 
-| Aspect | Phase-2 (keep) | Phase-3 (replace wire) |
+| Aspect | Phase-2 (keep) | Phase-3 (plugin swap) |
 |---|---|---|
 | Envelope | `UMessage`, `UAttributes` (UUri inside) | Unchanged |
 | L2 patterns | `SimplePublisher`, `CallOptions`, `UPayload` | Unchanged |
-| L1 API | `UTransport::send`, `register_listener`, `UListener::on_receive` | **Same trait** — different plugin |
-| Physical transport | Unix Domain Socket + length framing | Zenoh (network-transparent) |
-| Multi-subscriber | Blocked by one socket accept loop | Native pub/sub fan-out on the same transport |
-| Demo scope | One battery subscriber | Thermal engine + fan-out payoff |
+| L1 API | `UTransport::send`, `register_listener`, `UListener::on_receive` | **Same trait** — `LocalTransport` |
+| Physical transport | Unix Domain Socket + length framing | None (in-process dispatch) |
+| Multi-subscriber | Blocked by one socket accept loop | Two listeners, same process |
+| Demo scope | One battery subscriber process | Battery + thermal listeners, one binary |
 
-The key insight: **Phase-3 replaces transport execution; Phase-2 semantics stay.** We are
-not relearning uProtocol in Phase-3 — we are unblocking topology.
+The key insight: **Phase 3 replaces transport execution; Phase 2 semantics stay.** We are
+not relearning uProtocol — we are seeing the same APIs on the in-repo plugin.
 
 ----
 
@@ -764,7 +821,9 @@ not relearning uProtocol in Phase-3 — we are unblocking topology.
 
 1. **L1 (`UTransport` / `UListener`) separates message moving from message handling.**
    Our business logic should implement `on_receive`, not `read_exact`. One type —
-   `UnixDomainSocketTransport` — with `connect` / `bind` for wire setup.
+   `UnixDomainSocketTransport` — with `connect` / `bind` for wire setup. This demo
+   **exits without `unregister_listener`** (process teardown); production unregisters after the
+   completion wait, then shuts down the accept loop (Chapter 8).
 
 2. **L2 (`SimplePublisher` / `CallOptions` / `UPayload`) separates intent from envelope construction.**
    We say "publish" with a typed `UPayload` and options — the library fills in
@@ -776,8 +835,8 @@ not relearning uProtocol in Phase-3 — we are unblocking topology.
    The `.proto` file is the source of truth, not a DBC offset comment.
 
 4. **The Unix Domain Socket wire stays the same; the semantics around it change.**
-   Phase-3 swaps the wire (Zenoh) but keeps these same L1/L2 APIs. That is the uProtocol
-   promise — code to the trait, not the transport.
+   Phase 3 swaps the L1 plugin (`LocalTransport`) but keeps these same L1/L2 APIs. That is the
+   uProtocol promise — code to the trait, not the transport.
 
 ----
 

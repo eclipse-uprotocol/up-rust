@@ -8,14 +8,15 @@ use std::sync::Arc;
 // See: https://docs.rs/up-rust/latest/up_rust/communication/struct.CallOptions.html
 
 use rand::Rng;
-use up_bms_proto::constants::*;
 use up_bms_proto::BatteryTelemetry;
+use up_bms_proto::constants::*;
+use up_rust::StaticUriProvider;
 use up_rust::communication::{CallOptions, Publisher, SimplePublisher, UPayload};
-use up_rust::{StaticUriProvider, UTransport};
 use up_unix_domain_socket_transport::UnixDomainSocketTransport;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // Phase 2 publisher: SimplePublisher over UnixDomainSocketTransport (L1/L2).
     env_logger::init();
 
     println!("--- Battery telemetry publisher starting ---");
@@ -24,10 +25,10 @@ async fn main() -> Result<(), anyhow::Error> {
         AUTHORITY_NAME,
         PUBLISHER_UE_ID,
         PUBLISHER_UE_VERSION,
-    ));
+    )?);
     let socket_path = up_frame_codec::socket_path()?;
-    let transport: Arc<dyn UTransport> =
-        UnixDomainSocketTransport::connect(&socket_path);
+    // SimplePublisher stores Arc<T>; wrapping is the call site's choice, not connect()'s.
+    let transport = Arc::new(UnixDomainSocketTransport::connect(&socket_path));
     log::trace!(
         "using UnixDomainSocketTransport::connect → {} (L1 UTransport)",
         socket_path.display()
@@ -56,7 +57,7 @@ async fn main() -> Result<(), anyhow::Error> {
         publisher
             .publish(
                 BATTERY_TELEMETRY_RESOURCE_ID,
-                // `CallOptions::for_publish(ttl, priority, sink)`.
+                // `CallOptions::for_publish(ttl, message_id, priority)`.
                 // - ttl (ms): Some(5000) matches Phase 1's explicit TTL of 5 seconds.
                 CallOptions::for_publish(Some(5000), None, None),
                 Some(payload),

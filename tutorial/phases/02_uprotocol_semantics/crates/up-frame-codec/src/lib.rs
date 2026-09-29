@@ -3,8 +3,7 @@
 
 use std::path::PathBuf;
 
-use protobuf::Message;
-use up_rust::UMessage;
+use up_rust::{ProtobufMappable, UMessage};
 
 /// Socket file name under `{current_working_dir}/tmp/`.
 pub const SOCKET_FILE_NAME: &str = "uprotocol_twin.sock";
@@ -34,7 +33,7 @@ pub fn ensure_socket_dir() -> Result<PathBuf, anyhow::Error> {
 /// The frame consists of a 4-byte Big-Endian length prefix followed by the
 /// protobuf-encoded UMessage payload.
 pub fn serialize_for_unix_socket(msg: &UMessage) -> Result<Vec<u8>, anyhow::Error> {
-    let envelope_bytes = msg.write_to_bytes()?;
+    let envelope_bytes = msg.write_to_protobuf_bytes()?;
 
     let msg_len = envelope_bytes.len() as u32;
     let mut framed_buffer = msg_len.to_be_bytes().to_vec();
@@ -57,5 +56,23 @@ pub fn deserialize_for_unix_socket(framed: &[u8]) -> Result<UMessage, anyhow::Er
         anyhow::bail!("framed buffer too short for declared body length");
     }
 
-    Ok(UMessage::parse_from_bytes(&framed[4..end])?)
+    Ok(UMessage::parse_from_protobuf_bytes(&framed[4..end])?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use up_rust::{UMessageBuilder, UPayloadFormat, UUri};
+
+    #[test]
+    fn framed_publish_roundtrip() {
+        let uri = UUri::try_from_parts("my_own_car", 0x1010, 1, 0x8001).unwrap();
+        let msg = UMessageBuilder::publish(uri)
+            .with_ttl(5000)
+            .build_with_payload(vec![1, 2, 3], UPayloadFormat::Raw)
+            .unwrap();
+        let framed = serialize_for_unix_socket(&msg).unwrap();
+        let decoded = deserialize_for_unix_socket(&framed).unwrap();
+        assert_eq!(decoded.payload().unwrap().as_ref(), &[1, 2, 3]);
+    }
 }

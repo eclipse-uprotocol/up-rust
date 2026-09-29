@@ -2,14 +2,14 @@
 // Copyright (c) 2026 Nirmalya Sengupta (https://github.com/nsengupta)
 
 use std::sync::{
-    atomic::{AtomicU32, Ordering},
     Arc,
+    atomic::{AtomicU32, Ordering},
 };
 
 use async_trait::async_trait;
 use tokio::sync::Notify;
-use up_bms_proto::constants::*;
 use up_bms_proto::BatteryTelemetry;
+use up_bms_proto::constants::*;
 use up_rust::{LocalUriProvider, StaticUriProvider, UListener, UMessage, UTransport};
 use up_unix_domain_socket_transport::UnixDomainSocketTransport;
 
@@ -45,13 +45,11 @@ impl UListener for BatteryTelemetryListener {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // Phase 2 subscriber: UListener on a bound UnixDomainSocketTransport.
     env_logger::init();
 
-    let uri_provider = StaticUriProvider::new(
-        AUTHORITY_NAME,
-        PUBLISHER_UE_ID,
-        PUBLISHER_UE_VERSION,
-    );
+    let uri_provider =
+        StaticUriProvider::new(AUTHORITY_NAME, PUBLISHER_UE_ID, PUBLISHER_UE_VERSION)?;
     let source_filter = uri_provider.get_resource_uri(BATTERY_TELEMETRY_RESOURCE_ID);
 
     let received = Arc::new(AtomicU32::new(0));
@@ -83,5 +81,9 @@ async fn main() -> Result<(), anyhow::Error> {
     shutdown.notified().await;
     println!("Received {EXPECTED_MESSAGE_COUNT} messages — exiting.");
 
+    // Demo shortcut: no unregister_listener; process exit aborts the accept loop
+    // and drops the socket.
+    // This crate's bind() has no shutdown handle. Obviously, a PROD-code will deal with
+    // it, much more cleanly and reliably.
     Ok(())
 }

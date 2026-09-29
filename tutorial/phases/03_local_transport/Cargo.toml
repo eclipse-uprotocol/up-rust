@@ -1,11 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/up-frame-codec",
     "crates/up-bms-proto",
-    "crates/up-unix-domain-socket-transport",
-    "crates/up-battery-telemetry-publisher",
-    "crates/up-telemetry-subscriber",
+    "crates/up-bms-local-demo",
 ]
 
 [workspace.dependencies]

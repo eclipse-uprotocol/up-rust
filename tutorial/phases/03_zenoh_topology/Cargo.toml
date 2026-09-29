@@ -1,8 +1,0 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/up-bms-proto",
-    "crates/up-battery-telemetry-publisher",
-    "crates/up-telemetry-subscriber",
-    "crates/up-thermal-logging-subscriber",
-]

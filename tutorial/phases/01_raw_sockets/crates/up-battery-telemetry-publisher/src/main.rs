@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Nirmalya Sengupta (https://github.com/nsengupta)
 
+use rand::Rng;
 use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
-use rand::Rng;
 use up_rust::{UMessageBuilder, UPayloadFormat, UUri};
 
 use up_frame_codec::serialize_for_unix_socket;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // Phase 1 publisher: length-framed UMessage bytes on a Unix Domain Socket.
     println!("--- Battery telemetry publisher starting ---");
 
     // 1. Build a source UUri for the battery telemetry publisher entity.
@@ -23,13 +24,16 @@ async fn main() -> Result<(), anyhow::Error> {
         let battery_pct: f32 = rng.random_range(75.0..78.9);
         let temp_c: i8 = rng.random_range(20..=25);
 
-        println!("Message {}: SoC = {:.1}%, Temp = {}°C", i, battery_pct, temp_c);
+        println!(
+            "Message {}: SoC = {:.1}%, Temp = {}°C",
+            i, battery_pct, temp_c
+        );
 
         let message = UMessageBuilder::publish(source_uri.clone())
             .with_ttl(5000)
             .build_with_payload(
                 pack_bms_can_frame(battery_pct, temp_c).to_vec(),
-                UPayloadFormat::UPAYLOAD_FORMAT_RAW,
+                UPayloadFormat::Raw,
             )?;
 
         let framed = serialize_for_unix_socket(&message)?;

@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Nirmalya Sengupta (https://github.com/nsengupta)
 
+use std::io::{Write, stdout};
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
-use std::io::{Write, stdout};
 
 use up_frame_codec::deserialize_for_unix_socket;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // Phase 1 subscriber: read length-framed UMessage bytes from a Unix Domain Socket.
     // Bind under `{cwd}/tmp/` (create the directory if needed; clean stale socket).
     let socket_path = up_frame_codec::ensure_socket_dir()?;
     let _ = std::fs::remove_file(&socket_path);
@@ -42,8 +43,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
             match deserialize_for_unix_socket(&framed) {
                 Ok(u_message) => {
-                    if let Some(payload_data) = u_message.payload.as_ref() {
-                        let extracted_bytes: Vec<u8> = payload_data.clone().into();
+                    if let Some(payload_data) = u_message.payload() {
+                        let extracted_bytes = payload_data.to_vec();
                         let (soc, temp) = unpack_bms_can_frame(&extracted_bytes);
 
                         let output = format!(
@@ -63,7 +64,9 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 fn unpack_bms_can_frame(can_data: &[u8]) -> (f32, i8) {
-    if can_data.len() < 2 { return (0.0, 0); }
+    if can_data.len() < 2 {
+        return (0.0, 0);
+    }
 
     // Unpack according to DBC rules
     let raw_soc = can_data[0];
