@@ -1,0 +1,12 @@
+[package]
+name = "up-bms-proto"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+protobuf = "3.7.2"
+
+[build-dependencies]
+protobuf-codegen = "3.7.2"
+protoc-bin-vendored = "3.2.0"
