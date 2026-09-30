@@ -45,6 +45,7 @@ permissions:
 
 env:
   RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  CARGO_DENY_VERSION: 0.20.2
   RUSTFLAGS: -Dwarnings
   CARGO_TERM_COLOR: always
 
@@ -55,10 +56,46 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with:
-          command: check
-          arguments: --all-features
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Restore cargo-deny cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/cargo-deny
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-deny-${{ env.CARGO_DENY_VERSION }}
+      - name: Install cargo-deny
+        run: |
+          case "${RUNNER_ARCH}" in
+            X64)
+              asset="cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+              sha256="9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
+              ;;
+            ARM64)
+              asset="cargo-deny-${CARGO_DENY_VERSION}-aarch64-unknown-linux-musl.tar.gz"
+              sha256="995c82be0defc7a025cae49a2aa2644ce8245c9a3318fc4103907c6a285e8c7d"
+              ;;
+            *)
+              echo "Unsupported runner architecture: ${RUNNER_ARCH}"
+              exit 1
+              ;;
+          esac
+          archive_dir="${HOME}/.cache/cargo-deny"
+          archive_path="${archive_dir}/${asset}"
+
+          mkdir -p "${archive_dir}" "${HOME}/.cargo/bin"
+
+          if [ ! -f "${archive_path}" ]; then
+            curl --proto '=https' --tlsv1.2 --silent --show-error --location \
+              --output "${archive_path}" \
+              "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/${asset}"
+          fi
+
+          echo "${sha256}  ${archive_path}" | sha256sum -c -
+          tar -xzf "${archive_path}" -C "${HOME}/.cargo/bin" --strip-components=1 "${asset%.tar.gz}/cargo-deny"
+          cargo deny --version | grep -Fxq "cargo-deny ${CARGO_DENY_VERSION}"
+      - name: Run cargo deny
+        run: cargo deny check --all-features
 
   # [impl->req~up-language-ci-build~1]
   check:

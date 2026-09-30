@@ -4,9 +4,7 @@ skip:
   - pkg:githubactions/actions-rust-lang/setup-rust-toolchain
   - pkg:githubactions/eclipse-dash/quevee
   - pkg:githubactions/eclipse-uprotocol/ci-cd
-  - pkg:githubactions/EmbarkStudios/cargo-deny-action
   - pkg:githubactions/joutvhu/get-release
   - pkg:githubactions/lycheeverse/lychee-action
   - pkg:githubactions/rust-lang/crates-io-auth-action
   - pkg:githubactions/xom9ikk/dotenv
-
