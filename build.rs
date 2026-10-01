@@ -42,7 +42,7 @@ fn proto_api() -> Result<(), Box<dyn std::error::Error>> {
         ),
         #[cfg(feature = "usubscription")]
         format!(
-            "{}uprotocol/core/usubscription/v3/usubscription.proto",
+            "{}uprotocol/core/usubscription/v4/usubscription.proto",
             UPROTOCOL_BASE_URI
         ),
     ];
