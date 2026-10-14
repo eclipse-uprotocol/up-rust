@@ -227,7 +227,7 @@ impl<T: UTransport + 'static, P: crate::LocalUriProvider + 'static>
                 .await
                 .map(Arc::new)?;
         let usubscription_client = Arc::new(
-            crate::core::usubscription::RpcClientUSubscription::new(rpc_client, None),
+            crate::core::usubscription::RpcClientUSubscription::new(rpc_client, None, None),
         );
         let notifier = Arc::new(crate::communication::SimpleNotifier::new(
             transport.clone(),

@@ -37,6 +37,7 @@ use crate::{
 pub struct RpcClientUSubscription {
     rpc_client: Arc<dyn RpcClient>,
     usubscription_authority: Option<String>,
+    call_options: Option<CallOptions>,
 }
 
 impl RpcClientUSubscription {
@@ -46,15 +47,35 @@ impl RpcClientUSubscription {
     ///
     /// * `rpc_client` - The client to use for performing the remote procedure calls on the USubscription service.
     /// * `usubscription_authority` - (Optional) authority of USubscription service to address - will default to local authority ("") if None.
-    pub fn new(rpc_client: Arc<dyn RpcClient>, usubscription_authority: Option<String>) -> Self {
+    /// * `call_options` - (Optional) set of CallOptions that will be used for all USubscription requests sent by this RpcClientUSubscription
+    ///   instance; will default to CallOptions::for_rpc_request(5_000, None, None, None).
+    pub fn new(
+        rpc_client: Arc<dyn RpcClient>,
+        usubscription_authority: Option<String>,
+        call_options: Option<CallOptions>,
+    ) -> Self {
         RpcClientUSubscription {
             rpc_client,
             usubscription_authority,
+            call_options,
         }
     }
 
-    fn default_call_options() -> CallOptions {
-        CallOptions::for_rpc_request(5_000, None, None, None)
+    /// Retrieve CallOptions currently used for USubscription requests sent by this RpcClientUSubscription instance.
+    pub fn call_options(&self) -> CallOptions {
+        self.call_options
+            .clone()
+            .unwrap_or(CallOptions::for_rpc_request(5_000, None, None, None))
+    }
+
+    /// Sets CallOptions to be used for USubscription calls made by this RpcClientUSubscription instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `call_options` - (Optional) set of CallOptions that will be used for USubscription requests sent by this RpcClientUSubscription
+    ///   instance; will default to CallOptions::for_rpc_request(5_000, None, None, None).
+    pub fn set_call_options(&mut self, call_options: Option<CallOptions>) {
+        self.call_options = call_options;
     }
 }
 
@@ -76,7 +97,7 @@ impl USubscription for RpcClientUSubscription {
                     self.usubscription_authority.as_deref(),
                     RESOURCE_ID_SUBSCRIBE,
                 ),
-                Self::default_call_options(),
+                self.call_options(),
                 subscribe_request,
             )
             .await?
@@ -93,7 +114,7 @@ impl USubscription for RpcClientUSubscription {
                     self.usubscription_authority.as_deref(),
                     RESOURCE_ID_UNSUBSCRIBE,
                 ),
-                Self::default_call_options(),
+                self.call_options(),
                 unsubscribe_request,
             )
             .await
@@ -113,7 +134,7 @@ impl USubscription for RpcClientUSubscription {
                     self.usubscription_authority.as_deref(),
                     RESOURCE_ID_FETCH_SUBSCRIPTIONS,
                 ),
-                Self::default_call_options(),
+                self.call_options(),
                 FetchSubscriptionsRequest {
                     topic_filter,
                     subscriber_filter,
@@ -130,7 +151,7 @@ impl USubscription for RpcClientUSubscription {
                     self.usubscription_authority.as_deref(),
                     RESOURCE_ID_REGISTER_FOR_NOTIFICATIONS,
                 ),
-                Self::default_call_options(),
+                self.call_options(),
                 crate::up_core_api::usubscription::NotificationsRequest::default(),
             )
             .await
@@ -145,7 +166,7 @@ impl USubscription for RpcClientUSubscription {
                     self.usubscription_authority.as_deref(),
                     RESOURCE_ID_UNREGISTER_FOR_NOTIFICATIONS,
                 ),
-                Self::default_call_options(),
+                self.call_options(),
                 crate::up_core_api::usubscription::NotificationsRequest::default(),
             )
             .await
@@ -157,7 +178,7 @@ impl USubscription for RpcClientUSubscription {
         self.rpc_client
             .invoke_proto_method::<_, ResetResponseProto>(
                 usubscription_uri(self.usubscription_authority.as_deref(), RESOURCE_ID_RESET),
-                Self::default_call_options(),
+                self.call_options(),
                 crate::up_core_api::usubscription::ResetRequest::default(),
             )
             .await
@@ -225,7 +246,7 @@ mod tests {
                 Ok(Some(UPayload::try_from_protobuf(response).unwrap()))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None, None);
 
         assert!(usubscription_client
             .subscribe(&topic, None, None)
@@ -277,7 +298,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None, None);
 
         assert!(usubscription_client
             .unsubscribe(&topic)
@@ -330,7 +351,7 @@ mod tests {
                 Ok(Some(UPayload::try_from_protobuf(response).unwrap()))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None, None);
 
         assert!(usubscription_client
             .fetch_subscriptions(Some(topic_filter.clone()), None)
@@ -373,7 +394,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None, None);
 
         assert!(usubscription_client
             .register_for_notifications()
@@ -416,7 +437,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None, None);
 
         assert!(usubscription_client
             .unregister_for_notifications()
@@ -458,7 +479,7 @@ mod tests {
                 ))
             });
 
-        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None);
+        let usubscription_client = RpcClientUSubscription::new(Arc::new(rpc_client), None, None);
 
         assert!(usubscription_client
             .reset()
