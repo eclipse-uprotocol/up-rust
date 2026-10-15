@@ -28,7 +28,7 @@ pub use usubscription_server::{
 mod usubscription_proto;
 
 // [impl->req~usubscription-uentity_id~1]
-pub const USUBSCRIPTION_TYPE_ID: u16 = 0x0000_0000;
+pub const USUBSCRIPTION_TYPE_ID: u16 = 0x0000;
 /// The (latest) major version of the uSubscription service.
 pub const USUBSCRIPTION_VERSION_MAJOR: u8 = 0x04;
 // [impl->req~usubscription-subscribe-method_id~1]

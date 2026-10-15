@@ -76,7 +76,6 @@ tracing = { version = "0.1.44", default-features = false, features = [
     "log",
     "std",
 ] }
-uriparse = { version = "0.6.4" }
 uuid-simd = { version = "0.8.0", default-features = false, features = [
     "std",
     "detect",

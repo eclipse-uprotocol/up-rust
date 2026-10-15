@@ -37,7 +37,7 @@ use crate::{
 pub struct RpcClientUSubscription {
     rpc_client: Arc<dyn RpcClient>,
     usubscription_authority: Option<String>,
-    call_options: Option<CallOptions>,
+    call_options: CallOptions,
 }
 
 impl RpcClientUSubscription {
@@ -57,25 +57,27 @@ impl RpcClientUSubscription {
         RpcClientUSubscription {
             rpc_client,
             usubscription_authority,
-            call_options,
+            call_options: call_options.unwrap_or(RpcClientUSubscription::default_call_options()),
         }
     }
 
     /// Retrieve CallOptions currently used for USubscription requests sent by this RpcClientUSubscription instance.
     pub fn call_options(&self) -> CallOptions {
-        self.call_options
-            .clone()
-            .unwrap_or(CallOptions::for_rpc_request(5_000, None, None, None))
+        self.call_options.clone()
     }
 
     /// Sets CallOptions to be used for USubscription calls made by this RpcClientUSubscription instance.
     ///
     /// # Arguments
     ///
-    /// * `call_options` - (Optional) set of CallOptions that will be used for USubscription requests sent by this RpcClientUSubscription
-    ///   instance; will default to CallOptions::for_rpc_request(5_000, None, None, None).
+    /// * `call_options` - CallOptions that will be used for USubscription requests sent by this RpcClientUSubscription
+    ///   instance; if None will reset to default CallOptions (ttl: 5_000, message_id: None, token: None, priority: None).
     pub fn set_call_options(&mut self, call_options: Option<CallOptions>) {
-        self.call_options = call_options;
+        self.call_options = call_options.unwrap_or(RpcClientUSubscription::default_call_options());
+    }
+
+    fn default_call_options() -> CallOptions {
+        CallOptions::for_rpc_request(5_000, None, None, None)
     }
 }
 
