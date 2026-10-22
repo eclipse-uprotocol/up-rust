@@ -142,6 +142,31 @@ impl SubscriptionInfo {
     pub fn has_status(&self, state: SubscriptionStatus) -> bool {
         self.status == state
     }
+
+    /// Modify the status field.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use up_rust::{communication::SubscriptionStatus, UUri};
+    /// use up_rust::core::usubscription::SubscriptionInfo;
+    ///
+    /// let subscription_info = SubscriptionInfo::new(
+    ///     UUri::try_from("/A100/1/9000").unwrap(),
+    ///     UUri::try_from("//subscriber/ABCD/1/0").unwrap(),
+    ///     SubscriptionStatus::Subscribed,
+    ///     None,
+    ///     None,
+    /// );
+    /// assert!(subscription_info.has_status(SubscriptionStatus::Subscribed));
+    /// let subscription_info = subscription_info.with_status(SubscriptionStatus::Unsubscribed);
+    /// assert!(subscription_info.has_status(SubscriptionStatus::Unsubscribed));
+    /// ```
+    #[must_use]
+    pub fn with_status(mut self, status: SubscriptionStatus) -> Self {
+        self.status = status;
+        self
+    }
 }
 
 /// A request to subscribe to a topic (client/subscriber UUri from the message UAttributes envelope).
