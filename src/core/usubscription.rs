@@ -52,7 +52,7 @@ pub const RESOURCE_ID_SUBSCRIPTION_CHANGE: u16 = 0x8000;
 /// This struct represents the subscription metadata maintained by the
 /// uSubscription service, including the topic, subscriber, current
 /// [`SubscriptionStatus`], and optional delivery constraints.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[repr(C)]
 pub struct SubscriptionInfo {
     topic: UUri,

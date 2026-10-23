@@ -414,7 +414,7 @@ impl UPayload {
 /// which is enabled via communication.rs by the more generic 'up-l2-api' feature.
 /// So to avoid having to enable/pull in all the core (protobuf) types and code for this single trait we put
 /// SubscriptionStatus here, on the same level of module/feature genericity.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[repr(C)]
 pub enum SubscriptionStatus {
     Unsubscribed,
