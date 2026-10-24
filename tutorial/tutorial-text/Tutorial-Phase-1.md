@@ -71,6 +71,8 @@ Let's focus on the *what* part first. 2 pieces of data are sent and received:
 1) Percent of charge remaining in battery (a `float` value)
 2) Temperature of battery (again, a `float` value)
 
+For simplicity, that real-life float temperature is stored as a `u8`.
+
 We assume that these two are packed in a CAN-frame (we don't care where do these originate; not
 important for the tutorial).
 
@@ -107,8 +109,7 @@ resource    8001   (0x8001)   ← SoC / temperature telemetry resource
 ```
 
 The labels on the right are for us as readers; they are **not** URI path segments. In code we build
-the same address with `UUri::try_from_parts` (Chapter 2 also shows parsing from a string with
-`UUri::from_str`):
+the same address with `UUri::try_from_parts`:
 
 ```rust
 let source_uri = UUri::try_from_parts("my_own_car", 0x1010, 1, 0x8001)?;
@@ -127,7 +128,7 @@ types when we meet them later).
 > struct literals.
 
 ```rust
-let message = UMessageBuilder::publish(source_uri)
+let message = UMessageBuilder::publish(source_uri.clone())
     .with_ttl(5000)
     .build_with_payload(
         pack_bms_can_frame(battery_pct, temp_c).to_vec(),
@@ -135,7 +136,7 @@ let message = UMessageBuilder::publish(source_uri)
     )?;
 ```
 
-- `publish(source_uri)` marks the message as **PUBLISH** and sets **source** to our battery
+- `publish(source_uri.clone())` marks the message as **PUBLISH** and sets **source** to our battery
   telemetry topic URI (`up://my_own_car/1010/1/8001`).
 - `with_ttl(5000)` sets a 5-second usefulness window.
 - `build_with_payload(bytes, format)` attaches the raw CAN bytes and a
@@ -272,11 +273,7 @@ In application code we use the `UUri` type, which carries the same four fields. 
 with the supported constructors — not struct literals:
 
 ```rust
-// When we already know the numeric parts:
 let source_uri = UUri::try_from_parts("my_own_car", 0x1010, 1, 0x8001)?;
-
-// When we have a URI string:
-let source_uri = UUri::from_str("up://my_own_car/1010/1/8001")?;
 ```
 
 **Are those IDs arbitrary?** No. They are _car-level constants_ assigned for this system (and, in
@@ -311,10 +308,6 @@ version     1
 resource    8002   (0x8002)   ← is-on
 ```
 
-```rust
-let head_lamp_uri = UUri::try_from_parts("my_own_car", 0x1020, 1, 0x8002)?;
-```
-
 And a third card so the pattern sticks — tyre / pressure:
 
 ```text
@@ -324,10 +317,6 @@ authority   my_own_car
 entity      101F   (0x101F)   ← tyre entity
 version     1
 resource    A010   (0xA010)   ← pressure resource
-```
-
-```rust
-let tyre_pressure_uri = UUri::try_from_parts("my_own_car", 0x101F, 1, 0xA010)?;
 ```
 
 Different topic, **same four-part URI shape**.
@@ -360,7 +349,7 @@ look at that envelope more carefully.
 this (same path as the publisher crate):
 
 ```rust
-let message = UMessageBuilder::publish(source_uri)
+let message = UMessageBuilder::publish(source_uri.clone())
     .with_ttl(5000)
     .build_with_payload(
         pack_bms_can_frame(battery_pct, temp_c).to_vec(),
@@ -394,8 +383,8 @@ For other values that message `type` can have, see [here](https://docs.rs/up-rus
 After the builder returns, we can **inspect** those attributes on the `UMessage`:
 
 ```rust
-assert_eq!(message.type_unchecked(), UMessageType::UMESSAGE_TYPE_PUBLISH);
-assert_eq!(message.source_unchecked(), &source_uri);
+assert_eq!(message.type_(), UMessageType::Publish);
+assert_eq!(message.source(), &source_uri);
 assert_eq!(message.ttl_unchecked(), 5000);
 ```
 
@@ -428,6 +417,10 @@ below) so they share that path. The subscriber creates `tmp/` if needed.
 
 ```shell
 # From the repo root
+
+# Make sure that we are the right place before we start
+cd tutorial 
+
 cargo build --manifest-path phases/01_raw_sockets/Cargo.toml
 
 # Terminal 1 — subscriber

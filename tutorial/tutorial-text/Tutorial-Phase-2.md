@@ -49,7 +49,7 @@ And the publisher:
 ```rust
 // Phase-1 publisher — builder + raw socket (no L1/L2 helpers yet)
 let source_uri = UUri::try_from_parts("my_own_car", 0x1010, 1, 0x8001)?;
-let message = UMessageBuilder::publish(source_uri)
+let message = UMessageBuilder::publish(source_uri.clone())
     .with_ttl(5000)
     .build_with_payload(
         pack_bms_can_frame(battery_pct, temp_c).to_vec(),
@@ -59,6 +59,7 @@ let framed = serialize_for_unix_socket(&message)?;
 let socket_path = up_frame_codec::socket_path()?;
 let mut stream = UnixStream::connect(&socket_path).await?;
 stream.write_all(&framed).await?;
+stream.flush().await?;
 ```
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -197,8 +198,9 @@ to invent a byte layout:
 And on the subscriber side:
 
 ```rust
-let payload = msg.payload().unwrap();
-let (pct, temp) = unpack_bms_can_frame(&payload);
+if let Some(payload_data) = u_message.payload() {
+    let extracted_bytes = payload_data.to_vec();
+    let (soc, temp) = unpack_bms_can_frame(&extracted_bytes);
 ```
 `pack_bms_can_frame` and `unpack_bms_can_frame` are **C code in Rust clothing**. They exist
 because the publisher and subscriber need a way to agree on how SoC and temperature are laid
@@ -208,31 +210,50 @@ database). Here, it comes from a pair of functions.
 Let's look at the actual functions from Phase-1:
 
 ```rust
-// 1 LSB = 0.5% SoC — this is a DBC convention in disguise
-fn pack_bms_can_frame(soc_pct: f32, temp_c: f32) -> [u8; 8] {
-    let soc_encoded = (soc_pct / 0.5) as u16;
-    let temp_encoded = (temp_c * 10.0) as i16;
-    let mut buf = [0u8; 8];
-    buf[0..2].copy_from_slice(&soc_encoded.to_be_bytes());
-    buf[2..4].copy_from_slice(&temp_encoded.to_be_bytes());
-    buf
+fn pack_bms_can_frame(battery_level_pct: f32, temperature_c: i8) -> [u8; 8] {
+    let mut can_data = [0u8; 8];
+
+    // Convert using a DBC scale of 0.5 (e.g. 75.0 / 0.5 = 150)
+    let raw_soc = (battery_level_pct / 0.5) as u8;
+
+    can_data[0] = raw_soc;
+    can_data[1] = temperature_c as u8;
+
+    can_data
+}
+
+fn unpack_bms_can_frame(can_data: &[u8]) -> (f32, i8) {
+    if can_data.len() < 2 {
+        return (0.0, 0);
+    }
+
+    // Unpack according to DBC rules
+    let raw_soc = can_data[0];
+    let battery_level_pct = raw_soc as f32 * 0.5;
+
+    let temperature_c = can_data[1] as i8;
+
+    (battery_level_pct, temperature_c)
 }
 ```
 We can spot the problems:
 
-1. **Scale factors are buried in code.** `0.5` and `10.0` are kind of, magic numbers. If we
-   change the SoC resolution from 0.5% to 0.1%, we must find and update both pack *and* unpack functions
-   in lockstep. If we miss one, the subscriber prints garbage.
+1. **The scale factor is buried in code.** SoC is the only scaled field. The publisher divides
+   by `0.5` and stores one byte (`75.0 / 0.5 = 150`); the subscriber multiplies that byte by
+   `0.5` to get percent back. Temperature has no scale: it is an `i8` copied into the next byte
+   with `as u8` and read back with `as i8`. Change the SoC resolution from 0.5% to 0.1% and both
+   functions must change together. Miss the unpack multiply and 75% prints as 150.
 
-2. **Byte layout is implicit.** `buf[0..2]` for SoC, `buf[2..4]` for temperature. These offsets
-   are invisible to anyone reading the code unless they carefully trace both functions.
+2. **Byte layout is implicit.** Byte 0 is SoC, byte 1 is temperature, and bytes 2–7 stay zero.
+   Those offsets are invisible unless you read both functions side by side.
 
 3. **There is no schema.** Nothing tells us "this buffer contains two fields named
    `soc_percent` and `temp_celsius`". The field names exist only in the programmer's head and
    in Rust's variable names. A DBC file at least names the signals.
 
-4. **Adding a third field is error-prone.** Double the buffer? Shift offsets? Every change
-   requires a coordinated deploy of both publisher and subscriber.
+4. **Adding a third field is error-prone.** The next free byte is index 2, but only because you
+   already know 0 and 1 are taken. Widen either field and every later offset moves. Both sides
+   have to ship together.
 
 **Protobuf solves all four problems in one move.**
 
@@ -248,17 +269,16 @@ message BatteryTelemetry {
     int32 temp_celsius = 2;
 }
 ```
-- **No more bit-level encoding.** The raw CAN buffer required dividing SoC by 0.5 and
-  multiplying temperature by 10 to fit into `u16`/`i16` — then the reverse on the subscriber
-  side. Protobuf lets us express `soc_percent` as `float` and `temp_celsius` as `int32`
-  directly. The scale conversion (how the sensor's ADC count maps to a physical value) is
-  still an application concern — protobuf cannot annotate units — but the *wire-level*
-  encode/decode arithmetic is gone.
-- **Byte layout is gone.** Protobuf field numbers (`= 1`, `= 2`) replace byte offsets. The
-  encoding is handled by the protobuf library.
+- **No more wire-level scale arithmetic.** The CAN buffer divides SoC by 0.5 into one byte and
+  copies temperature into the next byte as an `i8`. Protobuf lets us express `soc_percent` as
+  `float` and `temp_celsius` as `int32` directly. The scale conversion (how the sensor's ADC
+  count maps to a physical value) is still an application concern — protobuf cannot annotate
+  units — but the pack/unpack arithmetic is gone.
+- **Byte layout is gone.** Protobuf field numbers (`= 1`, `= 2`) replace `can_data[0]` and
+  `can_data[1]`. The encoding is handled by the protobuf library.
 - **The schema is the contract.** Both publisher and subscriber compile from the same `.proto`
   file. Any change to the schema is immediately visible at compile time — not at 2 AM when a
-  subscriber prints -273.15°C because of a scale mismatch.
+  subscriber prints 150% because it no longer multiplies the SoC byte by 0.5.
 - **Adding a third field is safe.** Appending `optional int32 cell_voltage = 3;` to the message
   does not break existing publishers or subscribers — protobuf skips unknown fields at deserialisation.
 
@@ -320,14 +340,24 @@ loop {
         let mut body_bytes = vec![0u8; body_len];
         if stream.read_exact(&mut body_bytes).await.is_err() { return; }
 
-        // Step 3 — deserialise the protobuf UMessage
-        let msg = UMessage::parse_from_protobuf_bytes(&body_bytes[..]).ok()?;
+        // Step 3 — deserialize_for_unix_socket(&framed)
+        // up-telemetry-subscriber/src/main.rs:44
+        // ....
 
-        // Step 4 — extract the CAN payload and interpret
-        let payload = msg.payload?;
-        let (pct, temp) = unpack_bms_can_frame(&payload);
-        println!("-> State of Charge: {:.1}%", pct);
-        println!("-> Cell Temp: {} °C", temp);
+        // Step 4 — up-telemetry-subscriber/src/main.rs:46
+        if let Some(payload_data) = u_message.payload() {
+            let extracted_bytes = payload_data.to_vec();
+            let (soc, temp) = unpack_bms_can_frame(&extracted_bytes);
+
+            let output = format!(
+                "[Battery telemetry subscriber] Processing incoming CAN telemetry...\n\
+                 -> State of Charge: {:.1}%\n\
+                 -> Cell Temp: {} °C",
+                soc, temp,
+            );
+            println!("{}", output);
+            let _ = stdout().flush();
+        }
     });
 }
 ```
@@ -336,7 +366,7 @@ Let's count the implicit responsibilities in that one spawned closure:
 | Step | Responsibility | Who should own it |
 |---|---|---|
 | 1–2 | Read framed bytes from a Unix socket | **Transport layer** — the socket code |
-| 3 | Deserialise a protobuf `UMessage` | **Transport layer** — `read_framed_message` |
+| 3 | Deserialise a protobuf `UMessage` | **Transport layer** — `deserialize_for_unix_socket` |
 | 4 | Extract the typed payload and print | **Application** — the subscriber |
 
 Three responsibilities. Two of them have nothing to do with battery telemetry.
@@ -397,22 +427,24 @@ transport
     .register_listener(&source_filter, None, listener)
     .await?;
 ```
-The dispatch logic (simplified from the crate):
+The dispatch logic (simplified from the crate) matches `LocalTransport`: the read lock is
+held for the whole loop, including `on_receive`.
 
 ```rust
-let matching: Vec<_> = {
-    let table = listeners.read().await;
-    table.iter().filter(|r| r.matches_msg_source(&message)).cloned().collect()
-}; // read guard dropped here
-
-for registered in matching {
-    registered.on_receive(message.clone()).await;
+let table = listeners.read().await;
+for registered in table.iter() {
+    if registered.matches_msg_source(&message) {
+        registered.on_receive(message.clone()).await;
+    }
 }
 ```
 Where `matches_msg_source` uses `up-rust`'s `UUri::matches` — the same URI matching rules that
 `LocalTransport` uses. A listener fires when the source filter matches the message's source URI.
-Matching runs under the read lock; `on_receive` runs after that lock is dropped, so listener
-work does not stall `register_listener` / `unregister_listener`.
+
+`unregister_listener` needs `write()`, so it waits until this dispatch finishes. That is the L1
+barrier: after unregister returns, this loop cannot start another `on_receive`. The cost is that
+`register_listener` / `unregister_listener` from inside `on_receive` deadlock — do those from
+`main` after a `Notify`, as the Phase 2 subscriber does.
 
 #### Point of interest — “start the subscriber first” is not a `dispatch_to` invariant
 
@@ -420,8 +452,8 @@ Look at the two calls above: `bind` then `register_listener`. `bind` **already s
 loop**. From that moment the socket will accept a publisher, decode a framed `UMessage`, and call
 `dispatch_to`. `register_listener` has not run yet.
 
-`dispatch_to` does **not** return `Result`. It takes a read lock only long enough to snapshot
-matching listeners, drops the lock, then `await`s those `on_receive` calls. If the table is
+`dispatch_to` does **not** return `Result`. It takes a read lock, walks matching listeners, and
+`await`s `on_receive` while still holding that lock (same as `LocalTransport`). If the table is
 empty, or no filter matches, it simply returns — the payload is dropped, nothing `Err`s. Decode
 problems inside a listener are the listener's concern; they do not make dispatch fail.
 
@@ -441,8 +473,8 @@ binary wraps with `Arc::new(...)`.
 
 ```rust
 let socket_path = up_frame_codec::socket_path()?;
-let transport = UnixDomainSocketTransport::connect(&socket_path);
-transport.send(message).await?;
+// SimplePublisher stores Arc<T>; wrapping is the call site's choice, not connect()'s.
+let transport = Arc::new(UnixDomainSocketTransport::connect(&socket_path));
 ```
 `register_listener` after `connect` returns `UNIMPLEMENTED` — listeners live on the bind side.
 
@@ -480,7 +512,6 @@ use up_unix_domain_socket_transport::UnixDomainSocketTransport;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    env_logger::init();
     println!("--- Battery telemetry publisher starting ---");
 
     let uri_provider = Arc::new(StaticUriProvider::new(
@@ -602,8 +633,6 @@ And wire it into `main`:
 ```rust
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    env_logger::init();
-
     let uri_provider = StaticUriProvider::new(
         AUTHORITY_NAME,
         PUBLISHER_UE_ID,

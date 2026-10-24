@@ -29,7 +29,7 @@ use up_rust::{
     verify_filter_criteria,
 };
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash)]
 struct RegisteredListener {
     source_filter: UUri,
     sink_filter: Option<UUri>,
@@ -191,13 +191,9 @@ impl UTransport for UnixDomainSocketTransport {
             listener: ComparableListener::new(listener),
         };
 
+        // Same filters and the same listener are one registration. HashSet::insert
+        // leaves the existing entry in place, matching LocalTransport.
         let mut listeners = self.listeners.write().await;
-        if listeners.contains(&registered) {
-            return Err(UStatus::fail_with_code(
-                UCode::AlreadyExists,
-                "listener already registered for filters",
-            ));
-        }
         listeners.insert(registered);
         Ok(())
     }
@@ -234,19 +230,23 @@ impl UTransport for UnixDomainSocketTransport {
 }
 
 async fn dispatch_to(listeners: &RwLock<HashSet<RegisteredListener>>, message: UMessage) {
-    // Snapshot matches under the read lock, then drop it before on_receive so a
-    // slow listener does not stall register_listener / unregister_listener.
-    let matching: Vec<RegisteredListener> = {
-        let table = listeners.read().await;
-        table
-            .iter()
-            .filter(|registered| registered.matches_msg_source(&message))
-            .cloned()
-            .collect()
-    };
-
-    for registered in matching {
-        registered.on_receive(message.clone()).await;
+    // Same lock scope as LocalTransport::dispatch: hold read() for the whole loop,
+    // including on_receive.
+    //
+    // Why (PR): a snapshot that drops the guard before the loop let unregister
+    // return Ok and then still start a later on_receive (L1 barrier broken).
+    // Holding read() means unregister's write() waits until this dispatch finishes,
+    // so no new callback starts after unregister returns.
+    //
+    // Trade-off: register_listener / unregister_listener from inside on_receive
+    // deadlock (they need write()). Do those from main after a Notify, like
+    // LocalTransport / the Phase 2 subscriber. UListener already asks on_receive
+    // to return promptly.
+    let table = listeners.read().await;
+    for registered in table.iter() {
+        if registered.matches_msg_source(&message) {
+            registered.on_receive(message.clone()).await;
+        }
     }
 }
 
@@ -275,25 +275,37 @@ async fn read_framed_message(mut stream: UnixStream) -> Result<UMessage, UStatus
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
     use tokio::sync::Notify;
     use up_rust::{LocalUriProvider, MockUListener, StaticUriProvider, UMessageBuilder};
 
-    struct RegisterDuringReceive {
-        transport: Arc<UnixDomainSocketTransport>,
-        source_filter: UUri,
-        extra: Arc<dyn UListener>,
+    /// Counts deliveries so a repeated registration can be checked as one callback.
+    struct CountingListener {
+        hits: Arc<AtomicUsize>,
         done: Arc<Notify>,
     }
 
     #[async_trait]
-    impl UListener for RegisterDuringReceive {
+    impl UListener for CountingListener {
         async fn on_receive(&self, _msg: UMessage) {
-            self.transport
-                .register_listener(&self.source_filter, None, Arc::clone(&self.extra))
-                .await
-                .expect("register_listener must not wait on this on_receive");
+            self.hits.fetch_add(1, Ordering::SeqCst);
             self.done.notify_one();
+        }
+    }
+
+    /// Parks in `on_receive` so the test can prove unregister waits for the read lock.
+    struct ParkingListener {
+        started: Arc<Notify>,
+        proceed: Arc<Notify>,
+    }
+
+    #[async_trait]
+    impl UListener for ParkingListener {
+        async fn on_receive(&self, _msg: UMessage) {
+            self.started.notify_one();
+            self.proceed.notified().await;
         }
     }
 
@@ -330,7 +342,62 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dispatch_releases_read_lock_before_on_receive() {
+    async fn register_listener_is_idempotent() {
+        let socket =
+            std::env::temp_dir().join("uprotocol_unix_domain_socket_transport_idempotent.sock");
+        let _ = std::fs::remove_file(&socket);
+        const RESOURCE_ID: u16 = 0x8001;
+        let uri_provider = StaticUriProvider::new("my_own_car", 0x1010, 0x01).unwrap();
+        let topic = uri_provider.get_resource_uri(RESOURCE_ID);
+
+        let hits = Arc::new(AtomicUsize::new(0));
+        let done = Arc::new(Notify::new());
+        let listener = Arc::new(CountingListener {
+            hits: Arc::clone(&hits),
+            done: Arc::clone(&done),
+        });
+
+        let server = UnixDomainSocketTransport::bind(&socket).await.unwrap();
+        server
+            .register_listener(&topic, None, listener.clone())
+            .await
+            .unwrap();
+        server
+            .register_listener(&topic, None, listener.clone())
+            .await
+            .unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let client = UnixDomainSocketTransport::connect(&socket);
+        client
+            .send(UMessageBuilder::publish(topic.clone()).build().unwrap())
+            .await
+            .unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(2), done.notified())
+            .await
+            .expect("registered listener did not receive the publish");
+
+        // dispatch_to awaits each match in order, so a duplicate entry would
+        // already have incremented `hits` before this wait returns.
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+
+        server
+            .unregister_listener(&topic, None, listener)
+            .await
+            .unwrap();
+
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    // Was `dispatch_releases_read_lock_before_on_receive`: that test required
+    // register_listener from inside on_receive (write while dispatch held no lock).
+    // Dispatch now matches LocalTransport and keeps read() across on_receive, so
+    // that pattern deadlocks. This test instead shows the L1 trade-off we chose:
+    // unregister's write() does not return until the in-flight callback finishes.
+    #[tokio::test]
+    async fn unregister_waits_for_in_flight_on_receive() {
         let socket =
             std::env::temp_dir().join("uprotocol_unix_domain_socket_transport_lock_test.sock");
         let _ = std::fs::remove_file(&socket);
@@ -339,26 +406,21 @@ mod tests {
         let source_filter = uri_provider.get_resource_uri(RESOURCE_ID);
 
         let transport = Arc::new(UnixDomainSocketTransport::bind(&socket).await.unwrap());
-        let extra = {
-            let mut mock = MockUListener::new();
-            mock.expect_on_receive().times(0).return_const(());
-            Arc::new(mock)
-        };
-        let done = Arc::new(Notify::new());
-        let listener = Arc::new(RegisterDuringReceive {
-            transport: Arc::clone(&transport),
-            source_filter: source_filter.clone(),
-            extra,
-            done: Arc::clone(&done),
+        let started = Arc::new(Notify::new());
+        let proceed = Arc::new(Notify::new());
+        let listener = Arc::new(ParkingListener {
+            started: Arc::clone(&started),
+            proceed: Arc::clone(&proceed),
         });
 
         transport
-            .register_listener(&source_filter, None, listener)
+            .register_listener(&source_filter, None, listener.clone())
             .await
             .unwrap();
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
+        let waiting_to_start = started.notified();
         let client = UnixDomainSocketTransport::connect(&socket);
         client
             .send(
@@ -369,9 +431,31 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(std::time::Duration::from_secs(2), done.notified())
+        tokio::time::timeout(std::time::Duration::from_secs(2), waiting_to_start)
             .await
-            .expect("on_receive deadlocked: read lock still held across callback");
+            .expect("on_receive did not start");
+
+        let unregister = tokio::spawn({
+            let transport = Arc::clone(&transport);
+            let source_filter = source_filter.clone();
+            async move {
+                transport
+                    .unregister_listener(&source_filter, None, listener)
+                    .await
+            }
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(
+            !unregister.is_finished(),
+            "unregister must not return while dispatch still holds read() in on_receive"
+        );
+
+        proceed.notify_one();
+        unregister
+            .await
+            .expect("unregister task panicked")
+            .expect("unregister after on_receive must succeed");
 
         let _ = std::fs::remove_file(&socket);
     }
