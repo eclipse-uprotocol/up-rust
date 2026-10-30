@@ -30,11 +30,22 @@ on:
       - "build.rs"
       - "deny.toml"
   workflow_call:
+    inputs:
+      RUST_TOOLCHAIN:
+        type: string
+        description: 'The Rust toolchain to use for the workflow'
+        required: false
+        default: 'stable'
     outputs:
       test_results_url:
         description: "URL of the test results artifact"
         value: ${{ jobs.test.outputs.test_results_url }}
   workflow_dispatch:
+    inputs:
+      RUST_TOOLCHAIN:
+        description: 'The Rust toolchain to use for the workflow'
+        required: false
+        default: 'stable'
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -44,7 +55,7 @@ permissions:
   contents: read # needed for checking out the code
 
 env:
-  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ github.event.inputs.RUST_TOOLCHAIN || 'stable' }}
   RUSTFLAGS: -Dwarnings
   CARGO_TERM_COLOR: always
 
