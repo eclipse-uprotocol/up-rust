@@ -31,4 +31,4 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: eclipse-uprotocol/ci-cd/.github/workflows/github-actions-policy-checks.yaml@ad3f99eac0675c714f08c473412dae14d9fecaa8 # main
+    uses: eclipse-uprotocol/ci-cd/.github/workflows/github-actions-policy-checks.yaml@ad3f99eac0675c714f08c473412dae14d9fecaa8
