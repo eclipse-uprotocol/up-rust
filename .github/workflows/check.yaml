@@ -26,6 +26,7 @@ on:
       - "examples/**"
       - "src/**"
       - "tests/**"
+      - "tutorial/**"
       - "Cargo.*"
       - "build.rs"
       - "deny.toml"
@@ -74,6 +75,28 @@ jobs:
       - name: Run cargo check
         run: |
           cargo check --workspace --all-targets --all-features
+
+  tutorial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: "recursive"
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Build tutorial phases
+        run: |
+          cargo build --manifest-path tutorial/phases/01_raw_sockets/Cargo.toml
+          cargo build --manifest-path tutorial/phases/02_uprotocol_semantics/Cargo.toml
+          cargo build --manifest-path tutorial/phases/03_local_transport/Cargo.toml
+      - name: Test tutorial phases
+        run: |
+          cargo test --manifest-path tutorial/phases/01_raw_sockets/Cargo.toml -p up-frame-codec
+          cargo test --manifest-path tutorial/phases/02_uprotocol_semantics/Cargo.toml -p up-frame-codec
+          cargo test --manifest-path tutorial/phases/02_uprotocol_semantics/Cargo.toml -p up-unix-domain-socket-transport
+          cargo test --manifest-path tutorial/phases/03_local_transport/Cargo.toml -p up-bms-local-demo
 
   # [impl->req~up-language-ci-linter~1]
   fmt:

@@ -1,0 +1,10 @@
+[package]
+name = "up-telemetry-subscriber"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+up-frame-codec = { path = "../up-frame-codec" }
+tokio = { version = "1.52.3", features = ["macros", "net", "io-util", "rt-multi-thread"] }
+anyhow = "1.0"

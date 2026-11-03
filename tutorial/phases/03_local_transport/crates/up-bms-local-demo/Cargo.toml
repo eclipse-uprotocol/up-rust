@@ -1,0 +1,13 @@
+[package]
+name = "up-bms-local-demo"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+up-bms-proto = { path = "../up-bms-proto" }
+up-rust = { workspace = true, features = ["communication", "util", "protobuf-support"] }
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
+anyhow = "1.0"
+async-trait = "0.1"
+rand = "0.9"

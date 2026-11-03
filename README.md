@@ -13,14 +13,22 @@ The crate can be used to
 Covers:
 - req~up-language-documentation~
 -->
-The crate needs to be added to the `[dependencies]` section of the `Cargo.toml` file:
+The crate needs to be added to the `[dependencies]` section of the `Cargo.toml` file.
+The snippet below is an **example** of depending on a **published** release (crates.io). It is
+not the dependency used by this repository's tutorial.
 
 ```toml
 [dependencies]
 up-rust = { version = "0.9" }
 ```
 
+The tutorial does not use that pin: it path-depends on this checkout (`0.10.0-SNAPSHOT`).
+
 Most developers will want to use the Communication Level API and its default implementation which are provided by the `communication` module. Please refer to the [examples](./examples/) for inspiration how to use this crate.
+
+## Tutorial
+
+A three-phase walkthrough (raw Unix Domain Sockets, then L1/L2 on that wire, then `LocalTransport` in one process) lives in [`tutorial/`](./tutorial/). Open [tutorial/README.md](./tutorial/README.md) and **`cd tutorial`** before copying the `cargo` commands. The tutorial crates depend on this checkout via a path, so they move when the library API moves.
 
 ## Building from Source
 <!--
