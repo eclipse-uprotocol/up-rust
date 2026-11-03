@@ -168,14 +168,13 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Install cargo-hack
         env:
-          CARGO_HACK_VERSION: "v0.6.45"
+          # token needed for GitHub CLI to verify release and artifact attestations
           GH_TOKEN: ${{ github.token }}
         run: |
-          # See https://github.com/taiki-e/cargo-hack#from-prebuilt-binaries
           # Get host target.
           host=$(rustc -vV | grep '^host:' | cut -d' ' -f2)
           # Download binary.
-          curl --proto '=https' --tlsv1.2 -fsSL -o cargo-hack.tar.gz "https://github.com/taiki-e/cargo-hack/releases/download/${CARGO_HACK_VERSION}/cargo-hack-${host}.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL -o cargo-hack.tar.gz "https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-${host}.tar.gz"
           # Verify release attestations.
           gh release -R https://github.com/taiki-e/cargo-hack verify-asset cargo-hack.tar.gz
           # Verify artifact attestations.
