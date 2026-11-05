@@ -16,6 +16,7 @@ use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 
+use crate::UCode;
 use crate::{
     communication::{CallOptions, RpcClient},
     core::usubscription::{
@@ -89,7 +90,7 @@ impl USubscription for RpcClientUSubscription {
         expiration: Option<SystemTime>,
         sample_period: Option<Duration>,
     ) -> Result<SubscriptionStatus, UStatus> {
-        Ok(self
+        let payload = self
             .rpc_client
             .invoke_proto_method::<_, SubscribeResponse>(
                 usubscription_uri(
@@ -100,8 +101,16 @@ impl USubscription for RpcClientUSubscription {
                 // [impl->dsn~usubscription-unsubscribe-valid-topic-uuris~1]
                 SubscribeRequest::new(topic, expiration, sample_period)?,
             )
-            .await?
-            .status)
+            .await?;
+
+        if let Some(subscription_info) = payload {
+            Ok(subscription_info.status)
+        } else {
+            Err(UStatus::fail_with_code(
+                UCode::Internal,
+                "subscribe response is missing payload content",
+            ))
+        }
     }
 
     async fn unsubscribe(&self, topic: &UUri) -> Result<(), UStatus> {
@@ -126,7 +135,7 @@ impl USubscription for RpcClientUSubscription {
         topic_filter: Option<UUri>,
         subscriber_filter: Option<UUri>,
     ) -> Result<Vec<SubscriptionInfo>, UStatus> {
-        Ok(self
+        let payload = self
             .rpc_client
             .invoke_proto_method::<_, FetchSubscriptionsResponse>(
                 usubscription_uri(
@@ -139,8 +148,16 @@ impl USubscription for RpcClientUSubscription {
                     subscriber_filter,
                 },
             )
-            .await?
-            .subscriptions)
+            .await?;
+
+        if let Some(subscriptions) = payload {
+            Ok(subscriptions.subscriptions)
+        } else {
+            Err(UStatus::fail_with_code(
+                UCode::Internal,
+                "fetch_subscriptions response is missing payload content",
+            ))
+        }
     }
 
     async fn register_for_notifications(&self) -> Result<(), UStatus> {

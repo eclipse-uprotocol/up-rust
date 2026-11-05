@@ -188,18 +188,18 @@ impl dyn RpcClient {
     ///
     /// # Returns
     ///
-    /// The payload returned by the service operation as a protobuf `Message`.
+    /// The payload returned by the service operation as a protobuf `Message`, if present, otherwise None.
     ///
     /// # Errors
     ///
-    /// Returns an error if invocation fails, the given arguments cannot be turned into a valid RPC Request message,
-    /// result protobuf deserialization fails, or result payload is empty.
+    /// Returns an error if invocation fails, the given arguments cannot be turned into a valid RPC Request
+    /// message or if result payload protobuf deserialization fails.
     pub async fn invoke_proto_method<T: crate::ProtobufMappable, R: crate::ProtobufMappable>(
         &self,
         method: UUri,
         call_options: CallOptions,
         request_message: T,
-    ) -> Result<R, ServiceInvocationError> {
+    ) -> Result<Option<R>, ServiceInvocationError> {
         let payload = UPayload::try_from_protobuf(request_message)
             .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))?;
 
@@ -207,14 +207,12 @@ impl dyn RpcClient {
             .invoke_method(method, call_options, Some(payload))
             .await?;
 
-        if let Some(result) = result {
-            UPayload::extract_protobuf::<R>(&result)
-                .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))
-        } else {
-            Err(ServiceInvocationError::InvalidArgument(
-                "No payload".to_string(),
-            ))
-        }
+        result
+            .map(|result| {
+                UPayload::extract_protobuf::<R>(&result)
+                    .map_err(|e| ServiceInvocationError::InvalidArgument(e.to_string()))
+            })
+            .transpose()
     }
 }
 
