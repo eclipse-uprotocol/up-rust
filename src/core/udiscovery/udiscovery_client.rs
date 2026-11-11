@@ -106,28 +106,34 @@ impl UDiscovery for RpcClientUDiscovery {
             recursive,
             ..Default::default()
         };
-        self.rpc_client
+        let response = self
+            .rpc_client
             .invoke_proto_method::<_, FindServicesResponse>(
                 udiscovery_uri(RESOURCE_ID_FIND_SERVICES),
                 Self::default_call_options(),
                 request_message,
             )
             .await
-            .and_then(|response_message| {
-                let mut result = vec![];
-                if let Some(uri_batch) = response_message.uris.as_ref() {
-                    for uri in &uri_batch.uris {
-                        result.push(UUri::try_from(uri).map_err(|_| {
+            .map_err(UStatus::from)?;
+
+        let mut result = Vec::new();
+        if let Some(response_message) = response {
+            if let Some(uri_batch) = response_message.uris.as_ref() {
+                result = uri_batch
+                    .uris
+                    .iter()
+                    .map(|uri| {
+                        UUri::try_from(uri).map_err(|_| {
                             UStatus::fail_with_code(
                                 UCode::InvalidArgument,
                                 "Service returned invalid URI in FindServicesResponse",
                             )
-                        })?);
-                    }
-                }
-                Ok(result)
-            })
-            .map_err(UStatus::from)
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+            }
+        }
+        Ok(result)
     }
 
     async fn get_service_topics(
@@ -140,21 +146,23 @@ impl UDiscovery for RpcClientUDiscovery {
             recursive,
             ..Default::default()
         };
-        self.rpc_client
+        let response = self
+            .rpc_client
             .invoke_proto_method::<_, GetServiceTopicsResponse>(
                 udiscovery_uri(RESOURCE_ID_GET_SERVICE_TOPICS),
                 Self::default_call_options(),
                 request_message,
             )
             .await
-            .and_then(|response_message| {
-                let mut result = vec![];
-                for topic in response_message.topics {
-                    result.push(TopicInfo::try_from(&topic)?);
-                }
-                Ok(result)
-            })
-            .map_err(UStatus::from)
+            .map_err(UStatus::from)?;
+
+        let mut result = vec![];
+        if let Some(response_message) = response {
+            for topic in response_message.topics {
+                result.push(TopicInfo::try_from(&topic)?);
+            }
+        }
+        Ok(result)
     }
 }
 
