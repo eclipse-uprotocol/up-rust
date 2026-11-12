@@ -412,21 +412,19 @@ length-prefix framing then wraps that buffer for the Unix Domain Socket.
 ### How to run
 
 Both processes use a Unix Domain Socket at **`{current working directory}/tmp/uprotocol_twin.sock`**
-(defined in `up_frame_codec::socket_path`). Start them from the **same directory** (the repo root
-below) so they share that path. The subscriber creates `tmp/` if needed.
+(defined in `up_frame_codec::socket_path`). Start both processes from the **`tutorial/` directory**
+so they share that path. The subscriber creates `tmp/` if needed.
 
 ```shell
-# From the repo root
-
-# Make sure that we are the right place before we start
-cd tutorial 
-
+# Terminal 1 — from the repo root; start the subscriber first
+cd tutorial
 cargo build --manifest-path phases/01_raw_sockets/Cargo.toml
-
-# Terminal 1 — subscriber
 cargo run --manifest-path phases/01_raw_sockets/Cargo.toml -p up-telemetry-subscriber
+```
 
-# Terminal 2 — publisher
+```shell
+# Terminal 2 — from the repo root
+cd tutorial
 cargo run --manifest-path phases/01_raw_sockets/Cargo.toml -p up-battery-telemetry-publisher
 ```
 Expected output:

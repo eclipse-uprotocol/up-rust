@@ -708,14 +708,19 @@ the socket. Phase-2's subscriber says "only nudge me for resource 0x8001 from th
 
 ### Chapter 9: Build and run
 
+Start both processes from the **`tutorial/` directory** so they use the same socket path,
+`{current working directory}/tmp/uprotocol_twin.sock`.
+
 ```shell
-# From the repo root
+# Terminal 1 — from the repo root; start the subscriber first
+cd tutorial
 cargo build --manifest-path phases/02_uprotocol_semantics/Cargo.toml
-
-# Terminal 1 — subscriber (start this first)
 cargo run --manifest-path phases/02_uprotocol_semantics/Cargo.toml -p up-telemetry-subscriber
+```
 
-# Terminal 2 — publisher
+```shell
+# Terminal 2 — from the repo root
+cd tutorial
 cargo run --manifest-path phases/02_uprotocol_semantics/Cargo.toml -p up-battery-telemetry-publisher
 ```
 Start the subscriber first. That is the same operational convention as the README: the publisher
