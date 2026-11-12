@@ -31,11 +31,22 @@ on:
       - "build.rs"
       - "deny.toml"
   workflow_call:
+    inputs:
+      RUST_TOOLCHAIN:
+        type: string
+        description: 'The Rust toolchain to use for the workflow'
+        required: false
+        default: 'stable'
     outputs:
       test_results_url:
         description: "URL of the test results artifact"
         value: ${{ jobs.test.outputs.test_results_url }}
   workflow_dispatch:
+    inputs:
+      RUST_TOOLCHAIN:
+        description: 'The Rust toolchain to use for the workflow'
+        required: false
+        default: 'stable'
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -45,7 +56,7 @@ permissions:
   contents: read # needed for checking out the code
 
 env:
-  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ github.event.inputs.RUST_TOOLCHAIN || 'stable' }}
   RUSTFLAGS: -Dwarnings
   CARGO_TERM_COLOR: always
 
@@ -69,7 +80,7 @@ jobs:
         with:
           submodules: "recursive"
           persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Run cargo check
@@ -105,7 +116,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt
@@ -121,7 +132,7 @@ jobs:
         with:
           submodules: "recursive"
           persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: clippy
@@ -140,7 +151,7 @@ jobs:
         with:
           submodules: "recursive"
           persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Run rustdoc
@@ -175,19 +186,18 @@ jobs:
         with:
           submodules: "recursive"
           persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Install cargo-hack
         env:
-          CARGO_HACK_VERSION: "v0.6.45"
+          # token needed for GitHub CLI to verify release and artifact attestations
           GH_TOKEN: ${{ github.token }}
         run: |
-          # See https://github.com/taiki-e/cargo-hack#from-prebuilt-binaries
           # Get host target.
           host=$(rustc -vV | grep '^host:' | cut -d' ' -f2)
           # Download binary.
-          curl --proto '=https' --tlsv1.2 -fsSL -o cargo-hack.tar.gz "https://github.com/taiki-e/cargo-hack/releases/download/${CARGO_HACK_VERSION}/cargo-hack-${host}.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL -o cargo-hack.tar.gz "https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-${host}.tar.gz"
           # Verify release attestations.
           gh release -R https://github.com/taiki-e/cargo-hack verify-asset cargo-hack.tar.gz
           # Verify artifact attestations.
@@ -223,7 +233,7 @@ jobs:
         with:
           submodules: "recursive"
           persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
@@ -259,7 +269,7 @@ jobs:
         id: test_results
         # prevent execution when running the workflow locally with act
         if: matrix.feature-flags == '--all-features' && !env.ACT
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results
           # include all test result files
