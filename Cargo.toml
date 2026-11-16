@@ -35,7 +35,7 @@ resolver = "2"
 
 [features]
 default = []
-cloudevents = ["protobuf-support"]
+cloudevents = ["dep:protobuf-codegen", "dep:protoc-bin-vendored", "protobuf-support" ]
 communication = [
     "up-l2-notifier",
     "up-l2-publisher",
@@ -44,15 +44,15 @@ communication = [
     "up-l2-rpc-server",
 ]
 protobuf-support = ["dep:protobuf"]
-symphony = ["up-l2-rpc-server", "dep:serde", "dep:serde_json", "dep:symphony"]
+symphony = ["up-l2-rpc-server", "dep:serde", "dep:serde_json", "dep:symphony", "dep:tracing"]
 test-util = ["dep:mockall"]
-up-core-types = ["protobuf-support"]
+up-core-types = ["dep:protobuf-codegen", "dep:protoc-bin-vendored", "protobuf-support"]
 up-l2-api = []
 up-l2-notifier = ["up-l2-api"]
 up-l2-publisher = ["up-l2-api"]
-up-l2-subscriber = ["up-l2-api", "usubscription"]
-up-l2-rpc-client = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time"]
-up-l2-rpc-server = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time"]
+up-l2-subscriber = ["up-l2-api", "usubscription", "dep:tracing"]
+up-l2-rpc-client = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time", "dep:tracing"]
+up-l2-rpc-server = ["up-l2-api", "up-core-types", "tokio/sync", "tokio/time", "dep:tracing"]
 udiscovery = ["up-l2-rpc-client"]
 usubscription = ["up-l2-rpc-client"]
 util = ["tokio/sync"]
@@ -72,12 +72,12 @@ serde_json = { version = "1.0.150", optional = true }
 symphony = { version = "0.1.5", optional = true }
 thiserror = { version = "2.0.21" }
 tokio = { version = "1.54.1", default-features = false, optional = true }
-tracing = { version = "0.1.44", default-features = false, features = ["log", "std"] }
+tracing = { version = "0.1.44", default-features = false, features = ["log", "std"], optional = true }
 uuid-simd = { version = "0.8.0", default-features = false, features = ["std", "detect"] }
 
 [build-dependencies]
-protobuf-codegen = { version = "3.7.2" }
-protoc-bin-vendored = { version = "3.2" }
+protobuf-codegen = { version = "3.7.2", optional = true }
+protoc-bin-vendored = { version = "3.2", optional = true }
 
 [dev-dependencies]
 clap = { version = "4.6.7" }
