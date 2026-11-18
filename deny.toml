@@ -28,3 +28,8 @@ skip-tree = [
     { crate = "protobuf-codegen", reason = "this is only needed/used during the build process" },
     { crate = "windows-sys", reason = "a foundational crate for many that bumps far too frequently to ever have a shared version" },
 ]
+
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2026-0542", reason = "humantime is a transitive dependency of cucumber which is only used during build time." },
+]
