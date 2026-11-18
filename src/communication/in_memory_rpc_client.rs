@@ -439,7 +439,9 @@ mod tests {
 
         // THEN the response contains the expected payload
         let response = response_handle.await.unwrap();
-        assert!(response.is_ok_and(|payload| payload.value == *"Hello World"));
+        assert!(response.is_ok_and(
+            |payload| payload.expect("expecting payload content").value == *"Hello World"
+        ));
         assert!(!rpc_client.contains_pending_request(&message_id));
 
         // AND if the remote service sends its response message again
