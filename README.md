@@ -13,14 +13,18 @@ The crate can be used to
 Covers:
 - req~up-language-documentation~
 -->
-The crate needs to be added to the `[dependencies]` section of the `Cargo.toml` file:
 
 ```toml
 [dependencies]
 up-rust = { version = "0.9" }
 ```
 
+
 Most developers will want to use the Communication Level API and its default implementation which are provided by the `communication` module. Please refer to the [examples](./examples/) for inspiration how to use this crate.
+
+## Tutorial
+
+A three-phase walkthrough (raw Unix Domain Sockets, then L1/L2 on that wire, then `LocalTransport` in one process) lives in [`tutorial/`](./tutorial/). Please follow the instructions given in [tutorial/README.md](./tutorial/README.md) to run the corresponding example code.
 
 ## Building from Source
 <!--

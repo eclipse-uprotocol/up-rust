@@ -1,0 +1,9 @@
+[package]
+name = "up-frame-codec"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[dependencies]
+up-rust = { workspace = true, features = ["up-core-types"] }
+anyhow = "1.0"
