@@ -83,8 +83,6 @@ Phase 3 is **not** that arrangement.
 cd tutorial
 ```
 
-CI uses `--manifest-path tutorial/phases/<phase>/Cargo.toml` from the clone root. Those two path spellings are not interchangeable.
-
 **Phases 1–2 start order:** start every **subscriber first**, then the **publisher**. The publisher sends a short burst and exits; if no subscriber is listening yet, those messages are missed. That order is an operational convention, not something `dispatch_to` enforces — see the Point of interest in [`Tutorial-Phase-2.md`](./tutorial-text/Tutorial-Phase-2.md) Chapter 6.
 
 ### Phase 1 — Raw sockets
@@ -144,12 +142,4 @@ cargo test --manifest-path phases/03_local_transport/Cargo.toml -p up-bms-local-
 ### Declaration
 
 I indeed have taken some help from [Cursor](https://cursor.com) and [Ralph](https://ralphy-server.fly.dev/) for writing draft code, but
-the concept behind this tutorial, and the choice of the problem and solutions as well the final
-documentation/code-structure/code are entirely mine.
-
-## License
-
-This project is licensed under the [Apache License, Version 2.0](../LICENSE).
-
-The entire tutorial text and sample Rust code in `phases/` are covered by that license
-unless noted otherwise.
+the concept behind this tutorial, and the choice of the problem and solutions as well the final documentation/code-structure/code are entirely mine.

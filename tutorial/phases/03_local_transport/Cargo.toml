@@ -6,4 +6,4 @@ members = [
 ]
 
 [workspace.dependencies]
-up-rust = { path = "../../.." }  # 0.10.0-SNAPSHOT (this checkout), not crates.io
+up-rust = { path = "../../.." }
